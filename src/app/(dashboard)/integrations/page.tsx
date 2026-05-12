@@ -24,6 +24,7 @@ export default async function IntegrationsPage(props: {
     .where(eq(marketplaceIntegrations.companyId, auth.activeCompanyId))
 
   const ottoIntegration = integrations.find((i: any) => i.type === 'otto')
+  const customMiraklIntegrations = integrations.filter((i: any) => i.type === 'mirakl_custom')
 
   return (
     <div className="max-w-4xl">
@@ -193,7 +194,7 @@ export default async function IntegrationsPage(props: {
               <h3 className="text-lg font-bold text-gray-900">Decathlon (Mirakl)</h3>
               <p className="text-sm text-gray-500">API Anbindung für Decathlon Bestellungen</p>
             </div>
-            {integrations.find((i: any) => i.type === 'mirakl_decathlon')?.clientSecret ? (
+            {integrations.find((i: any) => i.type === 'mirakl_decathlon')?.clientId ? (
               <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
                 <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                 Verbunden
@@ -212,36 +213,6 @@ export default async function IntegrationsPage(props: {
               initialClientSecret={integrations.find((i: any) => i.type === 'mirakl_decathlon')?.clientSecret || ''} 
               initialEnvironment={integrations.find((i: any) => i.type === 'mirakl_decathlon')?.environment || ''}
               initialApiKey={integrations.find((i: any) => i.type === 'mirakl_decathlon')?.apiKey || ''}
-            />
-          </div>
-        </section>
-
-        {/* MIRAKL Hauptaccount Card */}
-        <section className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-bold text-gray-900">MIRAKL Hauptaccount</h3>
-              <p className="text-sm text-gray-500">API Anbindung für Mirakl Hauptaccount (z.B. Decathlon EU)</p>
-            </div>
-            {integrations.find((i: any) => i.type === 'mirakl_decathlon_eu')?.clientSecret ? (
-              <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
-                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                Verbunden
-              </span>
-            ) : (
-              <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
-                Nicht verbunden
-              </span>
-            )}
-          </div>
-          <div className="p-6 bg-gray-50">
-            <MiraklIntegrationForm 
-              key={`mirakl_decathlon_eu_${integrations.find((i: any) => i.type === 'mirakl_decathlon_eu')?.updatedAt?.getTime() || 'new'}`}
-              type="mirakl_decathlon_eu"
-              initialClientId={integrations.find((i: any) => i.type === 'mirakl_decathlon_eu')?.clientId || ''}
-              initialClientSecret={integrations.find((i: any) => i.type === 'mirakl_decathlon_eu')?.clientSecret || ''} 
-              initialEnvironment={integrations.find((i: any) => i.type === 'mirakl_decathlon_eu')?.environment || ''}
-              initialApiKey={integrations.find((i: any) => i.type === 'mirakl_decathlon_eu')?.apiKey || ''}
             />
           </div>
         </section>
@@ -298,6 +269,55 @@ export default async function IntegrationsPage(props: {
             <AboutYouIntegrationForm 
               initialApiKey={integrations.find((i: any) => i.type === 'aboutyou')?.apiKey || ''}
               initialEnvironment={integrations.find((i: any) => i.type === 'aboutyou')?.environment || 'production'}
+            />
+          </div>
+        </section>
+
+        {/* Existing Custom Mirakl Integrations */}
+        {customMiraklIntegrations.map((integration: any) => (
+          <section key={integration.id} className="bg-white rounded-xl shadow-sm border border-blue-200 overflow-hidden">
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-blue-50/50">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">{(integration.metadata as any)?.customName || 'Unbenannter Marktplatz'} (Mirakl)</h3>
+                <p className="text-sm text-gray-500">Eigene API Anbindung</p>
+              </div>
+              <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
+                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                Verbunden
+              </span>
+            </div>
+            <div className="p-6 bg-gray-50">
+              <MiraklIntegrationForm 
+                id={integration.id}
+                type="mirakl_custom"
+                initialCustomName={(integration.metadata as any)?.customName || ''}
+                initialClientId={integration.clientId || ''}
+                initialClientSecret={integration.clientSecret || ''} 
+                initialEnvironment={integration.environment || ''}
+                initialApiKey={integration.apiKey || ''}
+              />
+            </div>
+          </section>
+        ))}
+
+        {/* Add New Custom Mirakl Integration */}
+        <section className="bg-white rounded-xl shadow-sm border border-dashed border-gray-300 overflow-hidden hover:border-blue-400 transition-colors">
+          <div className="p-6 border-b border-gray-100 flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xl">
+              +
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Weiteren Mirakl Marktplatz hinzufügen</h3>
+              <p className="text-sm text-gray-500">Limango, Worten, B&Q und viele mehr anbinden</p>
+            </div>
+          </div>
+          <div className="p-6 bg-gray-50">
+            <MiraklIntegrationForm 
+              type="mirakl_custom"
+              initialClientId=""
+              initialClientSecret="" 
+              initialEnvironment=""
+              initialApiKey=""
             />
           </div>
         </section>

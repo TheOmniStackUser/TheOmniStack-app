@@ -104,14 +104,14 @@ export function createMarketplaceSyncWorker() {
           marketplace === 'mirakl_decathlon_eu' ||
           marketplace === 'mirakl_mediamarkt'
         ) {
-          if (!integration.clientId || !integration.clientSecret) {
-            throw new Error(`${marketplace} integration is missing Client ID or Client Secret`)
+          if (!integration.clientId) {
+            throw new Error(`${marketplace} integration is missing Client ID (or API Key)`)
           }
           adapter = new MiraklAdapter({
             instance: marketplace,
             baseUrl: integration.environment!,
             clientId: integration.clientId,
-            clientSecret: integration.clientSecret,
+            clientSecret: integration.clientSecret || '',
             apiKey: integration.apiKey || undefined
           })
           rawOrders = await adapter.fetchUnshippedOrders(companyId, {

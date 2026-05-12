@@ -4,7 +4,7 @@ const companyId = 'abe0132f-18e4-41a8-92f7-e65005cfa6aa'
 const userId = '00000000-0000-0000-0000-000000000000'
 
 async function trigger() {
-  const marketplaces = ['otto', 'aboutyou', 'mirakl_decathlon_eu']
+  const marketplaces = ['otto', 'aboutyou', 'mirakl_decathlon']
   
   for (const mp of marketplaces) {
     console.log(`Enqueuing sync for ${mp}...`)

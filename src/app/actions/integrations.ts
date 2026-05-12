@@ -127,8 +127,10 @@ export async function saveHermesIntegrationAction(
 }
 
 const MiraklIntegrationSchema = z.object({
-  type: z.enum(['mirakl_decathlon', 'mirakl_decathlon_eu', 'mirakl_mediamarkt']),
-  clientId: z.string().min(1, { message: 'API-Key ist erforderlich.' }).trim(),
+  id: z.string().uuid().optional().nullable(),
+  type: z.enum(['mirakl_decathlon', 'mirakl_decathlon_eu', 'mirakl_mediamarkt', 'mirakl_custom']),
+  customName: z.string().optional().nullable(),
+  clientId: z.string().min(1, { message: 'API-Key/Client ID ist erforderlich.' }).trim(),
   clientSecret: z.string().trim().nullable().optional(),
   environment: z.string().url({ message: 'Bitte gib eine gültige API URL an (inkl. https://).' }).trim(),
   apiKey: z.string().nullable().optional(),
@@ -141,7 +143,9 @@ export async function saveMiraklIntegrationAction(
   const auth = await requireAuth()
 
   const validated = MiraklIntegrationSchema.safeParse({
+    id: formData.get('id'),
     type: formData.get('type'),
+    customName: formData.get('customName'),
     clientId: formData.get('clientId'),
     clientSecret: formData.get('clientSecret') || undefined,
     environment: formData.get('environment'),
@@ -152,34 +156,54 @@ export async function saveMiraklIntegrationAction(
     return { errors: validated.error.flatten().fieldErrors }
   }
 
-  const { type, clientId, clientSecret, environment, apiKey } = validated.data
+  const { id, type, customName, clientId, clientSecret, environment, apiKey } = validated.data
 
-  const [existing] = await db
-    .select({ id: marketplaceIntegrations.id })
-    .from(marketplaceIntegrations)
-    .where(
-      and(
-        eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
-        eq(marketplaceIntegrations.type, type as 'mirakl_decathlon' | 'mirakl_decathlon_eu' | 'mirakl_mediamarkt')
+  let existing = null
+
+  if (id) {
+    const [found] = await db
+      .select({ id: marketplaceIntegrations.id })
+      .from(marketplaceIntegrations)
+      .where(
+        and(
+          eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
+          eq(marketplaceIntegrations.id, id)
+        )
       )
-    )
-    .limit(1)
+      .limit(1)
+    existing = found
+  } else if (type !== 'mirakl_custom') {
+    const [found] = await db
+      .select({ id: marketplaceIntegrations.id })
+      .from(marketplaceIntegrations)
+      .where(
+        and(
+          eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
+          eq(marketplaceIntegrations.type, type as any)
+        )
+      )
+      .limit(1)
+    existing = found
+  }
+
+  const metadata = type === 'mirakl_custom' ? { customName: customName || 'Unbenannter Marktplatz' } : null
 
   if (existing) {
     await db
       .update(marketplaceIntegrations)
-      .set({ clientId, clientSecret, environment, apiKey, updatedAt: new Date() })
+      .set({ clientId, clientSecret, environment, apiKey, metadata, updatedAt: new Date() })
       .where(eq(marketplaceIntegrations.id, existing.id))
   } else {
     await db
       .insert(marketplaceIntegrations)
       .values({
         companyId: auth.activeCompanyId,
-        type: type as 'mirakl_decathlon' | 'mirakl_decathlon_eu' | 'mirakl_mediamarkt',
+        type: type as any,
         clientId,
         clientSecret,
         environment,
         apiKey,
+        metadata,
       })
   }
 

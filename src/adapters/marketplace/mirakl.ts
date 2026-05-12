@@ -76,6 +76,7 @@ export class MiraklAdapter implements MarketplaceAdapter {
           : this.config.apiKey
         
         if (apiKey) {
+          headers['Authorization'] = apiKey
           headers['X-Mirakl-Api-Key'] = apiKey
         }
       }

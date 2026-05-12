@@ -6,17 +6,21 @@ import { saveMiraklIntegrationAction } from '@/app/actions/integrations'
 import { HelpCircle } from 'lucide-react'
 
 export function MiraklIntegrationForm({ 
+  id,
   type,
   initialClientId,
   initialClientSecret,
   initialEnvironment,
-  initialApiKey
+  initialApiKey,
+  initialCustomName,
 }: { 
-  type: 'mirakl_decathlon' | 'mirakl_decathlon_eu' | 'mirakl_mediamarkt'
+  id?: string
+  type: 'mirakl_decathlon' | 'mirakl_decathlon_eu' | 'mirakl_mediamarkt' | 'mirakl_custom'
   initialClientId: string 
   initialClientSecret: string
   initialEnvironment: string
   initialApiKey: string
+  initialCustomName?: string
 }) {
   const [state, formAction, pending] = useActionState(saveMiraklIntegrationAction, undefined)
   
@@ -32,9 +36,37 @@ export function MiraklIntegrationForm({
   return (
     <form action={formAction} className="space-y-6 max-w-xl">
       <input type="hidden" name="type" value={type} />
+      {id && <input type="hidden" name="id" value={id} />}
+
+      {type === 'mirakl_custom' && (
+        <div className="space-y-1">
+          <label htmlFor={`${type}-customName`} className="block text-sm font-semibold text-gray-700">Name des Marktplatzes</label>
+          <input
+            type="text"
+            id={`${type}-customName`}
+            name="customName"
+            defaultValue={initialCustomName || ''}
+            required
+            className="block w-full px-4 py-2.5 border border-gray-300 rounded-xl shadow-sm text-black focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all bg-white"
+            placeholder="z.B. Limango, Worten, B&Q..."
+          />
+        </div>
+      )}
       
       <div className="space-y-1">
-        <label htmlFor={`${type}-apiUrl`} className="block text-sm font-semibold text-gray-700">Mirakl API URL</label>
+        <div className="flex items-center gap-2">
+          <label htmlFor={`${type}-apiUrl`} className="block text-sm font-semibold text-gray-700">Mirakl API URL</label>
+          <div className="group relative">
+            <HelpCircle size={14} className="text-gray-400 cursor-help hover:text-blue-500 transition-colors" />
+            <div className="absolute left-6 top-0 w-64 p-3 bg-slate-900 text-white text-xs rounded-xl shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 transform -translate-y-1/4">
+              <p className="font-bold mb-1">Wo finde ich das?</p>
+              <p className="leading-relaxed text-slate-300">
+                Logge dich in dein Decathlon/Mirakl Backend ein und kopiere einfach den vorderen Teil der Adresse aus dem Browser (z.B. <strong>https://marketplace-decathlon-eu.mirakl.net</strong>).
+              </p>
+              <div className="absolute left-0 top-3 -translate-x-full border-8 border-transparent border-r-slate-900"></div>
+            </div>
+          </div>
+        </div>
         <input
           type="text"
           id={`${type}-apiUrl`}

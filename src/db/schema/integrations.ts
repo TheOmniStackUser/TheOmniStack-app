@@ -12,6 +12,7 @@ export const integrationTypeEnum = pgEnum('integration_type', [
   'dhl',
   'shopify',
   'aboutyou',
+  'mirakl_custom',
 ])
 
 // Secure credential storage per company for marketplaces
