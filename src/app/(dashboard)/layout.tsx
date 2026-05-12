@@ -1,5 +1,6 @@
 import { requireAuth } from '@/lib/session'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { logoutAction } from '@/app/actions/auth'
 import { SidebarNav } from './sidebar-nav'
 import { db } from '@/db/client'
