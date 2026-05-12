@@ -26,7 +26,7 @@ export function ManualImport() {
       if (result.error) {
         setNotification({ message: result.error, type: 'error' })
       } else {
-        setNotification({ message: result.message, type: 'success' })
+        setNotification({ message: result.message || 'Import abgeschlossen', type: 'success' })
         // Auto-close after 10 seconds if it's a success
         setTimeout(() => setNotification(null), 10000)
       }

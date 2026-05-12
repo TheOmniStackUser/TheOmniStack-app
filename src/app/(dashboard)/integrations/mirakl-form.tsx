@@ -24,10 +24,11 @@ export function MiraklIntegrationForm({
 }) {
   const [state, formAction, pending] = useActionState(saveMiraklIntegrationAction, undefined)
   
-  const defaultUrls = {
+  const defaultUrls: Record<string, string> = {
     mirakl_decathlon: 'https://marketplace-decathlon-eu.mirakl.net',
     mirakl_decathlon_eu: 'https://marketplace-decathlon-eu.mirakl.net',
-    mirakl_mediamarkt: 'https://mediamarkt-prod.mirakl.net'
+    mirakl_mediamarkt: 'https://mediamarkt-prod.mirakl.net',
+    mirakl_custom: ''
   }
   
   const defaultUrl = defaultUrls[type] || ''
