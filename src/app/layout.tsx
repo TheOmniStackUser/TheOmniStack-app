@@ -11,7 +11,11 @@ export const metadata: Metadata = {
   },
   description:
     'Das zentrale Betriebssystem für E-Commerce-Unternehmen. Marktplatz-Sync, GoBD-konforme Rechnungen und Versandlabels aus einer Hand.',
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'),
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL && process.env.NEXT_PUBLIC_APP_URL !== '' 
+      ? process.env.NEXT_PUBLIC_APP_URL 
+      : 'http://localhost:3000'
+  ),
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

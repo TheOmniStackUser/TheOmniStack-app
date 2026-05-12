@@ -24,10 +24,10 @@ export default async function DashboardLayout({
 
   const { headers } = await import('next/headers')
   const hdrs = await headers()
-  const pathname = hdrs.get('x-pathname') || ''
-
+  const pathname = (hdrs.get('x-pathname') || '').split('?')[0]
+  
   // Mandatory 2FA Check - Block everything except /settings
-  if (user && !user.twoFactorEnabled && pathname !== '/settings') {
+  if (user && !user.twoFactorEnabled && !pathname.startsWith('/settings')) {
     return (
       <div className="h-screen bg-slate-900 flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-10 text-center space-y-6">
@@ -39,12 +39,12 @@ export default async function DashboardLayout({
             Um dein Konto und unsere Daten zu schützen, ist die Zwei-Faktor-Authentifizierung (2FA) jetzt verpflichtend.
           </p>
           <div className="pt-4 space-y-3">
-            <Link 
+            <a 
               href="/settings" 
               className="block w-full py-3 px-4 rounded-xl bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-all shadow-lg"
             >
               Jetzt 2FA einrichten
-            </Link>
+            </a>
             <form action={logoutAction}>
               <button type="submit" className="w-full py-3 px-4 rounded-xl border border-slate-200 text-slate-600 font-semibold hover:bg-slate-50 transition-all">
                 Abmelden
