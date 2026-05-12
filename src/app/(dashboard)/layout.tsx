@@ -34,7 +34,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="h-screen bg-gray-50 flex overflow-hidden">
-      <SidebarNav user={user} />
+      <SidebarNav />
       <aside className="w-64 bg-slate-900 text-white flex flex-col flex-shrink-0 overflow-y-auto border-r border-slate-800">
         <div className="p-6">
           <Link href="/dashboard" className="block hover:opacity-80 transition-opacity">
