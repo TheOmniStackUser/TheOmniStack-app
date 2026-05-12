@@ -58,6 +58,9 @@ export default async function DashboardLayout({
 
   return (
     <div className="h-screen bg-gray-50 flex overflow-hidden">
+      <div className="fixed top-0 left-0 bg-red-500 text-white text-[10px] z-[9999] px-2">
+        DEBUG PATH: {pathname}
+      </div>
       {/* Sidebar */}
       <aside className="w-64 bg-slate-900 text-white flex flex-col flex-shrink-0 overflow-y-auto border-r border-slate-800">
         <div className="p-6">
