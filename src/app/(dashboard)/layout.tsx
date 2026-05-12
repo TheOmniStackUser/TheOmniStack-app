@@ -26,34 +26,9 @@ export default async function DashboardLayout({
   const hdrs = await headers()
   const pathname = (hdrs.get('x-pathname') || '').split('?')[0]
   
-  // Mandatory 2FA Check - Block everything except /settings
-  if (user && !user.twoFactorEnabled && !pathname.startsWith('/settings')) {
-    return (
-      <div className="h-screen bg-slate-900 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-10 text-center space-y-6">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-red-50 text-red-600 mb-2">
-            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
-          </div>
-          <h2 className="text-3xl font-bold text-slate-900">Sicherheit erforderlich</h2>
-          <p className="text-slate-600">
-            Um dein Konto und unsere Daten zu schützen, ist die Zwei-Faktor-Authentifizierung (2FA) jetzt verpflichtend.
-          </p>
-          <div className="pt-4 space-y-3">
-            <a 
-              href="/settings" 
-              className="block w-full py-3 px-4 rounded-xl bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-all shadow-lg"
-            >
-              Jetzt 2FA einrichten
-            </a>
-            <form action={logoutAction}>
-              <button type="submit" className="w-full py-3 px-4 rounded-xl border border-slate-200 text-slate-600 font-semibold hover:bg-slate-50 transition-all">
-                Abmelden
-              </button>
-            </form>
-          </div>
-        </div>
-      </div>
-    )
+  // Mandatory 2FA Check - Redirect to setup if not enabled
+  if (user && !user.twoFactorEnabled && !pathname.startsWith('/settings') && !pathname.startsWith('/setup-2fa')) {
+    redirect('/setup-2fa')
   }
 
   return (
