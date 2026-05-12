@@ -1,0 +1,111 @@
+'use client'
+
+import { useState } from 'react'
+import { triggerManualSyncAction } from '@/app/actions/sync'
+import { useRouter } from 'next/navigation'
+
+export function ManualImport() {
+  const router = useRouter()
+  const [isOpen, setIsOpen] = useState(true)
+  const [marketplace, setMarketplace] = useState('all')
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
+  const [isSyncing, setIsSyncing] = useState(false)
+
+  const handleSync = async () => {
+    setIsSyncing(true)
+    try {
+      const result = await triggerManualSyncAction({
+        marketplace,
+        fromDate: fromDate || undefined,
+        toDate: toDate || undefined
+      })
+
+      if (result.error) {
+        alert(result.error)
+      } else {
+        alert(result.message)
+      }
+    } catch (e) {
+      alert('Ein Fehler ist aufgetreten.')
+    } finally {
+      setIsSyncing(false)
+    }
+  }
+
+  if (!isOpen) {
+    return (
+      <button 
+        onClick={() => setIsOpen(true)}
+        className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1 mb-6"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+        </svg>
+        Manuellen Import nach Zeitraum starten
+      </button>
+    )
+  }
+
+  return (
+    <div className="mb-6 bg-white p-5 rounded-xl shadow-sm border border-blue-200">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-sm font-bold text-gray-900">Manueller Import</h3>
+        <button onClick={() => setIsOpen(false)} className="text-gray-400 hover:text-gray-600">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Marktplatz</label>
+          <select 
+            value={marketplace}
+            onChange={e => setMarketplace(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-900"
+          >
+            <option value="all">Alle Marktplätze</option>
+            <option value="otto">Otto</option>
+            <option value="aboutyou">About You</option>
+            <option value="shopify">Shopify</option>
+            <option value="mirakl_decathlon">Decathlon</option>
+            <option value="mirakl_decathlon_eu">MIRAKL Hauptaccount</option>
+          </select>
+        </div>
+        
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Von (Optional)</label>
+          <input 
+            type="date" 
+            value={fromDate}
+            onChange={e => setFromDate(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-900"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Bis (Optional)</label>
+          <input 
+            type="date" 
+            value={toDate}
+            onChange={e => setToDate(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-900"
+          />
+        </div>
+
+        <button
+          onClick={handleSync}
+          disabled={isSyncing}
+          className="w-full flex justify-center items-center gap-2 bg-blue-600 text-white hover:bg-blue-700 font-semibold py-2 px-4 rounded-md transition-colors disabled:opacity-50 text-sm"
+        >
+          {isSyncing ? 'Startet...' : 'Import starten'}
+        </button>
+      </div>
+      <p className="text-xs text-gray-500 mt-3">
+        Tipp: Wird für Mirakl als Versanddatum (start_date) und für Otto als Bestelldatum (fromOrderDate) interpretiert.
+      </p>
+    </div>
+  )
+}

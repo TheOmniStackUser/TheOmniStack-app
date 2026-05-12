@@ -1,0 +1,75 @@
+services:
+  # The Heart: PostgreSQL for multi-tenant data
+  db:
+    image: postgres:16-alpine
+    container_name: easybill_db
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: billing_app
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  # The Worker Engine: Redis for background marketplace imports
+  redis:
+    image: redis:7-alpine
+    container_name: easybill_redis
+    ports:
+      - "6379:6379"
+
+  # S3 Simulator: For GoBD-compliant document testing
+  minio:
+    image: minio/minio
+    container_name: easybill_storage
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: password123
+    command: server /data --console-address ":9001"
+
+  # S3 Initializer: Automatically create buckets on startup
+  init-s3:
+    image: minio/mc
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until (/usr/bin/mc config host add myminio http://minio:9000 admin password123) do echo '...waiting...' && sleep 1; done;
+      /usr/bin/mc mb --ignore-existing myminio/omnistack-documents;
+      exit 0;
+      "
+
+  # Next.js Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: easybill_app
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env.local
+    depends_on:
+      - db
+      - redis
+      - minio
+
+  # Background Worker (processes the marketplace sync queue)
+  worker:
+    image: node:20-alpine
+    container_name: easybill_worker
+    working_dir: /app
+    volumes:
+      - ./:/app
+    command: npm run worker
+    depends_on:
+      - db
+      - redis
+      
+volumes:
+  db_data:
