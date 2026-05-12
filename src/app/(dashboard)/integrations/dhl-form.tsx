@@ -400,9 +400,9 @@ export function DhlIntegrationForm({ initialConfig }: { initialConfig?: DhlConfi
                 value={accountNumber}
                 onChange={e => setAccountNumber(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent text-gray-900 placeholder-gray-400"
-                placeholder="z.B. 3384421567 (10 Stellen)"
+                placeholder="z.B. 3384421567"
               />
-              <p className="mt-1 text-xs text-gray-400">Deine 10-stellige DHL Kundennummer</p>
+              <p className="mt-1 text-xs text-gray-400">Deine DHL Kundennummer</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Umgebung</label>

@@ -1,6 +1,8 @@
 import { createMarketplaceSyncWorker } from './marketplace-sync'
 
 console.log('🚀 Starting Marketplace Sync Worker...')
+const dbUrl = process.env.DATABASE_URL || 'NOT SET'
+console.log(`📡 Database: ${dbUrl.split('@')[1] || 'Local/Fallback'}`)
 const worker = createMarketplaceSyncWorker()
 
 worker.on('completed', (job) => {

@@ -3,6 +3,8 @@
 import { useActionState } from 'react'
 import { saveOttoIntegrationAction } from '@/app/actions/integrations'
 
+import { HelpCircle } from 'lucide-react'
+
 export function OttoIntegrationForm({ 
   initialClientId, 
   initialEnvironment = 'production',
@@ -15,21 +17,33 @@ export function OttoIntegrationForm({
   const [state, action, pending] = useActionState(saveOttoIntegrationAction, undefined)
 
   return (
-    <form action={action} className="space-y-4 max-w-xl">
+    <form action={action} className="space-y-6 max-w-xl">
       {state?.success && (
-        <div className="p-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded-md">
+        <div className="p-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded-md animate-in fade-in slide-in-from-top-1">
           {state.message}
         </div>
       )}
 
       {state?.errors && !state.success && (
-        <div className="p-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md">
+        <div className="p-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md animate-in fade-in slide-in-from-top-1">
           Bitte überprüfe deine Eingaben.
         </div>
       )}
 
-      <div>
-        <label htmlFor="clientId" className="block text-sm font-medium text-gray-700">Client ID (API User)</label>
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          <label htmlFor="clientId" className="block text-sm font-semibold text-gray-700">Client ID (API User)</label>
+          <div className="group relative">
+            <HelpCircle size={14} className="text-gray-400 cursor-help hover:text-blue-500 transition-colors" />
+            <div className="absolute left-6 top-0 w-64 p-3 bg-slate-900 text-white text-xs rounded-xl shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 transform -translate-y-1/4">
+              <p className="font-bold mb-1">Wo finde ich das?</p>
+              <p className="leading-relaxed text-slate-300">
+                Logge dich im <strong>Otto Partner Connect</strong> ein. Gehe zu <strong>Konfiguration &gt; API-Zugriff</strong>. Dort kannst du einen neuen API-Benutzer erstellen oder einen bestehenden einsehen.
+              </p>
+              <div className="absolute left-0 top-3 -translate-x-full border-8 border-transparent border-r-slate-900"></div>
+            </div>
+          </div>
+        </div>
         <input
           id="clientId"
           name="clientId"
@@ -37,24 +51,36 @@ export function OttoIntegrationForm({
           defaultValue={initialClientId}
           required
           placeholder="z.B. user_abc123"
-          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-black focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+          className="block w-full px-4 py-2.5 border border-gray-300 rounded-xl shadow-sm text-black focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all bg-white"
         />
         {state?.errors?.clientId && <p className="mt-1 text-sm text-red-600">{state.errors.clientId}</p>}
       </div>
 
-      <div>
-        <label htmlFor="clientSecret" className="block text-sm font-medium text-gray-700">Client Secret (Passwort)</label>
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          <label htmlFor="clientSecret" className="block text-sm font-semibold text-gray-700">Client Secret (Passwort)</label>
+          <div className="group relative">
+            <HelpCircle size={14} className="text-gray-400 cursor-help hover:text-blue-500 transition-colors" />
+            <div className="absolute left-6 top-0 w-64 p-3 bg-slate-900 text-white text-xs rounded-xl shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 transform -translate-y-1/4">
+              <p className="font-bold mb-1">Wichtig beim Secret</p>
+              <p className="leading-relaxed text-slate-300">
+                Das Client Secret wird nur einmalig bei der Erstellung des API-Benutzers im Otto Portal angezeigt. Falls du es verloren hast, musst du im Portal ein neues Secret generieren.
+              </p>
+              <div className="absolute left-0 top-3 -translate-x-full border-8 border-transparent border-r-slate-900"></div>
+            </div>
+          </div>
+        </div>
         <input
           id="clientSecret"
           name="clientSecret"
           type="password"
           required={!initialClientId}
           placeholder={initialClientId ? '••••••••••••••••' : 'Dein Otto.de API Passwort'}
-          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-black focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+          className="block w-full px-4 py-2.5 border border-gray-300 rounded-xl shadow-sm text-black focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all bg-white"
         />
         {state?.errors?.clientSecret && <p className="mt-1 text-sm text-red-600">{state.errors.clientSecret}</p>}
-        <p className="mt-2 text-xs text-gray-500">
-          Dein Client Secret wird sicher gespeichert und kann nach dem Speichern nicht mehr im Klartext angezeigt werden.
+        <p className="text-[11px] text-gray-500 italic mt-1 px-1">
+          Dein Client Secret wird sicher verschlüsselt gespeichert.
         </p>
       </div>
 

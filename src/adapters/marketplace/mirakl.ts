@@ -32,29 +32,23 @@ export class MiraklAdapter implements MarketplaceAdapter {
     }
 
     try {
-      console.log(`[MiraklAdapter:${this.marketplace}] Requesting OAuth2 token from auth.mirakl.net...`)
-      
       const params = new URLSearchParams()
       params.append('grant_type', 'client_credentials')
       params.append('client_id', this.config.clientId)
       params.append('client_secret', this.config.clientSecret)
-      
-      // The 'apiKey' field in our DB stores the 'audience' (Company ID) for Mirakl
-      if (this.config.apiKey) {
-        params.append('audience', this.config.apiKey)
-      }
-      
+      params.append('audience', 'mirakl-connect')
+
       const response = await fetch('https://auth.mirakl.net/oauth/token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
         },
-        body: params
+        body: params.toString()
       })
 
       if (!response.ok) {
         const errText = await response.text()
-        console.warn(`[MiraklAdapter:${this.marketplace}] OAuth2 failed (${response.status}): ${errText}. Falling back to API Key.`)
+        console.error(`[MiraklAdapter:${this.marketplace}] OAuth2 failed (${response.status}): ${errText}`)
         return null
       }
 
@@ -77,14 +71,39 @@ export class MiraklAdapter implements MarketplaceAdapter {
         headers['Authorization'] = `Bearer ${token}`
       } else {
         // Fallback to API Key
-        headers['Authorization'] = this.config.clientId
-        headers['X-Mirakl-Api-Key'] = this.config.clientId
+        const apiKey = this.config.clientSecret === '' || !this.config.clientSecret 
+          ? this.config.clientId 
+          : this.config.apiKey
+        
+        if (apiKey) {
+          headers['X-Mirakl-Api-Key'] = apiKey
+        }
       }
 
-      console.log(`[MiraklAdapter:${this.marketplace}] Fetching unshipped orders from ${this.config.baseUrl}...`)
-      console.log(`[MiraklAdapter:${this.marketplace}] Headers: ${JSON.stringify({ ...headers, 'Authorization': 'REDACTED', 'X-Mirakl-Api-Key': 'REDACTED' })}`)
+      const now = new Date().toISOString()
+      console.log(`[${now}] [MiraklAdapter:${this.marketplace}] Fetching unshipped orders from ${this.config.baseUrl}...`)
+      console.log(`[${now}] [MiraklAdapter:${this.marketplace}] Headers: ${JSON.stringify({ ...headers, 'Authorization': 'REDACTED', 'X-Mirakl-Api-Key': 'REDACTED' })}`)
+
+      let url = ''
+      const baseUrl = this.config.baseUrl.replace(/\/$/, '')
       
-      let url = `${this.config.baseUrl}/api/orders?order_state_codes=SHIPPING,WAITING_ACCEPTANCE&max=100`
+      if (baseUrl.includes('miraklconnect.com')) {
+        // Mirakl Connect API
+        // If the URL already ends with /api/v1, we just add /orders
+        if (baseUrl.endsWith('/v1')) {
+          url = `${baseUrl}/orders?order_state_codes=SHIPPING,WAITING_ACCEPTANCE&max=100`
+        } else {
+          url = `${baseUrl}/api/v1/orders?order_state_codes=SHIPPING,WAITING_ACCEPTANCE&max=100`
+        }
+      } else {
+        // Standard Mirakl Instance API
+        if (baseUrl.endsWith('/api')) {
+          url = `${baseUrl}/orders?order_state_codes=SHIPPING,WAITING_ACCEPTANCE&max=100`
+        } else {
+          url = `${baseUrl}/api/orders?order_state_codes=SHIPPING,WAITING_ACCEPTANCE&max=100`
+        }
+      }
+      
       if (options?.fromDate) url += `&start_date=${options.fromDate}T00:00:00Z`
       if (options?.toDate) url += `&end_date=${options.toDate}T23:59:59Z`
 
@@ -93,12 +112,20 @@ export class MiraklAdapter implements MarketplaceAdapter {
         headers
       })
 
+      const bodyText = await response.text()
+      console.log(`[MiraklAdapter:${this.marketplace}] Response start: ${bodyText.substring(0, 50).replace(/\n/g, ' ')}`)
+      
       if (!response.ok) {
-        const errText = await response.text()
-        throw new Error(`Mirakl API Error ${response.status}: ${errText}`)
+        console.error(`[MiraklAdapter:${this.marketplace}] API Error ${response.status}: ${bodyText.substring(0, 500)}`)
+        throw new Error(`Mirakl API Error ${response.status}: ${bodyText.substring(0, 100)}`)
       }
 
-      const data = await response.json()
+      if (bodyText.trim().startsWith('<!DOCTYPE') || bodyText.trim().startsWith('<html')) {
+        console.error(`[MiraklAdapter:${this.marketplace}] API returned HTML instead of JSON: ${bodyText.substring(0, 500)}`)
+        throw new Error(`Mirakl API returned HTML instead of JSON (likely a redirect or 404)`)
+      }
+
+      const data = JSON.parse(bodyText)
       const rawOrders = data.orders || []
       
       console.log(`[MiraklAdapter:${this.marketplace}] Fetched ${rawOrders.length} raw orders.`)

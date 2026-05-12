@@ -129,9 +129,9 @@ export async function saveHermesIntegrationAction(
 const MiraklIntegrationSchema = z.object({
   type: z.enum(['mirakl_decathlon', 'mirakl_decathlon_eu', 'mirakl_mediamarkt']),
   clientId: z.string().min(1, { message: 'API-Key ist erforderlich.' }).trim(),
-  clientSecret: z.string().min(1, { message: 'API-Key (Secret) ist erforderlich.' }).trim(),
+  clientSecret: z.string().trim().nullable().optional(),
   environment: z.string().url({ message: 'Bitte gib eine gültige API URL an (inkl. https://).' }).trim(),
-  apiKey: z.string().optional(),
+  apiKey: z.string().nullable().optional(),
 })
 
 export async function saveMiraklIntegrationAction(
@@ -143,9 +143,9 @@ export async function saveMiraklIntegrationAction(
   const validated = MiraklIntegrationSchema.safeParse({
     type: formData.get('type'),
     clientId: formData.get('clientId'),
-    clientSecret: formData.get('clientSecret'),
+    clientSecret: formData.get('clientSecret') || undefined,
     environment: formData.get('environment'),
-    apiKey: formData.get('apiKey'),
+    apiKey: formData.get('apiKey') || undefined,
   })
 
   if (!validated.success) {

@@ -147,5 +147,5 @@ export async function triggerManualSyncAction(data: { marketplace: string, fromD
   }
 
   revalidatePath('/orders')
-  return { success: true, message: `Der manuelle Import wurde abgeschlossen!\n\nEs wurden ${totalChecked} Bestellungen im Zeitraum gefunden, davon wurden ${totalAffected} neu hinzugefügt oder wiederhergestellt.` }
+  return { success: true, message: `Der manuelle Import wurde abgeschlossen! Es wurden ${totalChecked} Bestellungen im Zeitraum gefunden, davon wurden ${totalAffected} neu hinzugefügt oder wiederhergestellt.` }
 }

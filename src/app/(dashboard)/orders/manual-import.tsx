@@ -11,9 +11,11 @@ export function ManualImport() {
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [isSyncing, setIsSyncing] = useState(false)
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
 
   const handleSync = async () => {
     setIsSyncing(true)
+    setNotification(null)
     try {
       const result = await triggerManualSyncAction({
         marketplace,
@@ -22,12 +24,14 @@ export function ManualImport() {
       })
 
       if (result.error) {
-        alert(result.error)
+        setNotification({ message: result.error, type: 'error' })
       } else {
-        alert(result.message)
+        setNotification({ message: result.message, type: 'success' })
+        // Auto-close after 10 seconds if it's a success
+        setTimeout(() => setNotification(null), 10000)
       }
     } catch (e) {
-      alert('Ein Fehler ist aufgetreten.')
+      setNotification({ message: 'Ein unerwarteter Fehler ist aufgetreten.', type: 'error' })
     } finally {
       setIsSyncing(false)
     }
@@ -106,6 +110,38 @@ export function ManualImport() {
       <p className="text-xs text-gray-500 mt-3">
         Tipp: Wird für Mirakl als Versanddatum (start_date) und für Otto als Bestelldatum (fromOrderDate) interpretiert.
       </p>
+
+      {/* Modern Notification UI */}
+      {notification && (
+        <div className={`mt-4 p-4 rounded-lg flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300 ${
+          notification.type === 'success' 
+            ? 'bg-emerald-50 border border-emerald-200 text-emerald-800' 
+            : 'bg-red-50 border border-red-200 text-red-800'
+        }`}>
+          {notification.type === 'success' ? (
+            <svg className="w-5 h-5 text-emerald-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          ) : (
+            <svg className="w-5 h-5 text-red-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          )}
+          <div className="flex-1">
+            <p className="text-sm font-medium whitespace-pre-line">
+              {notification.message}
+            </p>
+          </div>
+          <button 
+            onClick={() => setNotification(null)}
+            className="shrink-0 text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
     </div>
   )
 }

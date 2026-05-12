@@ -206,6 +206,7 @@ export default async function IntegrationsPage(props: {
           </div>
           <div className="p-6 bg-gray-50">
             <MiraklIntegrationForm 
+              key={`mirakl_decathlon_${integrations.find((i: any) => i.type === 'mirakl_decathlon')?.updatedAt?.getTime() || 'new'}`}
               type="mirakl_decathlon"
               initialClientId={integrations.find((i: any) => i.type === 'mirakl_decathlon')?.clientId || ''}
               initialClientSecret={integrations.find((i: any) => i.type === 'mirakl_decathlon')?.clientSecret || ''} 
@@ -235,6 +236,7 @@ export default async function IntegrationsPage(props: {
           </div>
           <div className="p-6 bg-gray-50">
             <MiraklIntegrationForm 
+              key={`mirakl_decathlon_eu_${integrations.find((i: any) => i.type === 'mirakl_decathlon_eu')?.updatedAt?.getTime() || 'new'}`}
               type="mirakl_decathlon_eu"
               initialClientId={integrations.find((i: any) => i.type === 'mirakl_decathlon_eu')?.clientId || ''}
               initialClientSecret={integrations.find((i: any) => i.type === 'mirakl_decathlon_eu')?.clientSecret || ''} 
