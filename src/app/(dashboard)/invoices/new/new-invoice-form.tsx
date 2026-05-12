@@ -24,6 +24,7 @@ export function NewInvoiceForm() {
   const [defaults, setDefaults] = useState({ de: '', en: '' })
   const [hasVatId, setHasVatId] = useState(false)
   const [internalNote, setInternalNote] = useState('')
+  const [notification, setNotification] = useState<{ message: string, type: 'success' | 'error' | 'info' } | null>(null)
   const searchParams = useSearchParams()
   const editId = searchParams.get('edit')
 
@@ -184,9 +185,10 @@ export function NewInvoiceForm() {
       })
       setCustomText(invoice.customText || '')
       setShowDraftsList(false)
-      alert('Entwurf geladen!')
+      setNotification({ message: 'Entwurf geladen!', type: 'success' })
+      setTimeout(() => setNotification(null), 5000)
     } catch (error) {
-      alert('Fehler beim Laden des Entwurfs')
+      setNotification({ message: 'Fehler beim Laden des Entwurfs', type: 'error' })
     }
   }
 
@@ -196,8 +198,10 @@ export function NewInvoiceForm() {
     try {
       await deleteDraftAction(draftId)
       await loadDraftsList()
+      setNotification({ message: 'Entwurf gelöscht', type: 'success' })
+      setTimeout(() => setNotification(null), 3000)
     } catch (error) {
-      alert('Fehler beim Löschen des Entwurfs')
+      setNotification({ message: 'Fehler beim Löschen des Entwurfs', type: 'error' })
     }
   }
 
@@ -208,9 +212,10 @@ export function NewInvoiceForm() {
     try {
       const newTemplate = await saveInvoiceTemplateAction(name, customText)
       setTemplates([...templates, newTemplate])
-      alert('Vorlage gespeichert!')
+      setNotification({ message: 'Vorlage gespeichert!', type: 'success' })
+      setTimeout(() => setNotification(null), 5000)
     } catch (error) {
-      alert('Fehler beim Speichern der Vorlage')
+      setNotification({ message: 'Fehler beim Speichern der Vorlage', type: 'error' })
     }
   }
   const handleSearchCustomers = async (q: string) => {
@@ -313,7 +318,7 @@ export function NewInvoiceForm() {
 
     // Validation
     if (!customer.name.trim()) {
-      alert('Bitte geben Sie einen Kundennamen ein.')
+      setNotification({ message: 'Bitte geben Sie einen Kundennamen ein.', type: 'error' })
       if (status === 'issued') setIsSubmitting(false)
       else setIsSavingDraft(false)
       return
@@ -321,7 +326,7 @@ export function NewInvoiceForm() {
 
     const validItems = items.filter(item => item.title.trim() !== '')
     if (validItems.length === 0) {
-      alert('Bitte mindestens eine Position mit Titel eingeben.')
+      setNotification({ message: 'Bitte mindestens eine Position mit Titel eingeben.', type: 'error' })
       if (status === 'issued') setIsSubmitting(false)
       else setIsSavingDraft(false)
       return
@@ -330,7 +335,7 @@ export function NewInvoiceForm() {
     try {
       if (editId) {
         if (!internalNote.trim()) {
-          alert('Bitte gib einen internen Vermerk für die Bearbeitung an.')
+          setNotification({ message: 'Bitte gib einen internen Vermerk für die Bearbeitung an.', type: 'error' })
           setIsSubmitting(false)
           setIsSavingDraft(false)
           return
@@ -362,14 +367,16 @@ export function NewInvoiceForm() {
         })
         
         if (result?.error) {
-          alert(`Fehler: ${result.error}`)
+          setNotification({ message: `Fehler: ${result.error}`, type: 'error' })
           setIsSubmitting(false)
           setIsSavingDraft(false)
           return
         }
 
-        alert('Rechnung wurde erfolgreich aktualisiert!')
-        location.href = '/invoices'
+        setNotification({ message: 'Rechnung wurde erfolgreich aktualisiert!', type: 'success' })
+        setTimeout(() => {
+          location.href = '/invoices'
+        }, 1500)
         return
       }
 
@@ -401,13 +408,14 @@ export function NewInvoiceForm() {
       })
 
       if (result?.error) {
-        alert(`Fehler: ${result.error}`)
+        setNotification({ message: `Fehler: ${result.error}`, type: 'error' })
       } else {
         if (status === 'draft') {
           if (result.draftId) {
             setCurrentDraftId(result.draftId)
           }
-          alert('Entwurf gespeichert!')
+          setNotification({ message: 'Entwurf gespeichert!', type: 'success' })
+          setTimeout(() => setNotification(null), 5000)
           await loadDraftsList()
         }
       }
@@ -417,7 +425,10 @@ export function NewInvoiceForm() {
       if (error.message === 'NEXT_REDIRECT' || error.digest?.includes('NEXT_REDIRECT')) {
         return
       }
-      alert(status === 'issued' ? 'Fehler beim Erstellen der Rechnung' : 'Fehler beim Speichern des Entwurfs')
+      setNotification({ 
+        message: status === 'issued' ? 'Fehler beim Erstellen der Rechnung' : 'Fehler beim Speichern des Entwurfs', 
+        type: 'error' 
+      })
       setIsSubmitting(false)
       setIsSavingDraft(false)
     }
@@ -456,7 +467,7 @@ export function NewInvoiceForm() {
       }
     } catch (error) {
       console.error(error)
-      alert('Fehler beim Generieren der Vorschau')
+      setNotification({ message: 'Fehler beim Generieren der Vorschau', type: 'error' })
     } finally {
       setIsPreviewing(false)
     }
@@ -492,6 +503,33 @@ export function NewInvoiceForm() {
 
   return (
     <>
+    {/* Modern Notification Toast */}
+    {notification && (
+      <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[200] animate-in fade-in slide-in-from-top-4 duration-300">
+        <div className={`px-6 py-4 rounded-2xl shadow-2xl border flex items-center gap-4 min-w-[320px] ${
+          notification.type === 'success' ? 'bg-white border-green-100 text-green-800' : 
+          notification.type === 'error' ? 'bg-white border-red-100 text-red-800' : 
+          'bg-white border-blue-100 text-blue-800'
+        }`}>
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+            notification.type === 'success' ? 'bg-green-50 text-green-600' : 
+            notification.type === 'error' ? 'bg-red-50 text-red-600' : 
+            'bg-blue-50 text-blue-600'
+          }`}>
+            {notification.type === 'success' && <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>}
+            {notification.type === 'error' && <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>}
+            {notification.type === 'info' && <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+          </div>
+          <div className="flex-1">
+            <p className="font-bold text-sm leading-tight">{notification.message}</p>
+          </div>
+          <button onClick={() => setNotification(null)} className="p-1 hover:bg-slate-50 rounded-lg transition-colors text-slate-400">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+      </div>
+    )}
+
     <form onSubmit={handleSubmit} className="max-w-5xl mx-auto space-y-8 pb-32">
       {/* Top Header with Draft Loading */}
       <div className="flex justify-between items-center bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
