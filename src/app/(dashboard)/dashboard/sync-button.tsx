@@ -1,3 +1,5 @@
+'use client'
+
 import { useTransition, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { triggerSyncAction } from '@/app/actions/sync'
