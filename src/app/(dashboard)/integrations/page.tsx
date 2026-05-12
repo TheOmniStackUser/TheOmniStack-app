@@ -51,276 +51,294 @@ export default async function IntegrationsPage(props: {
         </div>
       )}
 
-      <div className="space-y-8">
-        {/* Otto.de Card */}
-        <section className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-bold text-gray-900">Otto.de Partner Connect</h3>
-              <p className="text-sm text-gray-500">API Anbindung für Bestellimport & Rechnungs-Upload</p>
-            </div>
-            {ottoIntegration?.clientId ? (
-              <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
-                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                Verbunden
-              </span>
-            ) : (
-              <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
-                Nicht verbunden
-              </span>
-            )}
-          </div>
-          <div className="p-6 bg-gray-50">
-            <OttoIntegrationForm 
-              initialClientId={ottoIntegration?.clientId || ''} 
-              initialEnvironment={ottoIntegration?.environment || 'production'}
-              initialReturnAddressCarrierId={(ottoIntegration?.metadata as any)?.returnAddressCarrierId || ''}
-            />
-          </div>
-        </section>
-
-        {/* Amazon Card */}
-        <section className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-bold text-gray-900">Amazon EU</h3>
-              <p className="text-sm text-gray-500">SP-API Anbindung für Bestellimport & Bestandsabgleich</p>
-            </div>
-            {integrations.find((i: any) => i.type === 'amazon')?.refreshToken ? (
-              <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
-                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                Verbunden
-              </span>
-            ) : (
-              <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
-                Nicht verbunden
-              </span>
-            )}
-          </div>
-          <div className="p-6 bg-gray-50">
-            <AmazonIntegrationForm 
-              initialSellerId={integrations.find((i: any) => i.type === 'amazon')?.sellerId || ''}
-              initialClientId={integrations.find((i: any) => i.type === 'amazon')?.clientId || ''}
-              initialClientSecret={integrations.find((i: any) => i.type === 'amazon')?.clientSecret || ''}
-              initialRefreshToken={integrations.find((i: any) => i.type === 'amazon')?.refreshToken || ''}
-            />
-          </div>
-        </section>
-
-        {/* Hermes Card */}
-        <section className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-bold text-gray-900">Hermes Versand</h3>
-              <p className="text-sm text-gray-500">Offizielle Anbindung über die Hermes Login-Seite</p>
-            </div>
-            {integrations.find((i: any) => i.type === 'hermes')?.accessToken ? (
-              <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
-                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                Aktiv
-              </span>
-            ) : (
-              <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
-                Nicht konfiguriert
-              </span>
-            )}
-          </div>
-          <div className="p-8 bg-gray-50 flex flex-col items-center justify-center text-center">
-            {integrations.find((i: any) => i.type === 'hermes')?.accessToken ? (
-              <div className="space-y-4">
-                <p className="text-sm text-gray-600 max-w-md">
-                  TheOmniStack ist erfolgreich mit deinem Hermes-Konto verknüpft. Du kannst jetzt Versandlabels direkt aus den Bestellungen erstellen.
-                </p>
-                <a 
-                  href="/api/shipping/hermes/auth"
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none"
-                >
-                  Verbindung aktualisieren
-                </a>
+      <div className="space-y-12">
+        {/* SECTION: MARKETPLACES */}
+        <div>
+          <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+            <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
+            Marktplätze & Shopsysteme
+          </h3>
+          <div className="space-y-8">
+            {/* Otto.de Card */}
+            <section className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Otto.de Partner Connect</h3>
+                  <p className="text-sm text-gray-500">API Anbindung für Bestellimport & Rechnungs-Upload</p>
+                </div>
+                {ottoIntegration?.clientId ? (
+                  <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
+                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                    Verbunden
+                  </span>
+                ) : (
+                  <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
+                    Nicht verbunden
+                  </span>
+                )}
               </div>
-            ) : (
-              <div className="space-y-6">
-                <p className="text-sm text-gray-600 max-w-md">
-                  Klicke auf den Button unten, um dich sicher bei Hermes anzumelden und TheOmniStack den Zugriff für die Label-Erstellung zu erlauben.
-                </p>
-                <a 
-                  href="/api/shipping/hermes/auth"
-                  className="inline-flex items-center px-8 py-4 border border-transparent text-lg font-semibold rounded-xl shadow-lg text-white bg-blue-600 hover:bg-blue-700 transform transition hover:-translate-y-0.5 active:translate-y-0"
-                >
-                  <svg className="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-                  </svg>
-                  Jetzt mit Hermes verbinden
-                </a>
+              <div className="p-6 bg-gray-50">
+                <OttoIntegrationForm 
+                  initialClientId={ottoIntegration?.clientId || ''} 
+                  initialEnvironment={ottoIntegration?.environment || 'production'}
+                  initialReturnAddressCarrierId={(ottoIntegration?.metadata as any)?.returnAddressCarrierId || ''}
+                />
               </div>
-            )}
-          </div>
-        </section>
+            </section>
 
-        {/* DHL Card */}
-        <section className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-yellow-400 rounded-lg flex items-center justify-center flex-shrink-0">
-                <span className="text-gray-900 font-black text-sm tracking-tighter">DHL</span>
+            {/* Amazon Card */}
+            <section className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Amazon EU</h3>
+                  <p className="text-sm text-gray-500">SP-API Anbindung für Bestellimport & Bestandsabgleich</p>
+                </div>
+                {integrations.find((i: any) => i.type === 'amazon')?.refreshToken ? (
+                  <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
+                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                    Verbunden
+                  </span>
+                ) : (
+                  <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
+                    Nicht verbunden
+                  </span>
+                )}
               </div>
-              <div>
-                <h3 className="text-lg font-bold text-gray-900">DHL Versand</h3>
-                <p className="text-sm text-gray-500">DHL Geschäftskundenportal – Label-Erstellung & Versandzonen</p>
+              <div className="p-6 bg-gray-50">
+                <AmazonIntegrationForm 
+                  initialSellerId={integrations.find((i: any) => i.type === 'amazon')?.sellerId || ''}
+                  initialClientId={integrations.find((i: any) => i.type === 'amazon')?.clientId || ''}
+                  initialClientSecret={integrations.find((i: any) => i.type === 'amazon')?.clientSecret || ''}
+                  initialRefreshToken={integrations.find((i: any) => i.type === 'amazon')?.refreshToken || ''}
+                />
               </div>
-            </div>
-            {(integrations.find((i: any) => i.type === 'dhl')?.metadata as any)?.username ? (
-              <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
-                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                Konfiguriert
-              </span>
-            ) : (
-              <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
-                Nicht konfiguriert
-              </span>
-            )}
-          </div>
-          <div className="p-6 bg-gray-50">
-            <DhlIntegrationForm
-              initialConfig={(integrations.find((i: any) => i.type === 'dhl')?.metadata as DhlConfig) ?? undefined}
-            />
-          </div>
-        </section>
+            </section>
 
-        {/* Decathlon (Mirakl) Card */}
-        <section className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-bold text-gray-900">Decathlon (Mirakl)</h3>
-              <p className="text-sm text-gray-500">API Anbindung für Decathlon Bestellungen</p>
-            </div>
-            {integrations.find((i: any) => i.type === 'mirakl_decathlon')?.clientId ? (
-              <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
-                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                Verbunden
-              </span>
-            ) : (
-              <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
-                Nicht verbunden
-              </span>
-            )}
-          </div>
-          <div className="p-6 bg-gray-50">
-            <MiraklIntegrationForm 
-              key={`mirakl_decathlon_${integrations.find((i: any) => i.type === 'mirakl_decathlon')?.updatedAt?.getTime() || 'new'}`}
-              type="mirakl_decathlon"
-              initialClientId={integrations.find((i: any) => i.type === 'mirakl_decathlon')?.clientId || ''}
-              initialClientSecret={integrations.find((i: any) => i.type === 'mirakl_decathlon')?.clientSecret || ''} 
-              initialEnvironment={integrations.find((i: any) => i.type === 'mirakl_decathlon')?.environment || ''}
-              initialApiKey={integrations.find((i: any) => i.type === 'mirakl_decathlon')?.apiKey || ''}
-            />
-          </div>
-        </section>
-
-        {/* Shopify Card */}
-        <section className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                <span className="text-green-800 font-black text-xs tracking-tighter">Shopify</span>
+            {/* Shopify Card */}
+            <section className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <span className="text-green-800 font-black text-xs tracking-tighter">Shopify</span>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">Shopify</h3>
+                    <p className="text-sm text-gray-500">API Anbindung via Admin API für Bestellimport</p>
+                  </div>
+                </div>
+                {integrations.find((i: any) => i.type === 'shopify')?.accessToken ? (
+                  <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
+                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                    Verbunden
+                  </span>
+                ) : (
+                  <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
+                    Nicht verbunden
+                  </span>
+                )}
               </div>
-              <div>
-                <h3 className="text-lg font-bold text-gray-900">Shopify</h3>
-                <p className="text-sm text-gray-500">API Anbindung via Admin API für Bestellimport</p>
+              <div className="p-6 bg-gray-50">
+                <ShopifyIntegrationForm
+                  initialData={integrations.find((i: any) => i.type === 'shopify')}
+                />
               </div>
-            </div>
-            {integrations.find((i: any) => i.type === 'shopify')?.accessToken ? (
-              <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
-                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                Verbunden
-              </span>
-            ) : (
-              <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
-                Nicht verbunden
-              </span>
-            )}
-          </div>
-          <div className="p-6 bg-gray-50">
-            <ShopifyIntegrationForm
-              initialData={integrations.find((i: any) => i.type === 'shopify')}
-            />
-          </div>
-        </section>
+            </section>
 
-        {/* About You Card */}
-        <section className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-bold text-gray-900">About You</h3>
-              <p className="text-sm text-gray-500">API Anbindung für Bestellimport & Versandbestätigung</p>
-            </div>
-            {integrations.find((i: any) => i.type === 'aboutyou')?.apiKey ? (
-              <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
-                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                Verbunden
-              </span>
-            ) : (
-              <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
-                Nicht verbunden
-              </span>
-            )}
-          </div>
-          <div className="p-6 bg-gray-50">
-            <AboutYouIntegrationForm 
-              initialApiKey={integrations.find((i: any) => i.type === 'aboutyou')?.apiKey || ''}
-              initialEnvironment={integrations.find((i: any) => i.type === 'aboutyou')?.environment || 'production'}
-            />
-          </div>
-        </section>
-
-        {/* Existing Custom Mirakl Integrations */}
-        {customMiraklIntegrations.map((integration: any) => (
-          <section key={integration.id} className="bg-white rounded-xl shadow-sm border border-blue-200 overflow-hidden">
-            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-blue-50/50">
-              <div>
-                <h3 className="text-lg font-bold text-gray-900">{(integration.metadata as any)?.customName || 'Unbenannter Marktplatz'} (Mirakl)</h3>
-                <p className="text-sm text-gray-500">Eigene API Anbindung</p>
+            {/* About You Card */}
+            <section className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">About You</h3>
+                  <p className="text-sm text-gray-500">API Anbindung für Bestellimport & Versandbestätigung</p>
+                </div>
+                {integrations.find((i: any) => i.type === 'aboutyou')?.apiKey ? (
+                  <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
+                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                    Verbunden
+                  </span>
+                ) : (
+                  <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
+                    Nicht verbunden
+                  </span>
+                )}
               </div>
-              <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
-                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                Verbunden
-              </span>
-            </div>
-            <div className="p-6 bg-gray-50">
-              <MiraklIntegrationForm 
-                id={integration.id}
-                type="mirakl_custom"
-                initialCustomName={(integration.metadata as any)?.customName || ''}
-                initialClientId={integration.clientId || ''}
-                initialClientSecret={integration.clientSecret || ''} 
-                initialEnvironment={integration.environment || ''}
-                initialApiKey={integration.apiKey || ''}
-              />
-            </div>
-          </section>
-        ))}
+              <div className="p-6 bg-gray-50">
+                <AboutYouIntegrationForm 
+                  initialApiKey={integrations.find((i: any) => i.type === 'aboutyou')?.apiKey || ''}
+                  initialEnvironment={integrations.find((i: any) => i.type === 'aboutyou')?.environment || 'production'}
+                />
+              </div>
+            </section>
 
-        {/* Add New Custom Mirakl Integration */}
-        <section className="bg-white rounded-xl shadow-sm border border-dashed border-gray-300 overflow-hidden hover:border-blue-400 transition-colors">
-          <div className="p-6 border-b border-gray-100 flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xl">
-              +
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-gray-900">Weiteren Mirakl Marktplatz hinzufügen</h3>
-              <p className="text-sm text-gray-500">Limango, Worten, B&Q und viele mehr anbinden</p>
-            </div>
+            {/* Decathlon (Mirakl) Card */}
+            <section className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Decathlon (Mirakl)</h3>
+                  <p className="text-sm text-gray-500">API Anbindung für Decathlon Bestellungen</p>
+                </div>
+                {integrations.find((i: any) => i.type === 'mirakl_decathlon')?.clientId ? (
+                  <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
+                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                    Verbunden
+                  </span>
+                ) : (
+                  <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
+                    Nicht verbunden
+                  </span>
+                )}
+              </div>
+              <div className="p-6 bg-gray-50">
+                <MiraklIntegrationForm 
+                  key={`mirakl_decathlon_${integrations.find((i: any) => i.type === 'mirakl_decathlon')?.updatedAt?.getTime() || 'new'}`}
+                  type="mirakl_decathlon"
+                  initialClientId={integrations.find((i: any) => i.type === 'mirakl_decathlon')?.clientId || ''}
+                  initialClientSecret={integrations.find((i: any) => i.type === 'mirakl_decathlon')?.clientSecret || ''} 
+                  initialEnvironment={integrations.find((i: any) => i.type === 'mirakl_decathlon')?.environment || ''}
+                  initialApiKey={integrations.find((i: any) => i.type === 'mirakl_decathlon')?.apiKey || ''}
+                />
+              </div>
+            </section>
+
+            {/* Existing Custom Mirakl Integrations */}
+            {customMiraklIntegrations.map((integration: any) => (
+              <section key={integration.id} className="bg-white rounded-xl shadow-sm border border-blue-200 overflow-hidden">
+                <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-blue-50/50">
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">{(integration.metadata as any)?.customName || 'Unbenannter Marktplatz'} (Mirakl)</h3>
+                    <p className="text-sm text-gray-500">Eigene API Anbindung</p>
+                  </div>
+                  <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
+                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                    Verbunden
+                  </span>
+                </div>
+                <div className="p-6 bg-gray-50">
+                  <MiraklIntegrationForm 
+                    id={integration.id}
+                    type="mirakl_custom"
+                    initialCustomName={(integration.metadata as any)?.customName || ''}
+                    initialClientId={integration.clientId || ''}
+                    initialClientSecret={integration.clientSecret || ''} 
+                    initialEnvironment={integration.environment || ''}
+                    initialApiKey={integration.apiKey || ''}
+                  />
+                </div>
+              </section>
+            ))}
+
+            {/* Add New Custom Mirakl Integration */}
+            <section className="bg-white rounded-xl shadow-sm border border-dashed border-gray-300 overflow-hidden hover:border-blue-400 transition-colors">
+              <div className="p-6 border-b border-gray-100 flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xl">
+                  +
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Weiteren Mirakl Marktplatz hinzufügen</h3>
+                  <p className="text-sm text-gray-500">Limango, Worten, B&Q und viele mehr anbinden</p>
+                </div>
+              </div>
+              <div className="p-6 bg-gray-50">
+                <MiraklIntegrationForm 
+                  type="mirakl_custom"
+                  initialClientId=""
+                  initialClientSecret="" 
+                  initialEnvironment=""
+                  initialApiKey=""
+                />
+              </div>
+            </section>
           </div>
-          <div className="p-6 bg-gray-50">
-            <MiraklIntegrationForm 
-              type="mirakl_custom"
-              initialClientId=""
-              initialClientSecret="" 
-              initialEnvironment=""
-              initialApiKey=""
-            />
+        </div>
+
+        {/* SECTION: SHIPPING PROVIDERS */}
+        <div className="pt-8 border-t border-gray-200">
+          <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+            <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
+            Versanddienstleister
+          </h3>
+          <div className="space-y-8">
+            {/* DHL Card */}
+            <section className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-yellow-400 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <span className="text-gray-900 font-black text-sm tracking-tighter">DHL</span>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">DHL Geschäftskunden</h3>
+                    <p className="text-sm text-gray-500">Label-Erstellung & Versandzonen</p>
+                  </div>
+                </div>
+                {(integrations.find((i: any) => i.type === 'dhl')?.metadata as any)?.username ? (
+                  <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
+                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                    Konfiguriert
+                  </span>
+                ) : (
+                  <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
+                    Nicht konfiguriert
+                  </span>
+                )}
+              </div>
+              <div className="p-6 bg-gray-50">
+                <DhlIntegrationForm
+                  initialConfig={(integrations.find((i: any) => i.type === 'dhl')?.metadata as DhlConfig) ?? undefined}
+                />
+              </div>
+            </section>
+
+            {/* Hermes Card */}
+            <section className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Hermes Versand</h3>
+                  <p className="text-sm text-gray-500">Offizielle Anbindung über die Hermes Login-Seite</p>
+                </div>
+                {integrations.find((i: any) => i.type === 'hermes')?.accessToken ? (
+                  <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
+                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                    Aktiv
+                  </span>
+                ) : (
+                  <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
+                    Nicht konfiguriert
+                  </span>
+                )}
+              </div>
+              <div className="p-8 bg-gray-50 flex flex-col items-center justify-center text-center">
+                {integrations.find((i: any) => i.type === 'hermes')?.accessToken ? (
+                  <div className="space-y-4">
+                    <p className="text-sm text-gray-600 max-w-md">
+                      TheOmniStack ist erfolgreich mit deinem Hermes-Konto verknüpft. Du kannst jetzt Versandlabels direkt aus den Bestellungen erstellen.
+                    </p>
+                    <a 
+                      href="/api/shipping/hermes/auth"
+                      className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none"
+                    >
+                      Verbindung aktualisieren
+                    </a>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    <p className="text-sm text-gray-600 max-w-md">
+                      Klicke auf den Button unten, um dich sicher bei Hermes anzumelden und TheOmniStack den Zugriff für die Label-Erstellung zu erlauben.
+                    </p>
+                    <a 
+                      href="/api/shipping/hermes/auth"
+                      className="inline-flex items-center px-8 py-4 border border-transparent text-lg font-semibold rounded-xl shadow-lg text-white bg-blue-600 hover:bg-blue-700 transform transition hover:-translate-y-0.5 active:translate-y-0"
+                    >
+                      <svg className="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                      </svg>
+                      Jetzt mit Hermes verbinden
+                    </a>
+                  </div>
+                )}
+              </div>
+            </section>
           </div>
-        </section>
+        </div>
       </div>
     </div>
   )
