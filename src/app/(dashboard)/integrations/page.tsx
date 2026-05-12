@@ -29,8 +29,8 @@ export default async function IntegrationsPage(props: {
   return (
     <div className="max-w-4xl">
       <header className="mb-8">
-        <h2 className="text-3xl font-bold text-gray-900">Marktplatz Integrationen</h2>
-        <p className="text-gray-500 mt-2">Verbinde theomnistack mit deinen Verkaufskanälen, um Bestellungen automatisch zu importieren.</p>
+        <h2 className="text-3xl font-bold text-gray-900">Verbindungen & Integrationen</h2>
+        <p className="text-gray-500 mt-2">Verbinde theomnistack mit deinen Verkaufskanälen und Versanddienstleistern, um Prozesse zu automatisieren.</p>
       </header>
 
       {status === 'hermes_success' && (
