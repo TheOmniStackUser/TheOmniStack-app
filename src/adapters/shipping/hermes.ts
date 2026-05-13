@@ -130,7 +130,7 @@ export class HermesAdapter {
     order: any, 
     company: any, 
     parcelClass: string = 'S'
-  ): Promise<{ labelUrl: string, trackingNumber: string, returnTrackingNumber?: string }> {
+  ): Promise<{ labelUrl: string, returnLabelUrl?: string, trackingNumber: string, returnTrackingNumber?: string }> {
     console.log(`[Hermes Adapter] Generiere Versandetikett für Bestellung ${order.marketplaceOrderId || order.id} (Klasse: ${parcelClass})...`)
 
     const token = await this.getAccessToken()
@@ -192,13 +192,11 @@ export class HermesAdapter {
         }
       }
     }
-
     // Check for return configuration
     const marketplace = (order.marketplace || 'unknown').toLowerCase()
     let returnType = this.config?.platformReturns?.[marketplace] || 'none'
     
-    // AUTO-FIX: Otto ALWAYS requires a return number. If it's set to 'none', we force 'virtual' 
-    // to ensure the shipment can be confirmed at all.
+    // AUTO-FIX: Otto ALWAYS requires a return number.
     if (marketplace === 'otto' && returnType === 'none') {
       console.log(`[Hermes Adapter] Auto-fixing returnType to 'virtual' for Otto shipment.`)
       returnType = 'virtual'
@@ -209,11 +207,16 @@ export class HermesAdapter {
     if (returnType === 'enclosed' || returnType === 'virtual') {
       console.log(`[Hermes Adapter] Fordere Retourenlabel an (Typ: ${returnType}) für Marktplatz: ${marketplace}`)
       ;(payload.service as any).returnService = {
-        returnReceiverName: payload.senderName,
+        returnReceiverName: {
+          firstname: payload.senderName.firstname,
+          lastname: payload.senderName.lastname
+        },
         returnReceiverAddress: payload.senderAddress,
-        returnProductType: 'PARCEL' // Required for some account types to trigger return generation
+        returnProductType: 'PARCEL'
       }
     }
+
+    console.log('[Hermes Adapter] Final Payload:', JSON.stringify(payload))
 
     let response: Response
     try {
@@ -228,7 +231,7 @@ export class HermesAdapter {
       })
     } catch (fetchError: any) {
       console.error('[Hermes Adapter] Network/Fetch Error:', fetchError)
-      throw new Error(`Hermes API Verbindung fehlgeschlagen: ${fetchError.message || 'Netzwerkfehler'}. Prüfe die Internetverbindung oder DNS-Einstellungen.`)
+      throw new Error(`Hermes API Verbindung fehlgeschlagen: ${fetchError.message || 'Netzwerkfehler'}`)
     }
 
     if (!response.ok) {
@@ -248,6 +251,17 @@ export class HermesAdapter {
     }
     
     const labelUrl = `data:application/pdf;base64,${base64}`
+    let returnLabelUrl: string | undefined = undefined
+    
+    if (data.returnLabelImage) {
+      returnLabelUrl = `data:application/pdf;base64,${data.returnLabelImage}`
+    } else if (data.shipmentOrder?.returnLabelImage) {
+      returnLabelUrl = `data:application/pdf;base64,${data.shipmentOrder.returnLabelImage}`
+    } else if (data.shipmentOrder?.returnShipments?.[0]?.labelImage) {
+      returnLabelUrl = `data:application/pdf;base64,${data.shipmentOrder.returnShipments[0].labelImage}`
+    } else if (data.returnShipments?.[0]?.labelImage) {
+      returnLabelUrl = `data:application/pdf;base64,${data.returnShipments[0].labelImage}`
+    }
 
     // Extract return tracking number with more fallbacks
     const returnTrackingNumber = 
@@ -259,13 +273,14 @@ export class HermesAdapter {
       data.shipmentOrder?.returnShipments?.[0]?.barcode ||
       data.returnShipments?.[0]?.shipmentID
 
-    // Validation: If a return was requested but no number came back, we must stop here.
+    // Validation
     if ((returnType === 'enclosed' || returnType === 'virtual') && !returnTrackingNumber) {
-      throw new Error(`Hermes hat keine Retourennummer geliefert, obwohl eine angefordert wurde (Marktplatz: ${marketplace}). Bitte prüfe, ob dein Hermes-Account für den Service 'Retouren' (HSI Beilageretoure) freigeschaltet ist. Falls nicht, kann für Otto keine Sendung bestätigt werden.`)
+      throw new Error(`Hermes hat keine Retourennummer geliefert, obwohl eine angefordert wurde (Marktplatz: ${marketplace}). Bitte prüfe, ob dein Hermes-Account für den Service 'Retouren' freigeschaltet ist.`)
     }
 
     return {
       labelUrl,
+      returnLabelUrl,
       trackingNumber,
       returnTrackingNumber
     }

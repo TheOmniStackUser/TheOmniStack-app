@@ -102,7 +102,7 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
           ? parcelClassMap 
           : (parcelClassMap?.[order.id] || 'S')
 
-        const { labelUrl, trackingNumber, returnTrackingNumber } = await hermes.generateLabelForOrder(order, company, orderParcelClass)
+        const { labelUrl, returnLabelUrl, trackingNumber, returnTrackingNumber } = await hermes.generateLabelForOrder(order, company, orderParcelClass)
         
         // Update order status to shipped and save label data
         await db
@@ -115,6 +115,9 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
             updatedAt: new Date() 
           })
           .where(eq(orders.id, order.id))
+
+        if (labelUrl) labels.push(labelUrl)
+        if (returnLabelUrl) labels.push(returnLabelUrl)
         
         // Confirm shipment in marketplace (e.g. Otto)
         if (order.marketplace === 'otto' && ottoAdapter && order.marketplaceOrderId) {
@@ -154,22 +157,6 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
           }
         }
 
-        if (labelUrl) labels.push(labelUrl)
-        
-        // If an enclosed return label was generated and user wants it printed
-        const [hermesIntegration] = await db
-          .select()
-          .from(marketplaceIntegrations)
-          .where(and(eq(marketplaceIntegrations.companyId, auth.activeCompanyId), eq(marketplaceIntegrations.type, 'hermes')))
-          .limit(1)
-        
-        const returnConfig = (hermesIntegration?.metadata as any)?.platformReturns?.[order.marketplace]
-        if (returnConfig === 'enclosed' && labelUrl) {
-           // For Hermes HSI, enclosed return labels are sometimes in the same PDF or separate.
-           // If they are in the same PDF, we don't need to push again.
-           // If we implemented separate return labels in the adapter, we would push them here.
-        }
-        
         successCount++
       } catch (err: any) {
         const msg = err?.message ?? String(err)
