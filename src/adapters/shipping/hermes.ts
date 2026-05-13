@@ -189,11 +189,10 @@ export class HermesAdapter {
 
     if (returnType === 'enclosed' || returnType === 'virtual') {
       console.log(`[Hermes Adapter] Fordere Retourenlabel an (Typ: ${returnType}) für Marktplatz: ${marketplace}`)
-      // For HSI, an enclosed return is typically requested via returnService
-      // We use the same address as the sender for the return recipient
       ;(payload.service as any).returnService = {
         returnReceiverName: payload.senderName,
-        returnReceiverAddress: payload.senderAddress
+        returnReceiverAddress: payload.senderAddress,
+        returnProductType: 'PARCEL' // Required for some account types to trigger return generation
       }
     }
 
@@ -240,6 +239,13 @@ export class HermesAdapter {
       data.shipmentOrder?.returnShipments?.[0]?.shipmentID ||
       data.shipmentOrder?.returnShipments?.[0]?.barcode ||
       data.returnShipments?.[0]?.shipmentID
+
+    // Validation for marketplaces that REQUIRE a return number (like Otto)
+    if ((returnType === 'enclosed' || returnType === 'virtual') && !returnTrackingNumber) {
+      if (marketplace === 'otto') {
+        throw new Error(`Hermes hat keine Retourennummer geliefert, diese ist aber für Otto zwingend erforderlich. Bitte prüfe, ob dein Hermes-Account für den Service 'Retouren' (HSI Beilageretoure) freigeschaltet ist.`)
+      }
+    }
 
     return {
       labelUrl,
