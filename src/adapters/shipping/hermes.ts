@@ -8,19 +8,19 @@ export class HermesAdapter {
   private baseUrl: string = 'https://de-api.myhermes.de'
   private authUrl: string = 'https://authme.myhermes.de/authorization-facade/oauth2/access_token'
 
-  // Application credentials (identifies this software)
+  // Application credentials (identifies this software as TheOmniStack)
   private appId: string = 'hsi.verm.theomnistack'
   private appSecret: string = 'B6LSgC-5tTYQyThjTa61'
   
-  // User credentials (identifies the business customer)
-  private username: string = 'testkunde3'
-  private password: string = 'ewrfn:gN'
+  // User credentials (identifies the business customer - set via DB)
+  private username: string
+  private password: string
 
   constructor(
     integrationId: string | null = null, 
     accessToken: string | null = null,
-    username: string = 'testkunde3',
-    password: string = 'ewrfn:gN'
+    username: string = '',
+    password: string = ''
   ) {
     this.integrationId = integrationId
     this.accessToken = accessToken
@@ -53,16 +53,16 @@ export class HermesAdapter {
       )
       .limit(1)
 
-    // If not configured in DB, we use the test credentials directly for the first label
-    if (!integration) {
-      return new HermesAdapter()
+    // If not configured in DB, throw a clear error instead of silently using wrong credentials
+    if (!integration || !integration.clientId) {
+      throw new Error('Hermes ist nicht konfiguriert. Bitte trage deine Hermes GKP-Zugangsdaten unter Integrationen ein.')
     }
 
     return new HermesAdapter(
       integration.id, 
       integration.accessToken,
-      integration.clientId || 'testkunde3', // Using clientId field for username in DB for now
-      integration.clientSecret || 'ewrfn:gN' // Using clientSecret field for password in DB for now
+      integration.clientId,   // GKP Username stored in clientId field
+      integration.clientSecret ?? '' // GKP Password stored in clientSecret field
     )
   }
 
