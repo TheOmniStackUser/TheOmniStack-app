@@ -1,26 +1,24 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/session'
+import { HermesAdapter } from '@/adapters/shipping/hermes'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(req: NextRequest) {
+// POST: Test whether the saved Hermes credentials are valid
+export async function POST() {
   try {
     const auth = await requireAuth()
     
-    // Diese Daten kommen von Hermes, sobald wir als Software-Partner registriert sind
-    const HERMES_CLIENT_ID = process.env.HERMES_PARTNER_CLIENT_ID || 'PENDING'
-    const REDIRECT_URI = `${process.env.NEXT_PUBLIC_APP_URL}/api/shipping/hermes/callback`
+    // This will throw a clear error if no credentials are configured
+    const adapter = await HermesAdapter.initialize(auth.activeCompanyId)
     
-    const hermesAuthUrl = new URL('https://authme.myhermes.de/authorization-facade/oauth2/authorize')
-    hermesAuthUrl.searchParams.append('response_type', 'code')
-    hermesAuthUrl.searchParams.append('client_id', HERMES_CLIENT_ID)
-    hermesAuthUrl.searchParams.append('redirect_uri', REDIRECT_URI)
-    hermesAuthUrl.searchParams.append('scope', 'shipments labels') // Beispiel Scopes
-    hermesAuthUrl.searchParams.append('state', auth.activeCompanyId) // Wir nutzen state, um die Company ID zu tracken
+    // Accessing the private getAccessToken method indirectly by calling a public method
+    // We expose a testAuth method for this purpose
+    const token = await adapter.testAuth()
 
-    return NextResponse.redirect(hermesAuthUrl.toString())
-  } catch (error) {
-    console.error('Hermes Auth Start Error:', error)
-    return NextResponse.json({ error: 'Auth konnte nicht gestartet werden' }, { status: 500 })
+    return NextResponse.json({ success: true, token: token.slice(0, 20) + '...' })
+  } catch (error: any) {
+    console.error('[Hermes Auth Test Error]', error)
+    return NextResponse.json({ success: false, error: error.message }, { status: 400 })
   }
 }

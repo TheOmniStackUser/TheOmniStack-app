@@ -98,6 +98,13 @@ export class HermesAdapter {
     return data.access_token
   }
 
+  // Public method to test if credentials are valid by requesting an access token
+  async testAuth(): Promise<string> {
+    // Force a fresh token fetch (don't use cached)
+    this.accessToken = null
+    return this.getAccessToken()
+  }
+
   async generateLabelForOrder(
     order: any, 
     company: any, 
