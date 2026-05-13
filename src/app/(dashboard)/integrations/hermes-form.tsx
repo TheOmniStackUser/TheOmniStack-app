@@ -5,7 +5,7 @@ import { saveHermesIntegrationAction } from '@/app/actions/integrations'
 import { Eye, EyeOff, CheckCircle, XCircle, Loader, Settings, Truck, RefreshCw } from 'lucide-react'
 
 export type HermesConfig = {
-  platformReturns: Record<string, 'none' | 'enclosed'>
+  platformReturns: Record<string, 'none' | 'enclosed' | 'virtual'>
 }
 
 export function HermesIntegrationForm({ 
@@ -188,7 +188,7 @@ export function HermesIntegrationForm({
         {activeTab === 'returns' && (
           <div className="space-y-4">
             <div className="bg-blue-50 rounded-lg p-4 text-sm text-blue-800 border border-blue-100 mb-2">
-              <p>Lege hier fest, ob für Sendungen automatisch ein <strong>Hermes Beilage-Retourenlabel</strong> erstellt werden soll.</p>
+              <p>Wähle aus, wie Retouren für den jeweiligen Marktplatz gehandhabt werden sollen.</p>
             </div>
 
             {([
@@ -207,43 +207,68 @@ export function HermesIntegrationForm({
                       <h4 className="font-bold text-gray-900 text-sm">{label}</h4>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <button
                       type="button"
                       onClick={() => setPlatformReturns(prev => ({ ...prev, [key]: 'none' }))}
-                      className={`flex items-center gap-3 p-3 rounded-lg border-2 text-left transition-all ${
+                      className={`flex flex-col gap-1 p-3 rounded-lg border-2 text-left transition-all ${
                         value === 'none'
                           ? 'border-blue-600 bg-blue-50'
                           : 'border-gray-100 hover:border-blue-200'
                       }`}
                     >
-                      <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
-                        value === 'none' ? 'border-blue-600 bg-blue-600' : 'border-gray-300'
-                      }`}>
-                        {value === 'none' && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                      <div className="flex items-center gap-2">
+                        <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                          value === 'none' ? 'border-blue-600 bg-blue-600' : 'border-gray-300'
+                        }`}>
+                          {value === 'none' && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                        </div>
+                        <span className={`text-xs font-bold ${value === 'none' ? 'text-blue-900' : 'text-gray-600'}`}>
+                          Keine Retoure
+                        </span>
                       </div>
-                      <span className={`text-sm font-medium ${value === 'none' ? 'text-blue-900' : 'text-gray-600'}`}>
-                        Keine Retoure
-                      </span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => setPlatformReturns(prev => ({ ...prev, [key]: 'enclosed' }))}
-                      className={`flex items-center gap-3 p-3 rounded-lg border-2 text-left transition-all ${
+                      className={`flex flex-col gap-1 p-3 rounded-lg border-2 text-left transition-all ${
                         value === 'enclosed'
                           ? 'border-blue-600 bg-blue-50'
                           : 'border-gray-100 hover:border-blue-200'
                       }`}
                     >
-                      <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
-                        value === 'enclosed' ? 'border-blue-600 bg-blue-600' : 'border-gray-300'
-                      }`}>
-                        {value === 'enclosed' && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                      <div className="flex items-center gap-2">
+                        <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                          value === 'enclosed' ? 'border-blue-600 bg-blue-600' : 'border-gray-300'
+                        }`}>
+                          {value === 'enclosed' && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                        </div>
+                        <span className={`text-xs font-bold ${value === 'enclosed' ? 'text-blue-900' : 'text-gray-600'}`}>
+                          Beilage-Label (drucken)
+                        </span>
                       </div>
-                      <span className={`text-sm font-medium ${value === 'enclosed' ? 'text-blue-900' : 'text-gray-600'}`}>
-                        Beilage-Label (HSI)
-                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setPlatformReturns(prev => ({ ...prev, [key]: 'virtual' }))}
+                      className={`flex flex-col gap-1 p-3 rounded-lg border-2 text-left transition-all ${
+                        value === 'virtual'
+                          ? 'border-blue-600 bg-blue-50'
+                          : 'border-gray-100 hover:border-blue-200'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                          value === 'virtual' ? 'border-blue-600 bg-blue-600' : 'border-gray-300'
+                        }`}>
+                          {value === 'virtual' && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                        </div>
+                        <span className={`text-xs font-bold ${value === 'virtual' ? 'text-blue-900' : 'text-gray-600'}`}>
+                          Nur Retourennummer
+                        </span>
+                      </div>
                     </button>
                   </div>
                 </div>
