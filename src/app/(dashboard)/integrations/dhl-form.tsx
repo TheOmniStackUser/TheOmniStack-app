@@ -2,6 +2,7 @@
 
 import { useState, useActionState } from 'react'
 import { saveDhlIntegrationAction } from '@/app/actions/integrations'
+import { Settings, Globe, Hash, Package, RefreshCw } from 'lucide-react'
 
 // ─── DHL Product Codes ──────────────────────────────────────────────────────
 const DHL_PRODUCTS = [
@@ -294,11 +295,11 @@ export function DhlIntegrationForm({ initialConfig }: { initialConfig?: DhlConfi
   }
 
   const tabs = [
-    { id: 'connection', label: 'Verbindung' },
-    { id: 'general', label: 'Allgemein' },
-    { id: 'zones', label: 'Abrechnungsnummern' },
-    { id: 'products', label: 'Produkte' },
-    { id: 'returns', label: 'Retouren' },
+    { id: 'connection', label: 'Verbindung', icon: Settings },
+    { id: 'general', label: 'Allgemein', icon: Globe },
+    { id: 'zones', label: 'Abrechnungsnummern', icon: Hash },
+    { id: 'products', label: 'Produkte', icon: Package },
+    { id: 'returns', label: 'Retouren', icon: RefreshCw },
   ] as const
 
   type TabId = typeof tabs[number]['id']
@@ -315,12 +316,15 @@ export function DhlIntegrationForm({ initialConfig }: { initialConfig?: DhlConfi
             key={tab.id}
             type="button"
             onClick={() => setActiveTab(tab.id)}
-            className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+            className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
               activeTab === tab.id
                 ? 'border-yellow-400 text-yellow-700'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
-          >{tab.label}</button>
+          >
+            <tab.icon className="w-4 h-4" />
+            {tab.label}
+          </button>
         ))}
       </div>
 
