@@ -5,12 +5,12 @@ import { eq, and } from 'drizzle-orm'
 export class HermesAdapter {
   private integrationId: string | null
   private accessToken: string | null
-  private baseUrl: string = 'https://de-api-int.hermesworld.com'
-  private authUrl: string = 'https://authme-int.myhermes.de/authorization-facade/oauth2/access_token'
+  private baseUrl: string = 'https://de-api.myhermes.de'
+  private authUrl: string = 'https://authme.myhermes.de/authorization-facade/oauth2/access_token'
 
   // Application credentials (identifies this software)
-  private appId: string = 'hsi.int.verm.theomnistack'
-  private appSecret: string = 'ZRLD4LtrD8vDihgieheT'
+  private appId: string = 'hsi.verm.theomnistack'
+  private appSecret: string = 'B6LSgC-5tTYQyThjTa61'
   
   // User credentials (identifies the business customer)
   private username: string = 'testkunde3'

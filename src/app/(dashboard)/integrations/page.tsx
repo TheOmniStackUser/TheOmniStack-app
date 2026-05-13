@@ -306,35 +306,10 @@ export default async function IntegrationsPage(props: {
                   </span>
                 )}
               </div>
-              <div className="p-8 bg-gray-50 flex flex-col items-center justify-center text-center">
-                {integrations.find((i: any) => i.type === 'hermes')?.accessToken ? (
-                  <div className="space-y-4">
-                    <p className="text-sm text-gray-600 max-w-md">
-                      TheOmniStack ist erfolgreich mit deinem Hermes-Konto verknüpft. Du kannst jetzt Versandlabels direkt aus den Bestellungen erstellen.
-                    </p>
-                    <a 
-                      href="/api/shipping/hermes/auth"
-                      className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none"
-                    >
-                      Verbindung aktualisieren
-                    </a>
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    <p className="text-sm text-gray-600 max-w-md">
-                      Klicke auf den Button unten, um dich sicher bei Hermes anzumelden und TheOmniStack den Zugriff für die Label-Erstellung zu erlauben.
-                    </p>
-                    <a 
-                      href="/api/shipping/hermes/auth"
-                      className="inline-flex items-center px-8 py-4 border border-transparent text-lg font-semibold rounded-xl shadow-lg text-white bg-blue-600 hover:bg-blue-700 transform transition hover:-translate-y-0.5 active:translate-y-0"
-                    >
-                      <svg className="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-                      </svg>
-                      Jetzt mit Hermes verbinden
-                    </a>
-                  </div>
-                )}
+              <div className="p-6 bg-gray-50 flex justify-center">
+                <HermesIntegrationForm 
+                  initialClientId={integrations.find((i: any) => i.type === 'hermes')?.clientId || ''}
+                />
               </div>
             </section>
           </div>

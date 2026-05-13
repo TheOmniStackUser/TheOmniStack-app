@@ -29,6 +29,8 @@ export function HermesIntegrationForm({ initialClientId }: { initialClientId: st
           defaultValue={initialClientId}
           required
           placeholder="Dein Hermes Benutzername"
+          autoComplete="off"
+          data-lpignore="true"
           className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-black focus:outline-none focus:ring-blue-500 focus:border-blue-500"
         />
         {state?.errors?.clientId && <p className="mt-1 text-sm text-red-600">{state.errors.clientId}</p>}
@@ -42,6 +44,8 @@ export function HermesIntegrationForm({ initialClientId }: { initialClientId: st
           type="password"
           required
           placeholder={initialClientId ? '••••••••••••••••' : 'Dein Hermes Passwort'}
+          autoComplete="new-password"
+          data-lpignore="true"
           className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-black focus:outline-none focus:ring-blue-500 focus:border-blue-500"
         />
         {state?.errors?.clientSecret && <p className="mt-1 text-sm text-red-600">{state.errors.clientSecret}</p>}
