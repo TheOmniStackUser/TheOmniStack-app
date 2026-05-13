@@ -208,7 +208,10 @@ export class HermesAdapter {
       }
       ;(payload as any).returnReceiverAddress = payload.senderAddress
       
-      // Some HSI versions also need this in service, but top-level is primary
+      // Official HSI trigger for enclosed returns (Beilageretoure)
+      ;(payload.service as any).flexReturnService = "true"
+      
+      // Some HSI versions also need this in service
       ;(payload.service as any).returnService = {
         returnProductType: 'PARCEL',
         returnServiceType: 'RETURN'
