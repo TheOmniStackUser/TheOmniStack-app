@@ -5,7 +5,7 @@ import { eq, and } from 'drizzle-orm'
 export class HermesAdapter {
   private integrationId: string | null
   private accessToken: string | null
-  private baseUrl: string = 'https://de-api.myhermes.de'
+  private baseUrl: string = 'https://de-api.hermesworld.com'
   private authUrl: string = 'https://authme.myhermes.de/authorization-facade/oauth2/access_token'
 
   // Application credentials (identifies this software as TheOmniStack)
