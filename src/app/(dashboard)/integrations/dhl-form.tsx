@@ -348,6 +348,8 @@ export function DhlIntegrationForm({ initialConfig }: { initialConfig?: DhlConfi
                 onChange={e => setUsername(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent text-gray-900 placeholder-gray-400"
                 placeholder="max.mustermann@example.com"
+                autoComplete="off"
+                data-lpignore="true"
               />
             </div>
             <div>
@@ -358,6 +360,8 @@ export function DhlIntegrationForm({ initialConfig }: { initialConfig?: DhlConfi
                 onChange={e => setPassword(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent text-gray-900"
                 placeholder="••••••••••••"
+                autoComplete="new-password"
+                data-lpignore="true"
               />
             </div>
           </div>
@@ -373,6 +377,8 @@ export function DhlIntegrationForm({ initialConfig }: { initialConfig?: DhlConfi
               onChange={e => setApiKey(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent text-gray-900"
               placeholder="z.B. 9Dsh3729sJd..."
+              autoComplete="new-password"
+              data-lpignore="true"
             />
             <p className="mt-1.5 text-xs text-gray-400">Erstelle eine App unter developer.dhl.com → My Apps → &quot;Parcel DE Shipping Post&quot; hinzufügen.</p>
           </div>
@@ -388,6 +394,8 @@ export function DhlIntegrationForm({ initialConfig }: { initialConfig?: DhlConfi
               onChange={e => setApiSecret(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent text-gray-900"
               placeholder="z.B. aBcDeFgH..."
+              autoComplete="new-password"
+              data-lpignore="true"
             />
             <p className="mt-1.5 text-xs text-gray-400">Das App Secret findest du direkt neben dem API Key in deiner DHL Developer App.</p>
           </div>
