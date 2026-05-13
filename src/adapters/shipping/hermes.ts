@@ -30,7 +30,17 @@ export class HermesAdapter {
   }
 
   public setConfig(config: any) {
-    this.config = config
+    if (typeof config === 'string') {
+      try {
+        this.config = JSON.parse(config)
+      } catch (e) {
+        console.error('[Hermes Adapter] Failed to parse config string:', e)
+        this.config = config
+      }
+    } else {
+      this.config = config
+    }
+    console.log('[Hermes Adapter] Config loaded:', JSON.stringify(this.config))
   }
 
   private splitStreet(full: string | null | undefined): { street: string; houseNo: string } {
