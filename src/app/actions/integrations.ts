@@ -75,7 +75,7 @@ export async function saveOttoIntegrationAction(
 
 const HermesIntegrationSchema = z.object({
   clientId: z.string().min(1, { message: 'Benutzername ist erforderlich.' }).trim(),
-  clientSecret: z.string().min(1, { message: 'Passwort ist erforderlich.' }).trim(),
+  clientSecret: z.string().trim().optional(), // Optional: keep existing if not changed
 })
 
 export async function saveHermesIntegrationAction(
@@ -96,7 +96,7 @@ export async function saveHermesIntegrationAction(
   const { clientId, clientSecret } = validated.data
 
   const [existing] = await db
-    .select({ id: marketplaceIntegrations.id })
+    .select({ id: marketplaceIntegrations.id, clientSecret: marketplaceIntegrations.clientSecret })
     .from(marketplaceIntegrations)
     .where(
       and(
@@ -106,10 +106,17 @@ export async function saveHermesIntegrationAction(
     )
     .limit(1)
 
+  // Use the new password if provided, otherwise keep the existing one from the DB
+  const finalSecret = (clientSecret && clientSecret.length > 0) ? clientSecret : existing?.clientSecret
+
+  if (!finalSecret) {
+    return { errors: { clientSecret: 'Passwort ist erforderlich (noch kein Passwort gespeichert).' } }
+  }
+
   if (existing) {
     await db
       .update(marketplaceIntegrations)
-      .set({ clientId, clientSecret, updatedAt: new Date() })
+      .set({ clientId, clientSecret: finalSecret, updatedAt: new Date() })
       .where(eq(marketplaceIntegrations.id, existing.id))
   } else {
     await db
@@ -118,7 +125,7 @@ export async function saveHermesIntegrationAction(
         companyId: auth.activeCompanyId,
         type: 'hermes',
         clientId,
-        clientSecret,
+        clientSecret: finalSecret,
       })
   }
 
