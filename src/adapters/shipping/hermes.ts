@@ -9,8 +9,8 @@ export class HermesAdapter {
   private authUrl: string = 'https://authme-int.myhermes.de/authorization-facade/oauth2/access_token'
 
   // Application credentials (identifies this software)
-  private appId: string = 'testkunde3'
-  private appSecret: string = 'ewrfn:gN'
+  private appId: string = 'hsi.int.verm.theomnistack'
+  private appSecret: string = 'ZRLD4LtrD8vDihgieheT'
   
   // User credentials (identifies the business customer)
   private username: string = 'testkunde3'
