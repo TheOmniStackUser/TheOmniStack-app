@@ -99,7 +99,7 @@ export async function GET(request: Request) {
         environment: shop,
         accessToken: accessToken,
         isActive: true,
-        settings: {}
+        metadata: {}
       })
     }
 
