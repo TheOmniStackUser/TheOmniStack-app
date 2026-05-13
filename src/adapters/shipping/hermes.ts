@@ -214,12 +214,10 @@ export class HermesAdapter {
     }
 
     const data = await response.json()
+    console.log('[Hermes Adapter] Label API Response:', JSON.stringify(data))
     
-    // HSI returns tracking number in shipmentID or similar field depending on the exact version
-    // Usually it's data.shipmentID or data.shipmentOrder.shipmentID
-    const trackingNumber = data.shipmentID || data.shipmentOrder?.shipmentID || 'HERMES-' + Date.now()
+    const trackingNumber = data.shipmentID || data.shipmentOrder?.shipmentID || data.barcode || data.shipmentOrder?.barcode || 'HERMES-' + Date.now()
     
-    // Label is base64 in labelImage
     const base64 = data.labelImage
     if (!base64) {
       throw new Error('Hermes API hat kein Label (labelImage) zurückgegeben.')
@@ -227,8 +225,15 @@ export class HermesAdapter {
     
     const labelUrl = `data:application/pdf;base64,${base64}`
 
-    // Extract return tracking number if present
-    const returnTrackingNumber = data.returnShipmentID || data.shipmentOrder?.returnShipmentID || data.returnBarcode || data.shipmentOrder?.returnBarcode
+    // Extract return tracking number with more fallbacks
+    const returnTrackingNumber = 
+      data.returnShipmentID || 
+      data.shipmentOrder?.returnShipmentID || 
+      data.returnBarcode || 
+      data.shipmentOrder?.returnBarcode ||
+      data.shipmentOrder?.returnShipments?.[0]?.shipmentID ||
+      data.shipmentOrder?.returnShipments?.[0]?.barcode ||
+      data.returnShipments?.[0]?.shipmentID
 
     return {
       labelUrl,
