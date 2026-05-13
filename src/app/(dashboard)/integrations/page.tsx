@@ -115,7 +115,7 @@ export default async function IntegrationsPage(props: {
             </section>
 
             {/* Shopify Card */}
-            <section className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <section className="bg-white rounded-xl shadow-sm border border-gray-200">
               <div className="p-6 border-b border-gray-100 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -295,7 +295,7 @@ export default async function IntegrationsPage(props: {
                   <h3 className="text-lg font-bold text-gray-900">Hermes Versand</h3>
                   <p className="text-sm text-gray-500">Offizielle Anbindung über die Hermes Login-Seite</p>
                 </div>
-                {integrations.find((i: any) => i.type === 'hermes')?.accessToken ? (
+                {integrations.find((i: any) => i.type === 'hermes')?.clientId ? (
                   <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
                     <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                     Aktiv
