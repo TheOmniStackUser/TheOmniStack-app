@@ -201,11 +201,15 @@ export class HermesAdapter {
 
     if (returnType === 'enclosed' || returnType === 'virtual') {
       console.log(`[Hermes Adapter] Fordere Retourenlabel an (Typ: ${returnType}) für Marktplatz: ${marketplace}`)
+      
+      // Top-level fields according to HSI documentation
+      ;(payload as any).returnReceiverName = {
+        name1: (payload.senderName.firstname + ' ' + payload.senderName.lastname).trim().slice(0, 50)
+      }
+      ;(payload as any).returnReceiverAddress = payload.senderAddress
+      
+      // Some HSI versions also need this in service, but top-level is primary
       ;(payload.service as any).returnService = {
-        returnReceiverName: {
-          name1: (payload.senderName.firstname + ' ' + payload.senderName.lastname).trim().slice(0, 50)
-        },
-        returnReceiverAddress: payload.senderAddress,
         returnProductType: 'PARCEL',
         returnServiceType: 'RETURN'
       }
