@@ -110,7 +110,7 @@ export async function saveHermesIntegrationAction(
   const finalSecret = (clientSecret && clientSecret.length > 0) ? clientSecret : existing?.clientSecret
 
   if (!finalSecret) {
-    return { errors: { clientSecret: 'Passwort ist erforderlich (noch kein Passwort gespeichert).' } }
+    return { errors: { clientSecret: ['Passwort ist erforderlich (noch kein Passwort gespeichert).'] } }
   }
 
   if (existing) {
