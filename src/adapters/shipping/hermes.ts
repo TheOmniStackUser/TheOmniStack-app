@@ -185,12 +185,7 @@ export class HermesAdapter {
         parcelVolume: parcelVolume,  // Mandatory for Self-Service (in dl)
         productType: 'PARCEL'
       },
-      service: {
-        customerAlertService: {
-          notificationEmail: order.buyerEmail || 'no-reply@hermes.de',
-          notificationType: 'EMAIL'
-        }
-      }
+      service: {}
     }
     // Check for return configuration
     const marketplace = (order.marketplace || 'unknown').toLowerCase()
