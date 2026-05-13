@@ -197,15 +197,21 @@ export class HermesAdapter {
       }
     }
 
-    const response = await fetch(`${this.baseUrl}/services/hsi/shipmentorders/labels`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/shippinglabel-pdf+json'
-      },
-      body: JSON.stringify(payload)
-    })
+    let response: Response
+    try {
+      response = await fetch(`${this.baseUrl}/services/hsi/shipmentorders/labels`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/shippinglabel-pdf+json'
+        },
+        body: JSON.stringify(payload)
+      })
+    } catch (fetchError: any) {
+      console.error('[Hermes Adapter] Network/Fetch Error:', fetchError)
+      throw new Error(`Hermes API Verbindung fehlgeschlagen: ${fetchError.message || 'Netzwerkfehler'}. Prüfe die Internetverbindung oder DNS-Einstellungen.`)
+    }
 
     if (!response.ok) {
       const errText = await response.text()
