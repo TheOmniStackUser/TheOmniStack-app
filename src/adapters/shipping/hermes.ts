@@ -195,8 +195,16 @@ export class HermesAdapter {
 
     // Check for return configuration
     const marketplace = (order.marketplace || 'unknown').toLowerCase()
-    const returnType = this.config?.platformReturns?.[marketplace] || 'none'
-    console.log(`[Hermes Adapter] Return Config Check: marketplace=${marketplace}, returnType=${returnType}`)
+    let returnType = this.config?.platformReturns?.[marketplace] || 'none'
+    
+    // AUTO-FIX: Otto ALWAYS requires a return number. If it's set to 'none', we force 'virtual' 
+    // to ensure the shipment can be confirmed at all.
+    if (marketplace === 'otto' && returnType === 'none') {
+      console.log(`[Hermes Adapter] Auto-fixing returnType to 'virtual' for Otto shipment.`)
+      returnType = 'virtual'
+    }
+
+    console.log(`[Hermes Adapter] Return Config Check: marketplace=${marketplace}, returnType=${returnType}, integrationId=${this.integrationId}`)
 
     if (returnType === 'enclosed' || returnType === 'virtual') {
       console.log(`[Hermes Adapter] Fordere Retourenlabel an (Typ: ${returnType}) für Marktplatz: ${marketplace}`)
