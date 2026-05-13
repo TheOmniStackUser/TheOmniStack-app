@@ -15,6 +15,7 @@ export class HermesAdapter {
   // User credentials (identifies the business customer - set via DB)
   private username: string
   private password: string
+  private config: any = null
 
   constructor(
     integrationId: string | null = null, 
@@ -26,6 +27,10 @@ export class HermesAdapter {
     this.accessToken = accessToken
     this.username = username
     this.password = password
+  }
+
+  public setConfig(config: any) {
+    this.config = config
   }
 
   private splitStreet(full: string | null | undefined): { street: string; houseNo: string } {
@@ -58,12 +63,18 @@ export class HermesAdapter {
       throw new Error('Hermes ist nicht konfiguriert. Bitte trage deine Hermes GKP-Zugangsdaten unter Integrationen ein.')
     }
 
-    return new HermesAdapter(
+    const adapter = new HermesAdapter(
       integration.id, 
       integration.accessToken,
       integration.clientId,   // GKP Username stored in clientId field
       integration.clientSecret ?? '' // GKP Password stored in clientSecret field
     )
+
+    if (integration.metadata) {
+      adapter.setConfig(integration.metadata)
+    }
+
+    return adapter
   }
 
   private async getAccessToken(): Promise<string> {
@@ -109,7 +120,7 @@ export class HermesAdapter {
     order: any, 
     company: any, 
     parcelClass: string = 'S'
-  ): Promise<{ labelUrl: string, trackingNumber: string }> {
+  ): Promise<{ labelUrl: string, trackingNumber: string, returnTrackingNumber?: string }> {
     console.log(`[Hermes Adapter] Generiere Versandetikett für Bestellung ${order.marketplaceOrderId || order.id} (Klasse: ${parcelClass})...`)
 
     const token = await this.getAccessToken()
@@ -172,6 +183,20 @@ export class HermesAdapter {
       }
     }
 
+    // Check for return configuration
+    const marketplace = order.marketplace || 'unknown'
+    const returnType = this.config?.platformReturns?.[marketplace] || 'none'
+
+    if (returnType === 'enclosed' || returnType === 'virtual') {
+      console.log(`[Hermes Adapter] Fordere Retourenlabel an (Typ: ${returnType}) für Marktplatz: ${marketplace}`)
+      // For HSI, an enclosed return is typically requested via returnService
+      // We use the same address as the sender for the return recipient
+      ;(payload.service as any).returnService = {
+        returnReceiverName: payload.senderName,
+        returnReceiverAddress: payload.senderAddress
+      }
+    }
+
     const response = await fetch(`${this.baseUrl}/services/hsi/shipmentorders/labels`, {
       method: 'POST',
       headers: {
@@ -202,9 +227,13 @@ export class HermesAdapter {
     
     const labelUrl = `data:application/pdf;base64,${base64}`
 
+    // Extract return tracking number if present
+    const returnTrackingNumber = data.returnShipmentID || data.shipmentOrder?.returnShipmentID || data.returnBarcode || data.shipmentOrder?.returnBarcode
+
     return {
       labelUrl,
-      trackingNumber
+      trackingNumber,
+      returnTrackingNumber
     }
   }
 
