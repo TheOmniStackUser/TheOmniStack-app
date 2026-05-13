@@ -309,6 +309,7 @@ export default async function IntegrationsPage(props: {
               <div className="p-6 bg-gray-50 flex justify-center">
                 <HermesIntegrationForm 
                   initialClientId={integrations.find((i: any) => i.type === 'hermes')?.clientId || ''}
+                  initialConfig={(integrations.find((i: any) => i.type === 'hermes')?.metadata as any) ?? undefined}
                 />
               </div>
             </section>

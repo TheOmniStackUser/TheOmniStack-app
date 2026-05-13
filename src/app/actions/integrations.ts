@@ -76,6 +76,7 @@ export async function saveOttoIntegrationAction(
 const HermesIntegrationSchema = z.object({
   clientId: z.string().min(1, { message: 'Benutzername ist erforderlich.' }).trim(),
   clientSecret: z.string().trim().optional(), // Optional: keep existing if not changed
+  hermesConfig: z.string().optional(), // JSON string from form
 })
 
 export async function saveHermesIntegrationAction(
@@ -93,10 +94,15 @@ export async function saveHermesIntegrationAction(
     return { errors: validated.error.flatten().fieldErrors }
   }
 
-  const { clientId, clientSecret } = validated.data
+  const { clientId, clientSecret, hermesConfig } = validated.data
+  const metadata = hermesConfig ? JSON.parse(hermesConfig) : null
 
   const [existing] = await db
-    .select({ id: marketplaceIntegrations.id, clientSecret: marketplaceIntegrations.clientSecret })
+    .select({ 
+      id: marketplaceIntegrations.id, 
+      clientSecret: marketplaceIntegrations.clientSecret,
+      metadata: marketplaceIntegrations.metadata
+    })
     .from(marketplaceIntegrations)
     .where(
       and(
@@ -116,7 +122,12 @@ export async function saveHermesIntegrationAction(
   if (existing) {
     await db
       .update(marketplaceIntegrations)
-      .set({ clientId, clientSecret: finalSecret, updatedAt: new Date() })
+      .set({ 
+        clientId, 
+        clientSecret: finalSecret, 
+        metadata: metadata ?? existing.metadata,
+        updatedAt: new Date() 
+      })
       .where(eq(marketplaceIntegrations.id, existing.id))
   } else {
     await db
@@ -126,6 +137,7 @@ export async function saveHermesIntegrationAction(
         type: 'hermes',
         clientId,
         clientSecret: finalSecret,
+        metadata: metadata
       })
   }
 
