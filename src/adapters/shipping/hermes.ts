@@ -194,7 +194,7 @@ export class HermesAdapter {
     }
 
     // Check for return configuration
-    const marketplace = order.marketplace || 'unknown'
+    const marketplace = (order.marketplace || 'unknown').toLowerCase()
     const returnType = this.config?.platformReturns?.[marketplace] || 'none'
     console.log(`[Hermes Adapter] Return Config Check: marketplace=${marketplace}, returnType=${returnType}`)
 
@@ -251,11 +251,9 @@ export class HermesAdapter {
       data.shipmentOrder?.returnShipments?.[0]?.barcode ||
       data.returnShipments?.[0]?.shipmentID
 
-    // Validation for marketplaces that REQUIRE a return number (like Otto)
+    // Validation: If a return was requested but no number came back, we must stop here.
     if ((returnType === 'enclosed' || returnType === 'virtual') && !returnTrackingNumber) {
-      if (marketplace === 'otto') {
-        throw new Error(`Hermes hat keine Retourennummer geliefert, diese ist aber für Otto zwingend erforderlich. Bitte prüfe, ob dein Hermes-Account für den Service 'Retouren' (HSI Beilageretoure) freigeschaltet ist.`)
-      }
+      throw new Error(`Hermes hat keine Retourennummer geliefert, obwohl eine angefordert wurde (Marktplatz: ${marketplace}). Bitte prüfe, ob dein Hermes-Account für den Service 'Retouren' (HSI Beilageretoure) freigeschaltet ist. Falls nicht, kann für Otto keine Sendung bestätigt werden.`)
     }
 
     return {
