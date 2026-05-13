@@ -266,7 +266,6 @@ export function DhlIntegrationForm({ initialConfig }: { initialConfig?: DhlConfi
     otto: 'enclosed_without_label',
     amazon: 'online',
     mirakl_decathlon: 'online',
-    hermes: 'online',
   }
   const [platformReturns, setPlatformReturns] = useState<DhlConfig['platformReturns']>(
     initialConfig?.platformReturns ?? DEFAULT_PLATFORM_RETURNS
@@ -537,7 +536,6 @@ export function DhlIntegrationForm({ initialConfig }: { initialConfig?: DhlConfi
             { key: 'otto',             label: 'Otto',              icon: '🟥', hint: 'Otto-Kunden drucken das Label über das Otto-Portal – kein eigenes Label nötig.' },
             { key: 'amazon',           label: 'Amazon',            icon: '🟧', hint: 'Amazon bietet ein eigenes Retouren-Portal an.' },
             { key: 'mirakl_decathlon', label: 'Decathlon (Mirakl)', icon: '🟦', hint: '' },
-            { key: 'hermes',           label: 'Hermes',            icon: '🟪', hint: '' },
           ] as const).map(({ key, label, icon, hint }) => {
             const value = platformReturns[key] ?? 'online'
             return (
