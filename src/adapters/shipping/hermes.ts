@@ -186,6 +186,7 @@ export class HermesAdapter {
     // Check for return configuration
     const marketplace = order.marketplace || 'unknown'
     const returnType = this.config?.platformReturns?.[marketplace] || 'none'
+    console.log(`[Hermes Adapter] Return Config Check: marketplace=${marketplace}, returnType=${returnType}`)
 
     if (returnType === 'enclosed' || returnType === 'virtual') {
       console.log(`[Hermes Adapter] Fordere Retourenlabel an (Typ: ${returnType}) für Marktplatz: ${marketplace}`)

@@ -118,7 +118,8 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
         
         // Confirm shipment in marketplace (e.g. Otto)
         if (order.marketplace === 'otto' && ottoAdapter && order.marketplaceOrderId) {
-          console.log(`[Hermes-Action] Triggering Otto confirmation for ${order.marketplaceOrderId} with tracking ${trackingNumber}`)
+          console.log(`[Hermes-Action] Otto Check: order.id=${order.id}, marketplace=${order.marketplace}, tracking=${trackingNumber}, returnTracking=${returnTrackingNumber}`)
+          console.log(`[Hermes-Action] Triggering Otto confirmation for ${order.marketplaceOrderId}`)
           try {
             await ottoAdapter.confirmShipment(
               order.marketplaceOrderId, 
