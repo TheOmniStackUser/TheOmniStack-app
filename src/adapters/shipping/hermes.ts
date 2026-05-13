@@ -203,11 +203,11 @@ export class HermesAdapter {
       console.log(`[Hermes Adapter] Fordere Retourenlabel an (Typ: ${returnType}) für Marktplatz: ${marketplace}`)
       ;(payload.service as any).returnService = {
         returnReceiverName: {
-          firstname: payload.senderName.firstname,
-          lastname: payload.senderName.lastname
+          name1: (payload.senderName.firstname + ' ' + payload.senderName.lastname).trim().slice(0, 50)
         },
         returnReceiverAddress: payload.senderAddress,
-        returnProductType: 'PARCEL'
+        returnProductType: 'PARCEL',
+        returnServiceType: 'RETURN'
       }
     }
 
