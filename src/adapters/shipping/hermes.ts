@@ -278,9 +278,9 @@ export class HermesAdapter {
       data.shipmentOrder?.returnShipments?.[0]?.barcode ||
       data.returnShipments?.[0]?.shipmentID
 
-    // Validation
+    // Extraction and non-blocking validation
     if ((returnType === 'enclosed' || returnType === 'virtual') && !returnTrackingNumber) {
-      throw new Error(`Hermes hat keine Retourennummer geliefert, obwohl eine angefordert wurde (Marktplatz: ${marketplace}). Bitte prüfe, ob dein Hermes-Account für den Service 'Retouren' freigeschaltet ist.`)
+      console.warn(`[Hermes Adapter] WARNUNG: Hermes hat keine Retourennummer geliefert, obwohl eine angefordert wurde (Marktplatz: ${marketplace}). Wahrscheinlich ist der Service für diesen Account noch nicht freigeschaltet.`)
     }
 
     return {
