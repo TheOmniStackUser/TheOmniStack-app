@@ -21,6 +21,7 @@ export default async function AdminMerchantsPage() {
       name: companies.name,
       email: companies.email,
       createdAt: companies.createdAt,
+      trialExpiresAt: companies.trialExpiresAt,
     })
     .from(companies)
     .orderBy(companies.createdAt)
@@ -88,6 +89,7 @@ export default async function AdminMerchantsPage() {
                 <th className="text-right px-6 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider">{lastMonthName}</th>
                 <th className="text-right px-6 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider">{monthName}</th>
                 <th className="text-right px-6 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider">Gesamt</th>
+                <th className="text-center px-6 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider">Testphase</th>
                 <th className="text-right px-6 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider">Details</th>
               </tr>
             </thead>
@@ -120,6 +122,28 @@ export default async function AdminMerchantsPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right text-white/40 text-xs">{total}</td>
+                    <td className="px-6 py-4 text-center">
+                      {company.trialExpiresAt ? (
+                        (() => {
+                          const daysLeft = Math.ceil((company.trialExpiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+                          if (daysLeft > 0) {
+                            return (
+                              <span className="bg-blue-500/10 text-blue-400 text-[10px] px-2 py-1 rounded-full font-bold">
+                                {daysLeft} Tage
+                              </span>
+                            )
+                          } else {
+                            return (
+                              <span className="bg-white/5 text-white/30 text-[10px] px-2 py-1 rounded-full">
+                                Abgelaufen
+                              </span>
+                            )
+                          }
+                        })()
+                      ) : (
+                        <span className="text-white/20 text-xs">–</span>
+                      )}
+                    </td>
                     <td className="px-6 py-4 text-right">
                       <Link
                         href={`/admin/merchants/${company.id}`}

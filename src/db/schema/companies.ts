@@ -53,6 +53,7 @@ export const companies = pgTable('companies', {
   nextInvoiceNumber: text('next_invoice_number').notNull().default('1'),
   nextCustomerNumber: text('next_customer_number').notNull().default('1'),
   nextDeliveryNoteNumber: text('next_delivery_note_number').notNull().default('1'),
+  trialExpiresAt: timestamp('trial_expires_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })

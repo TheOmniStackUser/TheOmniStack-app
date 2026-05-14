@@ -5,6 +5,7 @@ import { companies, companyMembers } from '@/db/schema/companies'
 import { users } from '@/db/schema/auth'
 import { sql, count, gte, and, eq, lte } from 'drizzle-orm'
 import { notFound } from 'next/navigation'
+import { TrialManager } from './trial-manager'
 
 export default async function AdminMerchantDetailPage({
   params,
@@ -131,6 +132,7 @@ export default async function AdminMerchantDetailPage({
             <p className="text-xs text-white/30 mb-1">Nutzer im Account</p>
             <p className="text-2xl font-bold text-white">{members.length}</p>
           </div>
+          <TrialManager companyId={company.id} currentExpiry={company.trialExpiresAt} />
           <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
             <p className="text-xs text-white/30 mb-1">Land</p>
             <p className="text-2xl font-bold text-white">{company.country}</p>

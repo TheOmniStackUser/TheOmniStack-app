@@ -33,39 +33,52 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="h-screen bg-gray-50 flex overflow-hidden">
-      <aside className="w-64 bg-slate-900 text-white flex flex-col flex-shrink-0 overflow-y-auto border-r border-slate-800">
-        <div className="p-6">
-          <Link href="/dashboard" className="block hover:opacity-80 transition-opacity">
-            <h1 className="text-xl font-bold tracking-wider">theomnistack</h1>
+    <div className="h-screen bg-[#F8FAFC] flex overflow-hidden font-sans">
+      <aside className="w-64 bg-[#0F172A] text-slate-300 flex flex-col flex-shrink-0 overflow-y-auto border-r border-slate-800/50 shadow-xl">
+        <div className="p-8">
+          <Link href="/dashboard" className="flex items-center gap-3 group transition-all duration-300">
+            <div className="relative w-8 h-8 rounded-lg overflow-hidden shadow-[0_0_15px_rgba(34,211,238,0.3)] group-hover:shadow-[0_0_20px_rgba(34,211,238,0.5)] transition-shadow">
+              <img 
+                src="/icon.png" 
+                alt="TheOmniStack Logo" 
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <h1 className="text-xl font-extrabold tracking-tight flex items-center leading-none">
+              <span className="text-white">The</span>
+              <span className="text-cyan-400">Omni</span>
+              <span className="text-white">Stack</span>
+            </h1>
           </Link>
         </div>
         <div className="flex-1">
           <SidebarNav />
         </div>
-        <div className="p-4 pb-12 border-t border-slate-800">
-          <div className="mb-4 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-            Account
+        <div className="p-6 pb-10 border-t border-slate-800/50 mt-auto bg-[#0F172A]/50">
+          <div className="mb-4 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.1em]">
+            Account & System
           </div>
-          <Link href="/settings" className="block px-4 py-2 text-sm text-slate-300 hover:text-white transition-colors">
-            Einstellungen
-          </Link>
-          <Link href="/integrations" className="block px-4 py-2 text-sm text-slate-300 hover:text-white transition-colors">
-            Integrationen
-          </Link>
-          <Link href="/settings/users" className="block px-4 py-2 text-sm text-slate-300 hover:text-white transition-colors">
-            Userverwaltung
-          </Link>
-          {user?.isSuperAdmin && (
-            <Link href="/admin" className="block px-4 py-2 text-sm text-violet-400 font-bold hover:text-violet-300 transition-colors border-t border-slate-800 mt-2 pt-2">
-              Admin Panel →
+          <nav className="space-y-1 px-2">
+            <Link href="/settings" className="flex items-center px-3 py-2 text-sm font-medium rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+              Einstellungen
             </Link>
-          )}
-          <form action={logoutAction}>
-            <button type="submit" className="w-full text-left px-4 py-2 text-sm text-red-400 hover:text-red-300 transition-colors">
-              Abmelden
-            </button>
-          </form>
+            <Link href="/integrations" className="flex items-center px-3 py-2 text-sm font-medium rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+              Integrationen
+            </Link>
+            <Link href="/settings/users" className="flex items-center px-3 py-2 text-sm font-medium rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+              Team-Verwaltung
+            </Link>
+            {user?.isSuperAdmin && (
+              <Link href="/admin" className="flex items-center px-3 py-2 text-sm font-bold rounded-lg text-cyan-400 hover:text-cyan-300 hover:bg-cyan-400/5 transition-all mt-4 border-t border-slate-800/50 pt-4">
+                Admin Panel →
+              </Link>
+            )}
+            <form action={logoutAction} className="pt-2">
+              <button type="submit" className="w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-400/5 transition-all">
+                Abmelden
+              </button>
+            </form>
+          </nav>
         </div>
       </aside>
 

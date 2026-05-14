@@ -22,7 +22,7 @@ export default async function OrdersPage() {
   })
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="max-w-[1600px] mx-auto">
       <header className="mb-8">
         <h2 className="text-3xl font-bold text-gray-900">Bestellungen</h2>
         <p className="text-gray-500 mt-2">Alle importierten Bestellungen im Überblick.</p>

@@ -13,7 +13,7 @@ export function SidebarNav() {
   ]
 
   return (
-    <nav className="flex-1 px-4 space-y-2 mt-4">
+    <nav className="flex-1 px-4 space-y-1 mt-4">
       {links.map((link) => {
         const isActive = pathname === link.href || pathname?.startsWith(`${link.href}/`)
         
@@ -21,18 +21,17 @@ export function SidebarNav() {
           <Link
             key={link.href}
             href={link.href}
-            className={`block px-4 py-2 rounded-md transition-colors ${
+            className={`flex items-center px-4 py-2.5 text-sm font-medium rounded-xl transition-all duration-200 ${
               isActive 
-                ? 'bg-blue-600 text-white' 
-                : 'text-slate-300 hover:bg-slate-800'
+                ? 'bg-cyan-500/10 text-cyan-400 shadow-[inset_0_0_10px_rgba(34,211,238,0.1)]' 
+                : 'text-slate-400 hover:text-white hover:bg-white/5'
             }`}
           >
+            <div className={`w-1.5 h-1.5 rounded-full mr-3 transition-all ${isActive ? 'bg-cyan-400' : 'bg-transparent'}`} />
             {link.label}
           </Link>
         )
       })}
-      
-
     </nav>
   )
 }

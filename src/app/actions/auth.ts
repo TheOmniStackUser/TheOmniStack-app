@@ -319,7 +319,11 @@ export async function completeRegistrationAction(
 
     const [company] = await tx
       .insert(companies)
-      .values({ name: companyName, legalName: companyLegalName })
+      .values({ 
+        name: companyName, 
+        legalName: companyLegalName,
+        trialExpiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) // 14 days
+      })
       .returning({ id: companies.id })
 
     await tx.insert(companyMembers).values({
