@@ -27,8 +27,9 @@ export default async function DashboardLayout({
   const hdrs = await headers()
   const pathname = (hdrs.get('x-pathname') || '').split('?')[0]
   
-  // Mandatory 2FA Check - Redirect to setup if not enabled
-  if (user && !user.twoFactorEnabled && !pathname.startsWith('/settings') && !pathname.startsWith('/setup-2fa')) {
+  // Mandatory 2FA Check - Redirect to setup if not enabled (Bypass for Shopify Reviewer)
+  const isTestAccount = auth.userEmail === 'shopify-test@theomnistack.de'
+  if (user && !user.twoFactorEnabled && !isTestAccount && !pathname.startsWith('/settings') && !pathname.startsWith('/setup-2fa')) {
     redirect('/setup-2fa')
   }
 
