@@ -16,6 +16,7 @@ import { saveCustomerAction } from './customers'
 
 export async function createManualInvoiceAction(data: {
   customer: {
+    id?: string
     name: string
     street: string
     zip: string
@@ -159,7 +160,7 @@ export async function createManualInvoiceAction(data: {
     let finalCustomerNumber = data.customer.customerNumber || null
     if (data.customer.name?.trim()) {
       const custResult = await saveCustomerAction({
-        id: (data.customer as any).id,
+        id: data.customer.id,
         name: data.customer.name,
         email: data.customer.email,
         street: data.customer.street,
