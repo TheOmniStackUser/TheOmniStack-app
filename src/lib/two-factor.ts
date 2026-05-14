@@ -31,8 +31,7 @@ export async function generateQrCode(url: string) {
 export function verifyTwoFactorToken(token: string, secret: string) {
   return authenticator.verify({ 
     token, 
-    secret,
-    window: 1 // Allow +/- 1 interval (30 seconds) drift
+    secret
   })
 }
 
