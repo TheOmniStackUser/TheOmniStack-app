@@ -29,7 +29,11 @@ export async function generateQrCode(url: string) {
  * Verify a TOTP code against a secret.
  */
 export function verifyTwoFactorToken(token: string, secret: string) {
-  return authenticator.verify({ token, secret })
+  return authenticator.verify({ 
+    token, 
+    secret,
+    window: 1 // Allow +/- 1 interval (30 seconds) drift
+  })
 }
 
 /**

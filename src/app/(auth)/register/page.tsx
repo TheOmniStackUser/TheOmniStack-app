@@ -1,11 +1,11 @@
 'use client'
 
 import { useActionState } from 'react'
-import { registerAction } from '@/app/actions/auth'
+import { startRegistrationAction } from '@/app/actions/auth'
 import Link from 'next/link'
 
 export default function RegisterPage() {
-  const [state, action, pending] = useActionState(registerAction, undefined)
+  const [state, action, pending] = useActionState(startRegistrationAction, undefined)
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
@@ -21,19 +21,6 @@ export default function RegisterPage() {
               {state.message}
             </div>
           )}
-
-          <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700">Dein Name</label>
-            <input
-              id="name"
-              name="name"
-              type="text"
-              required
-              defaultValue={state?.fields?.name || ''}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-black focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            />
-            {state?.errors?.name && <p className="mt-1 text-sm text-red-600">{state.errors.name}</p>}
-          </div>
 
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700">E-Mail</label>
@@ -67,44 +54,12 @@ export default function RegisterPage() {
             )}
           </div>
 
-          <div className="py-2">
-            <hr className="border-gray-200" />
-          </div>
-
-          <div>
-            <label htmlFor="companyName" className="block text-sm font-medium text-gray-700">Unternehmensname (Anzeige)</label>
-            <input
-              id="companyName"
-              name="companyName"
-              type="text"
-              required
-              defaultValue={state?.fields?.companyName || ''}
-              placeholder="Z.B. Acme Corp"
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-black focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            />
-            {state?.errors?.companyName && <p className="mt-1 text-sm text-red-600">{state.errors.companyName}</p>}
-          </div>
-
-          <div>
-            <label htmlFor="companyLegalName" className="block text-sm font-medium text-gray-700">Rechtlicher Name (für Rechnungen)</label>
-            <input
-              id="companyLegalName"
-              name="companyLegalName"
-              type="text"
-              required
-              defaultValue={state?.fields?.companyLegalName || ''}
-              placeholder="Z.B. Acme Corporation GmbH"
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-black focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            />
-            {state?.errors?.companyLegalName && <p className="mt-1 text-sm text-red-600">{state.errors.companyLegalName}</p>}
-          </div>
-
           <button
             type="submit"
             disabled={pending}
             className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
           >
-            {pending ? 'Wird erstellt...' : 'Konto erstellen'}
+            {pending ? 'Sende Bestätigungslink...' : 'E-Mail bestätigen'}
           </button>
         </form>
 

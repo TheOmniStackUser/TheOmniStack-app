@@ -2,13 +2,14 @@
 
 import React, { useState, useEffect } from 'react'
 import { setupTwoFactorAction, enableTwoFactorAction } from '@/app/actions/auth'
-import { Loader2, ShieldCheck } from 'lucide-react'
+import { Loader2, ShieldCheck, AlertCircle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 export function TwoFactorSetup() {
   const [setupData, setSetupData] = useState<{ secret: string; qrCodeUrl: string } | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isActivating, setIsActivating] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -27,16 +28,18 @@ export function TwoFactorSetup() {
 
   const handleActivate = async (formData: FormData) => {
     setIsActivating(true)
+    setErrorMessage(null)
     try {
       const res = await enableTwoFactorAction(undefined, formData)
       if (res?.message?.includes('erfolgreich')) {
         router.push('/dashboard')
         router.refresh()
       } else {
-        alert(res?.message || 'Fehler beim Aktivieren.')
+        setErrorMessage(res?.message || 'Fehler beim Aktivieren.')
       }
     } catch (error) {
       console.error(error)
+      setErrorMessage('Ein unerwarteter Fehler ist aufgetreten.')
     } finally {
       setIsActivating(false)
     }
@@ -88,10 +91,18 @@ export function TwoFactorSetup() {
               name="code"
               type="text"
               placeholder="000 000"
-              className="block w-full px-4 py-4 text-center text-3xl font-bold tracking-[0.3em] text-slate-900 rounded-2xl border-2 border-slate-100 focus:border-blue-600 focus:ring-0 outline-none transition-all placeholder:text-slate-200"
+              className={`block w-full px-4 py-4 text-center text-3xl font-bold tracking-[0.3em] text-slate-900 rounded-2xl border-2 transition-all placeholder:text-slate-200 outline-none focus:ring-0 ${
+                errorMessage ? 'border-red-500 bg-red-50' : 'border-slate-100 focus:border-blue-600'
+              }`}
               required
               autoFocus
+              onChange={() => setErrorMessage(null)}
             />
+            {errorMessage && (
+              <p className="text-xs font-bold text-red-600 mt-2 ml-1 flex items-center gap-1">
+                <AlertCircle size={12} /> {errorMessage}
+              </p>
+            )}
           </div>
           
           <button

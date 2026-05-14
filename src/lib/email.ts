@@ -7,13 +7,13 @@ import { InvitationEmail } from '@/emails/InvitationEmail'
 const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder')
 
 // Standard sender address once the domain is verified.
-const DEFAULT_SENDER = 'TheOmniStack Team <hallo@theomnistack.de>'
+const DEFAULT_SENDER = 'TheOmniStack Team <noreply@theomnistack.de>'
 
 export async function sendVerificationEmail(toEmail: string, token: string) {
   try {
     // Generate the full verify link based on the current environment
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-    const verifyLink = `${baseUrl}/verify-email?token=${token}`
+    const verifyLink = `${baseUrl}/register/verify?token=${token}`
 
     const { data, error } = await resend.emails.send({
       from: DEFAULT_SENDER,

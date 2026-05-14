@@ -4,12 +4,14 @@ import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 import { db } from '@/db/client'
-import { users } from '@/db/schema/auth'
+import { users, pendingRegistrations, verificationTokens } from '@/db/schema/auth'
 import { companyMembers, companies } from '@/db/schema/companies'
 import { createSession, deleteSession, getSession } from '@/lib/session'
 import { auditLog } from '@/lib/audit'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, gt } from 'drizzle-orm'
 import { headers } from 'next/headers'
+import crypto from 'crypto'
+import { sendVerificationEmail } from '@/lib/email'
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 const LoginSchema = z.object({
@@ -18,13 +20,16 @@ const LoginSchema = z.object({
 })
 
 const RegisterSchema = z.object({
-  name: z.string().min(2, { message: 'Name muss mindestens 2 Zeichen lang sein.' }).trim(),
   email: z.string().email({ message: 'Bitte gib eine gültige E-Mail ein.' }).trim(),
   password: z
     .string()
     .min(8, { message: 'Passwort muss mindestens 8 Zeichen lang sein.' })
     .regex(/[A-Z]/, { message: 'Muss einen Großbuchstaben enthalten.' })
     .regex(/[0-9]/, { message: 'Muss eine Zahl enthalten.' }),
+})
+
+const DetailsSchema = z.object({
+  name: z.string().min(2, { message: 'Name muss mindestens 2 Zeichen lang sein.' }).trim(),
   companyName: z.string().min(2, { message: 'Firmenname ist erforderlich.' }).trim(),
   companyLegalName: z.string().min(2, { message: 'Rechtlicher Name ist erforderlich.' }).trim(),
 })
@@ -61,6 +66,29 @@ export async function loginAction(
 
   if (!user.isActive) {
     return { message: 'Dieses Konto wurde deaktiviert.' }
+  }
+
+  if (!user.emailVerifiedAt) {
+    // Generate a verification token for the existing user
+    const token = crypto.randomBytes(32).toString('hex')
+    const expiresAt = new Date(Date.now() + 3600 * 1000) // 1 hour
+
+    await db
+      .insert(verificationTokens)
+      .values({
+        identifier: email.toLowerCase(),
+        token,
+        expiresAt,
+      })
+      .onConflictDoUpdate({
+        target: verificationTokens.token,
+        set: { expiresAt, createdAt: new Date() }
+      })
+
+    const { sendVerificationEmail } = await import('@/lib/email')
+    await sendVerificationEmail(email.toLowerCase(), token)
+
+    return { message: 'Bitte bestätige zuerst deine E-Mail-Adresse. Wir haben dir gerade einen neuen Bestätigungslink gesendet.' }
   }
 
   // Two-Factor Authentication Check
@@ -150,17 +178,14 @@ export async function verifyTwoFactorLoginAction(
   redirect(membership ? '/dashboard' : '/select-company')
 }
 
-// ─── Register ─────────────────────────────────────────────────────────────────
-export async function registerAction(
+// ─── Step 1: Start Registration (Email + PW) ──────────────────────────────────
+export async function startRegistrationAction(
   _state: AuthFormState,
   formData: FormData
 ): Promise<AuthFormState> {
   const validated = RegisterSchema.safeParse({
-    name: formData.get('name'),
     email: formData.get('email'),
     password: formData.get('password'),
-    companyName: formData.get('companyName'),
-    companyLegalName: formData.get('companyLegalName'),
   })
 
   if (!validated.success) {
@@ -168,9 +193,9 @@ export async function registerAction(
     return { errors: validated.error.flatten().fieldErrors, fields }
   }
 
-  const { name, email, password, companyName, companyLegalName } = validated.data
+  const { email, password } = validated.data
 
-  // Check for duplicate email
+  // Check if user already exists
   const [existing] = await db
     .select({ id: users.id })
     .from(users)
@@ -178,11 +203,105 @@ export async function registerAction(
     .limit(1)
 
   if (existing) {
-    const fields = Object.fromEntries(formData.entries()) as Record<string, string>
-    return { errors: { email: ['Diese E-Mail-Adresse ist bereits registriert.'] }, fields }
+    return { message: 'Diese E-Mail-Adresse wird bereits verwendet.' }
   }
 
   const passwordHash = await bcrypt.hash(password, 12)
+  const token = crypto.randomBytes(32).toString('hex')
+  const expiresAt = new Date(Date.now() + 3600 * 1000) // 1 hour
+
+  await db
+    .insert(pendingRegistrations)
+    .values({
+      email: email.toLowerCase(),
+      passwordHash,
+      token,
+      expiresAt,
+    })
+    .onConflictDoUpdate({
+      target: pendingRegistrations.email,
+      set: { token, passwordHash, expiresAt, createdAt: new Date() }
+    })
+
+  await sendVerificationEmail(email.toLowerCase(), token)
+
+  redirect('/register/check-email')
+}
+
+// ─── Step 2: Verify Email & Load Pending Data ─────────────────────────────────
+export async function verifyEmailTokenAction(token: string) {
+  if (!token) redirect('/register')
+
+  const [pending] = await db
+    .select()
+    .from(pendingRegistrations)
+    .where(
+      and(
+        eq(pendingRegistrations.token, token),
+        gt(pendingRegistrations.expiresAt, new Date())
+      )
+    )
+    .limit(1)
+
+  if (!pending) {
+    // Check if it's an existing user verifying their email
+    const [existingToken] = await db
+      .select()
+      .from(verificationTokens)
+      .where(
+        and(
+          eq(verificationTokens.token, token),
+          gt(verificationTokens.expiresAt, new Date())
+        )
+      )
+      .limit(1)
+
+    if (existingToken) {
+      // Mark existing user as verified
+      await db
+        .update(users)
+        .set({ emailVerifiedAt: new Date() })
+        .where(eq(users.email, existingToken.identifier.toLowerCase()))
+
+      // Cleanup token
+      await db.delete(verificationTokens).where(eq(verificationTokens.id, existingToken.id))
+
+      return { success: true, message: 'E-Mail erfolgreich bestätigt. Du kannst dich jetzt einloggen.' }
+    }
+
+    return { error: 'Ungültiger oder abgelaufener Verifizierungslink.' }
+  }
+
+  return { email: pending.email }
+}
+
+// ─── Step 3: Complete Registration (Name + Company) ───────────────────────────
+export async function completeRegistrationAction(
+  _state: AuthFormState,
+  formData: FormData
+): Promise<AuthFormState> {
+  const token = formData.get('token') as string
+  const validated = DetailsSchema.safeParse({
+    name: formData.get('name'),
+    companyName: formData.get('companyName'),
+    companyLegalName: formData.get('companyLegalName'),
+  })
+
+  if (!validated.success) {
+    return { errors: validated.error.flatten().fieldErrors }
+  }
+
+  const [pending] = await db
+    .select()
+    .from(pendingRegistrations)
+    .where(eq(pendingRegistrations.token, token))
+    .limit(1)
+
+  if (!pending) {
+    return { message: 'Registrierungssitzung abgelaufen.' }
+  }
+
+  const { name, companyName, companyLegalName } = validated.data
 
   let newUserId: string | null = null
   let newCompanyId: string | null = null
@@ -190,7 +309,12 @@ export async function registerAction(
   await db.transaction(async (tx) => {
     const [user] = await tx
       .insert(users)
-      .values({ name, email: email.toLowerCase(), passwordHash })
+      .values({ 
+        name, 
+        email: pending.email, 
+        passwordHash: pending.passwordHash,
+        emailVerifiedAt: new Date() 
+      })
       .returning({ id: users.id })
 
     const [company] = await tx
@@ -204,6 +328,9 @@ export async function registerAction(
       role: 'owner',
     })
 
+    // Cleanup pending registration
+    await tx.delete(pendingRegistrations).where(eq(pendingRegistrations.id, pending.id))
+
     newUserId = user.id
     newCompanyId = company.id
   })
@@ -213,6 +340,15 @@ export async function registerAction(
   }
 
   redirect('/setup-2fa')
+}
+
+// ─── Legacy Register (Remove later or keep for compatibility) ────────────────
+export async function registerAction(
+  _state: AuthFormState,
+  formData: FormData
+): Promise<AuthFormState> {
+  // We now use startRegistrationAction
+  return startRegistrationAction(_state, formData)
 }
 
 // ─── Logout ───────────────────────────────────────────────────────────────────
@@ -274,8 +410,11 @@ export async function enableTwoFactorAction(
   _state: AuthFormState,
   formData: FormData
 ): Promise<AuthFormState> {
-  const code = formData.get('code') as string
+  const rawCode = formData.get('code') as string
   const secret = formData.get('secret') as string
+
+  // Sanitize code (remove spaces)
+  const code = rawCode?.replace(/\s+/g, '')
 
   if (!code || !secret) {
     return { message: 'Code und Secret sind erforderlich.' }

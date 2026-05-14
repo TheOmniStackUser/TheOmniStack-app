@@ -115,6 +115,9 @@ export class HermesAdapter {
     }
 
     const data = await response.json()
+    console.log('[Hermes Adapter] API Response:', JSON.stringify(data, null, 2))
+    
+    const labelUrl = data.labelImage || data.shipmentOrder?.labelImage || data.labelImage?.[0]
     this.accessToken = data.access_token
     return data.access_token
   }
@@ -205,19 +208,19 @@ export class HermesAdapter {
       const returnName = {
         name1: (payload.senderName.firstname + ' ' + payload.senderName.lastname).trim().slice(0, 50)
       }
-      const returnAddress = payload.senderAddress
+      const returnAddress = {
+        ...payload.senderAddress,
+        countryCode: 'DE'
+      }
 
-      // 1. Top-level fields (HSI 2.0 style)
-      ;(payload as any).returnReceiverName = returnName
-      ;(payload as any).returnReceiverAddress = returnAddress
-      
-      // 2. Nested service fields (HSI 1.x style)
-      ;(payload.service as any).flexReturnService = true // Try boolean instead of string
-      ;(payload.service as any).returnService = {
-        returnReceiverName: returnName,
-        returnReceiverAddress: returnAddress,
-        returnProductType: 'PARCEL',
-        returnServiceType: 'RETURN'
+      // Simple returnService object approach
+      ;(payload as any).service = {
+        returnService: {
+          returnReceiverName: returnName,
+          returnReceiverAddress: returnAddress,
+          returnProductType: 'PARCEL',
+          returnServiceType: 'RETURN'
+        }
       }
     }
 
@@ -241,16 +244,14 @@ export class HermesAdapter {
 
     if (!response.ok) {
       const errText = await response.text()
-      console.error('[Hermes Adapter] Label Error:', errText)
       throw new Error(`Hermes API Fehler: ${response.status} - ${errText}`)
     }
 
     const data = await response.json()
-    console.log('[Hermes Adapter] Label API Response:', JSON.stringify(data))
     
     const trackingNumber = data.shipmentID || data.shipmentOrder?.shipmentID || data.barcode || data.shipmentOrder?.barcode || 'HERMES-' + Date.now()
     
-    const base64 = data.labelImage
+    const base64 = data.labelImage || data.shipmentOrder?.labelImage
     if (!base64) {
       throw new Error('Hermes API hat kein Label (labelImage) zurückgegeben.')
     }
@@ -258,14 +259,14 @@ export class HermesAdapter {
     const labelUrl = `data:application/pdf;base64,${base64}`
     let returnLabelUrl: string | undefined = undefined
     
-    if (data.returnLabelImage) {
-      returnLabelUrl = `data:application/pdf;base64,${data.returnLabelImage}`
-    } else if (data.shipmentOrder?.returnLabelImage) {
-      returnLabelUrl = `data:application/pdf;base64,${data.shipmentOrder.returnLabelImage}`
-    } else if (data.shipmentOrder?.returnShipments?.[0]?.labelImage) {
-      returnLabelUrl = `data:application/pdf;base64,${data.shipmentOrder.returnShipments[0].labelImage}`
-    } else if (data.returnShipments?.[0]?.labelImage) {
-      returnLabelUrl = `data:application/pdf;base64,${data.returnShipments[0].labelImage}`
+    // Robust return label extraction
+    const rawReturnImage = data.returnLabelImage || data.shipmentOrder?.returnLabelImage || (data.returnShipments?.[0]?.labelImage) || (data.shipmentOrder?.returnShipments?.[0]?.labelImage)
+    
+    if (rawReturnImage) {
+      const base64Return = Array.isArray(rawReturnImage) ? rawReturnImage[0] : rawReturnImage
+      if (base64Return && typeof base64Return === 'string' && base64Return.length > 100) {
+        returnLabelUrl = `data:application/pdf;base64,${base64Return}`
+      }
     }
 
     // Extract return tracking number with more fallbacks
