@@ -202,17 +202,20 @@ export class HermesAdapter {
     if (returnType === 'enclosed' || returnType === 'virtual') {
       console.log(`[Hermes Adapter] Fordere Retourenlabel an (Typ: ${returnType}) für Marktplatz: ${marketplace}`)
       
-      // Top-level fields according to HSI documentation
-      ;(payload as any).returnReceiverName = {
+      const returnName = {
         name1: (payload.senderName.firstname + ' ' + payload.senderName.lastname).trim().slice(0, 50)
       }
-      ;(payload as any).returnReceiverAddress = payload.senderAddress
+      const returnAddress = payload.senderAddress
+
+      // 1. Top-level fields (HSI 2.0 style)
+      ;(payload as any).returnReceiverName = returnName
+      ;(payload as any).returnReceiverAddress = returnAddress
       
-      // Official HSI trigger for enclosed returns (Beilageretoure)
-      ;(payload.service as any).flexReturnService = "true"
-      
-      // Some HSI versions also need this in service
+      // 2. Nested service fields (HSI 1.x style)
+      ;(payload.service as any).flexReturnService = true // Try boolean instead of string
       ;(payload.service as any).returnService = {
+        returnReceiverName: returnName,
+        returnReceiverAddress: returnAddress,
         returnProductType: 'PARCEL',
         returnServiceType: 'RETURN'
       }
