@@ -23,19 +23,31 @@ export async function POST(req: NextRequest) {
 
     const model = genAI.getGenerativeModel({ 
       model: 'gemini-1.5-flash',
-      generationConfig: { responseMimeType: "application/json" } // Zwingt Gemini zu JSON
+      generationConfig: { responseMimeType: "application/json" }
     })
     
     const prompt = `
-      Analysiere dieses Bild eines Versandlabels oder Lieferscheins.
-      Extrahiere folgende Felder als JSON:
+      Du bist ein Experte für Logistik und Dokumentenerkennung. 
+      Analysiere das beigefügte Bild (Versandlabel oder Lieferschein).
+      
+      SUCHE NACH DIESEN DATEN:
+      1. Bestellnummer: Suche nach "Bestell-Nr", "Order ID", "Referenz", "Rechnungsnummer" oder Barcode-Werten.
+      2. Kunde: Suche nach dem Empfänger oder Namen auf dem Lieferschein.
+      3. Artikel (Items): Suche nach Tabellen oder Listen mit Artikelnummern (SKU), EANs oder Produktnamen und deren Menge.
+      
+      WICHTIG:
+      - Wenn es ein Hermes/DHL Label ist, ist die "Referenz" oft die Bestellnummer.
+      - Antworte STRENG im JSON-Format.
+      - Wenn ein Feld nicht gefunden wird, setze es auf null.
+      
+      JSON STRUKTUR:
       {
-        "order_number": "String oder null",
-        "customer_name": "String oder null",
+        "order_number": "String",
+        "customer_name": "String",
         "items": [
-          { "sku": "String", "quantity": 1 }
+          { "sku": "String", "quantity": number }
         ],
-        "document_type": "label" | "delivery_note"
+        "document_type": "label" | "delivery_note" | "other"
       }
     `
 
@@ -50,15 +62,14 @@ export async function POST(req: NextRequest) {
     ])
 
     const responseText = result.response.text().trim()
-    console.log('AI Raw Response:', responseText)
+    console.log('AI Analysis Result for Company', company.name, ':', responseText)
     
-    // Sicherstellen, dass wir nur das JSON-Objekt nehmen
     const jsonMatch = responseText.match(/\{[\s\S]*\}/)
     const cleanJson = jsonMatch ? jsonMatch[0] : responseText
     
     return NextResponse.json(JSON.parse(cleanJson))
   } catch (error: any) {
     console.error('AI Analysis Error:', error)
-    return NextResponse.json({ error: 'Failed to analyze image', details: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Analysis failed', details: error.message }, { status: 500 })
   }
 }
