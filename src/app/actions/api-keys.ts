@@ -8,12 +8,12 @@ import { revalidatePath } from 'next/cache'
 
 export async function getApiKeyAction() {
   const session = await getSession()
-  if (!session?.companyId) throw new Error('Unauthorized')
+  if (!session?.activeCompanyId) throw new Error('Unauthorized')
 
   const [company] = await db
     .select({ apiKey: companies.apiKey })
     .from(companies)
-    .where(eq(companies.id, session.companyId))
+    .where(eq(companies.id, session.activeCompanyId))
     .limit(1)
 
   return company?.apiKey
@@ -21,14 +21,14 @@ export async function getApiKeyAction() {
 
 export async function generateApiKeyAction() {
   const session = await getSession()
-  if (!session?.companyId) throw new Error('Unauthorized')
+  if (!session?.activeCompanyId) throw new Error('Unauthorized')
 
   const newApiKey = `os_${Buffer.from(Math.random().toString()).toString('hex').slice(0, 32)}`
 
   await db
     .update(companies)
     .set({ apiKey: newApiKey })
-    .where(eq(companies.id, session.companyId))
+    .where(eq(companies.id, session.activeCompanyId))
 
   revalidatePath('/settings')
   return newApiKey
