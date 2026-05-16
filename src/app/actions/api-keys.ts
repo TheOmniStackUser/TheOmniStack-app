@@ -3,7 +3,6 @@ import { companies } from '@/db/schema/companies'
 import { eq } from 'drizzle-orm'
 import { getSession } from '@/lib/session'
 import { revalidatePath } from 'next/cache'
-import { crypto } from 'crypto'
 
 export async function getApiKeyAction() {
   const session = await getSession()
