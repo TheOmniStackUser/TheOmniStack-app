@@ -1,0 +1,64 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { GoogleGenerativeAI } from '@google/generative-ai'
+import { db } from '@/db/client'
+import { companies } from '@/db/schema/companies'
+import { eq } from 'drizzle-orm'
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
+
+export async function POST(req: NextRequest) {
+  const apiKey = req.headers.get('x-api-key')
+  if (!apiKey) return NextResponse.json({ error: 'Missing API Key' }, { status: 401 })
+
+  const [company] = await db.select().from(companies).where(eq(companies.apiKey, apiKey)).limit(1)
+  if (!company) return NextResponse.json({ error: 'Invalid API Key' }, { status: 401 })
+
+  try {
+    const formData = await req.formData()
+    const imageFile = formData.get('image') as File
+    if (!imageFile) return NextResponse.json({ error: 'No image provided' }, { status: 400 })
+
+    const arrayBuffer = await imageFile.arrayBuffer()
+    const base64Image = Buffer.from(arrayBuffer).toString('base64')
+
+    const model = genAI.getGenerativeModel({ 
+      model: 'gemini-1.5-flash',
+      generationConfig: { responseMimeType: "application/json" } // Zwingt Gemini zu JSON
+    })
+    
+    const prompt = `
+      Analysiere dieses Bild eines Versandlabels oder Lieferscheins.
+      Extrahiere folgende Felder als JSON:
+      {
+        "order_number": "String oder null",
+        "customer_name": "String oder null",
+        "items": [
+          { "sku": "String", "quantity": 1 }
+        ],
+        "document_type": "label" | "delivery_note"
+      }
+    `
+
+    const result = await model.generateContent([
+      prompt,
+      {
+        inlineData: {
+          data: base64Image,
+          mimeType: imageFile.type
+        }
+      }
+    ])
+
+    const responseText = result.response.text().trim()
+    console.log('AI Raw Response:', responseText)
+    
+    // Sicherstellen, dass wir nur das JSON-Objekt nehmen
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/)
+    const cleanJson = jsonMatch ? jsonMatch[0] : responseText
+    
+    return NextResponse.json(JSON.parse(cleanJson))
+  } catch (error: any) {
+    console.error('AI Analysis Error:', error)
+    return NextResponse.json({ error: 'Failed to analyze image', details: error.message }, { status: 500 })
+  }
+}

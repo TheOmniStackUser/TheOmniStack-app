@@ -81,21 +81,24 @@ export function UserList({
           <form onSubmit={handleAddUser} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Name</label>
-              <input name="name" required className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium" placeholder="Max Mustermann" />
+              <input name="name" required className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium placeholder:text-slate-400" placeholder="Max Mustermann" />
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-400 uppercase mb-1">E-Mail</label>
-              <input name="email" type="email" required className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium" placeholder="max@beispiel.de" />
+              <input name="email" type="email" required className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium placeholder:text-slate-400" placeholder="max@beispiel.de" />
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Passwort (initial)</label>
-              <input name="password" type="password" required className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium" placeholder="********" />
+              <input name="password" type="password" required className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium placeholder:text-slate-400" placeholder="********" />
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Rolle</label>
-              <select name="role" className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium">
-                <option value="member">Mitglied (Lesen/Schreiben)</option>
+              <select name="role" className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-900 bg-white">
+                <option value="staff">Händler-Mitarbeiter (Operativ)</option>
                 <option value="admin">Administrator (Vollzugriff)</option>
+                {currentUserRole === 'owner' && (
+                  <option value="omnistack_support">TheOmniStack Mitarbeiter (Support & Beta)</option>
+                )}
               </select>
             </div>
             {error && <div className="md:col-span-2 text-sm text-red-600 font-bold">{error}</div>}
@@ -137,9 +140,13 @@ export function UserList({
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${
                     member.role === 'owner' ? 'bg-amber-50 text-amber-700 border-amber-200' :
                     member.role === 'admin' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                    member.role === 'omnistack_support' ? 'bg-purple-50 text-purple-700 border-purple-200' :
                     'bg-slate-50 text-slate-600 border-slate-200'
                   }`}>
-                    {member.role === 'owner' ? 'Besitzer' : member.role === 'admin' ? 'Administrator' : 'Mitglied'}
+                    {member.role === 'owner' ? 'Besitzer' : 
+                     member.role === 'admin' ? 'Administrator' : 
+                     member.role === 'omnistack_support' ? 'Support' :
+                     'Mitarbeiter'}
                   </span>
                 </td>
                 <td className="px-6 py-4 text-sm text-slate-500">

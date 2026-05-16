@@ -1,0 +1,47 @@
+{
+  "clientReference": "INT-TEST-850066",
+  "receiverName": {
+    "firstname": "Max",
+    "lastname": "Mustermann"
+  },
+  "receiverAddress": {
+    "street": "Essener Str.",
+    "houseNumber": "2",
+    "zipCode": "22419",
+    "town": "Hamburg",
+    "countryCode": "DE"
+  },
+  "senderName": {
+    "firstname": "TheOmniStack",
+    "lastname": "Test Account"
+  },
+  "senderAddress": {
+    "street": "Musterstraße",
+    "houseNumber": "1",
+    "zipCode": "50667",
+    "town": "Köln",
+    "countryCode": "DE"
+  },
+  "parcel": {
+    "parcelWeight": 1500,
+    "parcelClass": "S",
+    "parcelVolume": 50,
+    "productType": "PARCEL"
+  },
+  "service": {
+    "returnService": {
+      "returnReceiverName": {
+        "name1": "TheOmniStack Returns"
+      },
+      "returnReceiverAddress": {
+        "street": "Musterstraße",
+        "houseNumber": "1",
+        "zipCode": "50667",
+        "town": "Köln",
+        "countryCode": "DE"
+      },
+      "returnProductType": "PARCEL",
+      "returnServiceType": "RETURN"
+    }
+  }
+}

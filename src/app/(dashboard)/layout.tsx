@@ -34,6 +34,11 @@ export default async function DashboardLayout({
     redirect('/setup-2fa')
   }
 
+  // Permission Checks
+  const isStaff = auth.role === 'staff'
+  const isSupport = auth.role === 'omnistack_support'
+  const canManage = auth.role === 'owner' || auth.role === 'admin' || isSupport
+
   return (
     <div className="h-screen bg-[#F8FAFC] flex overflow-hidden font-sans">
       <aside className="w-64 bg-[#0F172A] text-slate-300 flex flex-col flex-shrink-0 overflow-y-auto border-r border-slate-800/50 shadow-xl">
@@ -54,27 +59,36 @@ export default async function DashboardLayout({
           </Link>
         </div>
         <div className="flex-1">
-          <SidebarNav />
+          <SidebarNav role={auth.role} />
         </div>
         <div className="p-6 pb-10 border-t border-slate-800/50 mt-auto bg-[#0F172A]/50">
           <div className="mb-4 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.1em]">
             Account & System
           </div>
           <nav className="space-y-1 px-2">
-            <Link href="/settings" className="flex items-center px-3 py-2 text-sm font-medium rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all">
-              Einstellungen
-            </Link>
-            <Link href="/integrations" className="flex items-center px-3 py-2 text-sm font-medium rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all">
-              Integrationen
-            </Link>
-            <Link href="/settings/users" className="flex items-center px-3 py-2 text-sm font-medium rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all">
-              Team-Verwaltung
-            </Link>
-            {user?.isSuperAdmin && (
+            {!isStaff && (
+              <>
+                <Link href="/settings" className="flex items-center px-3 py-2 text-sm font-medium rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+                  Einstellungen
+                </Link>
+                <Link href="/integrations" className="flex items-center px-3 py-2 text-sm font-medium rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+                  Integrationen
+                </Link>
+              </>
+            )}
+            
+            {canManage && (
+              <Link href="/settings/users" className="flex items-center px-3 py-2 text-sm font-medium rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+                Team-Verwaltung
+              </Link>
+            )}
+
+            {(user?.isSuperAdmin || isSupport) && (
               <Link href="/admin" className="flex items-center px-3 py-2 text-sm font-bold rounded-lg text-cyan-400 hover:text-cyan-300 hover:bg-cyan-400/5 transition-all mt-4 border-t border-slate-800/50 pt-4">
                 Admin Panel →
               </Link>
             )}
+
             <form action={logoutAction} className="pt-2">
               <button type="submit" className="w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-400/5 transition-all">
                 Abmelden

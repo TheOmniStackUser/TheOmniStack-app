@@ -17,7 +17,7 @@ export type SessionPayload = {
 export type AuthContext = {
   userId: string
   activeCompanyId: string
-  role: 'owner' | 'admin' | 'member'
+  role: 'owner' | 'admin' | 'staff' | 'omnistack_support'
 }
 
 // ─── Encryption ───────────────────────────────────────────────────────────────
@@ -158,7 +158,7 @@ export async function requireAuth(): Promise<AuthContext> {
   return {
     userId: payload.userId,
     activeCompanyId: payload.activeCompanyId,
-    role: membership.role,
+    role: membership.role as any, // Cast to our explicit role types
   }
 }
 

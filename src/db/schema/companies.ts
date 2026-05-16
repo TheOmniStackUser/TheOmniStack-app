@@ -11,7 +11,12 @@ import { orders } from './orders'
 import { invoices } from './invoices'
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
-export const memberRoleEnum = pgEnum('member_role', ['owner', 'admin', 'member'])
+// Updated Roles:
+// owner: Full control, billing, role management
+// admin: Full merchant access, settings, integrations
+// staff: Operational access only (orders, invoices), no settings
+// omnistack_support: Internal support team, can see admin panel & beta features
+export const memberRoleEnum = pgEnum('member_role', ['owner', 'admin', 'staff', 'omnistack_support'])
 
 // ─── Companies ────────────────────────────────────────────────────────────────
 // Each row = one legal entity / tenant. All other tables reference company_id.
@@ -53,6 +58,7 @@ export const companies = pgTable('companies', {
   nextInvoiceNumber: text('next_invoice_number').notNull().default('1'),
   nextCustomerNumber: text('next_customer_number').notNull().default('1'),
   nextDeliveryNoteNumber: text('next_delivery_note_number').notNull().default('1'),
+  apiKey: text('api_key').unique(), // For mobile app authentication
   trialExpiresAt: timestamp('trial_expires_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -68,7 +74,7 @@ export const companyMembers = pgTable('company_members', {
   userId: uuid('user_id')
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
-  role: memberRoleEnum('role').notNull().default('member'),
+  role: memberRoleEnum('role').notNull().default('staff'), // Default to staff (safest)
   joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
 })
 

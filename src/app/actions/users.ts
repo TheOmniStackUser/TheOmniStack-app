@@ -13,7 +13,7 @@ const CreateUserSchema = z.object({
   name: z.string().min(2, 'Name ist zu kurz'),
   email: z.string().email('Ungültige E-Mail'),
   password: z.string().min(8, 'Passwort muss mindestens 8 Zeichen haben'),
-  role: z.enum(['admin', 'member']),
+  role: z.enum(['admin', 'staff', 'omnistack_support']),
 })
 
 export async function addUserAction(formData: FormData) {
@@ -28,6 +28,11 @@ export async function addUserAction(formData: FormData) {
   }
 
   const { name, email, password, role } = validated.data
+
+  // Security check: Only owners can create Omnistack Support accounts
+  if (role === 'omnistack_support' && auth.role !== 'owner') {
+    return { error: 'Nur Besitzer können Support-Accounts anlegen' }
+  }
 
   try {
     // Check member limit (max 10)
@@ -80,7 +85,7 @@ export async function addUserAction(formData: FormData) {
     await db.insert(companyMembers).values({
       userId,
       companyId: auth.activeCompanyId,
-      role,
+      role: role as any,
     })
 
     revalidatePath('/settings/users')

@@ -6,6 +6,7 @@ import { SettingsForm } from './settings-form'
 import { VatSettings } from './vat-settings'
 import { MarketplaceAutomation } from './marketplace-automation'
 import { TwoFactorSettings } from './two-factor-settings'
+import { ApiSettings } from './api-settings'
 import { vatSettings } from '@/db/schema/vat-settings'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { users } from '@/db/schema/auth'
@@ -72,6 +73,8 @@ export default async function SettingsPage() {
       <TwoFactorSettings initialEnabled={user?.twoFactorEnabled ?? false} />
 
       <MarketplaceAutomation integrations={integrations} />
+
+      <ApiSettings />
 
       <VatSettings initialSettings={initialVatSettings} />
     </div>

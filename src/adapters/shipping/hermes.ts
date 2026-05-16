@@ -202,28 +202,6 @@ export class HermesAdapter {
 
     console.log(`[Hermes Adapter] Return Config Check: marketplace=${marketplace}, returnType=${returnType}, integrationId=${this.integrationId}`)
 
-    if (returnType === 'enclosed' || returnType === 'virtual') {
-      console.log(`[Hermes Adapter] Fordere Retourenlabel an (Typ: ${returnType}) für Marktplatz: ${marketplace}`)
-      
-      const returnName = {
-        name1: (payload.senderName.firstname + ' ' + payload.senderName.lastname).trim().slice(0, 50)
-      }
-      const returnAddress = {
-        ...payload.senderAddress,
-        countryCode: 'DE'
-      }
-
-      // Simple returnService object approach
-      ;(payload as any).service = {
-        returnService: {
-          returnReceiverName: returnName,
-          returnReceiverAddress: returnAddress,
-          returnProductType: 'PARCEL',
-          returnServiceType: 'RETURN'
-        }
-      }
-    }
-
     console.log('[Hermes Adapter] Final Payload:', JSON.stringify(payload))
 
     let response: Response
@@ -258,30 +236,61 @@ export class HermesAdapter {
     
     const labelUrl = `data:application/pdf;base64,${base64}`
     let returnLabelUrl: string | undefined = undefined
-    
-    // Robust return label extraction
-    const rawReturnImage = data.returnLabelImage || data.shipmentOrder?.returnLabelImage || (data.returnShipments?.[0]?.labelImage) || (data.shipmentOrder?.returnShipments?.[0]?.labelImage)
-    
-    if (rawReturnImage) {
-      const base64Return = Array.isArray(rawReturnImage) ? rawReturnImage[0] : rawReturnImage
-      if (base64Return && typeof base64Return === 'string' && base64Return.length > 100) {
-        returnLabelUrl = `data:application/pdf;base64,${base64Return}`
+    let returnTrackingNumber: string | undefined = undefined
+
+    // Hermes uses a SEPARATE endpoint for return labels: POST /returnorders/labels
+    // The /shipmentorders/labels endpoint does NOT support a returnService field.
+    if (returnType === 'enclosed' || returnType === 'virtual') {
+      console.log(`[Hermes Adapter] Requesting return label via /returnorders/labels (Typ: ${returnType}) für Marktplatz: ${marketplace}`)
+      try {
+        const returnPayload: any = {
+          clientReference: (payload.clientReference + '-R').slice(0, 20),
+          senderAddress: payload.receiverAddress,  // customer is the SENDER on a return
+          senderName: {
+            firstname: payload.receiverName.firstname,
+            lastname: payload.receiverName.lastname
+          },
+          parcel: {
+            parcelWeight: payload.parcel.parcelWeight
+          }
+        }
+
+        const returnResponse = await fetch(`${this.baseUrl}/services/hsi/returnorders/labels`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/shippinglabel-pdf+json'
+          },
+          body: JSON.stringify(returnPayload)
+        })
+
+        if (returnResponse.ok) {
+          const returnData = await returnResponse.json()
+          const returnResultCode = returnData.listOfResultCodes?.[0]?.code
+          console.log('[Hermes Adapter] Return Label Response codes:', JSON.stringify(returnData.listOfResultCodes))
+
+          if (returnResultCode === 'OK' || returnData.shipmentID) {
+            returnTrackingNumber = returnData.shipmentID
+            const returnBase64 = returnData.shippinglabel
+            if (returnBase64 && typeof returnBase64 === 'string' && returnBase64.length > 100) {
+              returnLabelUrl = `data:application/pdf;base64,${returnBase64}`
+              console.log(`[Hermes Adapter] ✅ Retourenlabel erfolgreich generiert. Tracking: ${returnTrackingNumber}`)
+            }
+          } else {
+            console.warn(`[Hermes Adapter] Retourenlabel Fehler:`, JSON.stringify(returnData.listOfResultCodes))
+          }
+        } else {
+          const errText = await returnResponse.text()
+          console.warn(`[Hermes Adapter] Return label request failed: ${returnResponse.status} - ${errText}`)
+        }
+      } catch (returnError: any) {
+        console.warn(`[Hermes Adapter] Return label request threw:`, returnError.message)
       }
-    }
 
-    // Extract return tracking number with more fallbacks
-    const returnTrackingNumber = 
-      data.returnShipmentID || 
-      data.shipmentOrder?.returnShipmentID || 
-      data.returnBarcode || 
-      data.shipmentOrder?.returnBarcode ||
-      data.shipmentOrder?.returnShipments?.[0]?.shipmentID ||
-      data.shipmentOrder?.returnShipments?.[0]?.barcode ||
-      data.returnShipments?.[0]?.shipmentID
-
-    // Extraction and non-blocking validation
-    if ((returnType === 'enclosed' || returnType === 'virtual') && !returnTrackingNumber) {
-      console.warn(`[Hermes Adapter] WARNUNG: Hermes hat keine Retourennummer geliefert, obwohl eine angefordert wurde (Marktplatz: ${marketplace}). Wahrscheinlich ist der Service für diesen Account noch nicht freigeschaltet.`)
+      if (!returnTrackingNumber) {
+        console.warn(`[Hermes Adapter] WARNUNG: Kein Retourenlabel erhalten (Marktplatz: ${marketplace}).`)
+      }
     }
 
     return {
