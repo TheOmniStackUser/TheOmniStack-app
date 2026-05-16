@@ -1,3 +1,5 @@
+'use server'
+
 import { db } from '@/db/client'
 import { companies } from '@/db/schema/companies'
 import { eq } from 'drizzle-orm'
