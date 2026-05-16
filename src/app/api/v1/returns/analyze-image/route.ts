@@ -27,27 +27,28 @@ export async function POST(req: NextRequest) {
     })
     
     const prompt = `
-      Du bist ein Experte für Logistik und Dokumentenerkennung. 
-      Analysiere das beigefügte Bild (Versandlabel oder Lieferschein).
+      Du bist ein Experte für Logistik-Belege der Marke "PEROYORK".
+      Analysiere das Bild und extrahiere die Daten STRENG nach diesen Regeln:
+
+      1. BESTELLNUMMER (order_number): 
+         - Auf dem HERMES Label: Suche nach "ReferenzNr." (z.B. cbn4xbrc7k). Das ist die wichtigste ID!
+         - Auf dem LIEFERSCHEIN: Suche nach "Ihre Bestellung Nr." oder "Lieferschein" (z.B. 44440).
       
-      SUCHE NACH DIESEN DATEN:
-      1. Bestellnummer: Suche nach "Bestell-Nr", "Order ID", "Referenz", "Rechnungsnummer" oder Barcode-Werten.
-      2. Kunde: Suche nach dem Empfänger oder Namen auf dem Lieferschein.
-      3. Artikel (Items): Suche nach Tabellen oder Listen mit Artikelnummern (SKU), EANs oder Produktnamen und deren Menge.
-      
-      WICHTIG:
-      - Wenn es ein Hermes/DHL Label ist, ist die "Referenz" oft die Bestellnummer.
-      - Antworte STRENG im JSON-Format.
-      - Wenn ein Feld nicht gefunden wird, setze es auf null.
-      
-      JSON STRUKTUR:
+      2. KUNDE (customer_name):
+         - Der Name unter "Absender" (Label) oder oben links (Lieferschein), z.B. "Carmen Hinkel".
+
+      3. ARTIKEL (items):
+         - Suche in der Tabelle nach "Art-Nr." (z.B. v84-Badehose-LuV-TS08-Blau-L).
+         - Extrahiere die dazugehörige "Menge" (z.B. 1).
+
+      ANTWORTE NUR ALS JSON:
       {
         "order_number": "String",
         "customer_name": "String",
         "items": [
           { "sku": "String", "quantity": number }
         ],
-        "document_type": "label" | "delivery_note" | "other"
+        "document_type": "label" | "delivery_note"
       }
     `
 
