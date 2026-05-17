@@ -56,7 +56,7 @@ export function ApiSettings() {
               type={apiKey ? 'text' : 'password'}
               value={loading ? 'Lädt...' : (apiKey || 'Noch kein Key generiert')}
               readOnly
-              className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 font-mono text-sm outline-none"
+              className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 font-mono text-sm text-slate-800 font-semibold outline-none"
             />
             {apiKey && (
               <button
