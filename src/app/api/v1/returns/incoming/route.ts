@@ -43,7 +43,30 @@ export async function POST(req: Request) {
       )
     })
 
-    // 4. Persistence — Log the Return Entry
+    // 4. Determine and Guess Marketplace
+    let resolvedMarketplace: string | null = body.marketplace || return_metadata?.marketplace || null
+
+    if (!resolvedMarketplace) {
+      if (matchedOrder?.marketplace) {
+        // Capitalize marketplace nicely (e.g. 'amazon' -> 'Amazon')
+        const rawMp = matchedOrder.marketplace
+        resolvedMarketplace = rawMp.charAt(0).toUpperCase() + rawMp.slice(1)
+      } else {
+        // Pattern-based guessing
+        const cleanNum = order_info.order_number.trim().replace(/\s+/g, '')
+        if (/^\d{3}-\d{7}-\d{7}$/.test(cleanNum)) {
+          resolvedMarketplace = 'Amazon'
+        } else if (/^\d{12}$/.test(cleanNum) || /^\d{2}-\d{5}-\d{5}$/.test(cleanNum)) {
+          resolvedMarketplace = 'eBay'
+        } else if (/^105\d{11}$/.test(cleanNum)) {
+          resolvedMarketplace = 'Zalando'
+        } else if (/^10\d{8}$/.test(cleanNum) || /^20\d{8}$/.test(cleanNum)) {
+          resolvedMarketplace = 'Otto'
+        }
+      }
+    }
+
+    // 5. Persistence — Log the Return Entry
     const [logEntry] = await db.insert(returnsLog).values({
       companyId: company.id,
       orderId: matchedOrder?.id,
@@ -51,7 +74,7 @@ export async function POST(req: Request) {
       customerName: customer_info?.customer_name || 'N/A',
       shippingAddress: customer_info?.shipping_address || 'N/A',
       processedByUserId: return_metadata?.processed_by_user_id || null,
-      marketplace: body.marketplace || return_metadata?.marketplace || null,
+      marketplace: resolvedMarketplace,
       metadata: return_metadata || {},
     }).returning({ id: returnsLog.id })
 
