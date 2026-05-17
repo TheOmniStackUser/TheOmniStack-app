@@ -13,6 +13,7 @@ export const returnsLog = pgTable('returns_log', {
   shippingAddress: text('shipping_address'),
   scannedAt: timestamp('scanned_at').defaultNow().notNull(),
   processedByUserId: uuid('processed_by_user_id').references(() => users.id),
+  status: text('status').default('neu').notNull(),
   metadata: jsonb('metadata'), 
 })
 

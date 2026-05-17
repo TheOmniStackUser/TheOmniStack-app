@@ -2,14 +2,23 @@ import { requireAuth } from '@/lib/session'
 import { db } from '@/db/client'
 import { returnsLog } from '@/db/schema'
 import { eq, desc } from 'drizzle-orm'
-import { format } from 'date-fns'
-import { de } from 'date-fns/locale'
 import { redirect } from 'next/navigation'
+import { ReturnsList } from './returns-list'
 
 export const dynamic = 'force-dynamic'
 
 export default async function ReturnsPage() {
   const auth = await requireAuth()
+
+  // Auto-migration: Ensure status column exists in returns_log
+  try {
+    const { sql } = await import('drizzle-orm')
+    await db.execute(sql`
+      ALTER TABLE "returns_log" ADD COLUMN IF NOT EXISTS "status" text NOT NULL DEFAULT 'neu';
+    `)
+  } catch (err) {
+    console.error('[Returns] Auto-migration failed:', err)
+  }
 
   // Strict Access Control: Only Owner and Support can see returns for now
   if (auth.role !== 'owner' && auth.role !== 'omnistack_support') {
@@ -39,95 +48,7 @@ export default async function ReturnsPage() {
         <p className="text-slate-500 mt-2">Übersicht aller über die mobile App erfassten Warenrücksendungen.</p>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-slate-50 border-b border-slate-200">
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Scan-Zeitpunkt</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Bestellnummer</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Versand</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Kunde</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Artikel</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Zustand</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Matching</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {logs.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-6 py-12 text-center text-slate-400 italic">
-                  Noch keine Retouren erfasst.
-                </td>
-              </tr>
-            ) : (
-              logs.map((log) => (
-                <tr key={log.id} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="px-6 py-4 text-sm text-slate-600">
-                    {format(new Date(log.scannedAt), 'dd.MM.yyyy HH:mm', { locale: de })}
-                  </td>
-                  <td className="px-6 py-4 font-bold text-slate-900">
-                    {log.orderNumber}
-                  </td>
-                  {(() => {
-                    const metadata = log.metadata as Record<string, any> | null
-                    const carrier = metadata?.carrier
-                    const trackingNumber = metadata?.tracking_number
-                    return (
-                      <td className="px-6 py-4">
-                        {carrier ? (
-                          <div>
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
-                              {carrier}
-                            </span>
-                            {trackingNumber && (
-                              <div className="text-[10px] text-slate-400 font-mono mt-1 truncate max-w-[120px]" title={trackingNumber}>
-                                {trackingNumber}
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-xs text-slate-400 italic">-</span>
-                        )}
-                      </td>
-                    )
-                  })()}
-                  <td className="px-6 py-4">
-                    <div className="text-sm font-medium text-slate-900">{log.customerName}</div>
-                    <div className="text-[10px] text-slate-400 truncate max-w-[150px]">{log.shippingAddress}</div>
-                  </td>
-                  <td className="px-6 py-4">
-                    {log.items.map((item, idx) => (
-                      <div key={idx} className="text-sm text-slate-700">
-                        {item.quantity}x {item.skuOrProductName}
-                      </div>
-                    ))}
-                  </td>
-                  <td className="px-6 py-4">
-                    {log.items.map((item, idx) => (
-                      <div key={idx} className={`text-xs font-bold uppercase ${
-                        item.condition === 'new' ? 'text-green-600' : 'text-amber-600'
-                      }`}>
-                        {item.condition === 'new' ? 'Neu' : item.condition === 'damaged' ? 'Defekt' : item.condition}
-                      </div>
-                    ))}
-                  </td>
-                  <td className="px-6 py-4">
-                    {log.orderId ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-green-50 text-green-700 border border-green-200">
-                        Zugeordnet
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-50 text-slate-500 border border-slate-200">
-                        Nicht gefunden
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <ReturnsList initialLogs={logs} />
     </div>
   )
 }

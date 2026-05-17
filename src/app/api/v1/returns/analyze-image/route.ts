@@ -27,7 +27,9 @@ export async function POST(req: NextRequest) {
     })
     
     const prompt = `
-      Du bist ein Experte für Logistik-Belege der Marke "PEROYORK".
+      Du bist ein Experte für Logistik-Belege.
+      Der aktive Händler in diesem System heißt: "${company.name}".
+
       Analysiere das Bild und extrahiere die Daten STRENG nach diesen Regeln:
 
       1. BESTELLNUMMER (order_number): 
@@ -48,6 +50,11 @@ export async function POST(req: NextRequest) {
          - Falls es ein Hermes Label ist, suche nach der Paketnummer, die mit "H" beginnt gefolgt von Ziffern (z.B. H1400000019229621034).
          - Falls es ein DHL Label ist, suche nach der Sendungsnummer.
 
+      6. FIRMEN-ABGLEICH (company_mismatch & detected_company):
+         - Analysiere das Bild auf Hinweise, zu welcher Firma, Marke, Onlineshop oder Empfänger-Firma dieser Beleg gehört (z.B. aus Logos, der Empfängeradresse auf dem Versandlabel oder dem Lieferschein-Header).
+         - Wenn du einen Firmen- oder Markennamen findest, der eindeutig NICHT zu "${company.name}" passt, setze "company_mismatch" auf true und "detected_company" auf diesen gefundenen Namen.
+         - Wenn der Beleg zu "${company.name}" passt, keine anderen Firmennamen gefunden werden oder es unklar ist, setze "company_mismatch" auf false und "detected_company" auf null.
+
       ANTWORTE NUR ALS JSON:
       {
         "order_number": "String",
@@ -57,7 +64,9 @@ export async function POST(req: NextRequest) {
         ],
         "document_type": "label" | "delivery_note",
         "carrier": "String" | null,
-        "tracking_number": "String" | null
+        "tracking_number": "String" | null,
+        "company_mismatch": boolean,
+        "detected_company": "String" | null
       }
     `
 
