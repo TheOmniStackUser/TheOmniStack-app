@@ -45,6 +45,7 @@ export default async function ReturnsPage() {
             <tr className="bg-slate-50 border-b border-slate-200">
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Scan-Zeitpunkt</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Bestellnummer</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Versand</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Kunde</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Artikel</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Zustand</th>
@@ -54,7 +55,7 @@ export default async function ReturnsPage() {
           <tbody className="divide-y divide-slate-100">
             {logs.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-slate-400 italic">
+                <td colSpan={7} className="px-6 py-12 text-center text-slate-400 italic">
                   Noch keine Retouren erfasst.
                 </td>
               </tr>
@@ -67,6 +68,29 @@ export default async function ReturnsPage() {
                   <td className="px-6 py-4 font-bold text-slate-900">
                     {log.orderNumber}
                   </td>
+                  {(() => {
+                    const metadata = log.metadata as Record<string, any> | null
+                    const carrier = metadata?.carrier
+                    const trackingNumber = metadata?.tracking_number
+                    return (
+                      <td className="px-6 py-4">
+                        {carrier ? (
+                          <div>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                              {carrier}
+                            </span>
+                            {trackingNumber && (
+                              <div className="text-[10px] text-slate-400 font-mono mt-1 truncate max-w-[120px]" title={trackingNumber}>
+                                {trackingNumber}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-400 italic">-</span>
+                        )}
+                      </td>
+                    )
+                  })()}
                   <td className="px-6 py-4">
                     <div className="text-sm font-medium text-slate-900">{log.customerName}</div>
                     <div className="text-[10px] text-slate-400 truncate max-w-[150px]">{log.shippingAddress}</div>

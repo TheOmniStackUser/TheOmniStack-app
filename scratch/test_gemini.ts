@@ -39,6 +39,13 @@ async function testImage(imagePath: string, docType: string) {
          - Suche in der Tabelle nach "Art-Nr." (z.B. v84-Badehose-LuV-TS08-Blau-L).
          - Extrahiere die dazugehörige "Menge" (z.B. 1).
 
+      4. VERSANDDIENSTLEISTER (carrier):
+         - Falls es ein Versandlabel ist, suche nach dem Logo oder Text "Hermes" oder "DHL" und gib "Hermes" oder "DHL" zurück.
+
+      5. PAKETNUMMER / RETOURENNUMMER (tracking_number):
+         - Falls es ein Hermes Label ist, suche nach der Paketnummer, die mit "H" beginnt gefolgt von Ziffern (z.B. H1400000019229621034).
+         - Falls es ein DHL Label ist, suche nach der Sendungsnummer.
+
       ANTWORTE NUR ALS JSON:
       {
         "order_number": "String",
@@ -46,7 +53,9 @@ async function testImage(imagePath: string, docType: string) {
         "items": [
           { "sku": "String", "quantity": number }
         ],
-        "document_type": "label" | "delivery_note"
+        "document_type": "label" | "delivery_note",
+        "carrier": "String" | null,
+        "tracking_number": "String" | null
       }
     `
 
