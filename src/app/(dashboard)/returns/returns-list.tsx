@@ -557,7 +557,7 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
                     type="text"
                     value={editOrderNumber}
                     onChange={(e) => setEditOrderNumber(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-semibold"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-semibold text-slate-900 bg-white"
                   />
                 </div>
 
@@ -567,7 +567,7 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
                   <select
                     value={editStatus}
                     onChange={(e) => setEditStatus(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-semibold bg-white"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-semibold text-slate-900 bg-white"
                   >
                     <option value="neu">Neu</option>
                     <option value="bearbeitet">Bearbeitet</option>
@@ -580,7 +580,7 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
                   <select
                     value={editMarketplace}
                     onChange={(e) => setEditMarketplace(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-semibold bg-white"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-semibold text-slate-900 bg-white"
                   >
                     <option value="">Direkt / Unbekannt</option>
                     <option value="Amazon">Amazon</option>
@@ -599,7 +599,7 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
                     type="text"
                     value={editCustomerName}
                     onChange={(e) => setEditCustomerName(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-slate-900 bg-white"
                   />
                 </div>
 
@@ -610,7 +610,7 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
                     rows={2}
                     value={editShippingAddress}
                     onChange={(e) => setEditShippingAddress(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-slate-900 bg-white"
                   />
                 </div>
               </div>
@@ -637,7 +637,7 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
                           type="text"
                           value={item.skuOrProductName}
                           onChange={(e) => handleItemChange(idx, 'skuOrProductName', e.target.value)}
-                          className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+                          className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900"
                         />
                       </div>
 
@@ -649,7 +649,7 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
                           min="1"
                           value={item.quantity}
                           onChange={(e) => handleItemChange(idx, 'quantity', parseInt(e.target.value) || 1)}
-                          className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs outline-none focus:ring-2 focus:ring-indigo-500 text-center"
+                          className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs outline-none focus:ring-2 focus:ring-indigo-500 text-center text-slate-900"
                         />
                       </div>
 
@@ -659,7 +659,7 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
                         <select
                           value={item.condition}
                           onChange={(e) => handleItemChange(idx, 'condition', e.target.value)}
-                          className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+                          className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900"
                         >
                           <option value="new">Neu</option>
                           <option value="used">Gebraucht</option>
