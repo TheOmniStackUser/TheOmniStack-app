@@ -25,6 +25,7 @@ interface ReturnLog {
   scannedAt: Date
   status: string
   marketplace: string | null
+  notes: string | null
   orderId: string | null
   metadata: any
   items: ScannedItem[]
@@ -55,13 +56,15 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
   const [editShippingAddress, setEditShippingAddress] = useState('')
   const [editStatus, setEditStatus] = useState('neu')
   const [editMarketplace, setEditMarketplace] = useState('')
+  const [editNotes, setEditNotes] = useState('')
   const [editItems, setEditItems] = useState<ScannedItem[]>([])
 
   // Search & Filter
   const filteredLogs = logs.filter((log) => {
     const matchesSearch =
       log.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (log.customerName || '').toLowerCase().includes(searchTerm.toLowerCase())
+      (log.customerName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (log.notes || '').toLowerCase().includes(searchTerm.toLowerCase())
     
     const matchesStatus = statusFilter === 'all' || log.status === statusFilter
     
@@ -167,6 +170,7 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
     setEditShippingAddress(log.shippingAddress || '')
     setEditStatus(log.status || 'neu')
     setEditMarketplace(log.marketplace || '')
+    setEditNotes(log.notes || '')
     setEditItems(log.items.map((i) => ({ ...i })))
   }
 
@@ -200,6 +204,7 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
           shippingAddress: editShippingAddress.trim(),
           status: editStatus,
           marketplace: editMarketplace || null,
+          notes: editNotes.trim() || null,
           items: editItems.map((i) => ({
             ...i,
             skuOrProductName: i.skuOrProductName.trim() || 'Unbekannt'
@@ -219,6 +224,7 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
                 shippingAddress: payload.shippingAddress,
                 status: payload.status,
                 marketplace: payload.marketplace,
+                notes: payload.notes,
                 items: editItems
               }
             }
@@ -239,7 +245,7 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
         <div className="relative w-full md:max-w-xs">
           <input
             type="text"
-            placeholder="Bestellnr. oder Kunde suchen..."
+            placeholder="Bestellnr., Kunde, Notiz suchen..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm bg-white"
@@ -358,7 +364,7 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Marktplatz</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Bestellnummer</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Versand</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Kunde</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Kunde & Notiz</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Artikel / Zustand</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Aktionen</th>
             </tr>
@@ -466,10 +472,20 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
                     )
                   })()}
 
-                  {/* Customer */}
+                  {/* Customer & Notes */}
                   <td className="px-6 py-4">
                     <div className="text-sm font-semibold text-slate-950">{log.customerName || 'Kein Name'}</div>
                     <div className="text-[10px] text-slate-400 truncate max-w-[150px] mt-0.5">{log.shippingAddress || 'Keine Adresse'}</div>
+                    {log.notes && (
+                      <div className="mt-1.5 flex items-start gap-1 p-1.5 bg-amber-50/70 border border-amber-100 rounded-lg max-w-[180px]">
+                        <svg className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                        </svg>
+                        <div className="text-[10px] font-medium text-amber-800 break-words leading-tight">
+                          {log.notes}
+                        </div>
+                      </div>
+                    )}
                   </td>
 
                   {/* Items / Conditions */}
@@ -610,6 +626,18 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
                     rows={2}
                     value={editShippingAddress}
                     onChange={(e) => setEditShippingAddress(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-slate-900 bg-white"
+                  />
+                </div>
+
+                {/* Notes/Comments */}
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Interne Notiz (z. B. Erstattungs-Grund)</label>
+                  <textarea
+                    rows={2}
+                    value={editNotes}
+                    onChange={(e) => setEditNotes(e.target.value)}
+                    placeholder="z. B. Defekt, keine Erstattung veranlasst da über 30 Tage Rückgabefrist..."
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-slate-900 bg-white"
                   />
                 </div>

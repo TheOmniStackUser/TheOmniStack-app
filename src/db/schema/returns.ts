@@ -16,6 +16,7 @@ export const returnsLog = pgTable('returns_log', {
   status: text('status').default('neu').notNull(),
   marketplace: text('marketplace'),
   metadata: jsonb('metadata'), 
+  notes: text('notes'),
 })
 
 export const returnedItems = pgTable('returned_items', {

@@ -19,6 +19,9 @@ export default async function ReturnsPage() {
     await db.execute(sql`
       ALTER TABLE "returns_log" ADD COLUMN IF NOT EXISTS "marketplace" text;
     `)
+    await db.execute(sql`
+      ALTER TABLE "returns_log" ADD COLUMN IF NOT EXISTS "notes" text;
+    `)
   } catch (err) {
     console.error('[Returns] Auto-migrations failed:', err)
   }

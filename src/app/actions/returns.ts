@@ -73,6 +73,7 @@ export async function updateReturnAction(
     shippingAddress?: string
     status: string
     marketplace?: string | null
+    notes?: string | null
     items: {
       id?: string
       skuOrProductName: string
@@ -92,6 +93,7 @@ export async function updateReturnAction(
       shippingAddress: data.shippingAddress || null,
       status: data.status,
       marketplace: data.marketplace || null,
+      notes: data.notes || null,
     })
     .where(
       and(
