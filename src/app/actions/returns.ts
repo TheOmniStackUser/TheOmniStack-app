@@ -3,13 +3,12 @@
 import { db } from '@/db/client'
 import { returnsLog, returnedItems } from '@/db/schema/returns'
 import { eq, and, inArray } from 'drizzle-orm'
-import { getSession } from '@/lib/session'
+import { requireAuth } from '@/lib/session'
 import { revalidatePath } from 'next/cache'
 
 // Strict session check helper
 async function checkAuth() {
-  const session = await getSession()
-  if (!session?.activeCompanyId) throw new Error('Nicht autorisiert')
+  const session = await requireAuth()
   if (session.role !== 'owner' && session.role !== 'omnistack_support') {
     throw new Error('Keine Berechtigung')
   }
