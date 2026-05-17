@@ -51,9 +51,14 @@ export async function POST(req: NextRequest) {
          - Falls es ein DHL Label ist, suche nach der Sendungsnummer.
 
       6. FIRMEN-ABGLEICH (company_mismatch & detected_company):
-         - Analysiere das Bild auf Hinweise, zu welcher Firma, Marke, Onlineshop oder Empfänger-Firma dieser Beleg gehört (z.B. aus Logos, der Empfängeradresse auf dem Versandlabel oder dem Lieferschein-Header).
-         - Wenn du einen Firmen- oder Markennamen findest, der eindeutig NICHT zu "${company.name}" passt, setze "company_mismatch" auf true und "detected_company" auf diesen gefundenen Namen.
-         - Wenn der Beleg zu "${company.name}" passt, keine anderen Firmennamen gefunden werden oder es unklar ist, setze "company_mismatch" auf false und "detected_company" auf null.
+         - Definitionen:
+           * Eigene Händler-Firma: "${company.name}" (und Teilwörter davon, wie z.B. "Leis").
+           * Erlaubte Marktplätze (KEIN Mismatch!): Amazon, Otto, Zalando, Kaufland, eBay, Mirakl, Otto Market, etc. (Da die eigene Firma ihre Waren über diese Plattformen vertreiben darf).
+         - Logik:
+           * Wenn die eigene Händler-Firma "${company.name}" (oder Wortbestandteile wie "Leis") auf dem Beleg (Absender, Empfänger, Text) erwähnt wird, setze "company_mismatch" auf false und "detected_company" auf null.
+           * Wenn Marktplätze wie Otto, Zalando, Amazon, etc. auf dem Beleg vorkommen, ignoriere diese, da sie erlaubt sind (kein Mismatch).
+           * **Wann liegt ein Mismatch vor?** Nur wenn du die eigene Firma "${company.name}" (oder Teilwörter davon) **NICHT** auf dem Beleg finden kannst **UND** du stattdessen eine andere, eindeutig fremde Händler- oder Firmenadresse (die kein Marktplatz ist, z.B. eine Drittanbieter-Firma wie "Müller GmbH", "Schmidt Mode") erkennst.
+           * Nur in diesem Fall: Setze "company_mismatch" auf true und "detected_company" auf den Namen der erkannten Fremdfirma. Andernfalls setze "company_mismatch" auf false und "detected_company" auf null.
 
       ANTWORTE NUR ALS JSON:
       {
