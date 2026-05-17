@@ -60,7 +60,7 @@ export async function POST(req: Request) {
           resolvedMarketplace = 'eBay'
         } else if (/^105\d{11}$/.test(cleanNum)) {
           resolvedMarketplace = 'Zalando'
-        } else if (/^10\d{8}$/.test(cleanNum) || /^20\d{8}$/.test(cleanNum)) {
+        } else if (/^10\d{8}$/.test(cleanNum) || /^20\d{8}$/.test(cleanNum) || /^cbn/i.test(cleanNum)) {
           resolvedMarketplace = 'Otto'
         }
       }
