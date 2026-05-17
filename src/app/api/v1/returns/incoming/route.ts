@@ -51,6 +51,7 @@ export async function POST(req: Request) {
       customerName: customer_info?.customer_name || 'N/A',
       shippingAddress: customer_info?.shipping_address || 'N/A',
       processedByUserId: return_metadata?.processed_by_user_id || null,
+      marketplace: body.marketplace || return_metadata?.marketplace || null,
       metadata: return_metadata || {},
     }).returning({ id: returnsLog.id })
 

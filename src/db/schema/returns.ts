@@ -14,6 +14,7 @@ export const returnsLog = pgTable('returns_log', {
   scannedAt: timestamp('scanned_at').defaultNow().notNull(),
   processedByUserId: uuid('processed_by_user_id').references(() => users.id),
   status: text('status').default('neu').notNull(),
+  marketplace: text('marketplace'),
   metadata: jsonb('metadata'), 
 })
 

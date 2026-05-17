@@ -24,6 +24,7 @@ interface ReturnLog {
   shippingAddress: string | null
   scannedAt: Date
   status: string
+  marketplace: string | null
   orderId: string | null
   metadata: any
   items: ScannedItem[]
@@ -44,6 +45,7 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'neu' | 'bearbeitet'>('all')
+  const [marketplaceFilter, setMarketplaceFilter] = useState<string>('all')
   const [isPending, startTransition] = useTransition()
 
   // Edit Modal State
@@ -52,6 +54,7 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
   const [editCustomerName, setEditCustomerName] = useState('')
   const [editShippingAddress, setEditShippingAddress] = useState('')
   const [editStatus, setEditStatus] = useState('neu')
+  const [editMarketplace, setEditMarketplace] = useState('')
   const [editItems, setEditItems] = useState<ScannedItem[]>([])
 
   // Search & Filter
@@ -59,8 +62,15 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
     const matchesSearch =
       log.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (log.customerName || '').toLowerCase().includes(searchTerm.toLowerCase())
+    
     const matchesStatus = statusFilter === 'all' || log.status === statusFilter
-    return matchesSearch && matchesStatus
+    
+    const matchesMarketplace =
+      marketplaceFilter === 'all' ||
+      (marketplaceFilter === 'direct' && !log.marketplace) ||
+      (log.marketplace?.toLowerCase() === marketplaceFilter.toLowerCase())
+
+    return matchesSearch && matchesStatus && matchesMarketplace
   })
 
   // Selection
@@ -156,6 +166,7 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
     setEditCustomerName(log.customerName || '')
     setEditShippingAddress(log.shippingAddress || '')
     setEditStatus(log.status || 'neu')
+    setEditMarketplace(log.marketplace || '')
     setEditItems(log.items.map((i) => ({ ...i })))
   }
 
@@ -188,6 +199,7 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
           customerName: editCustomerName.trim(),
           shippingAddress: editShippingAddress.trim(),
           status: editStatus,
+          marketplace: editMarketplace || null,
           items: editItems.map((i) => ({
             ...i,
             skuOrProductName: i.skuOrProductName.trim() || 'Unbekannt'
@@ -206,6 +218,7 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
                 customerName: payload.customerName,
                 shippingAddress: payload.shippingAddress,
                 status: payload.status,
+                marketplace: payload.marketplace,
                 items: editItems
               }
             }
@@ -222,8 +235,8 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
   return (
     <div className="space-y-6">
       {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-slate-50 p-4 rounded-xl border border-slate-200">
-        <div className="relative w-full sm:max-w-xs">
+      <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-slate-50 p-4 rounded-xl border border-slate-200">
+        <div className="relative w-full md:max-w-xs">
           <input
             type="text"
             placeholder="Bestellnr. oder Kunde suchen..."
@@ -236,37 +249,56 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
           </svg>
         </div>
 
-        <div className="flex gap-2 w-full sm:w-auto">
-          <button
-            onClick={() => setStatusFilter('all')}
-            className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-medium border transition-all ${
-              statusFilter === 'all'
-                ? 'bg-slate-800 text-white border-slate-800'
-                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-            }`}
+        <div className="flex flex-wrap gap-2 w-full md:w-auto">
+          {/* Marketplace Filter */}
+          <select
+            value={marketplaceFilter}
+            onChange={(e) => setMarketplaceFilter(e.target.value)}
+            className="px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm bg-white text-slate-600 font-medium"
           >
-            Alle
-          </button>
-          <button
-            onClick={() => setStatusFilter('neu')}
-            className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-medium border transition-all ${
-              statusFilter === 'neu'
-                ? 'bg-indigo-600 text-white border-indigo-600'
-                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-            }`}
-          >
-            Neu
-          </button>
-          <button
-            onClick={() => setStatusFilter('bearbeitet')}
-            className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-medium border transition-all ${
-              statusFilter === 'bearbeitet'
-                ? 'bg-emerald-600 text-white border-emerald-600'
-                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-            }`}
-          >
-            Bearbeitet
-          </button>
+            <option value="all">Alle Kanäle</option>
+            <option value="direct">Direkt / Kein Marktplatz</option>
+            <option value="Amazon">Amazon</option>
+            <option value="Otto">Otto</option>
+            <option value="Zalando">Zalando</option>
+            <option value="Kaufland">Kaufland</option>
+            <option value="eBay">eBay</option>
+            <option value="Mirakl">Mirakl</option>
+          </select>
+
+          {/* Status Filters */}
+          <div className="flex gap-1 bg-white p-1 rounded-lg border border-slate-200">
+            <button
+              onClick={() => setStatusFilter('all')}
+              className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
+                statusFilter === 'all'
+                  ? 'bg-slate-800 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              Alle
+            </button>
+            <button
+              onClick={() => setStatusFilter('neu')}
+              className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
+                statusFilter === 'neu'
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              Neu
+            </button>
+            <button
+              onClick={() => setStatusFilter('bearbeitet')}
+              className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
+                statusFilter === 'bearbeitet'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              Bearbeitet
+            </button>
+          </div>
         </div>
       </div>
 
@@ -323,6 +355,7 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
               </th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Scan-Zeitpunkt</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Marktplatz</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Bestellnummer</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Versand</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Kunde</th>
@@ -333,7 +366,7 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
           <tbody className="divide-y divide-slate-100">
             {filteredLogs.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-6 py-12 text-center text-slate-400 italic">
+                <td colSpan={9} className="px-6 py-12 text-center text-slate-400 italic">
                   Keine Retouren gefunden.
                 </td>
               </tr>
@@ -370,6 +403,29 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
                   {/* Date */}
                   <td className="px-6 py-4 text-sm text-slate-500 font-medium">
                     {format(log.scannedAt, 'dd.MM.yyyy HH:mm', { locale: de })}
+                  </td>
+
+                  {/* Marketplace Badge */}
+                  <td className="px-6 py-4">
+                    {log.marketplace ? (
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${
+                        log.marketplace.toLowerCase() === 'amazon'
+                          ? 'bg-amber-50 text-amber-800 border-amber-200'
+                          : log.marketplace.toLowerCase() === 'otto'
+                          ? 'bg-red-50 text-red-800 border-red-200'
+                          : log.marketplace.toLowerCase() === 'zalando'
+                          ? 'bg-orange-50 text-orange-800 border-orange-200'
+                          : log.marketplace.toLowerCase() === 'kaufland'
+                          ? 'bg-rose-50 text-rose-800 border-rose-200'
+                          : log.marketplace.toLowerCase() === 'ebay'
+                          ? 'bg-blue-50 text-blue-800 border-blue-200'
+                          : 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                      }`}>
+                        {log.marketplace}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-slate-400 italic">Direkt / Unbekannt</span>
+                    )}
                   </td>
 
                   {/* Order ID */}
@@ -515,6 +571,24 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
                   >
                     <option value="neu">Neu</option>
                     <option value="bearbeitet">Bearbeitet</option>
+                  </select>
+                </div>
+
+                {/* Marketplace Selection */}
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Marktplatz</label>
+                  <select
+                    value={editMarketplace}
+                    onChange={(e) => setEditMarketplace(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-semibold bg-white"
+                  >
+                    <option value="">Direkt / Unbekannt</option>
+                    <option value="Amazon">Amazon</option>
+                    <option value="Otto">Otto</option>
+                    <option value="Zalando">Zalando</option>
+                    <option value="Kaufland">Kaufland</option>
+                    <option value="eBay">eBay</option>
+                    <option value="Mirakl">Mirakl</option>
                   </select>
                 </div>
 
