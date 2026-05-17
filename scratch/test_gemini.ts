@@ -2,8 +2,23 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 import * as fs from 'fs'
 import * as path from 'path'
 
-// Get key from environment
-const apiKey = 'AIzaSyCsajjv733r3mJuDB_8GB0c9zCNYQFGUWM'
+// Load key from .env.local dynamically
+let apiKey = process.env.GEMINI_API_KEY || ""
+if (!apiKey) {
+  try {
+    const envLocalPath = path.resolve('.env.local')
+    if (fs.existsSync(envLocalPath)) {
+      const envContent = fs.readFileSync(envLocalPath, 'utf8')
+      const match = envContent.match(/GEMINI_API_KEY=(.*)/)
+      if (match && match[1]) {
+        apiKey = match[1].trim()
+      }
+    }
+  } catch (e) {
+    console.error("Failed to read .env.local", e)
+  }
+}
+
 const genAI = new GoogleGenerativeAI(apiKey)
 
 async function testImage(imagePath: string, docType: string) {
