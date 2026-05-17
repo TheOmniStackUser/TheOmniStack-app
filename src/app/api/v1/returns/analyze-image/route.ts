@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { db } from '@/db/client'
 import { companies } from '@/db/schema/companies'
-import { eq } from 'drizzle-orm'
+import { orders } from '@/db/schema/orders'
+import { eq, and } from 'drizzle-orm'
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
 
@@ -60,6 +61,9 @@ export async function POST(req: NextRequest) {
            * **Wann liegt ein Mismatch vor?** Nur wenn du die eigene Firma "${company.name}" (oder Teilwörter davon) **NICHT** auf dem Beleg finden kannst **UND** du stattdessen eine andere, eindeutig fremde Händler- oder Firmenadresse (die kein Marktplatz ist, z.B. eine Drittanbieter-Firma wie "Müller GmbH", "Schmidt Mode") erkennst.
            * Nur in diesem Fall: Setze "company_mismatch" auf true und "detected_company" auf den Namen der erkannten Fremdfirma. Andernfalls setze "company_mismatch" auf false und "detected_company" auf null.
 
+      7. MARKTPLATZ (marketplace):
+         - Suche nach bekannten E-Commerce-Plattformen oder Marktplätzen, über die dieser Beleg abgewickelt wurde (z.B. Amazon, Otto, Zalando, Kaufland, eBay, Mirakl). Wenn du einen dieser Namen auf dem Beleg findest (als Logo, Rechnungs- oder Lieferschein-Header, Text etc.), gib ihn im Feld "marketplace" zurück (z.B. "Amazon", "Otto", "Zalando", "Kaufland", "eBay", "Mirakl"). Wenn kein bekannter Marktplatz gefunden wird, gib null zurück.
+
       ANTWORTE NUR ALS JSON:
       {
         "order_number": "String",
@@ -71,7 +75,8 @@ export async function POST(req: NextRequest) {
         "carrier": "String" | null,
         "tracking_number": "String" | null,
         "company_mismatch": boolean,
-        "detected_company": "String" | null
+        "detected_company": "String" | null,
+        "marketplace": "String" | null
       }
     `
 
@@ -91,7 +96,37 @@ export async function POST(req: NextRequest) {
     const jsonMatch = responseText.match(/\{[\s\S]*\}/)
     const cleanJson = jsonMatch ? jsonMatch[0] : responseText
     
-    return NextResponse.json(JSON.parse(cleanJson))
+    const parsedData = JSON.parse(cleanJson)
+
+    // Apply database lookup and pattern-based guessing to assist image analysis
+    if (!parsedData.marketplace && parsedData.order_number) {
+      // 1. Try database lookup!
+      const matchedOrder = await db.query.orders.findFirst({
+        where: and(
+          eq(orders.companyId, company.id),
+          eq(orders.marketplaceOrderId, parsedData.order_number)
+        )
+      })
+
+      if (matchedOrder?.marketplace) {
+        const rawMp = matchedOrder.marketplace
+        parsedData.marketplace = rawMp.charAt(0).toUpperCase() + rawMp.slice(1)
+      } else {
+        // 2. Try pattern guessing!
+        const cleanNum = parsedData.order_number.trim().replace(/\s+/g, '')
+        if (/^\d{3}-\d{7}-\d{7}$/.test(cleanNum)) {
+          parsedData.marketplace = 'Amazon'
+        } else if (/^\d{12}$/.test(cleanNum) || /^\d{2}-\d{5}-\d{5}$/.test(cleanNum)) {
+          parsedData.marketplace = 'eBay'
+        } else if (/^105\d{11}$/.test(cleanNum)) {
+          parsedData.marketplace = 'Zalando'
+        } else if (/^10\d{8}$/.test(cleanNum) || /^20\d{8}$/.test(cleanNum) || /^cbn/i.test(cleanNum)) {
+          parsedData.marketplace = 'Otto'
+        }
+      }
+    }
+
+    return NextResponse.json(parsedData)
   } catch (error: any) {
     console.error('AI Analysis Error:', error)
     return NextResponse.json({ error: 'Analysis failed', details: error.message }, { status: 500 })
