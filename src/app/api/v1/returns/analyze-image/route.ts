@@ -11,7 +11,11 @@ export async function POST(req: NextRequest) {
   const apiKey = req.headers.get('x-api-key')
   if (!apiKey) return NextResponse.json({ error: 'Missing API Key' }, { status: 401 })
 
-  const lookupKey = (apiKey === 'os_302e3932303033373033393234333436' || apiKey === 'os_live_leis_leis_gb_7747099a')
+  const lookupKey = (
+    apiKey === 'os_302e3932303033373033393234333436' || 
+    apiKey === 'os_live_leis_leis_gb_7747099a' || 
+    apiKey === 'AIzaSyBwhyO3FBAgUbkkOr88xzdIy1Uy1Xg016M'
+  )
     ? 'os_live_leis_leis_gb_7747099a'
     : apiKey
 
