@@ -22,6 +22,9 @@ export type ReturnsReportJobData = {
 const redisConnection = new IORedis(process.env.REDIS_URL ?? 'redis://localhost:6379', {
   maxRetriesPerRequest: null,
 })
+redisConnection.on('error', (err) => {
+  console.error('[Redis Error in returns-report]', err)
+})
 
 const s3 = new S3Client({
   region: process.env.AWS_REGION || 'us-east-1',
