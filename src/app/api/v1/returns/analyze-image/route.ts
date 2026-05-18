@@ -5,7 +5,7 @@ import { companies } from '@/db/schema/companies'
 import { orders } from '@/db/schema/orders'
 import { eq, and } from 'drizzle-orm'
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
+const genAI = new GoogleGenerativeAI('AIzaSyBwhyO3FBAgUbkkOr88xzdIy1Uy1Xg016M')
 
 export async function POST(req: NextRequest) {
   const apiKey = req.headers.get('x-api-key')
