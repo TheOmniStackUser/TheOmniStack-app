@@ -101,13 +101,14 @@ export async function addUserAction(formData: FormData) {
       expiresAt,
     })
 
-    // Send invitation email in the background
+    // Send invitation email and capture result
     const [company] = await db
       .select({ name: companies.name })
       .from(companies)
       .where(eq(companies.id, auth.activeCompanyId))
       .limit(1)
 
+    let emailError: string | null = null
     if (company) {
       const [adminUser] = await db
         .select({ name: users.name })
@@ -115,19 +116,23 @@ export async function addUserAction(formData: FormData) {
         .where(eq(users.id, auth.userId))
         .limit(1)
 
-      await sendInvitationEmail(
+      const emailResult = await sendInvitationEmail(
         email.toLowerCase(),
         adminUser?.name || 'Ein Administrator',
         company.name,
         token
       )
+
+      if (!emailResult.success) {
+        emailError = (emailResult.error as any)?.message || 'Fehler beim E-Mail-Dienst (Resend)'
+      }
     }
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
     const inviteLink = `${baseUrl}/invite?token=${token}`
 
     revalidatePath('/settings/users')
-    return { success: true, inviteLink }
+    return { success: true, inviteLink, emailError }
   } catch (e) {
     console.error(e)
     return { error: 'Fehler beim Erstellen des Benutzers' }

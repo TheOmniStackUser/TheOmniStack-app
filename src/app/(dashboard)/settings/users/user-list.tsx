@@ -30,9 +30,12 @@ export function UserList({
   const [generatedLink, setGeneratedLink] = useState<string | null>(null)
   const [copiedLink, setCopiedLink] = useState(false)
 
+  const [emailError, setEmailError] = useState<string | null>(null)
+
   const handleAddUser = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError(null)
+    setEmailError(null)
     setIsSubmitting(true)
     setGeneratedLink(null)
 
@@ -47,6 +50,9 @@ export function UserList({
       setIsSubmitting(false)
       if (result?.inviteLink) {
         setGeneratedLink(result.inviteLink)
+      }
+      if (result?.emailError) {
+        setEmailError(result.emailError)
       }
     }
   }
@@ -113,7 +119,16 @@ export function UserList({
             </div>
             <div>
               <h3 className="text-lg font-bold">Benutzer erfolgreich angelegt!</h3>
-              <p className="text-sm text-emerald-700">Der Benutzer wurde eingeladen und hat eine E-Mail erhalten.</p>
+              {emailError ? (
+                <div className="mt-1 text-sm text-amber-800 font-medium">
+                  ⚠️ Der Benutzer wurde angelegt, aber die E-Mail konnte nicht gesendet werden.
+                  <span className="block text-xs mt-1 text-amber-700 font-mono bg-amber-100/60 px-1.5 py-0.5 rounded w-fit border border-amber-200">
+                    Fehler von Resend: {emailError}
+                  </span>
+                </div>
+              ) : (
+                <p className="text-sm text-emerald-700">Der Benutzer wurde eingeladen und hat eine E-Mail erhalten.</p>
+              )}
             </div>
           </div>
           <div className="space-y-2">
