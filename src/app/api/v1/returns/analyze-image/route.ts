@@ -5,17 +5,13 @@ import { companies } from '@/db/schema/companies'
 import { orders } from '@/db/schema/orders'
 import { eq, and } from 'drizzle-orm'
 
-const genAI = new GoogleGenerativeAI('AIzaSyBwhyO3FBAgUbkkOr88xzdIy1Uy1Xg016M')
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
 
 export async function POST(req: NextRequest) {
   const apiKey = req.headers.get('x-api-key')
   if (!apiKey) return NextResponse.json({ error: 'Missing API Key' }, { status: 401 })
 
-  const lookupKey = (
-    apiKey === 'os_302e3932303033373033393234333436' || 
-    apiKey === 'os_live_leis_leis_gb_7747099a' || 
-    apiKey === 'AIzaSyBwhyO3FBAgUbkkOr88xzdIy1Uy1Xg016M'
-  )
+  const lookupKey = (apiKey === 'os_302e3932303033373033393234333436' || apiKey === 'os_live_leis_leis_gb_7747099a')
     ? 'os_live_leis_leis_gb_7747099a'
     : apiKey
 
