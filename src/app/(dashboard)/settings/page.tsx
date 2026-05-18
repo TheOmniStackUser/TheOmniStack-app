@@ -77,6 +77,21 @@ export default async function SettingsPage() {
       <ApiSettings />
 
       <VatSettings initialSettings={initialVatSettings} />
+
+      {/* Save Button for Main Profile Settings at the bottom */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div>
+          <h4 className="font-bold text-gray-900">Unternehmensdaten speichern</h4>
+          <p className="text-sm text-gray-500">Klicke hier, um alle oben eingegebenen Stammdaten und Dokumenten-Einstellungen zu sichern.</p>
+        </div>
+        <button
+          type="submit"
+          form="settings-profile-form"
+          className="px-8 py-3 rounded-2xl font-bold text-white shadow-lg bg-blue-600 hover:bg-blue-700 hover:shadow-blue-500/30 transition-all shrink-0 cursor-pointer"
+        >
+          Änderungen speichern
+        </button>
+      </div>
     </div>
   )
 }

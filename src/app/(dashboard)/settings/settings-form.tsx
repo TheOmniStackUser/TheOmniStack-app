@@ -8,7 +8,7 @@ export function SettingsForm({ company }: { company: Company }) {
   const [state, action, isPending] = useActionState(saveCompanySettingsAction, undefined)
 
   return (
-    <form action={action} className="space-y-8 pb-12">
+    <form id="settings-profile-form" action={action} className="space-y-8 pb-12">
       {/* --- Section: Stammdaten --- */}
       <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-gray-100 bg-gray-50/50">
