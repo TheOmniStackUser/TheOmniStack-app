@@ -17,6 +17,14 @@ export const metadata: Metadata = {
       ? process.env.NEXT_PUBLIC_APP_URL 
       : 'http://localhost:3000'
   ),
+  icons: {
+    icon: [
+      { url: '/icon.png', type: 'image/png' },
+      { url: '/favicon.ico', sizes: 'any' }
+    ],
+    shortcut: '/favicon.ico',
+    apple: '/apple-touch-icon.png',
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
