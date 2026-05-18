@@ -68,10 +68,14 @@ export async function POST(req: NextRequest) {
       7. MARKTPLATZ (marketplace):
          - Suche nach bekannten E-Commerce-Plattformen oder Marktplätzen, über die dieser Beleg abgewickelt wurde (z.B. Amazon, Otto, Zalando, Kaufland, eBay, Mirakl). Wenn du einen dieser Namen auf dem Beleg findest (als Logo, Rechnungs- oder Lieferschein-Header, Text etc.), gib ihn im Feld "marketplace" zurück (z.B. "Amazon", "Otto", "Zalando", "Kaufland", "eBay", "Mirakl"). Wenn kein bekannter Marktplatz gefunden wird, gib null zurück.
 
+      8. KUNDENADRESSE / VERSANDADRESSE (shipping_address):
+         - Suche nach der vollständigen Adresse des Kunden (Absender auf dem Label oder Lieferanschrift auf dem Lieferschein). Gib sie als sauber formatierten String zurück (z.B. "Musterstraße 12, 12345 Musterstadt"). Wenn keine Adresse gefunden wird, gib null zurück.
+
       ANTWORTE NUR ALS JSON:
       {
         "order_number": "String",
         "customer_name": "String",
+        "shipping_address": "String" | null,
         "items": [
           { "sku": "String", "quantity": number }
         ],
