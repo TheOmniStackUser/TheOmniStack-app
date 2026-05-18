@@ -5,7 +5,7 @@ async function main() {
   const apiKey = 'os_live_leis_leis_gb_7747099a'
   const url = 'https://app.theomnistack.de/api/v1/returns/analyze-image'
   
-  const imagePath = './scratch/media__1778959937598.png'
+  const imagePath = './scratch/media__1778959986561.png'
   const fullPath = path.resolve(imagePath)
   if (!fs.existsSync(fullPath)) {
     console.error(`File not found: ${fullPath}`)

@@ -454,15 +454,16 @@ export function InvoiceList({ initialInvoices }: { initialInvoices: Invoice[] })
       </div>
 
       {/* Pagination Controls */}
-      {totalPages > 1 && (
+      {filteredInvoices.length > 0 && (
         <div className="mt-6 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="text-sm text-slate-500 flex flex-col sm:flex-row sm:items-center gap-3">
-            <div>
-              Zeige <span className="font-medium">{(currentPage - 1) * pageSize + 1}</span> bis <span className="font-medium">{Math.min(currentPage * pageSize, filteredInvoices.length)}</span> von <span className="font-medium">{filteredInvoices.length}</span> Ergebnissen
-            </div>
-            
+          <div className="text-sm text-slate-500">
+            Zeige <span className="font-medium">{(currentPage - 1) * pageSize + 1}</span> bis <span className="font-medium">{Math.min(currentPage * pageSize, filteredInvoices.length)}</span> von <span className="font-medium">{filteredInvoices.length}</span> Ergebnissen
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-4">
+            {/* Page Size Select on Bottom Right */}
             <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
-              <label htmlFor="pageSizeBottom" className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Anzeige:</label>
+              <label htmlFor="pageSizeBottom" className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Zeilen:</label>
               <select
                 id="pageSizeBottom"
                 value={pageSize}
@@ -470,58 +471,60 @@ export function InvoiceList({ initialInvoices }: { initialInvoices: Invoice[] })
                   setPageSize(Number(e.target.value))
                   setCurrentPage(1)
                 }}
-                className="bg-transparent focus:outline-none text-sm text-slate-700 font-bold"
+                className="bg-transparent focus:outline-none text-sm text-slate-700 font-bold cursor-pointer"
               >
-                <option value={10}>10</option>
                 <option value={25}>25</option>
                 <option value={50}>50</option>
                 <option value={100}>100</option>
               </select>
             </div>
-          </div>
 
-          <div className="flex gap-2">
-            <button
-              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-              disabled={currentPage === 1}
-              className="px-3 py-1 border border-slate-300 rounded-lg bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Zurück
-            </button>
-            <div className="flex items-center gap-1">
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                let pageNum = i + 1
-                if (totalPages > 5 && currentPage > 3) {
-                  pageNum = currentPage - 2 + i
-                  if (pageNum + (4 - i) > totalPages) {
-                    pageNum = totalPages - 4 + i
-                  }
-                }
-                if (pageNum <= 0) return null
-                if (pageNum > totalPages) return null
+            {/* Page Navigation */}
+            {totalPages > 1 && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 border border-slate-300 rounded-lg bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Zurück
+                </button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum = i + 1
+                    if (totalPages > 5 && currentPage > 3) {
+                      pageNum = currentPage - 2 + i
+                      if (pageNum + (4 - i) > totalPages) {
+                        pageNum = totalPages - 4 + i
+                      }
+                    }
+                    if (pageNum <= 0) return null
+                    if (pageNum > totalPages) return null
 
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
-                    className={`px-3 py-1 text-sm font-medium rounded-lg ${
-                      currentPage === pageNum
-                        ? 'bg-slate-900 text-white'
-                        : 'bg-white text-gray-700 border border-slate-300 hover:bg-slate-50'
-                    }`}
-                  >
-                    {pageNum}
-                  </button>
-                )
-              })}
-            </div>
-            <button
-              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-              disabled={currentPage === totalPages}
-              className="px-3 py-1 border border-slate-300 rounded-lg bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Weiter
-            </button>
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`px-3 py-1 text-sm font-medium rounded-lg ${
+                          currentPage === pageNum
+                            ? 'bg-slate-900 text-white'
+                            : 'bg-white text-gray-700 border border-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    )
+                  })}
+                </div>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 border border-slate-300 rounded-lg bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Weiter
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

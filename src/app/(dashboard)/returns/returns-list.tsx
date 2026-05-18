@@ -52,6 +52,10 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
   const [marketplaceFilter, setMarketplaceFilter] = useState<string>('all')
   const [isPending, startTransition] = useTransition()
 
+  // Pagination State
+  const [pageSize, setPageSize] = useState(25)
+  const [currentPage, setCurrentPage] = useState(1)
+
   // Edit Modal State
   const [editingLog, setEditingLog] = useState<ReturnLog | null>(null)
   const [editOrderNumber, setEditOrderNumber] = useState('')
@@ -80,6 +84,13 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
 
     return matchesSearch && matchesStatus && matchesMarketplace
   })
+
+  // Pagination Logic
+  const totalPages = Math.ceil(filteredLogs.length / pageSize)
+  const paginatedLogs = filteredLogs.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  )
 
   // Selection
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -274,7 +285,10 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
             type="text"
             placeholder="Bestellnr., Kunde, Notiz suchen..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value)
+              setCurrentPage(1)
+            }}
             className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm bg-white"
           />
           <svg className="w-5 h-5 text-slate-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -286,7 +300,10 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
           {/* Marketplace Filter */}
           <select
             value={marketplaceFilter}
-            onChange={(e) => setMarketplaceFilter(e.target.value)}
+            onChange={(e) => {
+              setMarketplaceFilter(e.target.value)
+              setCurrentPage(1)
+            }}
             className="px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm bg-white text-slate-600 font-medium"
           >
             <option value="all">Alle Kanäle</option>
@@ -302,7 +319,10 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
           {/* Status Filters */}
           <div className="flex gap-1 bg-white p-1 rounded-lg border border-slate-200">
             <button
-              onClick={() => setStatusFilter('all')}
+              onClick={() => {
+                setStatusFilter('all')
+                setCurrentPage(1)
+              }}
               className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
                 statusFilter === 'all'
                   ? 'bg-slate-800 text-white shadow-sm'
@@ -312,7 +332,10 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
               Alle
             </button>
             <button
-              onClick={() => setStatusFilter('neu')}
+              onClick={() => {
+                setStatusFilter('neu')
+                setCurrentPage(1)
+              }}
               className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
                 statusFilter === 'neu'
                   ? 'bg-indigo-600 text-white shadow-sm'
@@ -322,7 +345,10 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
               Neu
             </button>
             <button
-              onClick={() => setStatusFilter('bearbeitet')}
+              onClick={() => {
+                setStatusFilter('bearbeitet')
+                setCurrentPage(1)
+              }}
               className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
                 statusFilter === 'bearbeitet'
                   ? 'bg-emerald-600 text-white shadow-sm'
@@ -404,7 +430,7 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
                 </td>
               </tr>
             ) : (
-              filteredLogs.map((log) => (
+              paginatedLogs.map((log) => (
                 <tr key={log.id} className="hover:bg-slate-50/30 transition-colors">
                   {/* Checkbox */}
                   <td className="px-6 py-4 text-center">
@@ -587,6 +613,82 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
           </tbody>
         </table>
       </div>
+
+      {/* Pagination Controls */}
+      {filteredLogs.length > 0 && (
+        <div className="mt-6 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="text-sm text-slate-500">
+            Zeige <span className="font-medium">{(currentPage - 1) * pageSize + 1}</span> bis <span className="font-medium">{Math.min(currentPage * pageSize, filteredLogs.length)}</span> von <span className="font-medium">{filteredLogs.length}</span> Ergebnissen
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-4">
+            {/* Page Size Select on Bottom Right */}
+            <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
+              <label htmlFor="pageSizeBottom" className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Zeilen:</label>
+              <select
+                id="pageSizeBottom"
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value))
+                  setCurrentPage(1)
+                }}
+                className="bg-transparent focus:outline-none text-sm text-slate-700 font-bold cursor-pointer"
+              >
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
+
+            {/* Page Navigation */}
+            {totalPages > 1 && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 border border-slate-300 rounded-lg bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Zurück
+                </button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum = i + 1
+                    if (totalPages > 5 && currentPage > 3) {
+                      pageNum = currentPage - 2 + i
+                      if (pageNum + (4 - i) > totalPages) {
+                        pageNum = totalPages - 4 + i
+                      }
+                    }
+                    if (pageNum <= 0) return null
+                    if (pageNum > totalPages) return null
+
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`px-3 py-1 text-sm font-medium rounded-lg ${
+                          currentPage === pageNum
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    )
+                  })}
+                </div>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 border border-slate-300 rounded-lg bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Weiter
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Edit Modal Dialog */}
       {editingLog && (

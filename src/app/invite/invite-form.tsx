@@ -10,8 +10,12 @@ export function InviteForm({ token, email }: { token: string; email: string }) {
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
       <div className="max-w-md w-full bg-white rounded-2xl border border-slate-200 shadow-xl p-8 space-y-6">
         <div className="text-center space-y-2">
-          <div className="inline-flex w-12 h-12 rounded-full bg-blue-100 text-blue-600 items-center justify-center font-bold text-xl shadow-inner">
-            ✦
+          <div className="inline-flex w-12 h-12 rounded-xl overflow-hidden shadow-sm items-center justify-center mx-auto border border-slate-100 bg-slate-50">
+            <img 
+              src="/icon.png" 
+              alt="TheOmniStack Logo" 
+              className="w-full h-full object-cover animate-pulse-subtle"
+            />
           </div>
           <h1 className="text-2xl font-bold text-slate-900">Willkommen bei TheOmniStack</h1>
           <p className="text-sm text-slate-500">
