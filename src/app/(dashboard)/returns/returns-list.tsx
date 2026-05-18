@@ -23,6 +23,7 @@ interface ReturnLog {
   customerName: string | null
   shippingAddress: string | null
   scannedAt: Date
+  receivedAt: Date
   status: string
   marketplace: string | null
   notes: string | null
@@ -40,6 +41,7 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
     initialLogs.map((l) => ({
       ...l,
       scannedAt: new Date(l.scannedAt),
+      receivedAt: l.receivedAt ? new Date(l.receivedAt) : new Date(l.scannedAt),
       items: l.items || []
     }))
   )
@@ -59,6 +61,7 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
   const [editNotes, setEditNotes] = useState('')
   const [editItems, setEditItems] = useState<ScannedItem[]>([])
   const [editScannedAt, setEditScannedAt] = useState('')
+  const [editReceivedAt, setEditReceivedAt] = useState('')
 
   // Search & Filter
   const filteredLogs = logs.filter((log) => {
@@ -174,13 +177,22 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
     setEditNotes(log.notes || '')
     setEditItems(log.items.map((i) => ({ ...i })))
     
-    // Format Date for <input type="datetime-local" />
+    // Format scannedAt Date for <input type="datetime-local" />
     if (log.scannedAt) {
       const tzoffset = log.scannedAt.getTimezoneOffset() * 60000
       const localTime = new Date(log.scannedAt.getTime() - tzoffset).toISOString().slice(0, 16)
       setEditScannedAt(localTime)
     } else {
       setEditScannedAt('')
+    }
+
+    // Format receivedAt Date for <input type="datetime-local" />
+    if (log.receivedAt) {
+      const tzoffset = log.receivedAt.getTimezoneOffset() * 60000
+      const localTime = new Date(log.receivedAt.getTime() - tzoffset).toISOString().slice(0, 16)
+      setEditReceivedAt(localTime)
+    } else {
+      setEditReceivedAt('')
     }
   }
 
@@ -216,6 +228,7 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
           marketplace: editMarketplace || null,
           notes: editNotes.trim() || null,
           scannedAt: editScannedAt ? new Date(editScannedAt) : null,
+          receivedAt: editReceivedAt ? new Date(editReceivedAt) : null,
           items: editItems.map((i) => ({
             ...i,
             skuOrProductName: i.skuOrProductName.trim() || 'Unbekannt'
@@ -237,6 +250,7 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
                 marketplace: payload.marketplace,
                 notes: payload.notes,
                 scannedAt: payload.scannedAt || l.scannedAt,
+                receivedAt: payload.receivedAt || l.receivedAt,
                 items: editItems
               }
             }
@@ -372,7 +386,7 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
                 />
               </th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Scan-Zeitpunkt</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Eingang & Scan</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Marktplatz</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Bestellnummer</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Versand</th>
@@ -419,8 +433,19 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
                   </td>
 
                   {/* Date */}
-                  <td className="px-6 py-4 text-sm text-slate-500 font-medium">
-                    {format(log.scannedAt, 'dd.MM.yyyy HH:mm', { locale: de })}
+                  <td className="px-6 py-4 space-y-1">
+                    <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5" title="Datum des Retoureneingangs">
+                      <svg className="w-3.5 h-3.5 text-indigo-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <span>{format(log.receivedAt, 'dd.MM.yyyy HH:mm', { locale: de })}</span>
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-semibold flex items-center gap-1.5" title="Scan-Zeitpunkt (System-Log)">
+                      <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>Scan: {format(log.scannedAt, 'dd.MM.yyyy HH:mm', { locale: de })}</span>
+                    </div>
                   </td>
 
                   {/* Marketplace Badge */}
@@ -602,14 +627,25 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
                   </select>
                 </div>
 
-                {/* Scan Date Input */}
+                {/* Return Date Input */}
                 <div className="space-y-1.5 sm:col-span-2">
                   <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Datum des Retoureneingangs</label>
                   <input
                     type="datetime-local"
-                    value={editScannedAt}
-                    onChange={(e) => setEditScannedAt(e.target.value)}
+                    value={editReceivedAt}
+                    onChange={(e) => setEditReceivedAt(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-semibold text-slate-900 bg-white"
+                  />
+                </div>
+
+                {/* Scan Date Input */}
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Scan-Zeitpunkt (System-Log)</label>
+                  <input
+                    type="datetime-local"
+                    value={editScannedAt}
+                    disabled
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none text-sm font-semibold text-slate-500 bg-slate-50 cursor-not-allowed"
                   />
                 </div>
 

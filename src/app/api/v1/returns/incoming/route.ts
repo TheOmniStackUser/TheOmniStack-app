@@ -146,6 +146,16 @@ export async function POST(req: Request) {
       }
     }
 
+    // Determine custom receivedAt from payload if sent by the iPhone App (falls back to resolvedScannedAt)
+    let resolvedReceivedAt: Date = resolvedScannedAt
+    const rawReceivedDate = body.received_at || body.receivedAt || body.return_date || body.returnDate || return_metadata?.received_at || return_metadata?.receivedAt || return_metadata?.return_date || return_metadata?.returnDate
+    if (rawReceivedDate) {
+      const parsedReceivedDate = new Date(rawReceivedDate)
+      if (!isNaN(parsedReceivedDate.getTime())) {
+        resolvedReceivedAt = parsedReceivedDate
+      }
+    }
+
     // 5. Persistence — Log the Return Entry
     const [logEntry] = await db.insert(returnsLog).values({
       companyId: company.id,
@@ -156,6 +166,7 @@ export async function POST(req: Request) {
       processedByUserId: return_metadata?.processed_by_user_id || null,
       marketplace: resolvedMarketplace,
       scannedAt: resolvedScannedAt,
+      receivedAt: resolvedReceivedAt,
       metadata: return_metadata || {},
     }).returning({ id: returnsLog.id })
 

@@ -12,6 +12,7 @@ export const returnsLog = pgTable('returns_log', {
   customerName: text('customer_name'),
   shippingAddress: text('shipping_address'),
   scannedAt: timestamp('scanned_at').defaultNow().notNull(),
+  receivedAt: timestamp('received_at').defaultNow().notNull(),
   processedByUserId: uuid('processed_by_user_id').references(() => users.id),
   status: text('status').default('neu').notNull(),
   marketplace: text('marketplace'),
