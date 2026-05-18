@@ -72,10 +72,60 @@ export async function POST(req: Request) {
       }
     }
 
+    // Invincible Customer Name Fallback Parser (handles snake_case, camelCase, root-level, nested, etc.)
+    const parsedCustomerName = 
+      customer_info?.customer_name ||
+      customer_info?.customerName ||
+      customer_info?.name ||
+      body.customer_name ||
+      body.customerName ||
+      body.name ||
+      body.buyer_name ||
+      body.buyerName ||
+      return_metadata?.customer_name ||
+      return_metadata?.customerName ||
+      'N/A'
+
+    // Invincible Shipping Address Fallback Parser
+    let parsedShippingAddress = 
+      customer_info?.shipping_address ||
+      customer_info?.shippingAddress ||
+      customer_info?.address ||
+      body.shipping_address ||
+      body.shippingAddress ||
+      body.address ||
+      order_info?.shipping_address ||
+      order_info?.shippingAddress ||
+      return_metadata?.shipping_address ||
+      return_metadata?.shippingAddress ||
+      ''
+
+    // If no raw address string was found, try to assemble from structured fields
+    if (!parsedShippingAddress.trim()) {
+      const street = customer_info?.street || customer_info?.shipping_street || customer_info?.shippingStreet || body.street || body.shippingStreet || ''
+      const zip = customer_info?.zip || customer_info?.zip_code || customer_info?.zipCode || customer_info?.shipping_zip || customer_info?.shippingZip || body.zip || body.shippingZip || ''
+      const city = customer_info?.city || customer_info?.shipping_city || customer_info?.shippingCity || body.city || body.shippingCity || ''
+      const country = customer_info?.country || customer_info?.country_code || customer_info?.countryCode || customer_info?.shipping_country || customer_info?.shippingCountry || body.country || ''
+
+      const structuredAddress = [
+        street,
+        `${zip} ${city}`.trim(),
+        country
+      ].filter(Boolean).join('\n')
+
+      if (structuredAddress.trim()) {
+        parsedShippingAddress = structuredAddress
+      }
+    }
+
+    if (!parsedShippingAddress.trim()) {
+      parsedShippingAddress = 'N/A'
+    }
+
     // Resolve Customer Name and Shipping Address using the matched order in our database
     const resolvedCustomerName = matchedOrder 
-      ? (matchedOrder.buyerName || matchedOrder.shippingName || 'N/A')
-      : (customer_info?.customer_name || 'N/A')
+      ? (matchedOrder.buyerName || matchedOrder.shippingName || parsedCustomerName)
+      : parsedCustomerName
 
     const resolvedShippingAddress = matchedOrder
       ? [
@@ -84,7 +134,7 @@ export async function POST(req: Request) {
           `${matchedOrder.shippingZip || ''} ${matchedOrder.shippingCity || ''}`.trim(),
           matchedOrder.shippingCountry || ''
         ].filter(Boolean).join('\n')
-      : (customer_info?.shipping_address || 'N/A')
+      : parsedShippingAddress
 
     // Determine custom return date / scannedAt from payload if sent by the iPhone App
     let resolvedScannedAt: Date = new Date()
