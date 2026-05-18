@@ -174,3 +174,39 @@ export async function removeUserAction(userId: string) {
   revalidatePath('/settings/users')
   return { success: true }
 }
+
+export async function getOrCreateInviteLinkAction(email: string) {
+  const auth = await requireAuth()
+  if (auth.role !== 'owner' && auth.role !== 'admin') {
+    throw new Error('Keine Berechtigung')
+  }
+
+  // Check if token exists and is valid
+  const [existingToken] = await db
+    .select()
+    .from(verificationTokens)
+    .where(
+      and(
+        eq(verificationTokens.identifier, email.toLowerCase()),
+        gt(verificationTokens.expiresAt, new Date())
+      )
+    )
+    .limit(1)
+
+  let token = existingToken?.token
+
+  if (!existingToken) {
+    // Generate new token
+    token = crypto.randomBytes(32).toString('hex')
+    const expiresAt = new Date(Date.now() + 48 * 3600 * 1000) // 48 hours
+
+    await db.insert(verificationTokens).values({
+      identifier: email.toLowerCase(),
+      token,
+      expiresAt,
+    })
+  }
+
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  return { inviteLink: `${baseUrl}/invite?token=${token}` }
+}

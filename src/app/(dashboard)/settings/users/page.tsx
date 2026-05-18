@@ -1,8 +1,8 @@
 import { requireAuth } from '@/lib/session'
 import { db } from '@/db/client'
 import { companyMembers } from '@/db/schema/companies'
-import { users } from '@/db/schema/auth'
-import { eq } from 'drizzle-orm'
+import { users, verificationTokens } from '@/db/schema/auth'
+import { eq, gt } from 'drizzle-orm'
 import { UserList } from './user-list'
 
 export default async function UserManagementPage() {
@@ -15,10 +15,35 @@ export default async function UserManagementPage() {
       email: users.email,
       role: companyMembers.role,
       joinedAt: companyMembers.joinedAt,
+      emailVerifiedAt: users.emailVerifiedAt,
     })
     .from(companyMembers)
     .innerJoin(users, eq(companyMembers.userId, users.id))
     .where(eq(companyMembers.companyId, auth.activeCompanyId))
+
+  // Fetch active verification tokens to identify pending invitations
+  const tokens = await db
+    .select({
+      identifier: verificationTokens.identifier,
+      token: verificationTokens.token,
+    })
+    .from(verificationTokens)
+    .where(gt(verificationTokens.expiresAt, new Date()))
+
+  const enrichedMembers = members.map((m) => {
+    const matchingToken = tokens.find(
+      (t) => t.identifier.toLowerCase() === m.email.toLowerCase()
+    )
+    return {
+      id: m.id,
+      name: m.name,
+      email: m.email,
+      role: m.role,
+      joinedAt: m.joinedAt,
+      isPending: !m.emailVerifiedAt || !!matchingToken,
+      inviteToken: matchingToken ? matchingToken.token : null,
+    }
+  })
 
   return (
     <div className="max-w-5xl mx-auto py-8">
@@ -29,7 +54,7 @@ export default async function UserManagementPage() {
         </div>
       </div>
 
-      <UserList initialMembers={members} currentUserRole={auth.role} currentUserId={auth.userId} />
+      <UserList initialMembers={enrichedMembers} currentUserRole={auth.role} currentUserId={auth.userId} />
     </div>
   )
 }

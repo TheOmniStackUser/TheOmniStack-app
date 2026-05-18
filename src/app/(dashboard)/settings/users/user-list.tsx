@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { addUserAction, removeUserAction } from '@/app/actions/users'
+import { addUserAction, removeUserAction, getOrCreateInviteLinkAction } from '@/app/actions/users'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
 
@@ -11,6 +11,8 @@ interface Member {
   email: string
   role: string
   joinedAt: Date
+  isPending?: boolean
+  inviteToken?: string | null
 }
 
 export function UserList({ 
@@ -46,6 +48,28 @@ export function UserList({
       if (result?.inviteLink) {
         setGeneratedLink(result.inviteLink)
       }
+    }
+  }
+
+  const [copyingInvite, setCopyingInvite] = useState<string | null>(null)
+  const [copiedInviteEmail, setCopiedInviteEmail] = useState<string | null>(null)
+
+  const handleCopyInviteLink = async (email: string) => {
+    setCopyingInvite(email)
+    try {
+      const result = await getOrCreateInviteLinkAction(email)
+      if (result?.inviteLink) {
+        await navigator.clipboard.writeText(result.inviteLink)
+        setCopiedInviteEmail(email)
+        setTimeout(() => setCopiedInviteEmail(null), 2500)
+      } else {
+        alert('Fehler beim Abrufen des Einladungslinks.')
+      }
+    } catch (err) {
+      console.error(err)
+      alert('Fehler beim Abrufen des Einladungslinks.')
+    } finally {
+      setCopyingInvite(null)
     }
   }
 
@@ -182,33 +206,66 @@ export function UserList({
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${
-                    member.role === 'owner' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                    member.role === 'admin' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                    member.role === 'omnistack_support' ? 'bg-purple-50 text-purple-700 border-purple-200' :
-                    'bg-slate-50 text-slate-600 border-slate-200'
-                  }`}>
-                    {member.role === 'owner' ? 'Besitzer' : 
-                     member.role === 'admin' ? 'Administrator' : 
-                     member.role === 'omnistack_support' ? 'Support' :
-                     'Mitarbeiter'}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${
+                      member.role === 'owner' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                      member.role === 'admin' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                      member.role === 'omnistack_support' ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                      'bg-slate-50 text-slate-600 border-slate-200'
+                    }`}>
+                      {member.role === 'owner' ? 'Besitzer' : 
+                       member.role === 'admin' ? 'Administrator' : 
+                       member.role === 'omnistack_support' ? 'Support' :
+                       'Mitarbeiter'}
+                    </span>
+                    {member.isPending && (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border bg-yellow-50 text-yellow-700 border-yellow-200">
+                        Ausstehend
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-6 py-4 text-sm text-slate-500">
                   {format(new Date(member.joinedAt), 'dd.MM.yyyy', { locale: de })}
                 </td>
                 <td className="px-6 py-4 text-right">
-                  {canManage && member.id !== currentUserId && member.role !== 'owner' && (
-                    <button
-                      onClick={() => handleRemoveUser(member.id)}
-                      className="p-2 text-slate-400 hover:text-red-600 transition-colors rounded-lg hover:bg-red-50"
-                      title="Benutzer entfernen"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  )}
+                  <div className="flex items-center justify-end gap-2">
+                    {member.isPending && (
+                      <button
+                        onClick={() => handleCopyInviteLink(member.email)}
+                        disabled={copyingInvite === member.email}
+                        className="px-3 py-1 text-xs font-bold text-blue-600 hover:text-blue-700 border border-blue-200 hover:bg-blue-50 rounded-lg transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50 shrink-0"
+                        title="Einladungslink kopieren"
+                      >
+                        {copiedInviteEmail === member.email ? (
+                          <>
+                            <svg className="w-3.5 h-3.5 text-green-600 animate-in zoom-in-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span>Kopiert!</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                            </svg>
+                            <span>{copyingInvite === member.email ? 'Lädt...' : 'Link kopieren'}</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                    {canManage && member.id !== currentUserId && member.role !== 'owner' && (
+                      <button
+                        onClick={() => handleRemoveUser(member.id)}
+                        className="p-2 text-slate-400 hover:text-red-600 transition-colors rounded-lg hover:bg-red-50 cursor-pointer"
+                        title="Benutzer entfernen"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
