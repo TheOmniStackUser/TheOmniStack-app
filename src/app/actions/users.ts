@@ -1,18 +1,19 @@
 'use server'
 
 import { db } from '@/db/client'
-import { users } from '@/db/schema/auth'
-import { companyMembers } from '@/db/schema/companies'
+import { users, verificationTokens } from '@/db/schema/auth'
+import { companyMembers, companies } from '@/db/schema/companies'
 import { requireAuth } from '@/lib/session'
 import { eq, and, ne } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
+import crypto from 'crypto'
+import { sendInvitationEmail } from '@/lib/email'
 
 const CreateUserSchema = z.object({
   name: z.string().min(2, 'Name ist zu kurz'),
   email: z.string().email('Ungültige E-Mail'),
-  password: z.string().min(8, 'Passwort muss mindestens 8 Zeichen haben'),
   role: z.enum(['admin', 'staff', 'omnistack_support']),
 })
 
@@ -27,7 +28,7 @@ export async function addUserAction(formData: FormData) {
     return { error: validated.error.issues[0].message }
   }
 
-  const { name, email, password, role } = validated.data
+  const { name, email, role } = validated.data
 
   // Security check: Only owners can create Omnistack Support accounts
   if (role === 'omnistack_support' && auth.role !== 'owner') {
@@ -54,7 +55,9 @@ export async function addUserAction(formData: FormData) {
     let userId = existingUser?.id
 
     if (!existingUser) {
-      const passwordHash = await bcrypt.hash(password, 12)
+      // Create invited user with a completely random password they cannot guess
+      const tempPassword = 'INVITED_USER_' + crypto.randomBytes(16).toString('hex')
+      const passwordHash = await bcrypt.hash(tempPassword, 12)
       const [newUser] = await db
         .insert(users)
         .values({
@@ -88,8 +91,43 @@ export async function addUserAction(formData: FormData) {
       role: role as any,
     })
 
+    // Generate secure invitation token
+    const token = crypto.randomBytes(32).toString('hex')
+    const expiresAt = new Date(Date.now() + 48 * 3600 * 1000) // 48 hours
+
+    await db.insert(verificationTokens).values({
+      identifier: email.toLowerCase(),
+      token,
+      expiresAt,
+    })
+
+    // Send invitation email in the background
+    const [company] = await db
+      .select({ name: companies.name })
+      .from(companies)
+      .where(eq(companies.id, auth.activeCompanyId))
+      .limit(1)
+
+    if (company) {
+      const [adminUser] = await db
+        .select({ name: users.name })
+        .from(users)
+        .where(eq(users.id, auth.userId))
+        .limit(1)
+
+      await sendInvitationEmail(
+        email.toLowerCase(),
+        adminUser?.name || 'Ein Administrator',
+        company.name,
+        token
+      )
+    }
+
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    const inviteLink = `${baseUrl}/invite?token=${token}`
+
     revalidatePath('/settings/users')
-    return { success: true }
+    return { success: true, inviteLink }
   } catch (e) {
     console.error(e)
     return { error: 'Fehler beim Erstellen des Benutzers' }

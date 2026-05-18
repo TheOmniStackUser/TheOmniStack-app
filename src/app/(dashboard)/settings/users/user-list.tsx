@@ -25,11 +25,14 @@ export function UserList({
   const [isAdding, setIsAdding] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [generatedLink, setGeneratedLink] = useState<string | null>(null)
+  const [copiedLink, setCopiedLink] = useState(false)
 
   const handleAddUser = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError(null)
     setIsSubmitting(true)
+    setGeneratedLink(null)
 
     const formData = new FormData(e.currentTarget)
     const result = await addUserAction(formData)
@@ -40,6 +43,9 @@ export function UserList({
     } else {
       setIsAdding(false)
       setIsSubmitting(false)
+      if (result?.inviteLink) {
+        setGeneratedLink(result.inviteLink)
+      }
     }
   }
 
@@ -75,10 +81,53 @@ export function UserList({
         )}
       </div>
 
+      {generatedLink && (
+        <div className="bg-emerald-50 p-6 rounded-2xl border border-emerald-200 shadow-sm text-emerald-900 animate-in fade-in slide-in-from-top-4 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold shadow-md shrink-0">
+              ✓
+            </div>
+            <div>
+              <h3 className="text-lg font-bold">Benutzer erfolgreich angelegt!</h3>
+              <p className="text-sm text-emerald-700">Der Benutzer wurde eingeladen und hat eine E-Mail erhalten.</p>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">Einladungslink (zur manuellen Übergabe):</p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                readOnly
+                value={generatedLink}
+                className="flex-1 px-4 py-2 border border-emerald-200 bg-white rounded-lg font-mono text-xs text-slate-800 outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(generatedLink)
+                  setCopiedLink(true)
+                  setTimeout(() => setCopiedLink(false), 2000)
+                }}
+                className="px-4 py-2 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700 transition-all text-sm shrink-0 cursor-pointer"
+              >
+                {copiedLink ? 'Kopiert!' : 'Link kopieren'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setGeneratedLink(null)}
+                className="px-4 py-2 border border-emerald-200 hover:bg-emerald-100 rounded-lg text-emerald-700 transition-all text-sm shrink-0 cursor-pointer"
+              >
+                Schließen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isAdding && (
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xl animate-in fade-in slide-in-from-top-4">
           <h3 className="text-lg font-bold text-slate-900 mb-4">Neuen Benutzer anlegen</h3>
-          <form onSubmit={handleAddUser} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <form onSubmit={handleAddUser} className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Name</label>
               <input name="name" required className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium placeholder:text-slate-400 text-slate-900 bg-white" placeholder="Max Mustermann" />
@@ -88,12 +137,8 @@ export function UserList({
               <input name="email" type="email" required className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium placeholder:text-slate-400 text-slate-900 bg-white" placeholder="max@beispiel.de" />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Passwort (initial)</label>
-              <input name="password" type="password" required className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium placeholder:text-slate-400 text-slate-900 bg-white" placeholder="********" />
-            </div>
-            <div>
               <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Rolle</label>
-              <select name="role" className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-900 bg-white">
+              <select name="role" className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-900 bg-white cursor-pointer">
                 <option value="staff">Händler-Mitarbeiter (Operativ)</option>
                 <option value="admin">Administrator (Vollzugriff)</option>
                 {currentUserRole === 'owner' && (
@@ -101,10 +146,10 @@ export function UserList({
                 )}
               </select>
             </div>
-            {error && <div className="md:col-span-2 text-sm text-red-600 font-bold">{error}</div>}
-            <div className="md:col-span-2 flex justify-end gap-3 mt-2">
-              <button type="button" onClick={() => setIsAdding(false)} className="px-4 py-2 text-slate-500 font-bold hover:bg-slate-50 rounded-lg transition-all">Abbrechen</button>
-              <button type="submit" disabled={isSubmitting} className="px-6 py-2 bg-slate-900 text-white font-bold rounded-lg hover:bg-slate-800 transition-all shadow-lg disabled:opacity-50">
+            {error && <div className="md:col-span-3 text-sm text-red-600 font-bold">{error}</div>}
+            <div className="md:col-span-3 flex justify-end gap-3 mt-2">
+              <button type="button" onClick={() => setIsAdding(false)} className="px-4 py-2 text-slate-500 font-bold hover:bg-slate-50 rounded-lg transition-all cursor-pointer">Abbrechen</button>
+              <button type="submit" disabled={isSubmitting} className="px-6 py-2 bg-slate-900 text-white font-bold rounded-lg hover:bg-slate-800 transition-all shadow-lg disabled:opacity-50 cursor-pointer">
                 {isSubmitting ? 'Wird erstellt...' : 'Benutzer anlegen'}
               </button>
             </div>

@@ -449,3 +449,97 @@ export async function disableTwoFactorAction() {
 
   return { message: 'Zweistufige Authentifizierung wurde deaktiviert.' }
 }
+
+// ─── Accept Invitation ────────────────────────────────────────────────────────
+const AcceptInvitationSchema = z.object({
+  token: z.string().min(1, 'Token ist erforderlich'),
+  password: z
+    .string()
+    .min(8, { message: 'Passwort muss mindestens 8 Zeichen lang sein.' })
+    .regex(/[A-Z]/, { message: 'Muss einen Großbuchstaben enthalten.' })
+    .regex(/[0-9]/, { message: 'Muss eine Zahl enthalten.' }),
+})
+
+export async function acceptInvitationAction(
+  _state: AuthFormState,
+  formData: FormData
+): Promise<AuthFormState> {
+  const token = formData.get('token') as string
+  const password = formData.get('password') as string
+
+  const validated = AcceptInvitationSchema.safeParse({ token, password })
+  if (!validated.success) {
+    return { errors: validated.error.flatten().fieldErrors }
+  }
+
+  // Find verification token
+  const [tokenRecord] = await db
+    .select()
+    .from(verificationTokens)
+    .where(
+      and(
+        eq(verificationTokens.token, token),
+        gt(verificationTokens.expiresAt, new Date())
+      )
+    )
+    .limit(1)
+
+  if (!tokenRecord) {
+    return { message: 'Der Einladungslink ist ungültig oder abgelaufen.' }
+  }
+
+  const email = tokenRecord.identifier.toLowerCase()
+
+  // Find user by email
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, email))
+    .limit(1)
+
+  if (!user) {
+    return { message: 'Benutzerkonto wurde nicht gefunden.' }
+  }
+
+  // Hash new password
+  const passwordHash = await bcrypt.hash(password, 12)
+
+  // Update user's password and verify their email
+  await db
+    .update(users)
+    .set({
+      passwordHash,
+      emailVerifiedAt: new Date(),
+    })
+    .where(eq(users.id, user.id))
+
+  // Delete the verification token so it can't be reused
+  await db
+    .delete(verificationTokens)
+    .where(eq(verificationTokens.token, token))
+
+  // Find user's company membership to set active company context
+  const [membership] = await db
+    .select({ companyId: companyMembers.companyId })
+    .from(companyMembers)
+    .where(eq(companyMembers.userId, user.id))
+    .limit(1)
+
+  // Create session
+  await createSession(user.id, membership?.companyId ?? null)
+
+  // Audit log
+  const hdrs = await headers()
+  await auditLog({
+    userId: user.id,
+    companyId: membership?.companyId,
+    action: 'login',
+    entityType: 'user',
+    entityId: user.id,
+    ipAddress: hdrs.get('x-forwarded-for') ?? 'unknown',
+    userAgent: hdrs.get('user-agent') ?? 'unknown',
+  })
+
+  // Redirect to dashboard
+  redirect('/dashboard')
+}
