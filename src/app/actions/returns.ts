@@ -81,6 +81,7 @@ export async function updateReturnAction(
       skuOrProductName: string
       quantity: number
       condition: string
+      notes?: string | null
     }[]
   }
 ) {
@@ -131,6 +132,7 @@ export async function updateReturnAction(
           skuOrProductName: item.skuOrProductName,
           quantity: item.quantity,
           condition: item.condition,
+          notes: item.notes || null,
         })
         .where(eq(returnedItems.id, item.id))
     } else {
@@ -140,6 +142,7 @@ export async function updateReturnAction(
         skuOrProductName: item.skuOrProductName,
         quantity: item.quantity,
         condition: item.condition,
+        notes: item.notes || null,
       })
     }
   }

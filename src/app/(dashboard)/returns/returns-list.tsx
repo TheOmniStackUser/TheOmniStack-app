@@ -15,6 +15,7 @@ interface ScannedItem {
   skuOrProductName: string
   quantity: number
   condition: string
+  notes?: string | null
 }
 
 interface ReturnLog {
@@ -531,6 +532,11 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
                       <div key={idx} className="flex items-center gap-2 text-xs">
                         <span className="text-slate-800 font-medium">
                           {item.quantity}x {item.skuOrProductName}
+                          {item.notes && (
+                            <span className="text-slate-400 font-normal italic ml-1">
+                              ({item.notes})
+                            </span>
+                          )}
                         </span>
                         <span className={`px-1.5 py-0.2 rounded font-bold text-[9px] uppercase tracking-wider ${
                           item.condition === 'new'
@@ -752,6 +758,18 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
                           <option value="used">Gebraucht</option>
                           <option value="damaged">Defekt</option>
                         </select>
+                      </div>
+
+                      {/* Notes */}
+                      <div className="flex-1 min-w-[120px] space-y-1">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Notiz zum Zustand</label>
+                        <input
+                          type="text"
+                          placeholder="z.B. Loch, Fleck"
+                          value={item.notes || ''}
+                          onChange={(e) => handleItemChange(idx, 'notes', e.target.value)}
+                          className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900"
+                        />
                       </div>
 
                       {/* Delete Item Button */}

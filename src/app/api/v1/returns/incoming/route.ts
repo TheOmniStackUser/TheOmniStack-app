@@ -182,6 +182,7 @@ export async function POST(req: Request) {
           skuOrProductName: item.sku_or_product_name || 'Unknown',
           quantity: item.quantity || 1,
           condition: item.condition || 'new',
+          notes: item.notes || null,
         }))
       )
     }

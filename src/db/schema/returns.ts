@@ -26,6 +26,7 @@ export const returnedItems = pgTable('returned_items', {
   skuOrProductName: text('sku_or_product_name').notNull(),
   quantity: integer('quantity').notNull().default(1),
   condition: text('condition').notNull().default('new'), 
+  notes: text('notes'),
 })
 
 export const returnsLogRelations = relations(returnsLog, ({ one, many }) => ({
