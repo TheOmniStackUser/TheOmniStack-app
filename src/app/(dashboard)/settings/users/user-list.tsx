@@ -81,15 +81,15 @@ export function UserList({
           <form onSubmit={handleAddUser} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Name</label>
-              <input name="name" required className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium placeholder:text-slate-400" placeholder="Max Mustermann" />
+              <input name="name" required className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium placeholder:text-slate-400 text-slate-900 bg-white" placeholder="Max Mustermann" />
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-400 uppercase mb-1">E-Mail</label>
-              <input name="email" type="email" required className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium placeholder:text-slate-400" placeholder="max@beispiel.de" />
+              <input name="email" type="email" required className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium placeholder:text-slate-400 text-slate-900 bg-white" placeholder="max@beispiel.de" />
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Passwort (initial)</label>
-              <input name="password" type="password" required className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium placeholder:text-slate-400" placeholder="********" />
+              <input name="password" type="password" required className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium placeholder:text-slate-400 text-slate-900 bg-white" placeholder="********" />
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Rolle</label>
