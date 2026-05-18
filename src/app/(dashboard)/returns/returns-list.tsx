@@ -400,8 +400,8 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
       )}
 
       {/* Main Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-        <table className="w-full text-left border-collapse">
+      <div className="bg-white rounded-2xl border border-slate-200 overflow-x-auto shadow-sm">
+        <table className="min-w-[1400px] w-full text-left border-collapse">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
               <th className="px-6 py-4 w-10 text-center">
