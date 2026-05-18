@@ -58,6 +58,7 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
   const [editMarketplace, setEditMarketplace] = useState('')
   const [editNotes, setEditNotes] = useState('')
   const [editItems, setEditItems] = useState<ScannedItem[]>([])
+  const [editScannedAt, setEditScannedAt] = useState('')
 
   // Search & Filter
   const filteredLogs = logs.filter((log) => {
@@ -172,6 +173,15 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
     setEditMarketplace(log.marketplace || '')
     setEditNotes(log.notes || '')
     setEditItems(log.items.map((i) => ({ ...i })))
+    
+    // Format Date for <input type="datetime-local" />
+    if (log.scannedAt) {
+      const tzoffset = log.scannedAt.getTimezoneOffset() * 60000
+      const localTime = new Date(log.scannedAt.getTime() - tzoffset).toISOString().slice(0, 16)
+      setEditScannedAt(localTime)
+    } else {
+      setEditScannedAt('')
+    }
   }
 
   const handleAddItem = () => {
@@ -205,6 +215,7 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
           status: editStatus,
           marketplace: editMarketplace || null,
           notes: editNotes.trim() || null,
+          scannedAt: editScannedAt ? new Date(editScannedAt) : null,
           items: editItems.map((i) => ({
             ...i,
             skuOrProductName: i.skuOrProductName.trim() || 'Unbekannt'
@@ -225,6 +236,7 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
                 status: payload.status,
                 marketplace: payload.marketplace,
                 notes: payload.notes,
+                scannedAt: payload.scannedAt || l.scannedAt,
                 items: editItems
               }
             }
@@ -588,6 +600,17 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
                     <option value="neu">Neu</option>
                     <option value="bearbeitet">Bearbeitet</option>
                   </select>
+                </div>
+
+                {/* Scan Date Input */}
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Datum des Retoureneingangs</label>
+                  <input
+                    type="datetime-local"
+                    value={editScannedAt}
+                    onChange={(e) => setEditScannedAt(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-semibold text-slate-900 bg-white"
+                  />
                 </div>
 
                 {/* Marketplace Selection */}

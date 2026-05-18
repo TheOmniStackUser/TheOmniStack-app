@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/db/client'
 import { companies, returnsLog, returnedItems, orders } from '@/db/schema'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, or } from 'drizzle-orm'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,10 +36,16 @@ export async function POST(req: Request) {
     }
 
     // 3. Attempt to Match existing Marketplace Order
+    // Match by: marketplaceOrderId, outbound tracking number, or return tracking number
+    const scanInput = order_info.order_number.trim()
     const matchedOrder = await db.query.orders.findFirst({
       where: and(
         eq(orders.companyId, company.id),
-        eq(orders.marketplaceOrderId, order_info.order_number)
+        or(
+          eq(orders.marketplaceOrderId, scanInput),
+          eq(orders.trackingNumber, scanInput),
+          eq(orders.returnTrackingNumber, scanInput)
+        )
       )
     })
 
@@ -53,7 +59,7 @@ export async function POST(req: Request) {
         resolvedMarketplace = rawMp.charAt(0).toUpperCase() + rawMp.slice(1)
       } else {
         // Pattern-based guessing
-        const cleanNum = order_info.order_number.trim().replace(/\s+/g, '')
+        const cleanNum = scanInput.replace(/\s+/g, '')
         if (/^\d{3}-\d{7}-\d{7}$/.test(cleanNum)) {
           resolvedMarketplace = 'Amazon'
         } else if (/^\d{12}$/.test(cleanNum) || /^\d{2}-\d{5}-\d{5}$/.test(cleanNum)) {
@@ -66,13 +72,27 @@ export async function POST(req: Request) {
       }
     }
 
+    // Resolve Customer Name and Shipping Address using the matched order in our database
+    const resolvedCustomerName = matchedOrder 
+      ? (matchedOrder.buyerName || matchedOrder.shippingName || 'N/A')
+      : (customer_info?.customer_name || 'N/A')
+
+    const resolvedShippingAddress = matchedOrder
+      ? [
+          matchedOrder.shippingName || matchedOrder.buyerName || '',
+          matchedOrder.shippingStreet || '',
+          `${matchedOrder.shippingZip || ''} ${matchedOrder.shippingCity || ''}`.trim(),
+          matchedOrder.shippingCountry || ''
+        ].filter(Boolean).join('\n')
+      : (customer_info?.shipping_address || 'N/A')
+
     // 5. Persistence — Log the Return Entry
     const [logEntry] = await db.insert(returnsLog).values({
       companyId: company.id,
       orderId: matchedOrder?.id,
-      orderNumber: order_info.order_number,
-      customerName: customer_info?.customer_name || 'N/A',
-      shippingAddress: customer_info?.shipping_address || 'N/A',
+      orderNumber: matchedOrder?.marketplaceOrderId || order_info.order_number, // Use the matched order number if a tracking number was scanned!
+      customerName: resolvedCustomerName,
+      shippingAddress: resolvedShippingAddress,
       processedByUserId: return_metadata?.processed_by_user_id || null,
       marketplace: resolvedMarketplace,
       metadata: return_metadata || {},
