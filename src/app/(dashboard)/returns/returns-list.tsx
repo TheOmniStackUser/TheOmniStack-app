@@ -527,26 +527,28 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
                   </td>
 
                   {/* Items / Conditions */}
-                  <td className="px-6 py-4 space-y-1">
+                  <td className="px-6 py-4 space-y-2">
                     {log.items.map((item, idx) => (
-                      <div key={idx} className="flex items-center gap-2 text-xs">
-                        <span className="text-slate-800 font-medium">
-                          {item.quantity}x {item.skuOrProductName}
-                          {item.notes && (
-                            <span className="text-slate-400 font-normal italic ml-1">
-                              ({item.notes})
-                            </span>
-                          )}
-                        </span>
-                        <span className={`px-1.5 py-0.2 rounded font-bold text-[9px] uppercase tracking-wider ${
-                          item.condition === 'new'
-                            ? 'bg-green-50 text-green-700 border border-green-200'
-                            : item.condition === 'damaged'
-                            ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                            : 'bg-amber-50 text-amber-700 border border-amber-200'
-                        }`}>
-                          {item.condition === 'new' ? 'Neu' : item.condition === 'damaged' ? 'Defekt' : item.condition}
-                        </span>
+                      <div key={idx} className="flex flex-col text-xs space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-slate-800 font-medium">
+                            {item.quantity}x {item.skuOrProductName}
+                          </span>
+                          <span className={`px-1.5 py-0.2 rounded font-bold text-[9px] uppercase tracking-wider ${
+                            item.condition === 'new'
+                              ? 'bg-green-50 text-green-700 border border-green-200'
+                              : item.condition === 'damaged'
+                              ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                              : 'bg-amber-50 text-amber-700 border border-amber-200'
+                          }`}>
+                            {item.condition === 'new' ? 'Neu' : item.condition === 'damaged' ? 'Defekt' : item.condition === 'used' ? 'Gebraucht' : item.condition}
+                          </span>
+                        </div>
+                        {item.notes && (
+                          <div className="text-[10px] font-medium text-amber-800 bg-amber-50/50 border border-amber-100 rounded px-1.5 py-0.5 mt-0.5 inline-block w-fit">
+                            Notiz: {item.notes}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </td>
