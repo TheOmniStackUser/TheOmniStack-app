@@ -240,7 +240,7 @@ export function SettingsForm({ company }: { company: Company }) {
               name="paymentRecipient"
               type="text"
               defaultValue={company.paymentRecipient || ''}
-              placeholder="F & L Fashion GmbH"
+              placeholder="Musterfirma GmbH"
               className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-gray-900"
             />
           </div>
