@@ -166,7 +166,10 @@ export function UserList({
                 <option value="staff">Händler-Mitarbeiter (Operativ)</option>
                 <option value="admin">Administrator (Vollzugriff)</option>
                 {currentUserRole === 'owner' && (
-                  <option value="omnistack_support">TheOmniStack Mitarbeiter (Support & Beta)</option>
+                  <>
+                    <option value="omnistack_support">TheOmniStack Mitarbeiter Vollzugriff (mit Admin Panel)</option>
+                    <option value="omnistack_beta">TheOmniStack Mitarbeiter (mit Beta-Diensten)</option>
+                  </>
                 )}
               </select>
             </div>
@@ -211,11 +214,13 @@ export function UserList({
                       member.role === 'owner' ? 'bg-amber-50 text-amber-700 border-amber-200' :
                       member.role === 'admin' ? 'bg-blue-50 text-blue-700 border-blue-200' :
                       member.role === 'omnistack_support' ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                      member.role === 'omnistack_beta' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' :
                       'bg-slate-50 text-slate-600 border-slate-200'
                     }`}>
                       {member.role === 'owner' ? 'Besitzer' : 
                        member.role === 'admin' ? 'Administrator' : 
-                       member.role === 'omnistack_support' ? 'Support' :
+                       member.role === 'omnistack_support' ? 'TheOmniStack Support (Vollzugriff)' :
+                       member.role === 'omnistack_beta' ? 'TheOmniStack Mitarbeiter' :
                        'Mitarbeiter'}
                     </span>
                     {member.isPending && (

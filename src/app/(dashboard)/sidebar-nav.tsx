@@ -13,7 +13,7 @@ export function SidebarNav({ role }: { role: string }) {
   ]
 
   // Beta features (Returns) positioned under Invoices for specific roles
-  const canSeeReturns = role === 'omnistack_support' || role === 'owner'
+  const canSeeReturns = role === 'omnistack_support' || role === 'omnistack_beta' || role === 'owner'
 
   return (
     <nav className="flex-1 px-4 space-y-1 mt-4">

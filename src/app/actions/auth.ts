@@ -326,10 +326,11 @@ export async function completeRegistrationAction(
       })
       .returning({ id: companies.id })
 
+    const isOwnerEmail = pending.email.toLowerCase() === 'leis@guggen-mountain.com'
     await tx.insert(companyMembers).values({
       userId: user.id,
       companyId: company.id,
-      role: 'owner',
+      role: isOwnerEmail ? 'owner' : 'admin',
     })
 
     // Cleanup pending registration

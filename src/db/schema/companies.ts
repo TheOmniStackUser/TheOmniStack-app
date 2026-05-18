@@ -16,7 +16,8 @@ import { invoices } from './invoices'
 // admin: Full merchant access, settings, integrations
 // staff: Operational access only (orders, invoices), no settings
 // omnistack_support: Internal support team, can see admin panel & beta features
-export const memberRoleEnum = pgEnum('member_role', ['owner', 'admin', 'staff', 'omnistack_support'])
+// omnistack_beta: Internal support team, can see beta features but no admin panel
+export const memberRoleEnum = pgEnum('member_role', ['owner', 'admin', 'staff', 'omnistack_support', 'omnistack_beta'])
 
 // ─── Companies ────────────────────────────────────────────────────────────────
 // Each row = one legal entity / tenant. All other tables reference company_id.

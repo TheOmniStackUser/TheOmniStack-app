@@ -14,12 +14,12 @@ import { sendInvitationEmail } from '@/lib/email'
 const CreateUserSchema = z.object({
   name: z.string().min(2, 'Name ist zu kurz'),
   email: z.string().email('Ungültige E-Mail'),
-  role: z.enum(['admin', 'staff', 'omnistack_support']),
+  role: z.enum(['admin', 'staff', 'omnistack_support', 'omnistack_beta']),
 })
 
 export async function addUserAction(formData: FormData) {
   const auth = await requireAuth()
-  if (auth.role !== 'owner' && auth.role !== 'admin') {
+  if (auth.role !== 'owner' && auth.role !== 'admin' && auth.role !== 'omnistack_support' && auth.role !== 'omnistack_beta') {
     throw new Error('Keine Berechtigung')
   }
 
@@ -136,7 +136,7 @@ export async function addUserAction(formData: FormData) {
 
 export async function removeUserAction(userId: string) {
   const auth = await requireAuth()
-  if (auth.role !== 'owner' && auth.role !== 'admin') {
+  if (auth.role !== 'owner' && auth.role !== 'admin' && auth.role !== 'omnistack_support' && auth.role !== 'omnistack_beta') {
     throw new Error('Keine Berechtigung')
   }
 
@@ -177,7 +177,7 @@ export async function removeUserAction(userId: string) {
 
 export async function getOrCreateInviteLinkAction(email: string) {
   const auth = await requireAuth()
-  if (auth.role !== 'owner' && auth.role !== 'admin') {
+  if (auth.role !== 'owner' && auth.role !== 'admin' && auth.role !== 'omnistack_support' && auth.role !== 'omnistack_beta') {
     throw new Error('Keine Berechtigung')
   }
 

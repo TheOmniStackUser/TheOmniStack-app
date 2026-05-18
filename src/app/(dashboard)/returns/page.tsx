@@ -26,8 +26,8 @@ export default async function ReturnsPage() {
     console.error('[Returns] Auto-migrations failed:', err)
   }
 
-  // Strict Access Control: Only Owner and Support can see returns for now
-  if (auth.role !== 'owner' && auth.role !== 'omnistack_support') {
+  // Strict Access Control: Only Owner and Support / Beta support can see returns for now
+  if (auth.role !== 'owner' && auth.role !== 'omnistack_support' && auth.role !== 'omnistack_beta') {
     redirect('/dashboard')
   }
 

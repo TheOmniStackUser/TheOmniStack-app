@@ -17,7 +17,7 @@ export type SessionPayload = {
 export type AuthContext = {
   userId: string
   activeCompanyId: string
-  role: 'owner' | 'admin' | 'staff' | 'omnistack_support'
+  role: 'owner' | 'admin' | 'staff' | 'omnistack_support' | 'omnistack_beta'
 }
 
 // ─── Encryption ───────────────────────────────────────────────────────────────

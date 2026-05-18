@@ -37,7 +37,8 @@ export default async function DashboardLayout({
   // Permission Checks
   const isStaff = auth.role === 'staff'
   const isSupport = auth.role === 'omnistack_support'
-  const canManage = auth.role === 'owner' || auth.role === 'admin' || isSupport
+  const isBetaSupport = auth.role === 'omnistack_beta'
+  const canManage = auth.role === 'owner' || auth.role === 'admin' || isSupport || isBetaSupport
 
   return (
     <div className="h-screen bg-[#F8FAFC] flex overflow-hidden font-sans">
