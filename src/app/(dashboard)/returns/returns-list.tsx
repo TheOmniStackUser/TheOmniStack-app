@@ -413,7 +413,8 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
                 />
               </th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Eingang & Scan</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Eingang</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Scan-Zeitpunkt</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Marktplatz</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Bestellnummer</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Versand</th>
@@ -425,7 +426,7 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
           <tbody className="divide-y divide-slate-100">
             {filteredLogs.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-6 py-12 text-center text-slate-400 italic">
+                <td colSpan={10} className="px-6 py-12 text-center text-slate-400 italic">
                   Keine Retouren gefunden.
                 </td>
               </tr>
@@ -459,19 +460,23 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
                     </button>
                   </td>
 
-                  {/* Date */}
-                  <td className="px-6 py-4 space-y-1">
+                  {/* Eingang (Date only) */}
+                  <td className="px-6 py-4">
                     <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5" title="Datum des Retoureneingangs">
                       <svg className="w-3.5 h-3.5 text-indigo-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
-                      <span>{format(log.receivedAt, 'dd.MM.yyyy HH:mm', { locale: de })}</span>
+                      <span>{format(log.receivedAt, 'dd.MM.yyyy', { locale: de })}</span>
                     </div>
-                    <div className="text-[10px] text-slate-400 font-semibold flex items-center gap-1.5" title="Scan-Zeitpunkt (System-Log)">
+                  </td>
+
+                  {/* Scan-Zeitpunkt (Date + Time) */}
+                  <td className="px-6 py-4">
+                    <div className="text-xs text-slate-600 font-semibold flex items-center gap-1.5" title="Scan-Zeitpunkt (System-Log)">
                       <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      <span>Scan: {format(log.scannedAt, 'dd.MM.yyyy HH:mm', { locale: de })}</span>
+                      <span>{format(log.scannedAt, 'dd.MM.yyyy HH:mm', { locale: de })}</span>
                     </div>
                   </td>
 
