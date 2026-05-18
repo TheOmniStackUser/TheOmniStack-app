@@ -8,6 +8,14 @@ import { UserList } from './user-list'
 export default async function UserManagementPage() {
   const auth = await requireAuth()
 
+  // Auto-migration: Ensure omnistack_beta value exists in the database enum
+  try {
+    const { sql } = await import('drizzle-orm')
+    await db.execute(sql`ALTER TYPE member_role ADD VALUE IF NOT EXISTS 'omnistack_beta'`)
+  } catch (err) {
+    console.log('[User Management] Auto-migration status:', err)
+  }
+
   const members = await db
     .select({
       id: users.id,
