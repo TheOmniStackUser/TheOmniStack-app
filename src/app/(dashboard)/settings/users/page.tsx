@@ -2,7 +2,7 @@ import { requireAuth } from '@/lib/session'
 import { db } from '@/db/client'
 import { companyMembers } from '@/db/schema/companies'
 import { users, verificationTokens } from '@/db/schema/auth'
-import { eq, gt } from 'drizzle-orm'
+import { eq, gt, sql } from 'drizzle-orm'
 import { UserList } from './user-list'
 
 export default async function UserManagementPage() {
@@ -10,7 +10,6 @@ export default async function UserManagementPage() {
 
   // Auto-migration: Ensure omnistack_beta value exists in the database enum
   try {
-    const { sql } = await import('drizzle-orm')
     await db.execute(sql`ALTER TYPE member_role ADD VALUE IF NOT EXISTS 'omnistack_beta'`)
   } catch (err) {
     console.log('[User Management] Auto-migration status:', err)
