@@ -88,12 +88,17 @@ export async function POST(req: NextRequest) {
       }
     `
 
+    let mimeType = imageFile.type
+    if (!mimeType || mimeType === 'application/octet-stream') {
+      mimeType = 'image/jpeg'
+    }
+
     const result = await model.generateContent([
       prompt,
       {
         inlineData: {
           data: base64Image,
-          mimeType: imageFile.type
+          mimeType: mimeType
         }
       }
     ])
@@ -106,6 +111,14 @@ export async function POST(req: NextRequest) {
     
     const parsedData = JSON.parse(cleanJson)
 
+    // Ensure order_number and other crucial string fields are actual strings (prevents crashes when integers are returned for delivery notes)
+    if (parsedData.order_number !== undefined && parsedData.order_number !== null) {
+      parsedData.order_number = String(parsedData.order_number)
+    }
+    if (parsedData.customer_name !== undefined && parsedData.customer_name !== null) {
+      parsedData.customer_name = String(parsedData.customer_name)
+    }
+
     // Apply database lookup and pattern-based guessing to assist image analysis
     if (!parsedData.marketplace && parsedData.order_number) {
       // 1. Try database lookup!
@@ -117,8 +130,10 @@ export async function POST(req: NextRequest) {
       })
 
       if (matchedOrder?.marketplace) {
-        const rawMp = matchedOrder.marketplace
-        parsedData.marketplace = rawMp.charAt(0).toUpperCase() + rawMp.slice(1)
+        const rawMp = String(matchedOrder.marketplace).trim()
+        if (rawMp) {
+          parsedData.marketplace = rawMp.charAt(0).toUpperCase() + rawMp.slice(1)
+        }
       } else {
         // 2. Try pattern guessing!
         const cleanNum = parsedData.order_number.trim().replace(/\s+/g, '')
