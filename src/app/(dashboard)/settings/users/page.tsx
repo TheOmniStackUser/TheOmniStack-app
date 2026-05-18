@@ -47,7 +47,7 @@ export default async function UserManagementPage() {
       email: m.email,
       role: m.role,
       joinedAt: m.joinedAt,
-      isPending: !m.emailVerifiedAt || !!matchingToken,
+      isPending: !m.emailVerifiedAt,
       inviteToken: matchingToken ? matchingToken.token : null,
     }
   })
