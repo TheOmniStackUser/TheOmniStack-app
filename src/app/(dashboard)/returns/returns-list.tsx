@@ -527,7 +527,7 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
                       <button
                         onClick={() => handleDeleteSingle(log.id)}
                         disabled={isPending}
-                        className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                        className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
                         title="Eintrag löschen"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
