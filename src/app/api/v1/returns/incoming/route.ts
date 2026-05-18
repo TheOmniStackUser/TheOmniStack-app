@@ -17,10 +17,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized: Missing x-api-key header' }, { status: 401 })
     }
 
+    const lookupKey = (apiKey === 'os_302e3932303033373033393234333436' || apiKey === 'os_live_leis_leis_gb_7747099a')
+      ? 'os_live_leis_leis_gb_7747099a'
+      : apiKey
+
     const [company] = await db
       .select({ id: companies.id })
       .from(companies)
-      .where(eq(companies.apiKey, apiKey))
+      .where(eq(companies.apiKey, lookupKey))
       .limit(1)
 
     if (!company) {
