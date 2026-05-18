@@ -86,6 +86,16 @@ export async function POST(req: Request) {
         ].filter(Boolean).join('\n')
       : (customer_info?.shipping_address || 'N/A')
 
+    // Determine custom return date / scannedAt from payload if sent by the iPhone App
+    let resolvedScannedAt: Date = new Date()
+    const rawDate = body.scanned_at || body.scannedAt || body.date || return_metadata?.scanned_at || return_metadata?.scannedAt || return_metadata?.date
+    if (rawDate) {
+      const parsedDate = new Date(rawDate)
+      if (!isNaN(parsedDate.getTime())) {
+        resolvedScannedAt = parsedDate
+      }
+    }
+
     // 5. Persistence — Log the Return Entry
     const [logEntry] = await db.insert(returnsLog).values({
       companyId: company.id,
@@ -95,6 +105,7 @@ export async function POST(req: Request) {
       shippingAddress: resolvedShippingAddress,
       processedByUserId: return_metadata?.processed_by_user_id || null,
       marketplace: resolvedMarketplace,
+      scannedAt: resolvedScannedAt,
       metadata: return_metadata || {},
     }).returning({ id: returnsLog.id })
 
