@@ -42,7 +42,7 @@ export class OttoAdapter implements MarketplaceAdapter {
       },
       body: new URLSearchParams({
         grant_type: 'client_credentials',
-        scope: 'orders receipts shipments',
+        scope: this.config.environment === 'sandbox' ? 'developer' : 'orders receipts shipments',
       }).toString(),
     })
 

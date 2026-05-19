@@ -1,42 +1,34 @@
 import { OttoAdapter } from '../src/adapters/marketplace/otto'
 import { db } from '../src/db/client'
 import { marketplaceIntegrations } from '../src/db/schema/integrations'
-import { eq, and } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 
 async function testOtto() {
-  console.log('Fetching Otto integration credentials...')
-  const [integration] = await db
+  console.log('Fetching all Otto integration credentials...')
+  const integrations = await db
     .select()
     .from(marketplaceIntegrations)
-    .where(
-      and(
-        eq(marketplaceIntegrations.companyId, 'abe0132f-18e4-41a8-92f7-e65005cfa6aa'),
-        eq(marketplaceIntegrations.type, 'otto')
-      )
-    )
-    .limit(1)
+    .where(eq(marketplaceIntegrations.type, 'otto'))
 
-  if (!integration) {
-    console.error('No Otto integration found')
-    process.exit(1)
-  }
+  console.log(`Found ${integrations.length} Otto integration(s).`)
 
-  console.log('Initializing Otto Adapter...')
-  const adapter = new OttoAdapter(
-    integration.clientId!,
-    integration.clientSecret!,
-    integration.environment as 'production' | 'sandbox'
-  )
+  for (const integration of integrations) {
+    console.log(`\nTesting integration for company: ${integration.companyId} (${integration.environment})`)
+    console.log(`Client ID: ${integration.clientId}`)
+    
+    const adapter = new OttoAdapter({
+      clientId: integration.clientId!,
+      clientSecret: integration.clientSecret!,
+      environment: integration.environment as 'production' | 'sandbox'
+    })
 
-  try {
-    console.log('Fetching unshipped orders...')
-    const orders = await adapter.fetchUnshippedOrders()
-    console.log(`Successfully fetched ${orders.length} unshipped orders.`)
-  } catch (error: any) {
-    console.error('ERROR during Otto import:')
-    console.error(error)
-    if (error.response) {
-      console.error('Response details:', error.response.data)
+    try {
+      console.log('Attempting to fetch unshipped orders (this will fetch token first)...')
+      const orders = await adapter.fetchUnshippedOrders(integration.companyId)
+      console.log(`SUCCESS! Successfully fetched ${orders.length} unshipped orders.`)
+    } catch (error: any) {
+      console.error('ERROR during Otto test connection:')
+      console.error(error.message || error)
     }
   }
   process.exit(0)
