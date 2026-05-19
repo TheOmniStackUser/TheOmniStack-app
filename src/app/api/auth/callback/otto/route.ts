@@ -62,8 +62,8 @@ export async function GET(request: NextRequest) {
     // Attempt to query the installation ID using potential App IDs
     // For sandbox, we try the V2 and V1 App IDs
     const appIdsToTry = environment === 'sandbox' 
-      ? ['b979c7bd-7e50-4b0e-bae2-d41d5fd2c1d7', '69eb5ed304bb0234c14c27b5']
-      : ['69eb5ed304bb0234c14c27b5'] // adjust as needed for production
+      ? ['6a0c0a71102c6f4203615ea3', 'b979c7bd-7e50-4b0e-bae2-d41d5fd2c1d7', '69eb5ed304bb0234c14c27b5']
+      : ['6a0c0a71102c6f4203615ea3', '69eb5ed304bb0234c14c27b5']
 
     let installationId = ''
     let finalAppId = ''
