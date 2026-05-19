@@ -67,8 +67,11 @@ export class OttoAdapter implements MarketplaceAdapter {
           'Authorization': `Bearer ${developerToken}`,
           'Accept': 'application/json',
           'Content-Type': 'application/x-www-form-urlencoded',
-          'Content-Length': '0'
-        }
+        },
+        body: new URLSearchParams({
+          grant_type: 'client_credentials',
+          scope: 'orders receipts shipments'
+        }).toString()
       })
 
       if (!installResponse.ok) {
