@@ -18,7 +18,9 @@ export async function GET(request: NextRequest) {
   // Determine environment based on issuer URL
   const environment = iss.includes('sandbox') ? 'sandbox' : 'production'
   const baseUrl = environment === 'sandbox' ? 'https://sandbox.api.otto.market' : 'https://api.otto.market'
-  const redirectUri = 'https://www.theomnistack.de/api/auth/callback/otto'
+  const requestHost = request.headers.get('x-forwarded-host') || request.headers.get('host') || 'app.theomnistack.de'
+  const proto = request.headers.get('x-forwarded-proto') || 'https'
+  const redirectUri = `${proto}://${requestHost}/api/auth/callback/otto`
 
   try {
     // Find matching Otto integration for the given company and environment
