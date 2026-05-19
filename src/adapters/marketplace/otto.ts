@@ -66,6 +66,7 @@ export class OttoAdapter implements MarketplaceAdapter {
         headers: {
           'Authorization': `Bearer ${developerToken}`,
           'Accept': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
           'Content-Length': '0'
         }
       })
