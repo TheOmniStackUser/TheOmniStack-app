@@ -112,7 +112,9 @@ export async function GET(request: NextRequest) {
     console.log(`[Otto OAuth Callback] Integration successfully updated in database!`)
 
     // Redirect the user back to the integrations settings page with a success message
-    const targetUrl = new URL('/integrations', request.url)
+    const requestHost = request.headers.get('x-forwarded-host') || request.headers.get('host') || 'localhost:3000'
+    const proto = request.headers.get('x-forwarded-proto') || 'http'
+    const targetUrl = new URL('/integrations', `${proto}://${requestHost}`)
     targetUrl.searchParams.set('status', 'otto_success')
     return NextResponse.redirect(targetUrl)
 
