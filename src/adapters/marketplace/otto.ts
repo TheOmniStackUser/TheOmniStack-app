@@ -10,6 +10,8 @@ export type OttoAdapterConfig = {
   clientId: string
   clientSecret: string
   environment?: 'sandbox' | 'production'
+  installationId?: string
+  appId?: string
 }
 
 export class OttoAdapter implements MarketplaceAdapter {
@@ -52,8 +54,33 @@ export class OttoAdapter implements MarketplaceAdapter {
     }
 
     const data = await response.json()
-    console.log('[OttoAdapter] Token response:', JSON.stringify({ ...data, access_token: '***' }))
-    return data.access_token
+    const developerToken = data.access_token
+
+    // If sandbox and we have installation details, exchange developer token for installation access token
+    if (this.config.environment === 'sandbox' && this.config.installationId && this.config.appId) {
+      console.log(`[OttoAdapter] Exchanging developer token for installation access token (appId: ${this.config.appId}, installationId: ${this.config.installationId})...`)
+      
+      const installTokenUrl = `${this.baseUrl}/v1/apps/${this.config.appId}/installations/${this.config.installationId}/accessToken`
+      const installResponse = await fetch(installTokenUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${developerToken}`,
+          'Accept': 'application/json',
+          'Content-Length': '0'
+        }
+      })
+
+      if (!installResponse.ok) {
+        const errText = await installResponse.text()
+        throw new Error(`[OttoAdapter] Failed to fetch installation access token: ${installResponse.status} - ${errText}`)
+      }
+
+      const installData = await installResponse.json()
+      console.log('[OttoAdapter] Successfully fetched installation access token!')
+      return installData.access_token
+    }
+
+    return developerToken
   }
 
   /**

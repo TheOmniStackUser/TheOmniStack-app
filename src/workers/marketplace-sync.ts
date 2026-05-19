@@ -96,7 +96,9 @@ export function createMarketplaceSyncWorker() {
           adapter = new OttoAdapter({
             clientId: integration.clientId,
             clientSecret: integration.clientSecret,
-            environment: (integration.environment as 'sandbox' | 'production') || 'production'
+            environment: (integration.environment as 'sandbox' | 'production') || 'production',
+            installationId: (integration.metadata as any)?.installationId,
+            appId: (integration.metadata as any)?.appId
           })
           rawOrders = await adapter.fetchUnshippedOrders(companyId, {
             fromDate: job.data.fromDate,

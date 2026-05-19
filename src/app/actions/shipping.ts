@@ -62,7 +62,9 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
         ottoAdapter = new OttoAdapter({
           clientId: ottoIntegration.clientId,
           clientSecret: ottoIntegration.clientSecret,
-          environment: (ottoIntegration.environment as 'sandbox' | 'production') || 'production'
+          environment: (ottoIntegration.environment as 'sandbox' | 'production') || 'production',
+          installationId: (ottoIntegration.metadata as any)?.installationId,
+          appId: (ottoIntegration.metadata as any)?.appId
         })
         ottoReturnAddressCarrierId = (ottoIntegration.metadata as any)?.returnAddressCarrierId
       }
@@ -276,7 +278,9 @@ export async function generateDhlLabelsAction(orderIds?: string[]) {
         ottoAdapter = new OttoAdapter({
           clientId: ottoIntegration.clientId,
           clientSecret: ottoIntegration.clientSecret,
-          environment: (ottoIntegration.environment as 'sandbox' | 'production') || 'production'
+          environment: (ottoIntegration.environment as 'sandbox' | 'production') || 'production',
+          installationId: (ottoIntegration.metadata as any)?.installationId,
+          appId: (ottoIntegration.metadata as any)?.appId
         })
         ottoReturnAddressCarrierId = (ottoIntegration.metadata as any)?.returnAddressCarrierId
       }
