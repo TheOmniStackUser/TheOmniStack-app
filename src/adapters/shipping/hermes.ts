@@ -226,7 +226,10 @@ export class HermesAdapter {
     }
 
     const data = await response.json()
-    
+    console.log('[Hermes Adapter] Outbound label response:', JSON.stringify(data, null, 2))
+
+    // The shipmentID is the 20-digit Hermes shipment number (pattern: H + 19 digits + 14 digits)
+    // It is REQUIRED in the return label request for Self-Service customers
     const trackingNumber = data.shipmentID || data.shipmentOrder?.shipmentID || data.barcode || data.shipmentOrder?.barcode || 'HERMES-' + Date.now()
     
     const base64 = data.labelImage || data.shipmentOrder?.labelImage
@@ -238,58 +241,70 @@ export class HermesAdapter {
     let returnLabelUrl: string | undefined = undefined
     let returnTrackingNumber: string | undefined = undefined
 
-    // Hermes uses a SEPARATE endpoint for return labels: POST /returnorders/labels
-    // The /shipmentorders/labels endpoint does NOT support a returnService field.
+    // Hermes Self-Service Return Flow:
+    // Self-Service customers (300–100k shipments/year) MUST pass the shipmentID of the
+    // outbound shipment in the return label request. Enterprise customers (100k+) can
+    // create returns standalone. We always use the Self-Service flow (shipmentID required).
+    // Endpoint: POST /returnorders/labels  →  body: { shipmentID: "<outbound shipmentID>" }
     if (returnType === 'enclosed' || returnType === 'virtual') {
-      console.log(`[Hermes Adapter] Requesting return label via /returnorders/labels (Typ: ${returnType}) für Marktplatz: ${marketplace}`)
-      try {
-        const returnPayload: any = {
-          clientReference: (payload.clientReference + '-R').slice(0, 20),
-          senderAddress: payload.receiverAddress,  // customer is the SENDER on a return
-          senderName: {
-            firstname: payload.receiverName.firstname,
-            lastname: payload.receiverName.lastname
-          },
-          parcel: {
-            parcelWeight: payload.parcel.parcelWeight
+      console.log(`[Hermes Adapter] Requesting Self-Service return label via /returnorders/labels (Typ: ${returnType}, outbound shipmentID: ${trackingNumber})`)
+      
+      // Validate that we have a real shipmentID (not a fallback timestamp placeholder)
+      if (!trackingNumber || trackingNumber.startsWith('HERMES-')) {
+        console.warn('[Hermes Adapter] WARNUNG: Keine gültige shipmentID für Retourenlabel – überspringe.')
+      } else {
+        try {
+          // Self-Service return payload: only shipmentID is required.
+          // The sender/receiver are automatically derived from the outbound shipment.
+          const returnPayload: any = {
+            shipmentID: trackingNumber
           }
-        }
 
-        const returnResponse = await fetch(`${this.baseUrl}/services/hsi/returnorders/labels`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/shippinglabel-pdf+json'
-          },
-          body: JSON.stringify(returnPayload)
-        })
+          console.log('[Hermes Adapter] Return label payload:', JSON.stringify(returnPayload))
 
-        if (returnResponse.ok) {
-          const returnData = await returnResponse.json()
-          const returnResultCode = returnData.listOfResultCodes?.[0]?.code
-          console.log('[Hermes Adapter] Return Label Response codes:', JSON.stringify(returnData.listOfResultCodes))
+          const returnResponse = await fetch(`${this.baseUrl}/services/hsi/returnorders/labels`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+              'Accept': 'application/shippinglabel-pdf+json'
+            },
+            body: JSON.stringify(returnPayload)
+          })
 
-          if (returnResultCode === 'OK' || returnData.shipmentID) {
-            returnTrackingNumber = returnData.shipmentID
-            const returnBase64 = returnData.shippinglabel
-            if (returnBase64 && typeof returnBase64 === 'string' && returnBase64.length > 100) {
-              returnLabelUrl = `data:application/pdf;base64,${returnBase64}`
-              console.log(`[Hermes Adapter] ✅ Retourenlabel erfolgreich generiert. Tracking: ${returnTrackingNumber}`)
+          const returnRawText = await returnResponse.text()
+          console.log(`[Hermes Adapter] Return label response ${returnResponse.status}:`, returnRawText)
+
+          if (returnResponse.ok) {
+            let returnData: any
+            try { returnData = JSON.parse(returnRawText) } catch { returnData = {} }
+
+            const returnResultCode = returnData.listOfResultCodes?.[0]?.code
+            console.log('[Hermes Adapter] Return Label result codes:', JSON.stringify(returnData.listOfResultCodes))
+
+            if (returnResultCode === 'OK' || returnData.shipmentID) {
+              returnTrackingNumber = returnData.shipmentID
+              // The return label PDF is in the 'shippinglabel' field (base64)
+              const returnBase64 = returnData.shippinglabel || returnData.labelImage
+              if (returnBase64 && typeof returnBase64 === 'string' && returnBase64.length > 100) {
+                returnLabelUrl = `data:application/pdf;base64,${returnBase64}`
+                console.log(`[Hermes Adapter] ✅ Self-Service Retourenlabel erfolgreich generiert. Return Tracking: ${returnTrackingNumber}`)
+              } else {
+                console.warn('[Hermes Adapter] Return Label: kein shippinglabel-PDF in Antwort.')
+              }
+            } else {
+              console.warn(`[Hermes Adapter] Retourenlabel Fehler:`, JSON.stringify(returnData.listOfResultCodes))
             }
           } else {
-            console.warn(`[Hermes Adapter] Retourenlabel Fehler:`, JSON.stringify(returnData.listOfResultCodes))
+            console.warn(`[Hermes Adapter] Return label request failed: ${returnResponse.status} - ${returnRawText}`)
           }
-        } else {
-          const errText = await returnResponse.text()
-          console.warn(`[Hermes Adapter] Return label request failed: ${returnResponse.status} - ${errText}`)
+        } catch (returnError: any) {
+          console.warn(`[Hermes Adapter] Return label request threw:`, returnError.message)
         }
-      } catch (returnError: any) {
-        console.warn(`[Hermes Adapter] Return label request threw:`, returnError.message)
-      }
 
-      if (!returnTrackingNumber) {
-        console.warn(`[Hermes Adapter] WARNUNG: Kein Retourenlabel erhalten (Marktplatz: ${marketplace}).`)
+        if (!returnTrackingNumber) {
+          console.warn(`[Hermes Adapter] WARNUNG: Kein Self-Service Retourenlabel erhalten (Marktplatz: ${marketplace}, shipmentID: ${trackingNumber}).`)
+        }
       }
     }
 

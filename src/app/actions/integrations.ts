@@ -88,6 +88,7 @@ export async function saveHermesIntegrationAction(
   const validated = HermesIntegrationSchema.safeParse({
     clientId: formData.get('clientId'),
     clientSecret: formData.get('clientSecret'),
+    hermesConfig: formData.get('hermesConfig'),
   })
 
   if (!validated.success) {
