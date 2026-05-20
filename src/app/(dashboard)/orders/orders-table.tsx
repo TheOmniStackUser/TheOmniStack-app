@@ -35,6 +35,15 @@ export function OrdersTable({ orders, hermesDefaultParcelClass = 'XS' }: {
   const [loadingInvoiceId, setLoadingInvoiceId] = useState<string | null>(null)
   const [showHermesModal, setShowHermesModal] = useState(false)
   const [hermesSelections, setHermesSelections] = useState<Record<string, string>>({})
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
+  
+  const showToast = (message: string | undefined | null, type: 'success' | 'error' | 'info' = 'info') => {
+    if (!message) return
+    setToast({ message, type })
+    setTimeout(() => {
+      setToast(current => current?.message === message ? null : current)
+    }, 5000)
+  }
   
   // Applied Filters (The actual state used for filtering)
   const [activeFilters, setActiveFilters] = useState({
@@ -93,10 +102,12 @@ export function OrdersTable({ orders, hermesDefaultParcelClass = 'XS' }: {
     try {
       const result = await updateOrderStatusAction(orderId, newStatus)
       if (result.error) {
-        alert(result.error)
+        showToast(result.error, 'error')
+      } else {
+        showToast('Status erfolgreich aktualisiert.', 'success')
       }
     } catch (e) {
-      alert('Fehler beim Aktualisieren des Status.')
+      showToast('Fehler beim Aktualisieren des Status.', 'error')
     } finally {
       setIsUpdatingStatus(null)
     }
@@ -231,7 +242,7 @@ export function OrdersTable({ orders, hermesDefaultParcelClass = 'XS' }: {
         const blobUrl = URL.createObjectURL(blob)
         window.open(blobUrl, '_blank')
       } catch (e) {
-        alert('Das Label konnte nicht geöffnet werden. Bitte versuche es erneut.')
+        showToast('Das Label konnte nicht geöffnet werden. Bitte versuche es erneut.', 'error')
         console.error('[openLabel] base64 decode error:', e)
       }
     } else {
@@ -245,7 +256,7 @@ export function OrdersTable({ orders, hermesDefaultParcelClass = 'XS' }: {
       const url = await getInvoiceDownloadUrl(invoiceId)
       window.open(url, '_blank')
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'Fehler beim Laden der Rechnung.')
+      showToast(error instanceof Error ? error.message : 'Fehler beim Laden der Rechnung.', 'error')
     } finally {
       setLoadingInvoiceId(null)
     }
@@ -309,9 +320,9 @@ export function OrdersTable({ orders, hermesDefaultParcelClass = 'XS' }: {
       const ids = Array.from(selectedIds).filter(id => orders.find(o => o.id === id)?.status !== 'shipped')
       const result = await generateHermesLabelsAction(ids, hermesSelections)
       if (result.error) {
-        alert(result.error)
+        showToast(result.error, 'error')
       } else {
-        alert(result.message)
+        showToast(result.message, 'success')
         setSelectedIds(new Set())
         
         if (result.labels && result.labels.length > 0) {
@@ -319,7 +330,7 @@ export function OrdersTable({ orders, hermesDefaultParcelClass = 'XS' }: {
         }
       }
     } catch (e) {
-      alert('Fehler: ' + (e instanceof Error ? e.message : String(e)))
+      showToast('Fehler: ' + (e instanceof Error ? e.message : String(e)), 'error')
     } finally {
       setIsGenerating(false)
     }
@@ -332,16 +343,16 @@ export function OrdersTable({ orders, hermesDefaultParcelClass = 'XS' }: {
     try {
       const result = await generateDhlLabelsAction(unshippedIds)
       if (result.error) {
-        alert(result.error)
+        showToast(result.error, 'error')
       } else {
-        alert(result.message)
+        showToast(result.message, 'success')
         setSelectedIds(new Set())
         if (result.labels && result.labels.length > 0) {
           window.open(`/api/orders/bulk/shipping-labels?ids=${unshippedIds.join(',')}`, '_blank')
         }
       }
     } catch (e) {
-      alert('Fehler: ' + (e instanceof Error ? e.message : String(e)))
+      showToast('Fehler: ' + (e instanceof Error ? e.message : String(e)), 'error')
     } finally {
       setIsDhlGenerating(false)
     }
@@ -353,9 +364,9 @@ export function OrdersTable({ orders, hermesDefaultParcelClass = 'XS' }: {
     try {
       const result = await archiveOrderAction(orderId)
       if (result.error) {
-        alert(result.error)
+        showToast(result.error, 'error')
       } else {
-        alert(result.message)
+        showToast(result.message, 'success')
         setSelectedIds(prev => {
           const next = new Set(prev)
           next.delete(orderId)
@@ -363,7 +374,7 @@ export function OrdersTable({ orders, hermesDefaultParcelClass = 'XS' }: {
         })
       }
     } catch (e) {
-      alert('Fehler beim Löschen.')
+      showToast('Fehler beim Löschen.', 'error')
     }
   }
 
@@ -375,13 +386,13 @@ export function OrdersTable({ orders, hermesDefaultParcelClass = 'XS' }: {
     try {
       const result = await archiveOrdersBulkAction(Array.from(selectedIds))
       if (result.error) {
-        alert(result.error)
+        showToast(result.error, 'error')
       } else {
-        alert(result.message)
+        showToast(result.message, 'success')
         setSelectedIds(new Set())
       }
     } catch (e) {
-      alert('Fehler: ' + (e instanceof Error ? e.message : String(e)))
+      showToast('Fehler: ' + (e instanceof Error ? e.message : String(e)), 'error')
     } finally {
       setIsDeletingBulk(false)
     }
@@ -399,7 +410,7 @@ export function OrdersTable({ orders, hermesDefaultParcelClass = 'XS' }: {
       .filter(id => !!orders.find(o => o.id === id)?.labelUrl)
 
     if (ids.length === 0) {
-      alert('Keine gespeicherten Versandlabels für die ausgewählten Bestellungen gefunden.')
+      showToast('Keine gespeicherten Versandlabels für die ausgewählten Bestellungen gefunden.', 'error')
       return
     }
     window.open(`/api/orders/bulk/shipping-labels?ids=${ids.join(',')}`, '_blank')
@@ -1054,6 +1065,44 @@ export function OrdersTable({ orders, hermesDefaultParcelClass = 'XS' }: {
         </div>
       )}
       </div>
+
+      {/* Floating Toast Notification */}
+      {toast && (
+        <div className="fixed top-6 right-6 z-[99999] flex items-center gap-3 bg-white/90 backdrop-blur-md border border-slate-100 shadow-2xl p-4 rounded-xl max-w-sm animate-in slide-in-from-top-5 duration-300">
+          <div className={`p-2 rounded-lg ${
+            toast.type === 'success' ? 'bg-emerald-50 text-emerald-600' :
+            toast.type === 'error' ? 'bg-rose-50 text-rose-600' :
+            'bg-blue-50 text-blue-600'
+          }`}>
+            {toast.type === 'success' && (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            )}
+            {toast.type === 'error' && (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            )}
+            {toast.type === 'info' && (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-slate-800 break-words">{toast.message}</p>
+          </div>
+          <button 
+            onClick={() => setToast(null)} 
+            className="text-slate-400 hover:text-slate-600 transition-colors p-1"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
     </div>
   )
 }
