@@ -83,7 +83,7 @@ export async function GET(request: Request) {
     }
 
     const mergedPdfBytes = await mergedPdf.save()
-    const pdfBlob = new Blob([mergedPdfBytes], { type: 'application/pdf' })
+    const pdfBlob = new Blob([mergedPdfBytes as any], { type: 'application/pdf' })
 
     return new Response(pdfBlob, {
       headers: {
