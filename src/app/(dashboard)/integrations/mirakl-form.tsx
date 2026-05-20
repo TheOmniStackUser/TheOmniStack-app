@@ -139,7 +139,7 @@ export function MiraklIntegrationForm({
             </div>
           </div>
           <input
-            type="text"
+            type="password"
             id={`${type}-clientId`}
             name="clientId"
             defaultValue={initialClientId}
