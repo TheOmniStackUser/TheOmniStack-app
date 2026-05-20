@@ -207,70 +207,7 @@ export function OrdersTable({ orders, hermesDefaultParcelClass = 'XS' }: {
   }
 
   // Helper: open a label — handles http URLs, data URIs, and raw base64 PDFs
-  // Opens multiple label PDFs merged into one printable page
-  const openMergedLabels = (labelUrls: string[]) => {
-    if (labelUrls.length === 0) return
-    if (labelUrls.length === 1) {
-      openLabel(labelUrls[0])
-      return
-    }
-    // Build a print page where each PDF is loaded as a Blob URL within the new window
-    const base64List = labelUrls.map(url => {
-      const comma = url.indexOf(',')
-      return comma !== -1 ? url.slice(comma + 1) : url
-    })
-    const newWin = window.open('', '_blank')
-    if (!newWin) {
-      // fallback: open each in its own tab
-      labelUrls.forEach(u => openLabel(u))
-      return
-    }
-    newWin.document.write(`<!DOCTYPE html>
-<html><head>
-  <title>Hermes Labels (${base64List.length})</title>
-  <style>
-    * { margin:0; padding:0; box-sizing:border-box; }
-    body { background:#f3f4f6; font-family:sans-serif; }
-    .toolbar { position:fixed; top:0; left:0; right:0; z-index:999; background:#1e293b; color:#fff;
-      padding:12px 24px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 2px 8px rgba(0,0,0,.3); }
-    .toolbar h1 { font-size:15px; font-weight:700; }
-    .toolbar button { background:#3b82f6; color:#fff; border:none; padding:8px 20px;
-      border-radius:8px; font-weight:700; font-size:13px; cursor:pointer; }
-    .toolbar button:hover { background:#2563eb; }
-    .pages { margin-top:60px; }
-    .label-page { width:100%; height:100vh; margin-bottom:8px; background:#fff; }
-    .label-page embed { width:100%; height:100%; border:none; }
-    @media print {
-      .toolbar { display:none; }
-      .pages { margin-top:0; }
-      .label-page { margin-bottom:0; page-break-after:always; }
-      .label-page:last-child { page-break-after:auto; }
-    }
-  </style>
-</head><body>
-  <div class="toolbar">
-    <h1>\u{1F4E6} ${base64List.length} Labels bereit</h1>
-    <button onclick="window.print()">\u{1F5A8}\uFE0F Alle drucken</button>
-  </div>
-  <div class="pages">
-    ${base64List.map((_, i) => `<div class="label-page" id="page-${i}"><embed id="pdf-${i}" type="application/pdf" /></div>`).join('\n    ')}
-  </div>
-  <script>
-    var data = ${JSON.stringify(base64List)};
-    data.forEach(function(b64, i) {
-      try {
-        var bytes = atob(b64);
-        var arr = new Uint8Array(bytes.length);
-        for (var j = 0; j < bytes.length; j++) arr[j] = bytes.charCodeAt(j);
-        var blob = new Blob([arr], { type: 'application/pdf' });
-        var url = URL.createObjectURL(blob);
-        document.getElementById('pdf-' + i).src = url;
-      } catch(e) { console.error('Label ' + i + ' error:', e); }
-    });
-  <\/script>
-</body></html>`)
-    newWin.document.close()
-  }
+
 
   const openLabel = (url: string) => {
     if (!url) return
@@ -368,7 +305,8 @@ export function OrdersTable({ orders, hermesDefaultParcelClass = 'XS' }: {
     setShowHermesModal(false)
     setIsGenerating(true)
     try {
-      const result = await generateHermesLabelsAction(Array.from(selectedIds), hermesSelections)
+      const ids = Array.from(selectedIds)
+      const result = await generateHermesLabelsAction(ids, hermesSelections)
       if (result.error) {
         alert(result.error)
       } else {
@@ -376,7 +314,7 @@ export function OrdersTable({ orders, hermesDefaultParcelClass = 'XS' }: {
         setSelectedIds(new Set())
         
         if (result.labels && result.labels.length > 0) {
-          openMergedLabels(result.labels)
+          window.open(`/api/orders/bulk/shipping-labels?ids=${ids.join(',')}`, '_blank')
         }
       }
     } catch (e) {
@@ -390,14 +328,15 @@ export function OrdersTable({ orders, hermesDefaultParcelClass = 'XS' }: {
     if (selectedIds.size === 0) return
     setIsDhlGenerating(true)
     try {
-      const result = await generateDhlLabelsAction(Array.from(selectedIds))
+      const ids = Array.from(selectedIds)
+      const result = await generateDhlLabelsAction(ids)
       if (result.error) {
         alert(result.error)
       } else {
         alert(result.message)
         setSelectedIds(new Set())
         if (result.labels && result.labels.length > 0) {
-          openMergedLabels(result.labels)
+          window.open(`/api/orders/bulk/shipping-labels?ids=${ids.join(',')}`, '_blank')
         }
       }
     } catch (e) {
@@ -455,15 +394,14 @@ export function OrdersTable({ orders, hermesDefaultParcelClass = 'XS' }: {
 
   // Collect stored label URLs from already-processed orders and open them merged
   const handleReprintLabels = () => {
-    const labelUrls = Array.from(selectedIds)
-      .map(id => orders.find(o => o.id === id)?.labelUrl)
-      .filter((url): url is string => !!url)
+    const ids = Array.from(selectedIds)
+      .filter(id => !!orders.find(o => o.id === id)?.labelUrl)
 
-    if (labelUrls.length === 0) {
+    if (ids.length === 0) {
       alert('Keine gespeicherten Versandlabels für die ausgewählten Bestellungen gefunden.')
       return
     }
-    openMergedLabels(labelUrls)
+    window.open(`/api/orders/bulk/shipping-labels?ids=${ids.join(',')}`, '_blank')
   }
 
   // Count selected orders that have a stored label
