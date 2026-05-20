@@ -5,18 +5,13 @@ import { eq, and } from 'drizzle-orm'
 export class HermesAdapter {
   private integrationId: string | null
   private accessToken: string | null
-  // ⚠️ TESTUMGEBUNG – URLs per curl bestätigt (20.05.2026)
-  // TODO vor Go-Live wechseln auf:
-  //   baseUrl: https://de-api.hermesworld.com
-  //   authUrl: https://authme.myhermes.de/authorization-facade/oauth2/access_token
-  //   appId:   hsi.verm.theomnistack
-  //   appSecret: B6LSgC-5tTYQyThjTa61
-  private baseUrl: string = 'https://de-api-int.hermesworld.com'
-  private authUrl: string = 'https://authme-int.myhermes.de/authorization-facade/oauth2/access_token'
+  // PRODUKTIONSUMGEBUNG
+  private baseUrl: string = 'https://de-api.hermesworld.com'
+  private authUrl: string = 'https://authme.myhermes.de/authorization-facade/oauth2/access_token'
 
-  // Application credentials – Testumgebung
-  private appId: string = 'hsi.int.verm.theomnistack'
-  private appSecret: string = 'ZRLD4LtrD8vDihgieheT'
+  // Application credentials – Produktion
+  private appId: string = 'hsi.verm.theomnistack'
+  private appSecret: string = 'B6LSgC-5tTYQyThjTa61'
   
   // User credentials (identifies the business customer - set via DB)
   private username: string
