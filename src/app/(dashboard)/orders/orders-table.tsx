@@ -272,6 +272,7 @@ export function OrdersTable({ orders, hermesDefaultParcelClass = 'XS' }: {
     newWin.document.close()
   }
 
+  const openLabel = (url: string) => {
     if (!url) return
 
     let base64: string | null = null
