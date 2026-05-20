@@ -147,14 +147,16 @@ export class AboutYouAdapter implements MarketplaceAdapter {
       const orderItemIds = rawOrder.order_items.map((item: any) => item.order_item_id || item.id)
 
       const shipmentPayload = {
-        items: [
-          {
-            order_items: orderItemIds,
-            shipment_provider: carrier.toUpperCase(),
-            shipment_tracking_key: trackingNumber,
-            ...(returnTrackingNumber ? { return_tracking_key: returnTrackingNumber } : {})
-          }
-        ]
+        data: {
+          items: [
+            {
+              order_items: orderItemIds,
+              carrier_key: carrier.toUpperCase(),
+              shipment_tracking_key: trackingNumber,
+              return_tracking_key: returnTrackingNumber || ""
+            }
+          ]
+        }
       }
 
       const response = await fetch(`${this.baseUrl}/orders/ship`, {
