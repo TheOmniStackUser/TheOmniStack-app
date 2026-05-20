@@ -76,7 +76,7 @@ export function createMarketplaceSyncWorker() {
           .where(
             and(
               eq(marketplaceIntegrations.companyId, companyId),
-              eq(marketplaceIntegrations.type, marketplace),
+              eq(marketplaceIntegrations.type, marketplace as any),
               eq(marketplaceIntegrations.isActive, true)
             )
           )
@@ -107,13 +107,17 @@ export function createMarketplaceSyncWorker() {
         } else if (
           marketplace === 'mirakl_decathlon' ||
           marketplace === 'mirakl_decathlon_eu' ||
-          marketplace === 'mirakl_mediamarkt'
+          marketplace === 'mirakl_mediamarkt' ||
+          marketplace === 'mirakl_custom'
         ) {
           if (!integration.clientId) {
             throw new Error(`${marketplace} integration is missing Client ID (or API Key)`)
           }
+          const customName = integration.type === 'mirakl_custom'
+            ? ((integration.metadata as any)?.customName || 'mirakl_custom')
+            : integration.type
           adapter = new MiraklAdapter({
-            instance: marketplace,
+            instance: customName.toLowerCase(),
             baseUrl: integration.environment!,
             clientId: integration.clientId,
             clientSecret: integration.clientSecret || '',

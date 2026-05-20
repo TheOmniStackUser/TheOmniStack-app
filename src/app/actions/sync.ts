@@ -61,7 +61,12 @@ export async function triggerManualSyncAction(data: { marketplace: string, fromD
   )
 
   if (data.marketplace !== 'all') {
-    query = and(query, eq(marketplaceIntegrations.type, data.marketplace as any))
+    if (data.marketplace.startsWith('mirakl_custom_')) {
+      const integrationId = data.marketplace.replace('mirakl_custom_', '')
+      query = and(query, eq(marketplaceIntegrations.id, integrationId))
+    } else {
+      query = and(query, eq(marketplaceIntegrations.type, data.marketplace as any))
+    }
   }
 
   const activeIntegrations = await db.select().from(marketplaceIntegrations).where(query)
@@ -92,8 +97,11 @@ export async function triggerManualSyncAction(data: { marketplace: string, fromD
           toDate: data.toDate
         })
       } else if (integration.type.startsWith('mirakl_')) {
+        const customName = integration.type === 'mirakl_custom'
+          ? ((integration.metadata as any)?.customName || 'mirakl_custom')
+          : integration.type
         const miraklAdapter = new MiraklAdapter({
-          instance: integration.type as any,
+          instance: customName.toLowerCase(),
           baseUrl: integration.environment!,
           clientId: integration.clientId!,
           clientSecret: integration.clientSecret!,

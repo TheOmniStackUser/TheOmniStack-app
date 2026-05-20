@@ -22,7 +22,7 @@ export type MarketplaceAddress = {
 
 export type NormalizedOrder = {
   marketplaceOrderId: string
-  marketplace: 'amazon' | 'otto' | 'mirakl_decathlon' | 'mirakl_decathlon_eu' | 'mirakl_mediamarkt' | 'shopify' | 'aboutyou'
+  marketplace: string
   purchaseDate: Date
   buyer: {
     name: string

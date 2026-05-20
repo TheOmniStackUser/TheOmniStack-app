@@ -22,9 +22,47 @@ const formatCountry = (code?: string | null) => {
   return map[code.toUpperCase()] || code.toUpperCase()
 }
 
-export function OrdersTable({ orders, hermesDefaultParcelClass = 'XS' }: { 
+const formatMarketplaceName = (mp: string) => {
+  if (!mp) return 'N/A'
+  if (mp === 'mirakl_decathlon') return 'Decathlon'
+  if (mp === 'mirakl_decathlon_eu') return 'MIRAKL Hauptaccount'
+  if (mp === 'mirakl_mediamarkt') return 'MediaMarkt'
+  if (mp === 'otto') return 'Otto'
+  if (mp === 'shopify') return 'Shopify'
+  if (mp === 'aboutyou') return 'About You'
+  if (mp === 'amazon') return 'Amazon'
+  // Capitalize first letter for others
+  return mp.charAt(0).toUpperCase() + mp.slice(1)
+}
+
+const getMarketplaceBadgeStyle = (mp: string) => {
+  switch (mp) {
+    case 'otto':
+      return { backgroundColor: '#ffebee', color: '#c62828' }
+    case 'aboutyou':
+      return { backgroundColor: '#f3e5f5', color: '#6a1b9a' }
+    case 'shopify':
+      return { backgroundColor: '#e8f5e9', color: '#2e7d32' }
+    case 'mirakl_decathlon':
+    case 'mirakl_decathlon_eu':
+    case 'mirakl_mediamarkt':
+      return { backgroundColor: '#e3f2fd', color: '#0d47a1' }
+    case 'amazon':
+      return { backgroundColor: '#fff3e0', color: '#e65100' }
+    default:
+      // Custom Mirakl integration style (nice clean green)
+      return { backgroundColor: '#e8f5e9', color: '#1b5e20' }
+  }
+}
+
+export function OrdersTable({ 
+  orders, 
+  hermesDefaultParcelClass = 'XS',
+  customMiraklIntegrations = []
+}: { 
   orders: OrderWithItems[]
   hermesDefaultParcelClass?: string
+  customMiraklIntegrations?: any[]
 }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
@@ -551,6 +589,14 @@ export function OrdersTable({ orders, hermesDefaultParcelClass = 'XS' }: {
             <option value="mirakl_decathlon_eu">MIRAKL Hauptaccount</option>
             <option value="amazon">Amazon</option>
             <option value="shopify">Shopify</option>
+            {customMiraklIntegrations.map((integration) => {
+              const name = (integration.metadata as any)?.customName || 'Unbenannter Mirakl Marktplatz'
+              return (
+                <option key={integration.id} value={name.toLowerCase()}>
+                  {name}
+                </option>
+              )
+            })}
           </select>
           
           <select
@@ -671,11 +717,8 @@ export function OrdersTable({ orders, hermesDefaultParcelClass = 'XS' }: {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize" 
-                          style={{
-                            backgroundColor: order.marketplace === 'otto' ? '#ffebee' : '#f3f4f6',
-                            color: order.marketplace === 'otto' ? '#c62828' : '#374151'
-                          }}>
-                          {order.marketplace}
+                          style={getMarketplaceBadgeStyle(order.marketplace)}>
+                          {formatMarketplaceName(order.marketplace)}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">

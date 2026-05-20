@@ -42,7 +42,7 @@ export const orders = pgTable('orders', {
     .notNull()
     .references(() => companies.id, { onDelete: 'cascade' }),
   // Raw marketplace identifiers
-  marketplace: marketplaceEnum('marketplace').notNull(),
+  marketplace: text('marketplace').notNull(),
   marketplaceOrderId: text('marketplace_order_id').notNull(),
   marketplacePurchaseDate: timestamp('marketplace_purchase_date', { withTimezone: true }),
   // Buyer information

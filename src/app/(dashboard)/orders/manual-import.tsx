@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { triggerManualSyncAction } from '@/app/actions/sync'
 import { useRouter } from 'next/navigation'
 
-export function ManualImport() {
+export function ManualImport({ customMiraklIntegrations = [] }: { customMiraklIntegrations?: any[] }) {
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(true)
   const [marketplace, setMarketplace] = useState('all')
@@ -76,6 +76,14 @@ export function ManualImport() {
             <option value="shopify">Shopify</option>
             <option value="mirakl_decathlon">Decathlon</option>
             <option value="mirakl_decathlon_eu">MIRAKL Hauptaccount</option>
+            {customMiraklIntegrations.map((integration) => {
+              const name = (integration.metadata as any)?.customName || 'Unbenannter Mirakl Marktplatz'
+              return (
+                <option key={integration.id} value={`mirakl_custom_${integration.id}`}>
+                  {name}
+                </option>
+              )
+            })}
           </select>
         </div>
         

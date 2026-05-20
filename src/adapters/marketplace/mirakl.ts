@@ -7,7 +7,7 @@
 
 import type { MarketplaceAdapter, NormalizedOrder } from './base'
 
-type MiraklInstance = 'mirakl_decathlon' | 'mirakl_decathlon_eu' | 'mirakl_mediamarkt'
+type MiraklInstance = string
 
 type MiraklAdapterConfig = {
   instance: MiraklInstance

@@ -10,7 +10,7 @@ import type { HermesConfig } from '@/app/(dashboard)/integrations/hermes-form'
 export default async function OrdersPage() {
   const auth = await requireAuth()
 
-  const [allOrders, hermesIntegration] = await Promise.all([
+  const [allOrders, hermesIntegration, integrations] = await Promise.all([
     db.query.orders.findMany({
       where: and(
         eq(orders.companyId, auth.activeCompanyId),
@@ -28,11 +28,18 @@ export default async function OrdersPage() {
         eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
         eq(marketplaceIntegrations.type, 'hermes')
       )
+    }),
+    db.query.marketplaceIntegrations.findMany({
+      where: and(
+        eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
+        eq(marketplaceIntegrations.isActive, true)
+      )
     })
   ])
 
   const hermesConfig = hermesIntegration?.metadata as HermesConfig | null
   const defaultParcelClass = hermesConfig?.defaultParcelClass ?? 'XS'
+  const customMiraklIntegrations = integrations.filter(i => i.type === 'mirakl_custom')
 
   return (
     <div className="max-w-[1600px] mx-auto">
@@ -41,9 +48,13 @@ export default async function OrdersPage() {
         <p className="text-gray-500 mt-2">Alle importierten Bestellungen im Überblick.</p>
       </header>
 
-      <ManualImport />
+      <ManualImport customMiraklIntegrations={customMiraklIntegrations} />
 
-      <OrdersTable orders={allOrders} hermesDefaultParcelClass={defaultParcelClass} />
+      <OrdersTable 
+        orders={allOrders} 
+        hermesDefaultParcelClass={defaultParcelClass} 
+        customMiraklIntegrations={customMiraklIntegrations}
+      />
     </div>
   )
 }
