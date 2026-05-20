@@ -83,8 +83,9 @@ export async function GET(request: Request) {
     }
 
     const mergedPdfBytes = await mergedPdf.save()
+    const pdfBlob = new Blob([mergedPdfBytes], { type: 'application/pdf' })
 
-    return new Response(mergedPdfBytes.buffer, {
+    return new Response(pdfBlob, {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': 'inline; filename="Versandlabels_Sammel.pdf"',
