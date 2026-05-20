@@ -26,7 +26,7 @@ export default async function OrdersPage() {
     db.query.marketplaceIntegrations.findFirst({
       where: and(
         eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
-        eq(marketplaceIntegrations.marketplace, 'hermes')
+        eq(marketplaceIntegrations.type, 'hermes')
       )
     })
   ])
