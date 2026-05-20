@@ -453,6 +453,23 @@ export function OrdersTable({ orders, hermesDefaultParcelClass = 'XS' }: {
     window.open(`/api/orders/bulk/delivery-note?ids=${ids}`, '_blank')
   }
 
+  // Collect stored label URLs from already-processed orders and open them merged
+  const handleReprintLabels = () => {
+    const labelUrls = Array.from(selectedIds)
+      .map(id => orders.find(o => o.id === id)?.labelUrl)
+      .filter((url): url is string => !!url)
+
+    if (labelUrls.length === 0) {
+      alert('Keine gespeicherten Versandlabels für die ausgewählten Bestellungen gefunden.')
+      return
+    }
+    openMergedLabels(labelUrls)
+  }
+
+  // Count selected orders that have a stored label
+  const selectedWithLabel = Array.from(selectedIds)
+    .filter(id => orders.find(o => o.id === id)?.labelUrl).length
+
   return (
     <div className="relative">
       <div>
@@ -471,6 +488,19 @@ export function OrdersTable({ orders, hermesDefaultParcelClass = 'XS' }: {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
               </svg>
               Lieferscheine ({selectedIds.size})
+            </button>
+          )}
+
+          {/* Reprint stored labels button – only visible when selected orders have saved labels */}
+          {selectedWithLabel > 0 && (
+            <button
+              onClick={handleReprintLabels}
+              className="flex items-center gap-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 font-semibold py-2 px-4 rounded-md transition-colors text-sm shadow-sm"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+              </svg>
+              Labels drucken ({selectedWithLabel})
             </button>
           )}
 
