@@ -63,7 +63,10 @@ export function NewInvoiceForm() {
     const rates = new Set([0])
     const isTaxExempt = ['kleinunternehmer', 'drittland', 'eu_vat_id', 'reverse_charge', 'innergemeinschaftlich', 'ausfuhr', 'sonstige', 'innenumsatz'].includes(settings.taxOption)
     if (isTaxExempt) return [0]
-    const targetCountryCode = settings.isOss ? settings.destinationCountry : 'DE'
+    
+    const allEqual = settings.taxCountry === settings.shippingCountry && settings.shippingCountry === settings.destinationCountry
+    const targetCountryCode = allEqual ? settings.taxCountry : (settings.isOss ? settings.destinationCountry : 'DE')
+    
     const countryData = EU_COUNTRIES.find(c => c.code === targetCountryCode)
     if (countryData) {
       rates.add(countryData.standardRate)
@@ -75,7 +78,13 @@ export function NewInvoiceForm() {
     return Array.from(rates).sort((a, b) => b - a)
   }
 
-  const availableVatRates = useMemo(() => getAvailableVatRates(), [settings.isOss, settings.destinationCountry, settings.taxOption])
+  const availableVatRates = useMemo(() => getAvailableVatRates(), [
+    settings.isOss,
+    settings.destinationCountry,
+    settings.taxOption,
+    settings.taxCountry,
+    settings.shippingCountry
+  ])
   const standardRate = availableVatRates[0] || 19
 
   const [items, setItems] = useState([{ title: '', quantity: 1, unitPrice: 0, taxRate: standardRate }])

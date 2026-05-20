@@ -328,6 +328,12 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
             )}
             
             <View style={{ marginTop: 10 }}>
+              {company.taxId && (
+                <View style={styles.row}>
+                  <Text style={styles.label}>{t.taxId}</Text>
+                  <Text style={styles.valueBold}>{company.taxId}</Text>
+                </View>
+              )}
               {company.vatId && (
                 <View style={styles.row}>
                   <Text style={styles.label}>{t.vatId}</Text>

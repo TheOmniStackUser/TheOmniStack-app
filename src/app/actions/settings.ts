@@ -12,6 +12,7 @@ export async function saveCompanySettingsAction(prevState: any, formData: FormDa
   const name = formData.get('name') as string
   const legalName = formData.get('legalName') as string
   const vatId = formData.get('vatId') as string
+  const taxId = formData.get('taxId') as string
   const street = formData.get('street') as string
   const zip = formData.get('zip') as string
   const city = formData.get('city') as string
@@ -55,6 +56,7 @@ export async function saveCompanySettingsAction(prevState: any, formData: FormDa
         name,
         legalName,
         vatId,
+        taxId,
         street,
         zip,
         city,

@@ -47,6 +47,16 @@ export function SettingsForm({ company }: { company: Company }) {
             />
           </div>
           <div className="space-y-2">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Steuernummer</label>
+            <input
+              name="taxId"
+              type="text"
+              defaultValue={company.taxId || ''}
+              placeholder="12/345/67890"
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-gray-900"
+            />
+          </div>
+          <div className="space-y-2">
             <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">E-Mail</label>
             <input
               name="email"
