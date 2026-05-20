@@ -114,6 +114,7 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
             trackingNumber: trackingNumber,
             labelUrl: labelUrl,
             returnTrackingNumber: returnTrackingNumber,
+            returnLabelUrl: returnLabelUrl ?? null,
             updatedAt: new Date() 
           })
           .where(eq(orders.id, order.id))
