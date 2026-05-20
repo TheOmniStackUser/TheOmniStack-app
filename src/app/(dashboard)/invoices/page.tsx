@@ -2,7 +2,7 @@ import { requireAuth } from '@/lib/session'
 import { db } from '@/db/client'
 import { invoices } from '@/db/schema/invoices'
 import { orders } from '@/db/schema/orders'
-import { eq, desc } from 'drizzle-orm'
+import { eq, desc, and, ne } from 'drizzle-orm'
 import Link from 'next/link'
 import { InvoiceList } from './invoice-list'
 import { GenerateMissingButton } from './generate-missing-button'
@@ -27,7 +27,10 @@ export default async function InvoicesPage() {
     })
     .from(invoices)
     .leftJoin(orders, eq(invoices.id, orders.invoiceId))
-    .where(eq(invoices.companyId, auth.activeCompanyId))
+    .where(and(
+      eq(invoices.companyId, auth.activeCompanyId),
+      ne(invoices.documentType, 'quote')
+    ))
     .orderBy(desc(invoices.createdAt))
 
   return (

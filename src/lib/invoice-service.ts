@@ -27,7 +27,8 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
   orderNumber?: string,
   buyerReference?: string,
   externalId?: string,
-  orderDate?: Date
+  orderDate?: Date,
+  documentType?: 'invoice' | 'quote' | 'delivery_note'
 } = {}) {
   const { 
     txContext, 
@@ -43,7 +44,8 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
     orderNumber: customOrderNumber,
     buyerReference,
     externalId,
-    orderDate: customOrderDate
+    orderDate: customOrderDate,
+    documentType = 'invoice'
   } = options
   // 1. Fetch data needed for PDF (outside transaction for better performance)
   const dbClient = txContext || db
@@ -54,7 +56,7 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
   })
 
   if (!order) throw new Error('Order not found')
-  if (order.invoiceId) return { skipped: true, reason: 'Invoice already exists' }
+  if (order.invoiceId && documentType === 'invoice') return { skipped: true, reason: 'Invoice already exists' }
 
   const [company] = await dbClient.select().from(companies).where(eq(companies.id, companyId)).limit(1)
   if (!company) throw new Error('Company not found')
@@ -63,7 +65,7 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
   const [lastInvoice] = await dbClient
     .select({ invoiceNumber: invoices.invoiceNumber })
     .from(invoices)
-    .where(eq(invoices.companyId, companyId))
+    .where(and(eq(invoices.companyId, companyId), eq(invoices.documentType, documentType)))
     .orderBy(desc(invoices.invoiceNumber))
     .limit(1)
 
@@ -72,68 +74,96 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
     const match = lastInvoice.invoiceNumber.match(/(\d+)$/)
     if (match) nextNumber = parseInt(match[1]) + 1
   }
-  const invoiceNumber = `INV-${new Date().getFullYear()}-${nextNumber.toString().padStart(5, '0')}`
+  const prefix = documentType === 'quote' ? 'ANG' : (documentType === 'delivery_note' ? 'LS' : 'INV')
+  const invoiceNumber = `${prefix}-${new Date().getFullYear()}-${nextNumber.toString().padStart(5, '0')}`
 
   // 3. Generate PDF Buffer (CPU intensive)
   // Dynamic imports required to avoid ESM/CJS module conflict
   const { renderToBuffer } = await import('@react-pdf/renderer')
-  const { InvoiceDocument } = await import('@/components/pdf/invoice')
 
   const { paymentMethod } = extractPaymentInfo(order)
   const metadata = (order.rawPayload as any)?.manualMetadata || {}
 
-  const pdfBuffer = await renderToBuffer(
-    React.createElement(InvoiceDocument, {
-      invoiceNumber,
-      date: new Date(),
-      dueDate: customDueDate || new Date(),
-      orderNumber: customOrderNumber || metadata.orderNumber || order.marketplaceOrderId,
-      orderDate: customOrderDate || order.marketplacePurchaseDate || undefined,
-      buyerReference: buyerReference || metadata.buyerReference,
-      externalId: externalId || metadata.externalId,
+  let pdfBuffer;
+  if (documentType === 'delivery_note') {
+    const { DeliveryNoteDocument } = await import('@/components/pdf/delivery-note')
+    const mappedOrder = {
+      shippingName: order.shippingName || order.buyerName || 'Kunde',
+      shippingStreet: order.shippingStreet || '',
+      shippingZip: order.shippingZip || '',
+      shippingCity: order.shippingCity || '',
+      shippingCountry: order.shippingCountry || 'DE',
       customerNumber: order.customerNumber || '–',
-      customText: customText || metadata.customText,
-      taxOption: taxOption || metadata.taxOption,
-      company: {
-        name: company.legalName || company.name,
-        street: company.street || undefined,
-        zip: company.zip || undefined,
-        city: company.city || undefined,
-        country: company.country,
-        email: company.email || undefined,
-        phone: company.phone || undefined,
-        website: company.website || undefined,
-        vatId: company.vatId || undefined,
-        taxId: company.taxId || undefined,
-        bankName: company.bankName || undefined,
-        bankIban: company.iban || undefined,
-        bankBic: company.bic || undefined,
-        logoUrl: company.logoUrl || undefined,
-        paymentRecipient: company.paymentRecipient || undefined,
-        management: company.management || undefined,
-        registrationCourt: company.registrationCourt || undefined,
-        internationalLanguage: company.internationalLanguage || undefined,
-      },
-      recipient: {
-        name: order.shippingName || order.buyerName || 'Kunde',
-        street: order.shippingStreet || '',
-        zip: order.shippingZip || '',
-        city: order.shippingCity || '',
-        country: order.shippingCountry || 'DE',
-      },
+      deliveryNoteNumber: invoiceNumber,
+      marketplaceOrderId: order.marketplaceOrderId,
+      marketplacePurchaseDate: order.marketplacePurchaseDate || new Date(),
       items: order.items.map((i: typeof orderItems.$inferSelect) => ({
+        quantity: parseInt(i.quantity),
         sku: i.sku,
         title: i.title || 'Produkt',
-        quantity: parseInt(i.quantity),
-        unitPrice: parseFloat(i.unitPrice),
-        taxRate: parseFloat(i.taxRate),
-      })),
-      currency: order.currency,
-      paymentMethod,
-      isCreditNote,
-    }) as any
-  )
-
+      }))
+    }
+    pdfBuffer = await renderToBuffer(
+      React.createElement(DeliveryNoteDocument, {
+        order: mappedOrder,
+        company: company,
+      }) as any
+    )
+  } else {
+    const { InvoiceDocument } = await import('@/components/pdf/invoice')
+    pdfBuffer = await renderToBuffer(
+      React.createElement(InvoiceDocument, {
+        invoiceNumber,
+        date: new Date(),
+        dueDate: customDueDate || new Date(),
+        orderNumber: customOrderNumber || metadata.orderNumber || order.marketplaceOrderId,
+        orderDate: customOrderDate || order.marketplacePurchaseDate || undefined,
+        buyerReference: buyerReference || metadata.buyerReference,
+        externalId: externalId || metadata.externalId,
+        customerNumber: order.customerNumber || '–',
+        customText: customText || metadata.customText,
+        taxOption: taxOption || metadata.taxOption,
+        company: {
+          name: company.legalName || company.name,
+          street: company.street || undefined,
+          zip: company.zip || undefined,
+          city: company.city || undefined,
+          country: company.country,
+          email: company.email || undefined,
+          phone: company.phone || undefined,
+          website: company.website || undefined,
+          vatId: company.vatId || undefined,
+          taxId: company.taxId || undefined,
+          bankName: company.bankName || undefined,
+          bankIban: company.iban || undefined,
+          bankBic: company.bic || undefined,
+          logoUrl: company.logoUrl || undefined,
+          paymentRecipient: company.paymentRecipient || undefined,
+          management: company.management || undefined,
+          registrationCourt: company.registrationCourt || undefined,
+          internationalLanguage: company.internationalLanguage || undefined,
+        },
+        recipient: {
+          name: order.shippingName || order.buyerName || 'Kunde',
+          street: order.shippingStreet || '',
+          zip: order.shippingZip || '',
+          city: order.shippingCity || '',
+          country: order.shippingCountry || 'DE',
+        },
+        items: order.items.map((i: typeof orderItems.$inferSelect) => ({
+          sku: i.sku,
+          title: i.title || 'Produkt',
+          quantity: parseInt(i.quantity),
+          unitPrice: parseFloat(i.unitPrice),
+          taxRate: parseFloat(i.taxRate),
+        })),
+        currency: order.currency,
+        paymentMethod,
+        isCreditNote,
+        documentType,
+      }) as any
+    )
+  }
 
   // 4. Upload to Storage (I/O intensive)
   const storageKey = buildInvoiceKey(companyId, invoiceNumber)
@@ -141,12 +171,14 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
 
   // 5. Save to Database (Fast Transaction)
   const runDbAction = async (tx: any) => {
-    // Double check inside transaction
-    const currentOrder = await tx.query.orders.findFirst({
-      where: and(eq(orders.id, orderId), eq(orders.companyId, companyId)),
-      columns: { invoiceId: true }
-    })
-    if (currentOrder?.invoiceId) return { skipped: true, reason: 'Invoice already exists' }
+    // Double check inside transaction for invoice duplicates
+    if (documentType === 'invoice') {
+      const currentOrder = await tx.query.orders.findFirst({
+        where: and(eq(orders.id, orderId), eq(orders.companyId, companyId)),
+        columns: { invoiceId: true }
+      })
+      if (currentOrder?.invoiceId) return { skipped: true, reason: 'Invoice already exists' }
+    }
 
     const calculatedSubtotal = order.items.reduce((sum: number, i: typeof orderItems.$inferSelect) => sum + (parseFloat(i.unitPrice) * parseFloat(i.quantity)), 0)
     const calculatedTax = order.items.reduce((sum: number, i: typeof orderItems.$inferSelect) => sum + (parseFloat(i.unitPrice) * parseFloat(i.quantity) * parseFloat(i.taxRate)), 0)
@@ -159,6 +191,7 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
         invoiceNumber,
         status,
         draftName,
+        documentType,
         recipientName: order.shippingName || order.buyerName || 'Kunde',
         recipientStreet: order.shippingStreet || '',
         recipientZip: order.shippingZip || '',
@@ -194,10 +227,12 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
       )
     }
 
-    // Link to Order
-    await tx.update(orders)
-      .set({ invoiceId: newInvoice.id })
-      .where(eq(orders.id, orderId))
+    // Link to Order if it is a standard invoice
+    if (documentType === 'invoice') {
+      await tx.update(orders)
+        .set({ invoiceId: newInvoice.id })
+        .where(eq(orders.id, orderId))
+    }
 
     return { 
       invoiceId: newInvoice.id, 
@@ -272,53 +307,82 @@ export async function regenerateInvoicePdf(invoiceId: string, companyId: string)
 
   const paymentInfo = order ? extractPaymentInfo(order) : { paymentMethod: 'Marketplace', isPaid: true }
 
-  const pdfBuffer = await renderToBuffer(
-    React.createElement(InvoiceDocument, {
-      invoiceNumber: invoice.invoiceNumber,
-      date: invoice.createdAt,
-      dueDate: invoice.dueAt || invoice.createdAt,
-      orderNumber: order?.marketplaceOrderId || '–',
-      orderDate: order?.marketplacePurchaseDate || undefined,
+  let pdfBuffer;
+  if (invoice.documentType === 'delivery_note') {
+    const { DeliveryNoteDocument } = await import('@/components/pdf/delivery-note')
+    const mappedOrder = {
+      shippingName: invoice.recipientName || 'Kunde',
+      shippingStreet: invoice.recipientStreet || '',
+      shippingZip: invoice.recipientZip || '',
+      shippingCity: invoice.recipientCity || '',
+      shippingCountry: invoice.recipientCountry || 'DE',
       customerNumber: order?.customerNumber || '–',
-      company: {
-        name: company.legalName || company.name,
-        street: company.street || undefined,
-        zip: company.zip || undefined,
-        city: company.city || undefined,
-        country: company.country,
-        email: company.email || undefined,
-        phone: company.phone || undefined,
-        website: company.website || undefined,
-        vatId: company.vatId || undefined,
-        taxId: company.taxId || undefined,
-        bankName: company.bankName || undefined,
-        bankIban: company.iban || undefined,
-        bankBic: company.bic || undefined,
-        logoUrl: company.logoUrl || undefined,
-        paymentRecipient: company.paymentRecipient || undefined,
-        management: company.management || undefined,
-        registrationCourt: company.registrationCourt || undefined,
-        internationalLanguage: company.internationalLanguage || undefined,
-      },
-      recipient: {
-        name: invoice.recipientName || 'Kunde',
-        street: invoice.recipientStreet || '',
-        zip: invoice.recipientZip || '',
-        city: invoice.recipientCity || '',
-        country: invoice.recipientCountry || 'DE',
-      },
+      deliveryNoteNumber: invoice.invoiceNumber,
+      marketplaceOrderId: order?.marketplaceOrderId || '–',
+      marketplacePurchaseDate: order?.marketplacePurchaseDate || invoice.createdAt,
       items: invoice.items.map((i: any) => ({
-        sku: i.sku,
-        title: i.description,
         quantity: parseInt(i.quantity),
-        unitPrice: parseFloat(i.unitPrice),
-        taxRate: parseFloat(i.taxRate),
-      })),
-      currency: invoice.currency,
-      paymentMethod: paymentInfo.paymentMethod,
-      isCreditNote: invoice.isCreditNote || false,
-    }) as any
-  )
+        sku: i.sku,
+        title: i.description || 'Produkt',
+      }))
+    }
+    pdfBuffer = await renderToBuffer(
+      React.createElement(DeliveryNoteDocument, {
+        order: mappedOrder,
+        company: company,
+      }) as any
+    )
+  } else {
+    const { InvoiceDocument } = await import('@/components/pdf/invoice')
+    pdfBuffer = await renderToBuffer(
+      React.createElement(InvoiceDocument, {
+        invoiceNumber: invoice.invoiceNumber,
+        date: invoice.createdAt,
+        dueDate: invoice.dueAt || invoice.createdAt,
+        orderNumber: order?.marketplaceOrderId || '–',
+        orderDate: order?.marketplacePurchaseDate || undefined,
+        customerNumber: order?.customerNumber || '–',
+        company: {
+          name: company.legalName || company.name,
+          street: company.street || undefined,
+          zip: company.zip || undefined,
+          city: company.city || undefined,
+          country: company.country,
+          email: company.email || undefined,
+          phone: company.phone || undefined,
+          website: company.website || undefined,
+          vatId: company.vatId || undefined,
+          taxId: company.taxId || undefined,
+          bankName: company.bankName || undefined,
+          bankIban: company.iban || undefined,
+          bankBic: company.bic || undefined,
+          logoUrl: company.logoUrl || undefined,
+          paymentRecipient: company.paymentRecipient || undefined,
+          management: company.management || undefined,
+          registrationCourt: company.registrationCourt || undefined,
+          internationalLanguage: company.internationalLanguage || undefined,
+        },
+        recipient: {
+          name: invoice.recipientName || 'Kunde',
+          street: invoice.recipientStreet || '',
+          zip: invoice.recipientZip || '',
+          city: invoice.recipientCity || '',
+          country: invoice.recipientCountry || 'DE',
+        },
+        items: invoice.items.map((i: any) => ({
+          sku: i.sku,
+          title: i.description,
+          quantity: parseInt(i.quantity),
+          unitPrice: parseFloat(i.unitPrice),
+          taxRate: parseFloat(i.taxRate),
+        })),
+        currency: invoice.currency,
+        paymentMethod: paymentInfo.paymentMethod,
+        isCreditNote: invoice.isCreditNote || false,
+        documentType: invoice.documentType || 'invoice',
+      }) as any
+    )
+  }
 
   const storageKey = invoice.pdfStorageKey || buildInvoiceKey(companyId, invoice.invoiceNumber)
   await uploadDocument(storageKey, pdfBuffer)

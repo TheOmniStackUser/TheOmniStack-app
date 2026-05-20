@@ -19,7 +19,9 @@ async function testOtto() {
     const adapter = new OttoAdapter({
       clientId: integration.clientId!,
       clientSecret: integration.clientSecret!,
-      environment: integration.environment as 'production' | 'sandbox'
+      environment: integration.environment as 'production' | 'sandbox',
+      installationId: (integration.metadata as any)?.installationId,
+      appId: (integration.metadata as any)?.appId
     })
 
     try {

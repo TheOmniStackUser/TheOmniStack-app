@@ -7,7 +7,7 @@ import { getInvoiceSettingsAction, saveInvoiceTemplateAction } from '@/app/actio
 import { searchCustomersAction, validateVatAction } from '@/app/actions/customers'
 import { WORLD_COUNTRIES, EU_COUNTRIES } from '@/lib/countries'
 
-export function NewInvoiceForm() {
+export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'invoice' | 'quote' | 'delivery_note' }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSavingDraft, setIsSavingDraft] = useState(false)
   const [isPreviewing, setIsPreviewing] = useState(false)
@@ -414,7 +414,8 @@ export function NewInvoiceForm() {
         dueDateDays: settings.dueDateDays,
         createOrder: settings.createOrder,
         currentDraftId,
-        vatCheckStatus
+        vatCheckStatus,
+        documentType,
       })
 
       if (result?.error) {
@@ -999,10 +1000,10 @@ export function NewInvoiceForm() {
         <button type="button" onClick={() => window.history.back()} className="px-8 py-3 text-slate-600 font-bold hover:bg-slate-100 rounded-xl">Abbrechen</button>
         <button type="button" onClick={handlePreview} disabled={isPreviewing || isSubmitting || isSavingDraft} className="px-8 py-3 bg-white border-2 border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition-all flex items-center gap-2 disabled:opacity-50">{isPreviewing ? <span className="animate-spin">🌀</span> : 'Vorschau'}</button>
         {!editId && (
-          <button type="button" onClick={(e) => handleSubmit(e, 'draft')} disabled={isSavingDraft || isSubmitting} className="px-8 py-3 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-all flex items-center gap-2 disabled:opacity-50">{isSavingDraft ? 'Wird gespeichert...' : 'Als Entwurf speichern'}</button>
+          <button type="button" onClick={(e) => handleSubmit(e, 'draft')} disabled={isSavingDraft || isSubmitting} className="px-8 py-3 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-all flex items-center gap-2 disabled:opacity-50">{isSavingDraft ? 'Wird gespeichert...' : documentType === 'quote' ? 'Als Entwurf speichern' : 'Als Entwurf speichern'}</button>
         )}
-        <button type="submit" disabled={isSubmitting || isSavingDraft} className={`px-10 py-3 ${settings.isCreditNote ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-200' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'} text-white font-bold rounded-xl transition-all shadow-lg disabled:opacity-50 flex items-center gap-2`}>
-          {isSubmitting ? 'Wird gespeichert...' : editId ? 'Änderungen speichern' : settings.isCreditNote ? 'Gutschrift finalisieren' : 'Rechnung finalisieren'}
+        <button type="submit" disabled={isSubmitting || isSavingDraft} className={`px-10 py-3 ${documentType === 'quote' ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-200' : settings.isCreditNote ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-200' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'} text-white font-bold rounded-xl transition-all shadow-lg disabled:opacity-50 flex items-center gap-2`}>
+          {isSubmitting ? 'Wird gespeichert...' : editId ? 'Änderungen speichern' : documentType === 'quote' ? 'Angebot erstellen' : settings.isCreditNote ? 'Gutschrift finalisieren' : 'Rechnung finalisieren'}
         </button>
       </div>
     </form>

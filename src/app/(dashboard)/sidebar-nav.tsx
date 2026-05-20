@@ -37,6 +37,21 @@ export function SidebarNav({ role }: { role: string }) {
               {link.label}
             </Link>
             
+            {/* Nest Angebote under Invoices */}
+            {link.href === '/invoices' && (
+              <Link
+                href="/quotes"
+                className={`flex items-center px-4 py-2 mt-1 ml-4 text-xs font-medium rounded-lg transition-all duration-200 ${
+                  pathname?.startsWith('/quotes')
+                    ? 'text-cyan-400'
+                    : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                <div className="w-1 h-1 rounded-full bg-slate-600 mr-3" />
+                Angebote
+              </Link>
+            )}
+
             {/* Nest Returns under Invoices if applicable */}
             {link.href === '/invoices' && canSeeReturns && (
               <Link

@@ -17,6 +17,12 @@ export const invoiceStatusEnum = pgEnum('invoice_status', [
   'cancelled', // GoBD: invoices can only be cancelled, never deleted/edited
 ])
 
+export const documentTypeEnum = pgEnum('document_type', [
+  'invoice',
+  'quote',
+  'delivery_note'
+])
+
 // ─── Invoices ─────────────────────────────────────────────────────────────────
 // GoBD-COMPLIANT: This table is append-only. No UPDATE of financial fields.
 // Cancellations create a new credit-note row referencing the original.
@@ -25,6 +31,7 @@ export const invoices = pgTable('invoices', {
   companyId: uuid('company_id')
     .notNull()
     .references(() => companies.id, { onDelete: 'restrict' }), // never cascade-delete financial records
+  documentType: documentTypeEnum('document_type').notNull().default('invoice'),
   // Human-readable invoice number (e.g. "INV-2024-0042")
   invoiceNumber: text('invoice_number').notNull().unique(),
   draftName: text('draft_name'),

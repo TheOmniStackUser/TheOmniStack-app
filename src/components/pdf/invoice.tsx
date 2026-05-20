@@ -112,6 +112,7 @@ interface InvoiceProps {
   isCreditNote?: boolean
   customText?: string
   taxOption?: string
+  documentType?: 'invoice' | 'quote' | 'delivery_note'
 }
 
 export const InvoiceDocument: React.FC<InvoiceProps> = ({
@@ -132,6 +133,7 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
   customText,
   taxOption,
   orderDate,
+  documentType = 'invoice',
 }) => {
   const countryCode = (recipient.country || '').toUpperCase()
   const isGerman = countryCode === 'DE' || countryCode === 'DEU' || countryCode === 'GERMANY' || countryCode === 'DEUTSCHLAND'
@@ -172,12 +174,13 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
       vatId: 'USt-IdNr.',
       date: 'Datum',
       customerNr: 'Kunde',
-      invoiceNr: 'Rechnung',
+      invoiceNr: documentType === 'quote' ? 'Angebot' : 'Rechnung',
       orderNr: 'Bestellnr.',
       orderDate: 'Bestelldatum',
       buyerRef: 'Käuferref.',
       externalId: 'Externe ID',
       invoiceTitle: 'Rechnung',
+      quoteTitle: 'Angebot',
       taxNote: 'Das Rechnungsdatum entspricht dem Leistungsdatum',
       quantity: 'Menge',
       sku: 'Art.-Nr. + Bezeichnung',
@@ -185,6 +188,7 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
       total: 'Gesamt',
       pos: 'Pos',
       thanks: 'Sehr geehrte Damen und Herren,\nvielen Dank für Ihren Auftrag! Wir berechnen Ihnen hiermit folgende Leistungen:',
+      thanksQuote: 'Sehr geehrte Damen und Herren,\nvielen Dank für Ihre Anfrage! Gerne unterbreiten wir Ihnen folgendes Angebot:',
       net: 'Gesamt Netto',
       vat: 'MwSt.',
       totalGross: 'Gesamtbetrag',
@@ -211,12 +215,13 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
       vatId: 'VAT ID',
       date: 'Date',
       customerNr: 'Customer',
-      invoiceNr: 'Invoice',
+      invoiceNr: documentType === 'quote' ? 'Quote' : 'Invoice',
       orderNr: 'Order No.',
       orderDate: 'Order Date',
       buyerRef: 'Buyer Ref',
       externalId: 'External ID',
       invoiceTitle: 'Invoice',
+      quoteTitle: 'Quote',
       taxNote: 'The invoice date corresponds to the service date',
       quantity: 'Qty',
       sku: 'SKU + Description',
@@ -224,6 +229,7 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
       total: 'Total',
       pos: 'Pos',
       thanks: 'Dear Sir or Madam,\nfollowing our agreement, we invoice you for:',
+      thanksQuote: 'Dear Sir or Madam,\nthank you for your inquiry! We are pleased to submit the following quote:',
       net: 'Total (Net)',
       vat: 'VAT',
       totalGross: 'Total Amount',
@@ -384,7 +390,7 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
         </View>
 
         <View style={styles.titleBlock} fixed>
-          <Text style={styles.mainTitle}>{isCreditNote ? t.creditNoteTitle : t.invoiceTitle} {invoiceNumber}</Text>
+          <Text style={styles.mainTitle}>{isCreditNote ? t.creditNoteTitle : (documentType === 'quote' ? t.quoteTitle : t.invoiceTitle)} {invoiceNumber}</Text>
           
           <View style={{ flexDirection: 'row', marginTop: 5, fontSize: 9 }}>
             {paymentMethod && (
@@ -434,7 +440,7 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
                   <Text key={i} style={{ marginBottom: 2 }}>{line}</Text>
                 ))
               ) : (
-                (isCreditNote ? t.thanksCredit : t.thanks).split('\n').map((line, i) => (
+                (isCreditNote ? t.thanksCredit : (documentType === 'quote' ? t.thanksQuote : t.thanks)).split('\n').map((line, i) => (
                   <Text key={i} style={{ marginBottom: 2 }}>{line}</Text>
                 ))
               )}

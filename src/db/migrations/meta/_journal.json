@@ -15,6 +15,13 @@
       "when": 1778143696961,
       "tag": "0001_bouncy_zarda",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1779260074987,
+      "tag": "0002_overjoyed_cable",
+      "breakpoints": true
     }
   ]
 }

@@ -55,6 +55,7 @@ export async function createManualInvoiceAction(data: {
   createOrder?: boolean
   currentDraftId?: string | null
   vatCheckStatus?: { status: string, lastChecked?: Date }
+  documentType?: 'invoice' | 'quote' | 'delivery_note'
 }) {
   try {
     const auth = await requireAuth()
@@ -183,7 +184,7 @@ export async function createManualInvoiceAction(data: {
     return [newOrder]
   })
 
-  // 2. Generate the invoice
+  // 2. Generate the invoice/quote/delivery_note
   const orderData = order[0]
   const invoiceResult = await createInvoiceForOrder(orderData.id, companyId, { 
     isCreditNote: data.isCreditNote,
@@ -198,11 +199,13 @@ export async function createManualInvoiceAction(data: {
     orderNumber: data.orderNumber,
     orderDate: data.orderDate,
     buyerReference: data.buyerReference,
-    externalId: data.externalId
+    externalId: data.externalId,
+    documentType: data.documentType || 'invoice'
   })
 
+  const redirectTarget = data.documentType === 'quote' ? '/quotes' : '/invoices'
   if (data.status !== 'draft') {
-    redirect('/invoices')
+    redirect(redirectTarget)
   }
   
   return { success: true, draftId: (invoiceResult as any).invoiceId }
@@ -215,12 +218,234 @@ export async function createManualInvoiceAction(data: {
   }
 }
 
+// ─── Quote Actions ─────────────────────────────────────────────────────────────
+
+export async function getQuotesAction() {
+  const auth = await requireAuth()
+  const companyId = auth.activeCompanyId
+
+  const allQuotes = await db
+    .select({
+      id: invoices.id,
+      invoiceNumber: invoices.invoiceNumber,
+      recipientName: invoices.recipientName,
+      recipientCountry: invoices.recipientCountry,
+      totalAmount: invoices.totalAmount,
+      currency: invoices.currency,
+      createdAt: invoices.createdAt,
+      pdfStorageKey: invoices.pdfStorageKey,
+      status: invoices.status,
+      draftName: invoices.draftName,
+    })
+    .from(invoices)
+    .where(and(
+      eq(invoices.companyId, companyId),
+      eq(invoices.documentType, 'quote')
+    ))
+    .orderBy(desc(invoices.createdAt))
+
+  return allQuotes
+}
+
+export async function getQuoteDetailsAction(quoteId: string) {
+  const auth = await requireAuth()
+  const companyId = auth.activeCompanyId
+
+  const quote = await db.query.invoices.findFirst({
+    where: and(
+      eq(invoices.id, quoteId),
+      eq(invoices.companyId, companyId),
+      eq(invoices.documentType, 'quote')
+    ),
+    with: { items: true }
+  })
+
+  if (!quote) throw new Error('Angebot nicht gefunden')
+
+  // Fetch the linked order to get manual metadata from rawPayload
+  const linkedOrder = await db.query.orders.findFirst({
+    where: eq(orders.invoiceId, quoteId)
+  })
+
+  const metadata = (linkedOrder?.rawPayload as any)?.manualMetadata || {}
+
+  return {
+    invoice: {
+      ...quote,
+      customText: metadata.customText,
+      taxOption: metadata.taxOption,
+      shippingCountry: metadata.shippingCountry,
+      destinationCountry: metadata.destinationCountry,
+      taxCountry: metadata.taxCountry,
+      orderNumber: metadata.orderNumber,
+      orderDate: metadata.orderDate ? new Date(metadata.orderDate).toISOString().split('T')[0] : '',
+      buyerReference: metadata.buyerReference,
+      externalId: metadata.externalId,
+      skontoRate: metadata.skontoRate,
+      skontoDays: metadata.skontoDays,
+      discountRate: metadata.discountRate,
+      ossEnabled: metadata.ossEnabled,
+      dueDateDays: metadata.dueDateDays,
+    },
+    items: quote.items,
+    linkedOrder
+  }
+}
+
+/**
+ * Converts an existing quote into a new invoice or delivery note.
+ * The original quote remains unchanged in the database.
+ */
+export async function convertQuoteAction(quoteId: string, targetType: 'invoice' | 'delivery_note') {
+  try {
+    const auth = await requireAuth()
+    const companyId = auth.activeCompanyId
+
+    // 1. Fetch the quote
+    const quote = await db.query.invoices.findFirst({
+      where: and(
+        eq(invoices.id, quoteId),
+        eq(invoices.companyId, companyId),
+        eq(invoices.documentType, 'quote')
+      ),
+      with: { items: true }
+    })
+    if (!quote) throw new Error('Angebot nicht gefunden')
+
+    // 2. Fetch the linked order (for data source)
+    const linkedOrder = await db.query.orders.findFirst({
+      where: eq(orders.invoiceId, quoteId),
+      with: { items: true }
+    })
+    if (!linkedOrder) throw new Error('Verknüpfte Bestellung nicht gefunden')
+
+    const metadata = (linkedOrder?.rawPayload as any)?.manualMetadata || {}
+
+    // 3. Create a new order clone for the new document
+    const subtotal = parseFloat(quote.subtotalAmount || '0')
+    const tax = parseFloat(quote.taxAmount || '0')
+    const total = parseFloat(quote.totalAmount || '0')
+
+    const [newOrder] = await db
+      .insert(orders)
+      .values({
+        companyId,
+        marketplace: 'manual',
+        marketplaceOrderId: `MAN-${Date.now()}`,
+        marketplacePurchaseDate: new Date(),
+        status: 'invoiced',
+        buyerName: quote.recipientName || '',
+        buyerEmail: quote.recipientEmail || undefined,
+        shippingName: quote.recipientName || '',
+        shippingStreet: quote.recipientStreet || '',
+        shippingZip: quote.recipientZip || '',
+        shippingCity: quote.recipientCity || '',
+        shippingCountry: quote.recipientCountry || 'DE',
+        currency: quote.currency || 'EUR',
+        subtotalAmount: subtotal.toFixed(2),
+        taxAmount: tax.toFixed(2),
+        totalAmount: total.toFixed(2),
+        isArchived: true, // hide from orders list
+        customerNumber: linkedOrder.customerNumber,
+        rawPayload: linkedOrder.rawPayload,
+      })
+      .returning({ id: orders.id })
+
+    // Clone order items
+    if (linkedOrder.items && linkedOrder.items.length > 0) {
+      await db.insert(orderItems).values(
+        (linkedOrder.items as any[]).map((item: any) => ({
+          orderId: newOrder.id,
+          companyId,
+          title: item.title,
+          sku: item.sku,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          taxRate: item.taxRate,
+        }))
+      )
+    }
+
+    // 4. Generate the new document
+    const { createInvoiceForOrder } = await import('@/lib/invoice-service')
+    const result = await createInvoiceForOrder(newOrder.id, companyId, {
+      documentType: targetType,
+      status: 'issued',
+      customText: metadata.customText,
+      taxOption: metadata.taxOption,
+      shippingCountry: metadata.shippingCountry,
+      destinationCountry: metadata.destinationCountry,
+      taxCountry: metadata.taxCountry,
+      orderNumber: metadata.orderNumber,
+      buyerReference: metadata.buyerReference,
+      externalId: metadata.externalId,
+    })
+
+    revalidatePath('/quotes')
+    revalidatePath('/invoices')
+
+    const redirectTarget = targetType === 'invoice' ? '/invoices' : '/invoices'
+    redirect(redirectTarget)
+  } catch (error: any) {
+    if (error.message === 'NEXT_REDIRECT' || error.digest?.includes('NEXT_REDIRECT')) {
+      throw error
+    }
+    console.error('[ConvertQuote] Error:', error)
+    return { error: error.message || 'Fehler bei der Konvertierung' }
+  }
+}
+
+export async function deleteQuoteAction(quoteId: string) {
+  const auth = await requireAuth()
+  const companyId = auth.activeCompanyId
+
+  await db.transaction(async (tx) => {
+    const [quote] = await tx
+      .select({ id: invoices.id })
+      .from(invoices)
+      .where(and(
+        eq(invoices.id, quoteId),
+        eq(invoices.companyId, companyId),
+        eq(invoices.documentType, 'quote')
+      ))
+      .limit(1)
+
+    if (!quote) return
+
+    // Delete order_items for linked orders
+    const linkedOrders = await tx
+      .select({ id: orders.id })
+      .from(orders)
+      .where(eq(orders.invoiceId, quoteId))
+    
+    for (const o of linkedOrders) {
+      await tx.delete(orderItems).where(eq(orderItems.orderId, o.id))
+    }
+
+    // Delete linked orders
+    await tx.delete(orders).where(eq(orders.invoiceId, quoteId))
+
+    // Delete invoice items
+    await tx.delete(invoiceItems).where(eq(invoiceItems.invoiceId, quoteId))
+
+    // Delete the invoice/quote record
+    await tx.delete(invoices).where(and(eq(invoices.id, quoteId), eq(invoices.companyId, companyId)))
+  })
+
+  revalidatePath('/quotes')
+}
+
+
 export async function getDraftsAction() {
   const auth = await requireAuth()
   const companyId = auth.activeCompanyId
 
   const allDrafts = await db.query.invoices.findMany({
-    where: and(eq(invoices.companyId, companyId), eq(invoices.status, 'draft')),
+    where: and(
+      eq(invoices.companyId, companyId),
+      eq(invoices.status, 'draft'),
+      eq(invoices.documentType, 'invoice')
+    ),
     orderBy: desc(invoices.createdAt),
   })
 
