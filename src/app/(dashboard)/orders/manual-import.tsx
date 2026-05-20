@@ -75,7 +75,6 @@ export function ManualImport({ customMiraklIntegrations = [] }: { customMiraklIn
             <option value="aboutyou">About You</option>
             <option value="shopify">Shopify</option>
             <option value="mirakl_decathlon">Decathlon</option>
-            <option value="mirakl_decathlon_eu">MIRAKL Hauptaccount</option>
             {customMiraklIntegrations.map((integration) => {
               const name = (integration.metadata as any)?.customName || 'Unbenannter Mirakl Marktplatz'
               return (

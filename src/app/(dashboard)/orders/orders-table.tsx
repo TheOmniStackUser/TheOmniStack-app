@@ -586,7 +586,6 @@ export function OrdersTable({
             <option value="all">Alle Marktplätze</option>
             <option value="otto">Otto</option>
             <option value="mirakl_decathlon">Decathlon</option>
-            <option value="mirakl_decathlon_eu">MIRAKL Hauptaccount</option>
             <option value="amazon">Amazon</option>
             <option value="shopify">Shopify</option>
             {customMiraklIntegrations.map((integration) => {
