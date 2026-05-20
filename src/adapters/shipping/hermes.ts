@@ -285,13 +285,18 @@ export class HermesAdapter {
 
             if (returnResultCode === 'OK' || returnData.shipmentID) {
               returnTrackingNumber = returnData.shipmentID
-              // The return label PDF is in the 'shippinglabel' field (base64)
-              const returnBase64 = returnData.shippinglabel || returnData.labelImage
-              if (returnBase64 && typeof returnBase64 === 'string' && returnBase64.length > 100) {
-                returnLabelUrl = `data:application/pdf;base64,${returnBase64}`
-                console.log(`[Hermes Adapter] ✅ Self-Service Retourenlabel erfolgreich generiert. Return Tracking: ${returnTrackingNumber}`)
+              // Only generate a PDF label for 'enclosed' type (needs to be printed & put in parcel).
+              // For 'virtual' (e.g. Otto), we only need the tracking number – no label PDF.
+              if (returnType === 'enclosed') {
+                const returnBase64 = returnData.shippinglabel || returnData.labelImage
+                if (returnBase64 && typeof returnBase64 === 'string' && returnBase64.length > 100) {
+                  returnLabelUrl = `data:application/pdf;base64,${returnBase64}`
+                  console.log(`[Hermes Adapter] ✅ Retourenlabel-PDF generiert. Return Tracking: ${returnTrackingNumber}`)
+                } else {
+                  console.warn('[Hermes Adapter] Return Label: kein shippinglabel-PDF in Antwort.')
+                }
               } else {
-                console.warn('[Hermes Adapter] Return Label: kein shippinglabel-PDF in Antwort.')
+                console.log(`[Hermes Adapter] ✅ Retourennummer erhalten (kein PDF für '${returnType}'): ${returnTrackingNumber}`)
               }
             } else {
               console.warn(`[Hermes Adapter] Retourenlabel Fehler:`, JSON.stringify(returnData.listOfResultCodes))

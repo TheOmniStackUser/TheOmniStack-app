@@ -6,6 +6,7 @@ import { Eye, EyeOff, CheckCircle, XCircle, Loader, Settings, RefreshCw } from '
 
 export type HermesConfig = {
   platformReturns: Record<string, 'none' | 'enclosed' | 'virtual'>
+  defaultParcelClass?: string
 }
 
 export function HermesIntegrationForm({ 
@@ -15,7 +16,7 @@ export function HermesIntegrationForm({
   initialClientId: string,
   initialConfig?: HermesConfig
 }) {
-  const [activeTab, setActiveTab] = useState<'connection' | 'returns'>('connection')
+  const [activeTab, setActiveTab] = useState<'connection' | 'returns' | 'settings'>('connection')
   const [state, action, pending] = useActionState(saveHermesIntegrationAction, undefined)
   const [showPassword, setShowPassword] = useState(false)
   const [testStatus, setTestStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle')
@@ -31,6 +32,9 @@ export function HermesIntegrationForm({
 
   const [platformReturns, setPlatformReturns] = useState<HermesConfig['platformReturns']>(
     initialConfig?.platformReturns ?? DEFAULT_PLATFORM_RETURNS
+  )
+  const [defaultParcelClass, setDefaultParcelClass] = useState<string>(
+    initialConfig?.defaultParcelClass ?? 'XS'
   )
 
   const handleTest = async () => {
@@ -55,12 +59,13 @@ export function HermesIntegrationForm({
   const tabs = [
     { id: 'connection', label: 'Verbindung', icon: Settings },
     { id: 'returns', label: 'Retouren', icon: RefreshCw },
+    { id: 'settings', label: 'Einstellungen', icon: Settings },
   ] as const
 
   return (
     <form action={action} className="w-full max-w-2xl">
       {/* Hidden field for JSON config */}
-      <input type="hidden" name="hermesConfig" value={JSON.stringify({ platformReturns })} />
+      <input type="hidden" name="hermesConfig" value={JSON.stringify({ platformReturns, defaultParcelClass })} />
 
       {/* Tab Bar */}
       <div className="flex border-b border-gray-200 mb-6">
@@ -277,6 +282,47 @@ export function HermesIntegrationForm({
           })}
 
           <div className="pt-4">
+            <button
+              type="submit"
+              disabled={pending}
+              className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition-all disabled:opacity-50"
+            >
+              {pending ? 'Wird gespeichert...' : 'Konfiguration speichern'}
+            </button>
+          </div>
+        </div>
+
+        {/* ── Tab: Einstellungen ──────────────────────────────────────────── */}
+        <div className={activeTab === 'settings' ? 'space-y-6' : 'hidden'}>
+          <div className="bg-blue-50 rounded-lg p-4 text-sm text-blue-800 border border-blue-100">
+            <p>Allgemeine Hermes-Einstellungen für alle Sendungen.</p>
+          </div>
+
+          {/* Default Parcel Size */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <h4 className="font-bold text-gray-900 text-sm mb-1">Standard-Paketgröße</h4>
+            <p className="text-xs text-gray-500 mb-4">
+              Vorauswahl im Label-Dialog. Kann pro Bestellung geändert werden.
+            </p>
+            <div className="flex gap-2">
+              {(['XS', 'S', 'M', 'L', 'XL'] as const).map(size => (
+                <button
+                  key={size}
+                  type="button"
+                  onClick={() => setDefaultParcelClass(size)}
+                  className={`flex-1 py-3 rounded-xl font-black text-sm transition-all duration-200 border-2 ${
+                    defaultParcelClass === size
+                      ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-600/20'
+                      : 'bg-white border-gray-200 text-gray-500 hover:border-blue-300 hover:text-blue-600'
+                  }`}
+                >
+                  {size}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="pt-2">
             <button
               type="submit"
               disabled={pending}

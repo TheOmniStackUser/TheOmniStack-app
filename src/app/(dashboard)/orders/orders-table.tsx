@@ -22,7 +22,10 @@ const formatCountry = (code?: string | null) => {
   return map[code.toUpperCase()] || code.toUpperCase()
 }
 
-export function OrdersTable({ orders }: { orders: OrderWithItems[] }) {
+export function OrdersTable({ orders, hermesDefaultParcelClass = 'XS' }: { 
+  orders: OrderWithItems[]
+  hermesDefaultParcelClass?: string
+}) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [isGenerating, setIsGenerating] = useState(false)
@@ -204,7 +207,71 @@ export function OrdersTable({ orders }: { orders: OrderWithItems[] }) {
   }
 
   // Helper: open a label — handles http URLs, data URIs, and raw base64 PDFs
-  const openLabel = (url: string) => {
+  // Opens multiple label PDFs merged into one printable page
+  const openMergedLabels = (labelUrls: string[]) => {
+    if (labelUrls.length === 0) return
+    if (labelUrls.length === 1) {
+      openLabel(labelUrls[0])
+      return
+    }
+    // Build a print page where each PDF is loaded as a Blob URL within the new window
+    const base64List = labelUrls.map(url => {
+      const comma = url.indexOf(',')
+      return comma !== -1 ? url.slice(comma + 1) : url
+    })
+    const newWin = window.open('', '_blank')
+    if (!newWin) {
+      // fallback: open each in its own tab
+      labelUrls.forEach(u => openLabel(u))
+      return
+    }
+    newWin.document.write(`<!DOCTYPE html>
+<html><head>
+  <title>Hermes Labels (${base64List.length})</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { background:#f3f4f6; font-family:sans-serif; }
+    .toolbar { position:fixed; top:0; left:0; right:0; z-index:999; background:#1e293b; color:#fff;
+      padding:12px 24px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .toolbar h1 { font-size:15px; font-weight:700; }
+    .toolbar button { background:#3b82f6; color:#fff; border:none; padding:8px 20px;
+      border-radius:8px; font-weight:700; font-size:13px; cursor:pointer; }
+    .toolbar button:hover { background:#2563eb; }
+    .pages { margin-top:60px; }
+    .label-page { width:100%; height:100vh; margin-bottom:8px; background:#fff; }
+    .label-page embed { width:100%; height:100%; border:none; }
+    @media print {
+      .toolbar { display:none; }
+      .pages { margin-top:0; }
+      .label-page { margin-bottom:0; page-break-after:always; }
+      .label-page:last-child { page-break-after:auto; }
+    }
+  </style>
+</head><body>
+  <div class="toolbar">
+    <h1>\u{1F4E6} ${base64List.length} Labels bereit</h1>
+    <button onclick="window.print()">\u{1F5A8}\uFE0F Alle drucken</button>
+  </div>
+  <div class="pages">
+    ${base64List.map((_, i) => `<div class="label-page" id="page-${i}"><embed id="pdf-${i}" type="application/pdf" /></div>`).join('\n    ')}
+  </div>
+  <script>
+    var data = ${JSON.stringify(base64List)};
+    data.forEach(function(b64, i) {
+      try {
+        var bytes = atob(b64);
+        var arr = new Uint8Array(bytes.length);
+        for (var j = 0; j < bytes.length; j++) arr[j] = bytes.charCodeAt(j);
+        var blob = new Blob([arr], { type: 'application/pdf' });
+        var url = URL.createObjectURL(blob);
+        document.getElementById('pdf-' + i).src = url;
+      } catch(e) { console.error('Label ' + i + ' error:', e); }
+    });
+  <\/script>
+</body></html>`)
+    newWin.document.close()
+  }
+
     if (!url) return
 
     let base64: string | null = null
@@ -287,10 +354,10 @@ export function OrdersTable({ orders }: { orders: OrderWithItems[] }) {
   const handleGenerateLabels = async () => {
     if (selectedIds.size === 0) return
     
-    // Initialize selections with default 'S' for each selected order
+    // Initialize with the configured default parcel class
     const initialSelections: Record<string, string> = {}
     selectedIds.forEach(id => {
-      initialSelections[id] = 'S'
+      initialSelections[id] = hermesDefaultParcelClass
     })
     setHermesSelections(initialSelections)
     setShowHermesModal(true)
@@ -308,14 +375,7 @@ export function OrdersTable({ orders }: { orders: OrderWithItems[] }) {
         setSelectedIds(new Set())
         
         if (result.labels && result.labels.length > 0) {
-          if (result.labels.length === 1) {
-            openLabel(result.labels[0])
-          } else {
-            const confirmed = window.confirm(`${result.labels.length} Labels wurden erstellt. Sollen diese in neuen Tabs geöffnet werden? (Dein Pop-Up-Blocker könnte dies verhindern).`)
-            if (confirmed) {
-              result.labels.forEach((url: string) => openLabel(url))
-            }
-          }
+          openMergedLabels(result.labels)
         }
       }
     } catch (e) {
@@ -336,12 +396,7 @@ export function OrdersTable({ orders }: { orders: OrderWithItems[] }) {
         alert(result.message)
         setSelectedIds(new Set())
         if (result.labels && result.labels.length > 0) {
-          if (result.labels.length === 1) {
-            openLabel(result.labels[0])
-          } else {
-            const confirmed = window.confirm(`${result.labels.length} DHL-Labels wurden erstellt. Jetzt in neuen Tabs öffnen?`)
-            if (confirmed) result.labels.forEach((url: string) => openLabel(url))
-          }
+          openMergedLabels(result.labels)
         }
       }
     } catch (e) {
