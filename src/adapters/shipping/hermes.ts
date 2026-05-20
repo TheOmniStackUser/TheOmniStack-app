@@ -5,12 +5,14 @@ import { eq, and } from 'drizzle-orm'
 export class HermesAdapter {
   private integrationId: string | null
   private accessToken: string | null
-  private baseUrl: string = 'https://de-api.hermesworld.com'
-  private authUrl: string = 'https://authme.myhermes.de/authorization-facade/oauth2/access_token'
+  // ⚠️ TESTUMGEBUNG – für Produktiv auf prod-URLs und prod-App-Credentials umstellen
+  private baseUrl: string = 'https://int-de-api.hermesworld.com'
+  private authUrl: string = 'https://int-authme.myhermes.de/authorization-facade/oauth2/access_token'
 
   // Application credentials (identifies this software as TheOmniStack)
-  private appId: string = 'hsi.verm.theomnistack'
-  private appSecret: string = 'B6LSgC-5tTYQyThjTa61'
+  // Test-Env: hsi.int.verm.theomnistack | Prod-Env: hsi.verm.theomnistack
+  private appId: string = 'hsi.int.verm.theomnistack'
+  private appSecret: string = 'ZRLD4LtrD8vDihgieheT'
   
   // User credentials (identifies the business customer - set via DB)
   private username: string
