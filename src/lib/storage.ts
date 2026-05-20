@@ -9,12 +9,12 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
 // ─── Client for uploads (uses internal Docker hostname, e.g. http://minio:9000) ──
 const s3UploadClient = new S3Client({
-  region: process.env.S3_REGION ?? 'us-east-1',
+  region: process.env.S3_REGION ?? process.env.AWS_REGION ?? 'us-east-1',
   endpoint: process.env.S3_ENDPOINT,
   forcePathStyle: process.env.S3_FORCE_PATH_STYLE === 'true',
   credentials: {
-    accessKeyId: process.env.S3_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
+    accessKeyId: (process.env.S3_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID)!,
+    secretAccessKey: (process.env.S3_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY)!,
   },
 })
 
@@ -22,16 +22,16 @@ const s3UploadClient = new S3Client({
 // The HMAC signature is bound to the endpoint hostname, so the client used for
 // signing must use the same hostname that the browser will actually request.
 const s3SigningClient = new S3Client({
-  region: process.env.S3_REGION ?? 'us-east-1',
+  region: process.env.S3_REGION ?? process.env.AWS_REGION ?? 'us-east-1',
   endpoint: process.env.S3_PUBLIC_ENDPOINT || process.env.S3_ENDPOINT,
   forcePathStyle: process.env.S3_FORCE_PATH_STYLE === 'true',
   credentials: {
-    accessKeyId: process.env.S3_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
+    accessKeyId: (process.env.S3_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID)!,
+    secretAccessKey: (process.env.S3_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY)!,
   },
 })
 
-const BUCKET = process.env.S3_BUCKET_NAME!
+const BUCKET = (process.env.S3_BUCKET_NAME || process.env.AWS_BUCKET_NAME)!
 let isBucketReady = false
 
 /**
