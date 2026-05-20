@@ -5,16 +5,18 @@ import { eq, and } from 'drizzle-orm'
 export class HermesAdapter {
   private integrationId: string | null
   private accessToken: string | null
-  // Gleiche URLs für Test- und Produktionsumgebung
-  private baseUrl: string = 'https://de-api.hermesworld.com'
-  private authUrl: string = 'https://authme.myhermes.de/authorization-facade/oauth2/access_token'
+  // ⚠️ TESTUMGEBUNG – URLs per curl bestätigt (20.05.2026)
+  // TODO vor Go-Live wechseln auf:
+  //   baseUrl: https://de-api.hermesworld.com
+  //   authUrl: https://authme.myhermes.de/authorization-facade/oauth2/access_token
+  //   appId:   hsi.verm.theomnistack
+  //   appSecret: B6LSgC-5tTYQyThjTa61
+  private baseUrl: string = 'https://de-api-int.hermesworld.com'
+  private authUrl: string = 'https://authme-int.myhermes.de/authorization-facade/oauth2/access_token'
 
-  // Application credentials (identifies this software as TheOmniStack)
-  // ⚠️ Test-App-Credentials (hsi.int.verm.theomnistack / ZRLD4LtrD8vDihgieheT) liefern
-  //    aktuell "invalid_client" – müssen von Hermes erst freigeschaltet werden.
-  // Aktuell: Prod-App-Credentials, bis Hermes die Test-App aktiviert hat.
-  private appId: string = 'hsi.verm.theomnistack'
-  private appSecret: string = 'B6LSgC-5tTYQyThjTa61'
+  // Application credentials – Testumgebung
+  private appId: string = 'hsi.int.verm.theomnistack'
+  private appSecret: string = 'ZRLD4LtrD8vDihgieheT'
   
   // User credentials (identifies the business customer - set via DB)
   private username: string
