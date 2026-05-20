@@ -6,7 +6,7 @@ import { db } from '@/db/client'
 import { orders } from '@/db/schema/orders'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { companies } from '@/db/schema/companies'
-import { eq, and, inArray } from 'drizzle-orm'
+import { eq, and, inArray, ne } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import type { DhlConfig } from '@/app/(dashboard)/integrations/dhl-form'
 import { OttoAdapter } from '@/adapters/marketplace/otto'
@@ -25,7 +25,7 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
       .where(
         and(
           eq(orders.companyId, auth.activeCompanyId),
-          eq(orders.status, 'pending'),
+          ne(orders.status, 'shipped'),
           orderIds && orderIds.length > 0 ? inArray(orders.id, orderIds) : undefined
         )
       )
@@ -234,7 +234,7 @@ export async function generateDhlLabelsAction(orderIds?: string[]) {
       .where(
         and(
           eq(orders.companyId, auth.activeCompanyId),
-          eq(orders.status, 'pending'),
+          ne(orders.status, 'shipped'),
           orderIds && orderIds.length > 0 ? inArray(orders.id, orderIds) : undefined
         )
       )

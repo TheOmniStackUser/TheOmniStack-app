@@ -290,11 +290,12 @@ export function OrdersTable({ orders, hermesDefaultParcelClass = 'XS' }: {
   }
 
   const handleGenerateLabels = async () => {
-    if (selectedIds.size === 0) return
+    const unshippedIds = Array.from(selectedIds).filter(id => orders.find(o => o.id === id)?.status !== 'shipped')
+    if (unshippedIds.length === 0) return
     
     // Initialize with the configured default parcel class
     const initialSelections: Record<string, string> = {}
-    selectedIds.forEach(id => {
+    unshippedIds.forEach(id => {
       initialSelections[id] = hermesDefaultParcelClass
     })
     setHermesSelections(initialSelections)
@@ -305,7 +306,7 @@ export function OrdersTable({ orders, hermesDefaultParcelClass = 'XS' }: {
     setShowHermesModal(false)
     setIsGenerating(true)
     try {
-      const ids = Array.from(selectedIds)
+      const ids = Array.from(selectedIds).filter(id => orders.find(o => o.id === id)?.status !== 'shipped')
       const result = await generateHermesLabelsAction(ids, hermesSelections)
       if (result.error) {
         alert(result.error)
@@ -325,18 +326,18 @@ export function OrdersTable({ orders, hermesDefaultParcelClass = 'XS' }: {
   }
 
   const handleGenerateDhlLabels = async () => {
-    if (selectedIds.size === 0) return
+    const unshippedIds = Array.from(selectedIds).filter(id => orders.find(o => o.id === id)?.status !== 'shipped')
+    if (unshippedIds.length === 0) return
     setIsDhlGenerating(true)
     try {
-      const ids = Array.from(selectedIds)
-      const result = await generateDhlLabelsAction(ids)
+      const result = await generateDhlLabelsAction(unshippedIds)
       if (result.error) {
         alert(result.error)
       } else {
         alert(result.message)
         setSelectedIds(new Set())
         if (result.labels && result.labels.length > 0) {
-          window.open(`/api/orders/bulk/shipping-labels?ids=${ids.join(',')}`, '_blank')
+          window.open(`/api/orders/bulk/shipping-labels?ids=${unshippedIds.join(',')}`, '_blank')
         }
       }
     } catch (e) {
@@ -408,6 +409,10 @@ export function OrdersTable({ orders, hermesDefaultParcelClass = 'XS' }: {
   const selectedWithLabel = Array.from(selectedIds)
     .filter(id => orders.find(o => o.id === id)?.labelUrl).length
 
+  // Count selected orders that are not shipped
+  const selectedUnshippedCount = Array.from(selectedIds)
+    .filter(id => orders.find(o => o.id === id)?.status !== 'shipped').length
+
   return (
     <div className="relative">
       <div>
@@ -465,7 +470,7 @@ export function OrdersTable({ orders, hermesDefaultParcelClass = 'XS' }: {
           {/* DHL Labels Button */}
           <button
             onClick={handleGenerateDhlLabels}
-            disabled={selectedIds.size === 0 || isDhlGenerating || isDeletingBulk || isGenerating}
+            disabled={selectedUnshippedCount === 0 || isDhlGenerating || isDeletingBulk || isGenerating}
             className="flex items-center gap-2 bg-yellow-400 text-gray-900 hover:bg-yellow-500 font-semibold py-2 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow-sm"
           >
             {isDhlGenerating ? (
@@ -476,20 +481,19 @@ export function OrdersTable({ orders, hermesDefaultParcelClass = 'XS' }: {
             ) : (
               <span className="font-black text-xs tracking-tighter">DHL</span>
             )}
-            {selectedIds.size > 0 ? `Labels generieren (${selectedIds.size})` : 'DHL Labels'}
+            {selectedIds.size > 0 ? `Labels generieren (${selectedUnshippedCount})` : 'DHL Labels'}
           </button>
 
-          {/* Hermes Labels Button - ALWAYS ENABLED FOR DEBUGGING */}
           {/* Hermes Labels Button */}
           <button
             onClick={handleGenerateLabels}
-            disabled={selectedIds.size === 0 || isGenerating || isDeletingBulk || isDhlGenerating}
+            disabled={selectedUnshippedCount === 0 || isGenerating || isDeletingBulk || isDhlGenerating}
             className="flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 font-medium hover:bg-blue-100 transition-all disabled:opacity-50"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
             </svg>
-            {selectedIds.size > 0 ? `Hermes Labels generieren (${selectedIds.size})` : 'Hermes Labels generieren'}
+            {selectedIds.size > 0 ? `Hermes Labels generieren (${selectedUnshippedCount})` : 'Hermes Labels generieren'}
           </button>
         </div>
       </div>
