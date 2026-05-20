@@ -132,7 +132,7 @@ export function MiraklIntegrationForm({
               <div className="absolute left-6 top-0 w-64 p-3 bg-slate-900 text-white text-xs rounded-xl shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 transform -translate-y-1/4">
                 <p className="font-bold mb-1">Wo finde ich das?</p>
                 <p className="leading-relaxed text-slate-300">
-                  Logge dich im <strong>Backend deiner Mirakl-Instanz</strong> ein. Klicke oben rechts auf dein Profil &gt; <strong>API-Key</strong>.
+                  Logge dich im <strong>Backend deiner Mirakl-Instanz</strong> ein. Klicke oben rechts auf dein Profil &gt; <strong>Persönliche Einstellungen</strong> &gt; <strong>API-Schlüssel</strong>.
                 </p>
                 <div className="absolute left-0 top-3 -translate-x-full border-8 border-transparent border-r-slate-900"></div>
               </div>
