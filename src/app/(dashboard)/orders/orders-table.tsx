@@ -999,7 +999,7 @@ export function OrdersTable({ orders, hermesDefaultParcelClass = 'XS' }: {
             </div>
             
             <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar">
-              {orders.filter(o => selectedIds.has(o.id)).map((order) => {
+              {orders.filter(o => selectedIds.has(o.id) && o.status !== 'shipped').map((order) => {
                 const orderNum = (order.rawPayload as any)?.orderNumber || order.marketplaceOrderId
                 const currentSize = hermesSelections[order.id] || 'S'
                 
@@ -1047,7 +1047,7 @@ export function OrdersTable({ orders, hermesDefaultParcelClass = 'XS' }: {
                 onClick={confirmGenerateHermesLabels} 
                 className="flex-1 py-4 bg-blue-600 text-white font-black rounded-2xl hover:bg-blue-700 shadow-xl shadow-blue-600/30 transition-all transform active:scale-[0.98]"
               >
-                Labels erstellen ({selectedIds.size})
+                Labels erstellen ({selectedUnshippedCount})
               </button>
             </div>
           </div>
