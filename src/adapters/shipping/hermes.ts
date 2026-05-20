@@ -173,7 +173,7 @@ export class HermesAdapter {
         countryCode: order.shippingCountry === 'DE' ? 'DE' : (order.shippingCountry?.slice(0, 2) || 'DE')
       },
       senderName: {
-        firstname: 'Versand',
+        firstname: '',
         lastname: company.name || 'Absender'
       },
       senderAddress: {
