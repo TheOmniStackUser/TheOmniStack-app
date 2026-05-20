@@ -168,7 +168,7 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
       internet: 'Internet',
       email: 'E-Mail',
       phone: 'Telefon',
-      taxId: 'Steuernummer',
+      taxId: 'St.-Nr.',
       vatId: 'USt-IdNr.',
       date: 'Datum',
       customerNr: 'Kunde',

@@ -87,7 +87,7 @@ export function NewInvoiceForm() {
   ])
   const standardRate = availableVatRates[0] || 19
 
-  const [items, setItems] = useState([{ title: '', quantity: 1, unitPrice: 0, taxRate: standardRate }])
+  const [items, setItems] = useState([{ sku: '', title: '', quantity: 1, unitPrice: 0, taxRate: standardRate }])
 
   const [formats, setFormats] = useState({
     standardPdf: true,
@@ -168,6 +168,7 @@ export function NewInvoiceForm() {
         customerNumber: (invoice as any).customerNumber || ''
       })
       setItems(draftItems.map(i => ({
+        sku: i.sku || '',
         title: i.description,
         quantity: parseFloat(i.quantity),
         unitPrice: parseFloat(i.unitPrice),
@@ -306,7 +307,7 @@ export function NewInvoiceForm() {
     }
   }
 
-  const addItem = () => setItems([...items, { title: '', quantity: 1, unitPrice: 0, taxRate: standardRate }])
+  const addItem = () => setItems([...items, { sku: '', title: '', quantity: 1, unitPrice: 0, taxRate: standardRate }])
   const removeItem = (index: number) => setItems(items.filter((_, i) => i !== index))
 
   const updateItem = (index: number, field: string, value: any) => {
@@ -908,7 +909,25 @@ export function NewInvoiceForm() {
         <div className="space-y-4">
           {items.map((item, index) => (
             <div key={index} className="flex flex-wrap md:flex-nowrap gap-4 items-start bg-slate-50/50 p-4 rounded-xl border border-slate-200">
-              <div className="flex-1 min-w-[200px]"><label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Beschreibung</label><input required className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-900 text-sm" value={item.title} onChange={e => updateItem(index, 'title', e.target.value)} placeholder="Produktbezeichnung..." /></div>
+              <div className="w-40 shrink-0">
+                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Art.-Nr.</label>
+                <input 
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-900 text-sm" 
+                  value={item.sku || ''} 
+                  onChange={e => updateItem(index, 'sku', e.target.value)} 
+                  placeholder="z.B. Art-100" 
+                />
+              </div>
+              <div className="flex-1 min-w-[200px]">
+                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Bezeichnung</label>
+                <input 
+                  required 
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-900 text-sm" 
+                  value={item.title} 
+                  onChange={e => updateItem(index, 'title', e.target.value)} 
+                  placeholder="Produktbezeichnung..." 
+                />
+              </div>
               <div className="w-20"><label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Menge</label><input type="number" required min="1" className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-900 text-sm" value={item.quantity} onChange={e => updateItem(index, 'quantity', parseFloat(e.target.value))} /></div>
               <div className="w-32">
                 <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Einzelpreis (Netto)</label>
