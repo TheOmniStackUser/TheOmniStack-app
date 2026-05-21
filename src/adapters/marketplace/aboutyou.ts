@@ -146,17 +146,58 @@ export class AboutYouAdapter implements MarketplaceAdapter {
       // Collect all order_item_ids from the original payload
       const orderItemIds = rawOrder.order_items.map((item: any) => item.order_item_id || item.id)
 
-      const shipmentPayload = {
-        data: {
-          items: [
-            {
-              order_items: orderItemIds,
-              carrier_key: carrier.toUpperCase(),
-              shipment_tracking_key: trackingNumber,
-              return_tracking_key: returnTrackingNumber || ""
-            }
-          ]
+      // Determine the best carrier_key
+      let carrierKey = carrier.toUpperCase()
+
+      // If we have raw payload, try to extract the carrier key
+      if (rawOrder && rawOrder.carrier_key) {
+        const payloadCarrierKey = rawOrder.carrier_key
+        // Verify if it matches the general carrier type (e.g. HERMES matches HERMES_KLV, DHL matches DHL_STD_NATIONAL)
+        if (
+          (carrier.toUpperCase() === 'HERMES' && payloadCarrierKey.toUpperCase().includes('HERMES')) ||
+          (carrier.toUpperCase() === 'DHL' && payloadCarrierKey.toUpperCase().includes('DHL'))
+        ) {
+          carrierKey = payloadCarrierKey
         }
+      }
+
+      // If we couldn't match from the raw payload, fall back to country-specific carrier keys
+      if (carrierKey === 'HERMES' || carrierKey === 'DHL') {
+        const countryCode = (rawOrder?.shipping_country_code || rawOrder?.shipping?.country_code || 'DE').toUpperCase()
+        if (carrierKey === 'HERMES') {
+          if (countryCode === 'AT') {
+            carrierKey = 'HERMES_POST_AUT'
+          } else {
+            carrierKey = 'HERMES_KLV' // Default to Germany
+          }
+        } else if (carrierKey === 'DHL') {
+          if (countryCode === 'AT') {
+            carrierKey = 'DHL_AT'
+          } else if (countryCode === 'NL') {
+            carrierKey = 'DHL_NL'
+          } else if (countryCode === 'BE') {
+            carrierKey = 'DHL_BPOST_BEL'
+          } else if (countryCode === 'ES') {
+            carrierKey = 'DS_TB_ES'
+          } else if (countryCode === 'IT') {
+            carrierKey = 'DS_TB_IT'
+          } else if (countryCode === 'SE') {
+            carrierKey = 'UB_DHL_SE'
+          } else {
+            carrierKey = 'DHL_STD_NATIONAL' // Default to Germany
+          }
+        }
+      }
+
+      const shipmentPayload = {
+        items: [
+          {
+            order_items: orderItemIds,
+            carrier_key: carrierKey,
+            shipment_tracking_key: trackingNumber,
+            return_tracking_key: returnTrackingNumber || ""
+          }
+        ]
       }
 
       const response = await fetch(`${this.baseUrl}/orders/ship`, {

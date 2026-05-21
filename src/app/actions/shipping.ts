@@ -150,7 +150,7 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
               order.marketplaceOrderId, 
               trackingNumber, 
               'HERMES', 
-              undefined,
+              returnTrackingNumber || undefined,
               order.rawPayload
             )
           } catch (confirmErr: any) {

@@ -6,7 +6,17 @@ import { orders, orderItems } from '@/db/schema/orders'
 import { companies } from '@/db/schema/companies'
 import { eq, and, inArray } from 'drizzle-orm'
 import { renderToStream } from '@react-pdf/renderer'
-import { BulkDeliveryNoteDocument } from '@/components/pdf/delivery-note'
+import { DeliveryNoteDocument } from '@/components/pdf/delivery-note'
+import { PDFDocument } from 'pdf-lib'
+
+async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const chunks: Uint8Array[] = []
+    stream.on('data', (chunk) => chunks.push(chunk))
+    stream.on('end', () => resolve(Buffer.concat(chunks)))
+    stream.on('error', (err) => reject(err))
+  })
+}
 
 export async function GET(request: Request) {
   try {
@@ -43,13 +53,45 @@ export async function GET(request: Request) {
         eq(orders.companyId, auth.activeCompanyId)
       ))
 
-    // For each order, we might need to generate numbers if missing (similar to single route)
+    // Sort ordersData to match the requested ids order
+    const ordersMap = new Map(ordersData.map(o => [o.id, o]))
+    const sortedOrders = ids.map(id => ordersMap.get(id)).filter((o): o is typeof ordersData[number] => !!o)
+
+    if (sortedOrders.length === 0) {
+      return new Response('No orders found', { status: 404 })
+    }
+
+    // 3. Check for About You integration if needed
+    const hasAboutYou = sortedOrders.some(o => o.marketplace === 'aboutyou')
+    let aboutYouAdapter: any = null
+    if (hasAboutYou) {
+      const { marketplaceIntegrations } = await import('@/db/schema/integrations')
+      const [integration] = await db
+        .select()
+        .from(marketplaceIntegrations)
+        .where(and(
+          eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
+          eq(marketplaceIntegrations.type, 'aboutyou'),
+          eq(marketplaceIntegrations.isActive, true)
+        ))
+        .limit(1)
+
+      if (integration?.apiKey) {
+        const { AboutYouAdapter } = await import('@/adapters/marketplace/aboutyou')
+        aboutYouAdapter = new AboutYouAdapter({
+          apiKey: integration.apiKey,
+          environment: (integration.environment as any) || 'production'
+        })
+      }
+    }
+
+    // 4. Process and generate numbers
     const ordersWithItems = []
     let nextCustomerNumber = Number(company.nextCustomerNumber)
     let nextDeliveryNoteNumber = Number(company.nextDeliveryNoteNumber)
     let companyUpdated = false
 
-    for (const order of ordersData) {
+    for (const order of sortedOrders) {
       const items = await db
         .select()
         .from(orderItems)
@@ -89,18 +131,44 @@ export async function GET(request: Request) {
         .where(eq(companies.id, company.id))
     }
 
-    // 3. Render PDF
-    const stream = await renderToStream(<BulkDeliveryNoteDocument orders={ordersWithItems} company={company} />)
-
-    const webStream = new ReadableStream({
-      start(controller) {
-        stream.on('data', (chunk) => controller.enqueue(chunk))
-        stream.on('end', () => controller.close())
-        stream.on('error', (err) => controller.error(err))
+    // 5. Render/Fetch PDFs
+    const pdfBuffers: Buffer[] = []
+    for (const order of ordersWithItems) {
+      if (order.marketplace === 'aboutyou') {
+        if (!aboutYouAdapter) {
+          return new Response(`About You Integration ist nicht konfiguriert für Bestellung ${order.marketplaceOrderId}`, { status: 400 })
+        }
+        try {
+          const pdfBuffer = await aboutYouAdapter.getDeliveryNote(order.marketplaceOrderId)
+          pdfBuffers.push(pdfBuffer)
+        } catch (aboutYouError: any) {
+          console.error(`[DeliveryNoteRoute] Error fetching About You doc for ${order.marketplaceOrderId}:`, aboutYouError)
+          return new Response(`Original-Lieferschein von About You für Bestellung ${order.marketplaceOrderId} konnte nicht geladen werden: ${aboutYouError.message}`, { status: 502 })
+        }
+      } else {
+        const stream = await renderToStream(<DeliveryNoteDocument order={order} company={company} />)
+        const pdfBuffer = await streamToBuffer(stream)
+        pdfBuffers.push(pdfBuffer)
       }
-    })
+    }
 
-    return new Response(webStream, {
+    // 6. Merge the PDFs using pdf-lib
+    const mergedPdf = await PDFDocument.create()
+
+    for (const buffer of pdfBuffers) {
+      try {
+        const srcPdf = await PDFDocument.load(buffer)
+        const copiedPages = await mergedPdf.copyPages(srcPdf, srcPdf.getPageIndices())
+        copiedPages.forEach((page: any) => mergedPdf.addPage(page))
+      } catch (err: any) {
+        console.error('Fehler beim Zusammenführen eines PDFs:', err)
+        return new Response(`Fehler beim Zusammenführen der Lieferscheine: ${err.message}`, { status: 500 })
+      }
+    }
+
+    const mergedPdfBytes = await mergedPdf.save()
+
+    return new Response(new Uint8Array(mergedPdfBytes), {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `inline; filename="Lieferscheine_Sammel_Batch.pdf"`,
