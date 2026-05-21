@@ -99,39 +99,67 @@ export function SyncSettingsForm({ company, activeMarketplaces }: SyncSettingsFo
 
           {/* Marketplaces Checklist */}
           <div className="space-y-3">
-            <span className="block text-sm font-semibold text-gray-700">Abzurufende Marktplätze</span>
+            <div>
+              <span className="block text-sm font-semibold text-gray-700">Abzurufende Marktplätze</span>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Es werden nur deine aktiv verbundenen Marktplätze gelistet. Neue Kanäle kannst du weiter unten hinzufügen.
+              </p>
+            </div>
             {activeMarketplaces.length === 0 ? (
               <div className="p-4 bg-gray-100 rounded-xl text-sm text-gray-500 border border-gray-200">
                 Keine aktiven Marktplatz-Verbindungen eingerichtet. Bitte verknüpfe zuerst einen Marktplatz weiter unten.
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {activeMarketplaces.map((option) => {
-                  const isChecked = selectedMarketplaces.includes(option.value)
-                  return (
-                    <div
-                      key={option.value}
-                      onClick={() => handleToggleMarketplace(option.value)}
-                      className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer select-none transition-all duration-200 ${
-                        isChecked
-                          ? 'border-blue-500 bg-blue-50/50 shadow-sm'
-                          : 'border-gray-200 bg-white hover:border-gray-300'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        name="fetchOrdersMarketplaces"
-                        value={option.value}
-                        checked={isChecked}
-                        readOnly
-                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <div>
-                        <span className="block text-sm font-bold text-gray-900">{option.label}</span>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between pb-1.5 border-b border-gray-100">
+                  <span className="text-xs text-gray-500">
+                    {selectedMarketplaces.length} von {activeMarketplaces.length} Marktplätzen ausgewählt
+                  </span>
+                  <label className="flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={selectedMarketplaces.length === activeMarketplaces.length}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedMarketplaces(activeMarketplaces.map((m) => m.value))
+                        } else {
+                          setSelectedMarketplaces([])
+                        }
+                      }}
+                      className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    />
+                    Alle auswählen
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {activeMarketplaces.map((option) => {
+                    const isChecked = selectedMarketplaces.includes(option.value)
+                    return (
+                      <div
+                        key={option.value}
+                        onClick={() => handleToggleMarketplace(option.value)}
+                        className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer select-none transition-all duration-200 ${
+                          isChecked
+                            ? 'border-blue-500 bg-blue-50/50 shadow-sm'
+                            : 'border-gray-200 bg-white hover:border-gray-300'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          name="fetchOrdersMarketplaces"
+                          value={option.value}
+                          checked={isChecked}
+                          readOnly
+                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        />
+                        <div>
+                          <span className="block text-sm font-bold text-gray-900">{option.label}</span>
+                        </div>
                       </div>
-                    </div>
-                  )
-                })}
+                    )
+                  })}
+                </div>
               </div>
             )}
           </div>
