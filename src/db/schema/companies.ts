@@ -4,6 +4,8 @@ import {
   uuid,
   timestamp,
   pgEnum,
+  boolean,
+  jsonb,
 } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { users } from './auth'
@@ -61,6 +63,12 @@ export const companies = pgTable('companies', {
   nextDeliveryNoteNumber: text('next_delivery_note_number').notNull().default('1'),
   apiKey: text('api_key').unique(), // For mobile app authentication
   trialExpiresAt: timestamp('trial_expires_at', { withTimezone: true }),
+
+  // Configurable daily automated order sync
+  fetchOrdersDaily: boolean('fetch_orders_daily').notNull().default(false),
+  fetchOrdersTime: text('fetch_orders_time').notNull().default('03:00'),
+  fetchOrdersMarketplaces: jsonb('fetch_orders_marketplaces').$type<string[]>().notNull().default([]),
+
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })

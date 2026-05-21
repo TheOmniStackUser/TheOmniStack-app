@@ -26,10 +26,11 @@ export const QUEUE_MARKETPLACE_SYNC = 'marketplace-sync'
 
 export type MarketplaceSyncJobData = {
   companyId: string
-  marketplace: NormalizedOrder['marketplace']
-  triggeredByUserId: string
+  marketplace?: NormalizedOrder['marketplace'] | null
+  triggeredByUserId?: string | null
   fromDate?: string
   toDate?: string
+  integrationId?: string | null
 }
 
 // ─── Redis Connection ─────────────────────────────────────────────────────────
@@ -59,12 +60,61 @@ export function createMarketplaceSyncWorker() {
     async (job: Job<MarketplaceSyncJobData>) => {
       const { companyId, marketplace, triggeredByUserId } = job.data
 
+      if (job.name === 'daily-marketplace-sync') {
+        // Fetch company config
+        const [company] = await db
+          .select({
+            fetchOrdersDaily: companies.fetchOrdersDaily,
+            fetchOrdersMarketplaces: companies.fetchOrdersMarketplaces,
+          })
+          .from(companies)
+          .where(eq(companies.id, companyId))
+          .limit(1)
+
+        if (!company || !company.fetchOrdersDaily || !company.fetchOrdersMarketplaces || company.fetchOrdersMarketplaces.length === 0) {
+          return { success: true, message: 'Daily sync is disabled or no marketplaces configured.' }
+        }
+
+        // Fetch all active integrations for this company
+        const allActiveIntegrations = await db
+          .select()
+          .from(marketplaceIntegrations)
+          .where(
+            and(
+              eq(marketplaceIntegrations.companyId, companyId),
+              eq(marketplaceIntegrations.isActive, true)
+            )
+          )
+
+        // Filter to only those selected in the daily sync settings
+        const toSync = allActiveIntegrations.filter(integration =>
+          company.fetchOrdersMarketplaces.includes(integration.id)
+        )
+
+        for (const integration of toSync) {
+          await marketplaceSyncQueue.add(
+            `sync-${integration.type}`,
+            {
+              companyId,
+              marketplace: integration.type as any,
+              triggeredByUserId: null,
+              integrationId: integration.id,
+            },
+            {
+              jobId: `sync-${integration.type}-${companyId}-${Date.now()}`
+            }
+          )
+        }
+
+        return { success: true, message: `Dispatched daily sync for ${toSync.length} marketplaces.` }
+      }
+
       await auditLog({
         companyId,
-        userId: triggeredByUserId,
+        userId: triggeredByUserId ?? null,
         action: 'sync_start',
         entityType: 'marketplace_sync',
-        entityId: marketplace,
+        entityId: marketplace || 'unknown',
         nextState: { marketplace, startedAt: new Date().toISOString() },
       })
 
@@ -76,7 +126,9 @@ export function createMarketplaceSyncWorker() {
           .where(
             and(
               eq(marketplaceIntegrations.companyId, companyId),
-              eq(marketplaceIntegrations.type, marketplace as any),
+              job.data.integrationId 
+                ? eq(marketplaceIntegrations.id, job.data.integrationId)
+                : eq(marketplaceIntegrations.type, marketplace as any),
               eq(marketplaceIntegrations.isActive, true)
             )
           )

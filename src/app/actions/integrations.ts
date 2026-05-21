@@ -3,9 +3,11 @@
 import { z } from 'zod'
 import { db } from '@/db/client'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
+import { companies } from '@/db/schema/companies'
 import { requireAuth } from '@/lib/session'
 import { eq, and } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
+import { marketplaceSyncQueue } from '@/workers/marketplace-sync'
 
 const OttoIntegrationSchema = z.object({
   clientId: z.string().min(1, { message: 'Client ID ist erforderlich.' }).trim(),
@@ -473,4 +475,87 @@ export async function saveAboutYouIntegrationAction(
 
   revalidatePath('/integrations')
   return { success: true, message: 'About You Zugangsdaten wurden erfolgreich gespeichert!' }
+}
+
+const SyncSettingsSchema = z.object({
+  fetchOrdersDaily: z.boolean(),
+  fetchOrdersTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'Ungültiges Uhrzeitformat (HH:MM).' }),
+  fetchOrdersMarketplaces: z.array(z.string().uuid()),
+})
+
+export async function saveSyncSettingsAction(
+  _state: IntegrationFormState,
+  formData: FormData
+): Promise<IntegrationFormState> {
+  const auth = await requireAuth()
+
+  const fetchOrdersDaily = formData.get('fetchOrdersDaily') === 'true'
+  const fetchOrdersTime = (formData.get('fetchOrdersTime') as string) || '03:00'
+  const marketplacesListRaw = (formData.get('marketplacesList') as string) || '[]'
+  
+  let fetchOrdersMarketplaces: string[] = []
+  try {
+    fetchOrdersMarketplaces = JSON.parse(marketplacesListRaw)
+  } catch (rawErr) {
+    return { success: false, message: 'Ungültige Marktplatzauswahl.' }
+  }
+
+  const validated = SyncSettingsSchema.safeParse({
+    fetchOrdersDaily,
+    fetchOrdersTime,
+    fetchOrdersMarketplaces,
+  })
+
+  if (!validated.success) {
+    return { errors: validated.error.flatten().fieldErrors }
+  }
+
+  const data = validated.data
+
+  // Update company config in the database
+  await db
+    .update(companies)
+    .set({
+      fetchOrdersDaily: data.fetchOrdersDaily,
+      fetchOrdersTime: data.fetchOrdersTime,
+      fetchOrdersMarketplaces: data.fetchOrdersMarketplaces,
+      updatedAt: new Date(),
+    })
+    .where(eq(companies.id, auth.activeCompanyId))
+
+  // Clean up any existing repeatable sync jobs in Redis for this company
+  try {
+    const repeatableJobs = await marketplaceSyncQueue.getRepeatableJobs()
+    for (const job of repeatableJobs) {
+      if (job.id?.startsWith(`daily-sync-${auth.activeCompanyId}`)) {
+        await marketplaceSyncQueue.removeRepeatableByKey(job.key)
+      }
+    }
+
+    // Schedule the new repeatable job if daily fetching is enabled and at least one marketplace is selected
+    if (data.fetchOrdersDaily && data.fetchOrdersMarketplaces.length > 0) {
+      const [hourStr, minuteStr] = data.fetchOrdersTime.split(':')
+      const hour = parseInt(hourStr || '0', 10)
+      const minute = parseInt(minuteStr || '0', 10)
+      const cronPattern = `${minute} ${hour} * * *`
+
+      await marketplaceSyncQueue.add(
+        'daily-marketplace-sync',
+        { companyId: auth.activeCompanyId },
+        {
+          jobId: `daily-sync-${auth.activeCompanyId}`,
+          repeat: {
+            pattern: cronPattern,
+          },
+          removeOnComplete: true,
+        }
+      )
+    }
+  } catch (err: any) {
+    console.error('[SyncSettingsAction] Failed to manage repeatable BullMQ jobs:', err)
+    return { success: false, message: 'Einstellungen in DB gespeichert, aber Redis-Job konnte nicht konfiguriert werden.' }
+  }
+
+  revalidatePath('/integrations')
+  return { success: true, message: 'Automatisierungseinstellungen wurden erfolgreich gespeichert!' }
 }

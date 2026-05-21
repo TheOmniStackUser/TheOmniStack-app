@@ -238,12 +238,13 @@ export async function generateDhlLabelsAction(orderIds?: string[]) {
 
     const config = integration.metadata as DhlConfig
 
-    if (!config.username || !config.password) {
+    if (!config || !config.username || !config.password) {
       return { error: 'DHL Zugangsdaten fehlen. Bitte überprüfe die DHL-Konfiguration unter Integrationen.' }
     }
 
-    if (!config.apiKey) {
-      return { error: 'DHL API Key fehlt. Bitte trage den API Key vom DHL Developer Portal (developer.dhl.com) unter Integrationen → DHL → Verbindung ein.' }
+    const apiKey = config.apiKey || process.env.DHL_API_KEY
+    if (!apiKey) {
+      return { error: 'DHL API Key fehlt. Bitte hinterlege einen globalen DHL_API_KEY in der Server-Konfiguration.' }
     }
 
     // 1.5 Fetch company details for sender address
@@ -447,7 +448,7 @@ export async function generateDhlLabelsAction(orderIds?: string[]) {
           method: 'POST',
           headers: {
             'Authorization': `Basic ${basicAuth}`,
-            'dhl-api-key': config.apiKey,
+            'dhl-api-key': apiKey,
             'Content-Type': 'application/json',
             'Accept': 'application/json',
           },

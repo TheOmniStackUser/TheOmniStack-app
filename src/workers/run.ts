@@ -1,6 +1,6 @@
 import { createMarketplaceSyncWorker } from './marketplace-sync'
 import { createReturnsReportWorker } from './returns-report'
-import { setupScheduledReports } from './scheduler'
+import { setupScheduledReports, setupScheduledSyncs } from './scheduler'
 
 console.log('🚀 Starting OmniStack Worker Engine...')
 
@@ -13,6 +13,7 @@ const returnsWorker = createReturnsReportWorker()
 
 // Setup CRON jobs
 setupScheduledReports().catch(console.error)
+setupScheduledSyncs().catch(console.error)
 
 marketplaceWorker.on('completed', (job) => {
   console.log(`✅ [Marketplace] Job ${job.id} completed.`)

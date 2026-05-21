@@ -1,6 +1,7 @@
 import { requireAuth } from '@/lib/session'
 import { db } from '@/db/client'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
+import { companies } from '@/db/schema/companies'
 import { eq } from 'drizzle-orm'
 import { OttoIntegrationForm } from './otto-form'
 import { HermesIntegrationForm } from './hermes-form'
@@ -9,6 +10,7 @@ import { AmazonIntegrationForm } from './amazon-form'
 import { DhlIntegrationForm } from './dhl-form'
 import { ShopifyIntegrationForm } from './shopify-form'
 import { AboutYouIntegrationForm } from './aboutyou-form'
+import { SyncSettingsForm } from './sync-settings-form'
 import type { DhlConfig } from './dhl-form'
 
 export default async function IntegrationsPage(props: { 
@@ -18,10 +20,42 @@ export default async function IntegrationsPage(props: {
   const status = searchParams?.status
   const auth = await requireAuth()
 
-  const integrations = await db
-    .select()
-    .from(marketplaceIntegrations)
-    .where(eq(marketplaceIntegrations.companyId, auth.activeCompanyId))
+  const [
+    [company],
+    integrations
+  ] = await Promise.all([
+    db
+      .select({
+        fetchOrdersDaily: companies.fetchOrdersDaily,
+        fetchOrdersTime: companies.fetchOrdersTime,
+        fetchOrdersMarketplaces: companies.fetchOrdersMarketplaces,
+      })
+      .from(companies)
+      .where(eq(companies.id, auth.activeCompanyId))
+      .limit(1),
+    db
+      .select()
+      .from(marketplaceIntegrations)
+      .where(eq(marketplaceIntegrations.companyId, auth.activeCompanyId))
+  ])
+
+  const activeMarketplaces = integrations
+    .filter((i) => i.isActive && i.type !== 'dhl' && i.type !== 'hermes')
+    .map((i) => {
+      let label = i.type
+      if (i.type === 'otto') label = 'Otto.de'
+      else if (i.type === 'amazon') label = 'Amazon EU'
+      else if (i.type === 'shopify') label = 'Shopify'
+      else if (i.type === 'aboutyou') label = 'About You'
+      else if (i.type === 'mirakl_decathlon') label = 'Decathlon (Mirakl)'
+      else if (i.type === 'mirakl_custom') {
+        label = (i.metadata as any)?.customName || 'Anderer Mirakl Marktplatz'
+      }
+      return {
+        value: i.id,
+        label,
+      }
+    })
 
   const ottoIntegration = integrations.find((i: any) => i.type === 'otto')
   const customMiraklIntegrations = integrations.filter((i: any) => i.type === 'mirakl_custom')
@@ -70,6 +104,21 @@ export default async function IntegrationsPage(props: {
       )}
 
       <div className="space-y-12">
+        {/* SECTION: AUTOMATION / SCHEDULE */}
+        <section className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="p-6 border-b border-gray-100 flex items-center gap-2">
+            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <h3 className="text-lg font-bold text-gray-900">Automatischer Bestellabruf</h3>
+          </div>
+          <div className="p-6 bg-gray-50">
+            {company ? (
+              <SyncSettingsForm company={company} activeMarketplaces={activeMarketplaces} />
+            ) : (
+              <p className="text-sm text-gray-500">Unternehmensdaten konnten nicht geladen werden.</p>
+            )}
+          </div>
+        </section>
+
         {/* SECTION: MARKETPLACES */}
         <div>
           <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">

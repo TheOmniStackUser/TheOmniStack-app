@@ -336,9 +336,8 @@ export function DhlIntegrationForm({ initialConfig }: { initialConfig?: DhlConfi
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <div>
-              <p className="font-semibold mb-1">DHL Geschäftskundenportal (VLS) – Zwei Zugangsdaten nötig</p>
-              <p className="mb-1">1. <strong>Benutzername &amp; Passwort</strong>: Deine Login-Daten vom <a href="https://geschaeftskunden.dhl.de" target="_blank" className="underline">DHL Geschäftskundenportal</a>.</p>
-              <p>2. <strong>API Key</strong>: Ein separater Schlüssel vom <a href="https://developer.dhl.com" target="_blank" className="underline">DHL Developer Portal</a> (developer.dhl.com → My Apps → App erstellen → Parcel DE Shipping Post).</p>
+              <p className="font-semibold mb-1">DHL Geschäftskundenportal (VLS) Zugangsdaten</p>
+              <p>Gib hier deine Login-Daten vom <a href="https://geschaeftskunden.dhl.de" target="_blank" className="underline font-bold">DHL Geschäftskundenportal</a> ein, um Versandetiketten direkt aus theomnistack zu erstellen.</p>
             </div>
           </div>
 
@@ -367,40 +366,6 @@ export function DhlIntegrationForm({ initialConfig }: { initialConfig?: DhlConfi
                 data-lpignore="true"
               />
             </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              API Key
-              <span className="ml-2 text-xs font-normal text-gray-400">(vom DHL Developer Portal – developer.dhl.com)</span>
-            </label>
-            <input
-              type="password"
-              value={apiKey}
-              onChange={e => setApiKey(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent text-gray-900"
-              placeholder="z.B. 9Dsh3729sJd..."
-              autoComplete="new-password"
-              data-lpignore="true"
-            />
-            <p className="mt-1.5 text-xs text-gray-400">Erstelle eine App unter developer.dhl.com → My Apps → &quot;Parcel DE Shipping Post&quot; hinzufügen.</p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              API Secret
-              <span className="ml-2 text-xs font-normal text-gray-400">(vom DHL Developer Portal – App Secret)</span>
-            </label>
-            <input
-              type="password"
-              value={apiSecret}
-              onChange={e => setApiSecret(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent text-gray-900"
-              placeholder="z.B. aBcDeFgH..."
-              autoComplete="new-password"
-              data-lpignore="true"
-            />
-            <p className="mt-1.5 text-xs text-gray-400">Das App Secret findest du direkt neben dem API Key in deiner DHL Developer App.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
