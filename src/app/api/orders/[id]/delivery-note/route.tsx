@@ -7,13 +7,41 @@ import { companies } from '@/db/schema/companies'
 import { eq, and } from 'drizzle-orm'
 import { renderToStream } from '@react-pdf/renderer'
 import { DeliveryNoteDocument } from '@/components/pdf/delivery-note'
+import { documentExists, downloadDocument, uploadDocument, buildDeliveryNoteKey } from '@/lib/storage'
+
+async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const chunks: Uint8Array[] = []
+    stream.on('data', (chunk) => chunks.push(chunk))
+    stream.on('end', () => resolve(Buffer.concat(chunks)))
+    stream.on('error', (err) => reject(err))
+  })
+}
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const auth = await requireAuth()
     const { id } = await context.params
 
-    // 1. Fetch Order
+    // 1. Check cache first (Measure 4: PDF Caching)
+    const cacheKey = buildDeliveryNoteKey(auth.activeCompanyId, id)
+    try {
+      const cached = await documentExists(cacheKey)
+      if (cached) {
+        console.log(`[DeliveryNoteRoute] Cache hit for order ${id}`)
+        const pdfBuffer = await downloadDocument(cacheKey)
+        return new Response(new Uint8Array(pdfBuffer), {
+          headers: {
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `inline; filename="Lieferschein_${id}.pdf"`,
+          },
+        })
+      }
+    } catch (cacheErr) {
+      console.warn(`[DeliveryNoteRoute] Cache check failed for order ${id}:`, cacheErr)
+    }
+
+    // 2. Fetch Order
     const [order] = await db
       .select()
       .from(orders)
@@ -24,7 +52,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       return new Response('Order not found', { status: 404 })
     }
 
-    // 2. Fetch Order Items
+    // 3. Fetch Order Items
     const items = await db
       .select()
       .from(orderItems)
@@ -32,7 +60,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
 
     const orderWithItems = { ...order, items }
 
-    // 3. Fetch Company details
+    // 4. Fetch Company details
     const [company] = await db
       .select()
       .from(companies)
@@ -66,6 +94,14 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
         
         try {
           const pdfBuffer = await adapter.getDeliveryNote(order.marketplaceOrderId)
+          
+          // Cache the fetched PDF
+          try {
+            await uploadDocument(cacheKey, pdfBuffer)
+          } catch (uploadErr) {
+            console.warn(`[DeliveryNoteRoute] Cache save failed for About You order ${id}:`, uploadErr)
+          }
+
           return new Response(new Uint8Array(pdfBuffer), {
             headers: {
               'Content-Type': 'application/pdf',
@@ -74,9 +110,6 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
           })
         } catch (aboutYouError) {
           console.error('[DeliveryNoteRoute] Error fetching About You doc:', aboutYouError)
-          // Fallback to generating our own if About You API fails? 
-          // User said "must use About You", so maybe we should error here.
-          // But for now, let's fall back so they have SOMETHING, or maybe just error.
           return new Response('Original-Lieferschein von About You konnte nicht geladen werden.', { status: 502 })
         }
       }
@@ -87,17 +120,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     let companyUpdates: any = {}
 
     if (!customerNumber) {
-      if (order.buyerEmail) {
-        const [existing] = await db
-          .select({ customerNumber: orders.customerNumber })
-          .from(orders)
-          .where(and(eq(orders.companyId, auth.activeCompanyId), eq(orders.buyerEmail, order.buyerEmail)))
-          .limit(1)
-        
-        // This is a naive check (might grab a row where customerNumber is null), so let's refine:
-      }
-      
-      // Let's just do a proper fetch:
+      // Let's do a proper fetch:
       let existingCustomerNumber = null;
       if (order.buyerEmail) {
         const allOrdersForEmail = await db
@@ -137,19 +160,18 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       orderWithItems.deliveryNoteNumber = deliveryNoteNumber
     }
 
-    // 4. Render PDF
+    // 5. Render PDF
     const stream = await renderToStream(<DeliveryNoteDocument order={orderWithItems} company={company} />)
+    const pdfBuffer = await streamToBuffer(stream)
 
-    // Convert NodeJS Readable stream to Web ReadableStream
-    const webStream = new ReadableStream({
-      start(controller) {
-        stream.on('data', (chunk) => controller.enqueue(chunk))
-        stream.on('end', () => controller.close())
-        stream.on('error', (err) => controller.error(err))
-      }
-    })
+    // Cache the newly generated PDF
+    try {
+      await uploadDocument(cacheKey, pdfBuffer)
+    } catch (uploadErr) {
+      console.warn(`[DeliveryNoteRoute] Cache save failed for generated order ${id}:`, uploadErr)
+    }
 
-    return new Response(webStream, {
+    return new Response(new Uint8Array(pdfBuffer), {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `inline; filename="Lieferschein_${order.marketplaceOrderId || order.id}.pdf"`,

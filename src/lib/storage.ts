@@ -3,7 +3,8 @@ import {
   PutObjectCommand, 
   GetObjectCommand, 
   HeadBucketCommand, 
-  CreateBucketCommand 
+  CreateBucketCommand,
+  HeadObjectCommand
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
@@ -98,6 +99,45 @@ export async function uploadDocument(
 }
 
 /**
+ * Download a stored document from S3.
+ */
+export async function downloadDocument(key: string): Promise<Buffer> {
+  await ensureBucketExists()
+  const response = await s3UploadClient.send(
+    new GetObjectCommand({
+      Bucket: BUCKET,
+      Key: key,
+    })
+  )
+  if (!response.Body) {
+    throw new Error(`No body in S3 response for key ${key}`)
+  }
+  const bytes = await response.Body.transformToByteArray()
+  return Buffer.from(bytes)
+}
+
+/**
+ * Check if a document exists in S3.
+ */
+export async function documentExists(key: string): Promise<boolean> {
+  try {
+    await ensureBucketExists()
+    await s3UploadClient.send(
+      new HeadObjectCommand({
+        Bucket: BUCKET,
+        Key: key,
+      })
+    )
+    return true
+  } catch (error: any) {
+    if (error.name === 'NotFound' || error.$metadata?.httpStatusCode === 404) {
+      return false
+    }
+    throw error
+  }
+}
+
+/**
  * Generate a time-limited signed URL for viewing a stored document.
  * Uses the public endpoint so the browser can resolve the URL.
  */
@@ -120,4 +160,15 @@ export function buildInvoiceKey(
 ): string {
   const safeNumber = invoiceNumber.replace(/[^a-zA-Z0-9-_]/g, '_')
   return `${companyId}/invoices/${year}/${safeNumber}.pdf`
+}
+
+/**
+ * Build a consistent storage key for a delivery note PDF.
+ * Format: {companyId}/delivery-notes/{orderId}.pdf
+ */
+export function buildDeliveryNoteKey(
+  companyId: string,
+  orderId: string
+): string {
+  return `${companyId}/delivery-notes/${orderId}.pdf`
 }

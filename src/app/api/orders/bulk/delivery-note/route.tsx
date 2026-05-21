@@ -8,6 +8,7 @@ import { eq, and, inArray } from 'drizzle-orm'
 import { renderToStream } from '@react-pdf/renderer'
 import { DeliveryNoteDocument } from '@/components/pdf/delivery-note'
 import { PDFDocument } from 'pdf-lib'
+import { documentExists, downloadDocument, uploadDocument, buildDeliveryNoteKey } from '@/lib/storage'
 
 async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
   return new Promise((resolve, reject) => {
@@ -44,7 +45,7 @@ export async function GET(request: Request) {
       return new Response('Company not found', { status: 404 })
     }
 
-    // 2. Fetch Orders with Items
+    // 2. Fetch Orders (Fast Batch Fetch)
     const ordersData = await db
       .select()
       .from(orders)
@@ -61,7 +62,21 @@ export async function GET(request: Request) {
       return new Response('No orders found', { status: 404 })
     }
 
-    // 3. Check for About You integration if needed
+    // 3. Batch Fetch Order Items upfront (Measure 3: Relational pre-fetching)
+    const allItems = await db
+      .select()
+      .from(orderItems)
+      .where(inArray(orderItems.orderId, ids))
+
+    const itemsByOrderId = new Map<string, typeof allItems>()
+    for (const item of allItems) {
+      if (!itemsByOrderId.has(item.orderId)) {
+        itemsByOrderId.set(item.orderId, [])
+      }
+      itemsByOrderId.get(item.orderId)!.push(item)
+    }
+
+    // 4. Check for About You integration if needed
     const hasAboutYou = sortedOrders.some(o => o.marketplace === 'aboutyou')
     let aboutYouAdapter: any = null
     if (hasAboutYou) {
@@ -85,17 +100,14 @@ export async function GET(request: Request) {
       }
     }
 
-    // 4. Process and generate numbers
+    // 5. Process and generate numbers
     const ordersWithItems = []
     let nextCustomerNumber = Number(company.nextCustomerNumber)
     let nextDeliveryNoteNumber = Number(company.nextDeliveryNoteNumber)
     let companyUpdated = false
 
     for (const order of sortedOrders) {
-      const items = await db
-        .select()
-        .from(orderItems)
-        .where(eq(orderItems.orderId, order.id))
+      const items = itemsByOrderId.get(order.id) || []
 
       let customerNumber = order.customerNumber
       let deliveryNoteNumber = order.deliveryNoteNumber
@@ -131,9 +143,23 @@ export async function GET(request: Request) {
         .where(eq(companies.id, company.id))
     }
 
-    // 5. Render/Fetch PDFs
+    // 6. Render/Fetch/Cache PDFs (Measure 4: PDF Caching)
     const pdfBuffers: Buffer[] = []
     for (const order of ordersWithItems) {
+      const cacheKey = buildDeliveryNoteKey(auth.activeCompanyId, order.id)
+
+      try {
+        const cached = await documentExists(cacheKey)
+        if (cached) {
+          console.log(`[DeliveryNoteRoute] Cache hit for order ${order.id}`)
+          const pdfBuffer = await downloadDocument(cacheKey)
+          pdfBuffers.push(pdfBuffer)
+          continue
+        }
+      } catch (cacheErr) {
+        console.warn(`[DeliveryNoteRoute] Cache check failed for order ${order.id}:`, cacheErr)
+      }
+
       if (order.marketplace === 'aboutyou') {
         if (!aboutYouAdapter) {
           return new Response(`About You Integration ist nicht konfiguriert für Bestellung ${order.marketplaceOrderId}`, { status: 400 })
@@ -141,6 +167,13 @@ export async function GET(request: Request) {
         try {
           const pdfBuffer = await aboutYouAdapter.getDeliveryNote(order.marketplaceOrderId)
           pdfBuffers.push(pdfBuffer)
+          
+          // Cache the fetched About You PDF
+          try {
+            await uploadDocument(cacheKey, pdfBuffer)
+          } catch (uploadErr) {
+            console.warn(`[DeliveryNoteRoute] Cache save failed for About You order ${order.id}:`, uploadErr)
+          }
         } catch (aboutYouError: any) {
           console.error(`[DeliveryNoteRoute] Error fetching About You doc for ${order.marketplaceOrderId}:`, aboutYouError)
           return new Response(`Original-Lieferschein von About You für Bestellung ${order.marketplaceOrderId} konnte nicht geladen werden: ${aboutYouError.message}`, { status: 502 })
@@ -149,10 +182,17 @@ export async function GET(request: Request) {
         const stream = await renderToStream(<DeliveryNoteDocument order={order} company={company} />)
         const pdfBuffer = await streamToBuffer(stream)
         pdfBuffers.push(pdfBuffer)
+
+        // Cache the newly generated PDF
+        try {
+          await uploadDocument(cacheKey, pdfBuffer)
+        } catch (uploadErr) {
+          console.warn(`[DeliveryNoteRoute] Cache save failed for generated order ${order.id}:`, uploadErr)
+        }
       }
     }
 
-    // 6. Merge the PDFs using pdf-lib
+    // 7. Merge the PDFs using pdf-lib
     const mergedPdf = await PDFDocument.create()
 
     for (const buffer of pdfBuffers) {

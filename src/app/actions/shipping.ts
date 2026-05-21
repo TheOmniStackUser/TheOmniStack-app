@@ -94,11 +94,13 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
       }
     }
 
-    let successCount = 0
-    let labels: string[] = []
-    const errors: string[] = []
+    interface ShippingTaskResult {
+      success: boolean;
+      labels?: string[];
+      error?: string;
+    }
 
-    for (const order of pendingOrders) {
+    const tasks = pendingOrders.map(order => async (): Promise<ShippingTaskResult> => {
       try {
         const orderParcelClass = typeof parcelClassMap === 'string' 
           ? parcelClassMap 
@@ -119,9 +121,12 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
           })
           .where(eq(orders.id, order.id))
 
-        if (labelUrl) labels.push(labelUrl)
-        if (returnLabelUrl) labels.push(returnLabelUrl)
+        const orderLabels: string[] = []
+        if (labelUrl) orderLabels.push(labelUrl)
+        if (returnLabelUrl) orderLabels.push(returnLabelUrl)
         
+        let confirmError: string | undefined = undefined
+
         // Confirm shipment in marketplace (e.g. Otto)
         if (order.marketplace === 'otto' && ottoAdapter && order.marketplaceOrderId) {
           console.log(`[Hermes-Action] Otto Check: order.id=${order.id}, marketplace=${order.marketplace}, tracking=${trackingNumber}, returnTracking=${returnTrackingNumber}`)
@@ -138,7 +143,7 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
           } catch (confirmErr: any) {
             const msg = confirmErr?.message ?? String(confirmErr)
             console.error(`[Otto] Failed to confirm shipment for ${order.marketplaceOrderId}:`, msg)
-            errors.push(`Otto-Bestätigung fehlgeschlagen (${order.marketplaceOrderId}): ${msg}`)
+            confirmError = `Otto-Bestätigung fehlgeschlagen (${order.marketplaceOrderId}): ${msg}`
           }
         }
 
@@ -156,15 +161,40 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
           } catch (confirmErr: any) {
             const msg = confirmErr?.message ?? String(confirmErr)
             console.error(`[AboutYou] Failed to confirm shipment for ${order.marketplaceOrderId}:`, msg)
-            errors.push(`About You-Bestätigung fehlgeschlagen (${order.marketplaceOrderId}): ${msg}`)
+            confirmError = `About You-Bestätigung fehlgeschlagen (${order.marketplaceOrderId}): ${msg}`
           }
         }
 
-        successCount++
+        return {
+          success: true,
+          labels: orderLabels,
+          error: confirmError
+        }
       } catch (err: any) {
         const msg = err?.message ?? String(err)
         console.error(`[Hermes] Error processing order ${order.id}:`, msg)
-        errors.push(`Bestellung ${order.marketplaceOrderId ?? order.id}: ${msg}`)
+        return {
+          success: false,
+          error: `Bestellung ${order.marketplaceOrderId ?? order.id}: ${msg}`
+        }
+      }
+    })
+
+    const results = await runWithLimit(tasks, 3)
+
+    let successCount = 0
+    let labels: string[] = []
+    const errors: string[] = []
+
+    for (const res of results) {
+      if (res.success) {
+        successCount++
+        if (res.labels) {
+          labels.push(...res.labels)
+        }
+      }
+      if (res.error) {
+        errors.push(res.error)
       }
     }
 
@@ -344,11 +374,13 @@ export async function generateDhlLabelsAction(orderIds?: string[]) {
       return { street: full.trim(), houseNo: '.' }
     }
 
-    let successCount = 0
-    const labels: string[] = []
-    const errors: string[] = []
+    interface ShippingTaskResult {
+      success: boolean;
+      labels?: string[];
+      error?: string;
+    }
 
-    for (const order of pendingOrders) {
+    const tasks = pendingOrders.map(order => async (): Promise<ShippingTaskResult> => {
       try {
         const { street: consigneeStreet, houseNo: consigneeHouseNo } = splitStreet(order.shippingStreet)
 
@@ -436,24 +468,19 @@ export async function generateDhlLabelsAction(orderIds?: string[]) {
               ?? parsed?.title
               ?? responseText
           } catch {/* not JSON */}
-          const errMsg = `Bestellung ${order.marketplaceOrderId ?? order.id}: HTTP ${response.status} – ${apiMsg}`
-          console.error(`[DHL] ${errMsg}`)
-          errors.push(errMsg)
-          continue
+          return { success: false, error: `Bestellung ${order.marketplaceOrderId ?? order.id}: HTTP ${response.status} – ${apiMsg}` }
         }
 
         let data: any
         try {
           data = JSON.parse(responseText)
         } catch {
-          errors.push(`Bestellung ${order.marketplaceOrderId ?? order.id}: Ungültige API-Antwort`)
-          continue
+          return { success: false, error: `Bestellung ${order.marketplaceOrderId ?? order.id}: Ungültige API-Antwort` }
         }
 
         const shipment = data.items?.[0]
         if (!shipment) {
-          errors.push(`Bestellung ${order.marketplaceOrderId ?? order.id}: Kein Sendungsobjekt in Antwort`)
-          continue
+          return { success: false, error: `Bestellung ${order.marketplaceOrderId ?? order.id}: Kein Sendungsobjekt in Antwort` }
         }
 
         const trackingNumber = shipment.shipmentTrackingNumber || shipment.shipmentNumber || shipment.shipmentNo || shipment.barcode || ''
@@ -480,6 +507,8 @@ export async function generateDhlLabelsAction(orderIds?: string[]) {
           })
           .where(eq(orders.id, order.id))
 
+        let confirmError: string | undefined = undefined
+
         // Confirm shipment in marketplace (e.g. Otto)
         if (order.marketplace === 'otto' && ottoAdapter && order.marketplaceOrderId) {
           console.log(`[DHL-Action] Triggering Otto confirmation for ${order.marketplaceOrderId} with tracking ${trackingNumber}`)
@@ -495,7 +524,7 @@ export async function generateDhlLabelsAction(orderIds?: string[]) {
           } catch (confirmErr: any) {
             const msg = confirmErr?.message ?? String(confirmErr)
             console.error(`[Otto] Failed to confirm shipment for ${order.marketplaceOrderId}:`, msg)
-            errors.push(`Otto-Bestätigung fehlgeschlagen (${order.marketplaceOrderId}): ${msg}`)
+            confirmError = `Otto-Bestätigung fehlgeschlagen (${order.marketplaceOrderId}): ${msg}`
           }
         }
 
@@ -513,18 +542,41 @@ export async function generateDhlLabelsAction(orderIds?: string[]) {
           } catch (confirmErr: any) {
             const msg = confirmErr?.message ?? String(confirmErr)
             console.error(`[AboutYou] Failed to confirm shipment for ${order.marketplaceOrderId}:`, msg)
-            errors.push(`About You-Bestätigung fehlgeschlagen (${order.marketplaceOrderId}): ${msg}`)
+            confirmError = `About You-Bestätigung fehlgeschlagen (${order.marketplaceOrderId}): ${msg}`
           }
         }
 
-        if (labelUrl) labels.push(labelUrl)
-        if (returnType === 'enclosed_with_label' && returnLabelUrl) labels.push(returnLabelUrl)
-        
-        successCount++
+        const orderLabels: string[] = []
+        if (labelUrl) orderLabels.push(labelUrl)
+        if (returnType === 'enclosed_with_label' && returnLabelUrl) orderLabels.push(returnLabelUrl)
+
+        return {
+          success: true,
+          labels: orderLabels,
+          error: confirmError
+        }
       } catch (err: any) {
         const msg = err?.message ?? String(err)
         console.error(`[DHL] Error processing order ${order.id}:`, msg)
-        errors.push(`Bestellung ${order.marketplaceOrderId ?? order.id}: ${msg}`)
+        return { success: false, error: `Bestellung ${order.marketplaceOrderId ?? order.id}: ${msg}` }
+      }
+    })
+
+    const results = await runWithLimit(tasks, 3)
+
+    let successCount = 0
+    const labels: string[] = []
+    const errors: string[] = []
+
+    for (const res of results) {
+      if (res.success) {
+        successCount++
+        if (res.labels) {
+          labels.push(...res.labels)
+        }
+      }
+      if (res.error) {
+        errors.push(res.error)
       }
     }
 
@@ -546,5 +598,19 @@ export async function generateDhlLabelsAction(orderIds?: string[]) {
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Fehler bei der DHL API Kommunikation.' }
   }
+}
+
+async function runWithLimit<T>(tasks: (() => Promise<T>)[], limit: number): Promise<T[]> {
+  const results: T[] = new Array(tasks.length);
+  let index = 0;
+  async function worker() {
+    while (index < tasks.length) {
+      const currentIndex = index++;
+      results[currentIndex] = await tasks[currentIndex]();
+    }
+  }
+  const workers = Array.from({ length: Math.min(limit, tasks.length) }, () => worker());
+  await Promise.all(workers);
+  return results;
 }
 
