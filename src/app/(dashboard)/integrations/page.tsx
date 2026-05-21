@@ -42,7 +42,7 @@ export default async function IntegrationsPage(props: {
   const activeMarketplaces = integrations
     .filter((i) => i.isActive && i.type !== 'dhl' && i.type !== 'hermes')
     .map((i) => {
-      let label = i.type
+      let label: string = i.type
       if (i.type === 'otto') label = 'Otto.de'
       else if (i.type === 'amazon') label = 'Amazon EU'
       else if (i.type === 'shopify') label = 'Shopify'
