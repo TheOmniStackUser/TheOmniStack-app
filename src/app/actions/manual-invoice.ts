@@ -573,6 +573,7 @@ export async function previewInvoiceAction(data: {
   orderDate?: Date
   buyerReference?: string
   externalId?: string
+  documentType?: 'invoice' | 'quote' | 'delivery_note'
 }) {
   const auth = await requireAuth()
   const companyId = auth.activeCompanyId
@@ -595,6 +596,7 @@ export async function previewInvoiceAction(data: {
       customerNumber: data.customer.customerNumber || 'P-123',
       customText: data.customText,
       taxOption: data.taxOption,
+      documentType: data.documentType || 'invoice',
       company: {
         name: company.legalName || company.name,
         street: company.street || undefined,

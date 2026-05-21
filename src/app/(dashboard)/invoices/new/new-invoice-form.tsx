@@ -462,7 +462,8 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
         orderNumber: settings.orderNumber,
         orderDate: settings.orderDate ? new Date(settings.orderDate) : undefined,
         buyerReference: settings.buyerReference,
-        externalId: settings.externalId
+        externalId: settings.externalId,
+        documentType
       })
 
       if (result.base64) {
