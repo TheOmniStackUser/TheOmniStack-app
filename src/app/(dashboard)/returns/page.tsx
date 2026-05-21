@@ -10,24 +10,7 @@ export const dynamic = 'force-dynamic'
 export default async function ReturnsPage() {
   const auth = await requireAuth()
 
-  // Auto-migration: Ensure columns exist in returns_log
-  try {
-    const { sql } = await import('drizzle-orm')
-    await db.execute(sql`
-      ALTER TABLE "returns_log" ADD COLUMN IF NOT EXISTS "status" text NOT NULL DEFAULT 'neu';
-    `)
-    await db.execute(sql`
-      ALTER TABLE "returns_log" ADD COLUMN IF NOT EXISTS "marketplace" text;
-    `)
-    await db.execute(sql`
-      ALTER TABLE "returns_log" ADD COLUMN IF NOT EXISTS "notes" text;
-    `)
-    await db.execute(sql`
-      ALTER TABLE "returns_log" ADD COLUMN IF NOT EXISTS "received_at" timestamp default now() NOT NULL;
-    `)
-  } catch (err) {
-    console.error('[Returns] Auto-migrations failed:', err)
-  }
+
 
   // Strict Access Control: Only Owner and Support / Beta support can see returns for now
   if (auth.role !== 'owner' && auth.role !== 'omnistack_support' && auth.role !== 'omnistack_beta') {

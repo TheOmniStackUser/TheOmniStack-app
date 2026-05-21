@@ -1,7 +1,7 @@
 import { requireAuth } from '@/lib/session'
 import { db } from '@/db/client'
 import { companies } from '@/db/schema/companies'
-import { eq, sql } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { SettingsForm } from './settings-form'
 import { VatSettings } from './vat-settings'
 import { MarketplaceAutomation } from './marketplace-automation'
@@ -14,44 +14,36 @@ import { users } from '@/db/schema/auth'
 export default async function SettingsPage() {
   const auth = await requireAuth()
 
-  // Auto-migration: Ensure warehouse columns exist
-  try {
-    await db.execute(sql`
-      ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "warehouse_street" text;
-      ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "warehouse_zip" text;
-      ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "warehouse_city" text;
-      ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "warehouse_country" text DEFAULT 'DE';
-    `)
-  } catch (err) {
-    console.error('[Settings] Auto-migration failed:', err)
-  }
-
-  const [company] = await db
-    .select()
-    .from(companies)
-    .where(eq(companies.id, auth.activeCompanyId))
-    .limit(1)
-
-  const [user] = await db
-    .select({ twoFactorEnabled: users.twoFactorEnabled })
-    .from(users)
-    .where(eq(users.id, auth.userId))
-    .limit(1)
-
-  const initialVatSettings = await db
-    .select()
-    .from(vatSettings)
-    .where(eq(vatSettings.companyId, auth.activeCompanyId))
-
-  const integrations = await db
-    .select({
-      id: marketplaceIntegrations.id,
-      type: marketplaceIntegrations.type,
-      autoInvoice: marketplaceIntegrations.autoInvoice,
-      uploadInvoice: marketplaceIntegrations.uploadInvoice
-    })
-    .from(marketplaceIntegrations)
-    .where(eq(marketplaceIntegrations.companyId, auth.activeCompanyId))
+  const [
+    [company],
+    [user],
+    initialVatSettings,
+    integrations
+  ] = await Promise.all([
+    db
+      .select()
+      .from(companies)
+      .where(eq(companies.id, auth.activeCompanyId))
+      .limit(1),
+    db
+      .select({ twoFactorEnabled: users.twoFactorEnabled })
+      .from(users)
+      .where(eq(users.id, auth.userId))
+      .limit(1),
+    db
+      .select()
+      .from(vatSettings)
+      .where(eq(vatSettings.companyId, auth.activeCompanyId)),
+    db
+      .select({
+        id: marketplaceIntegrations.id,
+        type: marketplaceIntegrations.type,
+        autoInvoice: marketplaceIntegrations.autoInvoice,
+        uploadInvoice: marketplaceIntegrations.uploadInvoice
+      })
+      .from(marketplaceIntegrations)
+      .where(eq(marketplaceIntegrations.companyId, auth.activeCompanyId))
+  ])
 
   if (!company) {
     return (

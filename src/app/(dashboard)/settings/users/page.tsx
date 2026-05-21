@@ -2,40 +2,33 @@ import { requireAuth } from '@/lib/session'
 import { db } from '@/db/client'
 import { companyMembers } from '@/db/schema/companies'
 import { users, verificationTokens } from '@/db/schema/auth'
-import { eq, gt, sql } from 'drizzle-orm'
+import { eq, gt } from 'drizzle-orm'
 import { UserList } from './user-list'
 
 export default async function UserManagementPage() {
   const auth = await requireAuth()
 
-  // Auto-migration: Ensure omnistack_beta value exists in the database enum
-  try {
-    await db.execute(sql`ALTER TYPE member_role ADD VALUE IF NOT EXISTS 'omnistack_beta'`)
-  } catch (err) {
-    console.log('[User Management] Auto-migration status:', err)
-  }
-
-  const members = await db
-    .select({
-      id: users.id,
-      name: users.name,
-      email: users.email,
-      role: companyMembers.role,
-      joinedAt: companyMembers.joinedAt,
-      emailVerifiedAt: users.emailVerifiedAt,
-    })
-    .from(companyMembers)
-    .innerJoin(users, eq(companyMembers.userId, users.id))
-    .where(eq(companyMembers.companyId, auth.activeCompanyId))
-
-  // Fetch active verification tokens to identify pending invitations
-  const tokens = await db
-    .select({
-      identifier: verificationTokens.identifier,
-      token: verificationTokens.token,
-    })
-    .from(verificationTokens)
-    .where(gt(verificationTokens.expiresAt, new Date()))
+  const [members, tokens] = await Promise.all([
+    db
+      .select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        role: companyMembers.role,
+        joinedAt: companyMembers.joinedAt,
+        emailVerifiedAt: users.emailVerifiedAt,
+      })
+      .from(companyMembers)
+      .innerJoin(users, eq(companyMembers.userId, users.id))
+      .where(eq(companyMembers.companyId, auth.activeCompanyId)),
+    db
+      .select({
+        identifier: verificationTokens.identifier,
+        token: verificationTokens.token,
+      })
+      .from(verificationTokens)
+      .where(gt(verificationTokens.expiresAt, new Date()))
+  ])
 
   const enrichedMembers = members.map((m) => {
     const matchingToken = tokens.find(

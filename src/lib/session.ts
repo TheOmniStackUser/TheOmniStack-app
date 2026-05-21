@@ -6,6 +6,7 @@ import { db } from '@/db/client'
 import { sessions, users } from '@/db/schema/auth'
 import { companyMembers } from '@/db/schema/companies'
 import { eq, and } from 'drizzle-orm'
+import { cache } from 'react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type SessionPayload = {
@@ -79,12 +80,12 @@ export async function createSession(
   cookieStore.set(COOKIE_NAME, token, { ...COOKIE_OPTIONS, expires: expiresAt })
 }
 
-export async function getSession(): Promise<SessionPayload | null> {
+export const getSession = cache(async (): Promise<SessionPayload | null> => {
   const cookieStore = await cookies()
   const token = cookieStore.get(COOKIE_NAME)?.value
   if (!token) return null
   return decrypt(token)
-}
+})
 
 export async function deleteSession(): Promise<void> {
   const payload = await getSession()
@@ -135,7 +136,7 @@ export async function clearTwoFactorPending(): Promise<void> {
  * Redirects to /login if the user is unauthenticated.
  * Redirects to /select-company if the user hasn't selected a company context.
  */
-export async function requireAuth(): Promise<AuthContext> {
+export const requireAuth = cache(async (): Promise<AuthContext> => {
   const payload = await getSession()
 
   if (!payload) redirect('/login')
@@ -160,12 +161,12 @@ export async function requireAuth(): Promise<AuthContext> {
     activeCompanyId: payload.activeCompanyId,
     role: membership.role as any, // Cast to our explicit role types
   }
-}
+})
 
 /**
  * Get the current user record. Returns null if not authenticated.
  */
-export async function getCurrentUser() {
+export const getCurrentUser = cache(async () => {
   const payload = await getSession()
   if (!payload) return null
 
@@ -180,4 +181,4 @@ export async function getCurrentUser() {
     .limit(1)
 
   return user ?? null
-}
+})
