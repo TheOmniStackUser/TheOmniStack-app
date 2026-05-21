@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { getApiKeyAction, generateApiKeyAction } from '@/app/actions/api-keys'
+import { CollapsibleSection } from '@/components/collapsible-section'
 
 export function ApiSettings() {
   const [apiKey, setApiKey] = useState<string | null>(null)
@@ -38,17 +39,19 @@ export function ApiSettings() {
   }
 
   return (
-    <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-      <div className="p-6 border-b border-gray-100 bg-gray-50/50">
-        <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-          <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <CollapsibleSection
+      title="Mobile App & API"
+      subtitle="Nutze diesen Key, um die OmniScan App mit deinem Account zu verbinden."
+      icon={
+        <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center flex-shrink-0 border border-gray-100">
+          <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
           </svg>
-          Mobile App & API
-        </h3>
-        <p className="text-sm text-gray-500">Nutze diesen Key, um die OmniScan App mit deinem Account zu verbinden.</p>
-      </div>
-
+        </div>
+      }
+      headerClassName="p-6 flex items-center justify-between cursor-pointer hover:bg-gray-50/50 bg-gray-50/50 transition-colors select-none"
+      defaultOpen={false}
+    >
       <div className="p-6 space-y-6">
         <div className="space-y-2">
           <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Dein API-Key</label>
@@ -103,7 +106,7 @@ export function ApiSettings() {
           <button
             onClick={handleGenerate}
             disabled={loading}
-            className={`px-6 py-2.5 rounded-xl font-bold text-white shadow-sm transition-all flex items-center gap-2 ${
+            className={`px-6 py-2.5 rounded-xl font-bold text-white shadow-sm transition-all flex items-center gap-2 cursor-pointer ${
               loading ? 'bg-gray-400' : 'bg-gray-800 hover:bg-gray-900'
             }`}
           >
@@ -124,6 +127,6 @@ export function ApiSettings() {
           Hinweis: Ein neuer Key macht den alten sofort ungültig. Die mobile App muss danach neu verbunden werden.
         </p>
       </div>
-    </section>
+    </CollapsibleSection>
   )
 }

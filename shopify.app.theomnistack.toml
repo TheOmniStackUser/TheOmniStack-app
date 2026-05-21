@@ -1,0 +1,20 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "b58120a3b221baf4fd53a19acfe72d68"
+name = "TheOmniStack"
+application_url = "https://app.theomnistack.de/api/auth/shopify/install"
+embedded = false
+
+[webhooks]
+api_version = "2026-04"
+
+  [[webhooks.subscriptions]]
+  uri = "https://app.theomnistack.de/api/webhooks/shopify/gdpr"
+  compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "read_orders,write_orders"
+
+[auth]
+redirect_urls = [ "https://app.theomnistack.de/api/auth/shopify/callback" ]

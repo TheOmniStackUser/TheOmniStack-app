@@ -3,6 +3,7 @@
 import { useActionState, useState } from 'react'
 import { saveVatSettingAction, deleteVatSettingAction } from '@/app/actions/settings'
 import { Trash2, Plus, Percent } from 'lucide-react'
+import { CollapsibleSection } from '@/components/collapsible-section'
 
 type VatSetting = {
   id: string
@@ -15,6 +16,7 @@ type VatSetting = {
 export function VatSettings({ initialSettings }: { initialSettings: VatSetting[] }) {
   const [state, action, isPending] = useActionState(saveVatSettingAction, undefined)
   const [showAdd, setShowAdd] = useState(false)
+  const [isOpen, setIsOpen] = useState(false)
   const [vatType, setVatType] = useState('oss')
   const [selectedCountry, setSelectedCountry] = useState('')
   const [vatRateValue, setVatRateValue] = useState('')
@@ -84,21 +86,35 @@ export function VatSettings({ initialSettings }: { initialSettings: VatSetting[]
   const availableCountries = countries.filter(c => !existingCodes.has(c.code))
 
   return (
-    <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-      <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-bold text-gray-900">Umsatzsteuersätze pro Land</h3>
-          <p className="text-sm text-gray-500">Konfiguriere OSS, lokale Registrierungen oder Drittland-Regelungen.</p>
+    <CollapsibleSection
+      title="Umsatzsteuersätze pro Land"
+      subtitle="Konfiguriere OSS, lokale Registrierungen oder Drittland-Regelungen."
+      icon={
+        <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center flex-shrink-0 border border-gray-100">
+          <Percent className="text-gray-500 w-6 h-6" />
         </div>
+      }
+      headerClassName="p-6 flex items-center justify-between cursor-pointer hover:bg-gray-50/50 bg-gray-50/50 transition-colors select-none"
+      isOpen={isOpen}
+      onToggle={(open) => setIsOpen(open)}
+      headerRight={
         <button
-          onClick={() => setShowAdd(!showAdd)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
+          onClick={(e) => {
+            e.stopPropagation()
+            if (!showAdd) {
+              setIsOpen(true)
+              setShowAdd(true)
+            } else {
+              setShowAdd(false)
+            }
+          }}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 cursor-pointer"
         >
           <Plus size={16} />
           {showAdd ? 'Abbrechen' : 'Land hinzufügen'}
         </button>
-      </div>
-
+      }
+    >
       <div className="p-6 space-y-6">
         {showAdd && (
           <form action={action} className="p-4 bg-gray-50 rounded-2xl border border-gray-200 animate-in fade-in slide-in-from-top-4">
@@ -170,7 +186,7 @@ export function VatSettings({ initialSettings }: { initialSettings: VatSetting[]
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="w-full px-4 py-2.5 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-all disabled:opacity-50"
+                  className="w-full px-4 py-2.5 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-all disabled:opacity-50 cursor-pointer"
                 >
                   {isPending ? 'Speichert...' : 'Hinzufügen'}
                 </button>
@@ -197,7 +213,7 @@ export function VatSettings({ initialSettings }: { initialSettings: VatSetting[]
             <tbody className="divide-y divide-gray-50">
               {initialSettings.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="py-8 text-center text-gray-500 text-sm italic">
+                  <td colSpan={4} className="py-8 text-center text-gray-500 text-sm italic">
                     Keine länderspezifischen Steuersätze hinterlegt. Es werden die Standardwerte der Marktplätze verwendet.
                   </td>
                 </tr>
@@ -235,7 +251,7 @@ export function VatSettings({ initialSettings }: { initialSettings: VatSetting[]
                             await deleteVatSettingAction(setting.id)
                           }
                         }}
-                        className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+                        className="p-2 text-gray-400 hover:text-red-500 transition-colors cursor-pointer"
                       >
                         <Trash2 size={18} />
                       </button>
@@ -247,7 +263,7 @@ export function VatSettings({ initialSettings }: { initialSettings: VatSetting[]
           </table>
         </div>
       </div>
-    </section>
+    </CollapsibleSection>
   )
 }
 

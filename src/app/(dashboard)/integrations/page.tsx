@@ -12,6 +12,7 @@ import { ShopifyIntegrationForm } from './shopify-form'
 import { AboutYouIntegrationForm } from './aboutyou-form'
 import { SyncSettingsForm } from './sync-settings-form'
 import type { DhlConfig } from './dhl-form'
+import { CollapsibleSection } from '@/components/collapsible-section'
 
 export default async function IntegrationsPage(props: { 
   searchParams: Promise<{ [key: string]: string | string[] | undefined }> 
@@ -105,11 +106,11 @@ export default async function IntegrationsPage(props: {
 
       <div className="space-y-12">
         {/* SECTION: AUTOMATION / SCHEDULE */}
-        <section className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-100 flex items-center gap-2">
-            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            <h3 className="text-lg font-bold text-gray-900">Automatischer Bestellabruf</h3>
-          </div>
+        <CollapsibleSection
+          title="Automatischer Bestellabruf"
+          icon={<svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+          defaultOpen={false}
+        >
           <div className="p-6 bg-gray-50">
             {company ? (
               <SyncSettingsForm company={company} activeMarketplaces={activeMarketplaces} />
@@ -117,7 +118,7 @@ export default async function IntegrationsPage(props: {
               <p className="text-sm text-gray-500">Unternehmensdaten konnten nicht geladen werden.</p>
             )}
           </div>
-        </section>
+        </CollapsibleSection>
 
         {/* SECTION: MARKETPLACES */}
         <div>
@@ -127,23 +128,20 @@ export default async function IntegrationsPage(props: {
           </h3>
           <div className="space-y-8">
             {/* Otto.de Card */}
-            <section className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-              <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900">Otto.de Partner Connect</h3>
-                  <p className="text-sm text-gray-500">API Anbindung für Bestellimport & Rechnungs-Upload</p>
-                </div>
-                {ottoIntegration?.clientId ? (
-                  <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
-                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                    Verbunden
-                  </span>
-                ) : (
-                  <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
-                    Nicht verbunden
-                  </span>
-                )}
-              </div>
+            <CollapsibleSection
+              title="Otto.de Partner Connect"
+              subtitle="API Anbindung für Bestellimport & Rechnungs-Upload"
+              badge={ottoIntegration?.clientId ? (
+                <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  Verbunden
+                </span>
+              ) : (
+                <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
+                  Nicht verbunden
+                </span>
+              )}
+            >
               <div className="p-6 bg-gray-50">
                 <OttoIntegrationForm 
                   initialClientId={ottoIntegration?.clientId || ''} 
@@ -151,26 +149,23 @@ export default async function IntegrationsPage(props: {
                   initialReturnAddressCarrierId={(ottoIntegration?.metadata as any)?.returnAddressCarrierId || ''}
                 />
               </div>
-            </section>
+            </CollapsibleSection>
 
             {/* Amazon Card */}
-            <section className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-              <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900">Amazon EU</h3>
-                  <p className="text-sm text-gray-500">SP-API Anbindung für Bestellimport & Bestandsabgleich</p>
-                </div>
-                {integrations.find((i: any) => i.type === 'amazon')?.refreshToken ? (
-                  <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
-                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                    Verbunden
-                  </span>
-                ) : (
-                  <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
-                    Nicht verbunden
-                  </span>
-                )}
-              </div>
+            <CollapsibleSection
+              title="Amazon EU"
+              subtitle="SP-API Anbindung für Bestellimport & Bestandsabgleich"
+              badge={integrations.find((i: any) => i.type === 'amazon')?.refreshToken ? (
+                <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  Verbunden
+                </span>
+              ) : (
+                <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
+                  Nicht verbunden
+                </span>
+              )}
+            >
               <div className="p-6 bg-gray-50">
                 <AmazonIntegrationForm 
                   initialSellerId={integrations.find((i: any) => i.type === 'amazon')?.sellerId || ''}
@@ -179,82 +174,73 @@ export default async function IntegrationsPage(props: {
                   initialRefreshToken={integrations.find((i: any) => i.type === 'amazon')?.refreshToken || ''}
                 />
               </div>
-            </section>
+            </CollapsibleSection>
 
             {/* Shopify Card */}
-            <section className="bg-white rounded-xl shadow-sm border border-gray-200">
-              <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <span className="text-green-800 font-black text-xs tracking-tighter">Shopify</span>
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-900">Shopify</h3>
-                    <p className="text-sm text-gray-500">API Anbindung via Admin API für Bestellimport</p>
-                  </div>
+            <CollapsibleSection
+              title="Shopify"
+              subtitle="API Anbindung via Admin API für Bestellimport"
+              icon={
+                <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <span className="text-green-800 font-black text-xs tracking-tighter">Shopify</span>
                 </div>
-                {integrations.find((i: any) => i.type === 'shopify')?.accessToken ? (
-                  <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
-                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                    Verbunden
-                  </span>
-                ) : (
-                  <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
-                    Nicht verbunden
-                  </span>
-                )}
-              </div>
+              }
+              badge={integrations.find((i: any) => i.type === 'shopify')?.accessToken ? (
+                <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  Verbunden
+                </span>
+              ) : (
+                <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
+                  Nicht verbunden
+                </span>
+              )}
+            >
               <div className="p-6 bg-gray-50">
                 <ShopifyIntegrationForm
                   initialData={integrations.find((i: any) => i.type === 'shopify')}
                 />
               </div>
-            </section>
+            </CollapsibleSection>
 
             {/* About You Card */}
-            <section className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-              <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900">About You</h3>
-                  <p className="text-sm text-gray-500">API Anbindung für Bestellimport & Versandbestätigung</p>
-                </div>
-                {integrations.find((i: any) => i.type === 'aboutyou')?.apiKey ? (
-                  <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
-                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                    Verbunden
-                  </span>
-                ) : (
-                  <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
-                    Nicht verbunden
-                  </span>
-                )}
-              </div>
+            <CollapsibleSection
+              title="About You"
+              subtitle="API Anbindung für Bestellimport & Versandbestätigung"
+              badge={integrations.find((i: any) => i.type === 'aboutyou')?.apiKey ? (
+                <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  Verbunden
+                </span>
+              ) : (
+                <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
+                  Nicht verbunden
+                </span>
+              )}
+            >
               <div className="p-6 bg-gray-50">
                 <AboutYouIntegrationForm 
                   initialApiKey={integrations.find((i: any) => i.type === 'aboutyou')?.apiKey || ''}
                   initialEnvironment={integrations.find((i: any) => i.type === 'aboutyou')?.environment || 'production'}
                 />
               </div>
-            </section>
+            </CollapsibleSection>
 
             {/* Decathlon (Mirakl) Card */}
-            <section className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-              <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900">Decathlon (Mirakl)</h3>
-                  <p className="text-sm text-gray-500">API Anbindung für Decathlon Bestellungen</p>
-                </div>
-                {integrations.find((i: any) => i.type === 'mirakl_decathlon')?.clientId ? (
-                  <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
-                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                    Verbunden
-                  </span>
-                ) : (
-                  <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
-                    Nicht verbunden
-                  </span>
-                )}
-              </div>
+            <CollapsibleSection
+              title="Decathlon (Mirakl)"
+              subtitle="API Anbindung für Decathlon Bestellungen"
+              badge={integrations.find((i: any) => i.type === 'mirakl_decathlon')?.clientId ? (
+                <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  Verbunden
+                </span>
+              ) : (
+                <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
+                  Nicht verbunden
+                </span>
+              )}
+            >
               <div className="p-6 bg-gray-50">
                 <MiraklIntegrationForm 
                   key={`mirakl_decathlon_${integrations.find((i: any) => i.type === 'mirakl_decathlon')?.updatedAt?.getTime() || 'new'}`}
@@ -265,21 +251,23 @@ export default async function IntegrationsPage(props: {
                   initialApiKey={integrations.find((i: any) => i.type === 'mirakl_decathlon')?.apiKey || ''}
                 />
               </div>
-            </section>
+            </CollapsibleSection>
 
             {/* Existing Custom Mirakl Integrations */}
             {customMiraklIntegrations.map((integration: any) => (
-              <section key={integration.id} className="bg-white rounded-xl shadow-sm border border-blue-200 overflow-hidden">
-                <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-blue-50/50">
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-900">{(integration.metadata as any)?.customName || 'Unbenannter Marktplatz'} (Mirakl)</h3>
-                    <p className="text-sm text-gray-500">Eigene API Anbindung</p>
-                  </div>
+              <CollapsibleSection 
+                key={integration.id} 
+                className="bg-white rounded-xl shadow-sm border border-blue-200 overflow-hidden"
+                headerClassName="p-6 flex items-center justify-between cursor-pointer hover:bg-blue-50/20 bg-blue-50/50 transition-colors select-none"
+                title={`${(integration.metadata as any)?.customName || 'Unbenannter Marktplatz'} (Mirakl)`}
+                subtitle="Eigene API Anbindung"
+                badge={
                   <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
                     <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                     Verbunden
                   </span>
-                </div>
+                }
+              >
                 <div className="p-6 bg-gray-50">
                   <MiraklIntegrationForm 
                     id={integration.id}
@@ -291,20 +279,20 @@ export default async function IntegrationsPage(props: {
                     initialApiKey={integration.apiKey || ''}
                   />
                 </div>
-              </section>
+              </CollapsibleSection>
             ))}
 
             {/* Add New Custom Mirakl Integration */}
-            <section className="bg-white rounded-xl shadow-sm border border-dashed border-gray-300 overflow-hidden hover:border-blue-400 transition-colors">
-              <div className="p-6 border-b border-gray-100 flex items-center gap-3">
+            <CollapsibleSection
+              className="bg-white rounded-xl shadow-sm border border-dashed border-gray-300 overflow-hidden hover:border-blue-400 transition-colors"
+              title="Weiteren Mirakl Marktplatz hinzufügen"
+              subtitle="Limango, Worten, B&Q und viele mehr anbinden"
+              icon={
                 <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xl">
                   +
                 </div>
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900">Weiteren Mirakl Marktplatz hinzufügen</h3>
-                  <p className="text-sm text-gray-500">Limango, Worten, B&Q und viele mehr anbinden</p>
-                </div>
-              </div>
+              }
+            >
               <div className="p-6 bg-gray-50">
                 <MiraklIntegrationForm 
                   type="mirakl_custom"
@@ -314,7 +302,7 @@ export default async function IntegrationsPage(props: {
                   initialApiKey=""
                 />
               </div>
-            </section>
+            </CollapsibleSection>
           </div>
         </div>
 
@@ -326,60 +314,54 @@ export default async function IntegrationsPage(props: {
           </h3>
           <div className="space-y-8">
             {/* DHL Card */}
-            <section className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-              <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-yellow-400 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <span className="text-gray-900 font-black text-sm tracking-tighter">DHL</span>
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-900">DHL Geschäftskunden</h3>
-                    <p className="text-sm text-gray-500">Label-Erstellung & Versandzonen</p>
-                  </div>
+            <CollapsibleSection
+              title="DHL Geschäftskunden"
+              subtitle="Label-Erstellung & Versandzonen"
+              icon={
+                <div className="w-10 h-10 bg-yellow-400 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <span className="text-gray-900 font-black text-sm tracking-tighter">DHL</span>
                 </div>
-                {(integrations.find((i: any) => i.type === 'dhl')?.metadata as any)?.username ? (
-                  <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
-                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                    Konfiguriert
-                  </span>
-                ) : (
-                  <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
-                    Nicht konfiguriert
-                  </span>
-                )}
-              </div>
+              }
+              badge={(integrations.find((i: any) => i.type === 'dhl')?.metadata as any)?.username ? (
+                <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  Konfiguriert
+                </span>
+              ) : (
+                <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
+                  Nicht konfiguriert
+                </span>
+              )}
+            >
               <div className="p-6 bg-gray-50">
                 <DhlIntegrationForm
                   initialConfig={(integrations.find((i: any) => i.type === 'dhl')?.metadata as DhlConfig) ?? undefined}
                 />
               </div>
-            </section>
+            </CollapsibleSection>
 
             {/* Hermes Card */}
-            <section className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-              <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900">Hermes Versand</h3>
-                  <p className="text-sm text-gray-500">Offizielle Anbindung über die Hermes Login-Seite</p>
-                </div>
-                {integrations.find((i: any) => i.type === 'hermes')?.clientId ? (
-                  <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
-                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                    Aktiv
-                  </span>
-                ) : (
-                  <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
-                    Nicht konfiguriert
-                  </span>
-                )}
-              </div>
+            <CollapsibleSection
+              title="Hermes Versand"
+              subtitle="Offizielle Anbindung über die Hermes Login-Seite"
+              badge={integrations.find((i: any) => i.type === 'hermes')?.clientId ? (
+                <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  Aktiv
+                </span>
+              ) : (
+                <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
+                  Nicht konfiguriert
+                </span>
+              )}
+            >
               <div className="p-6 bg-gray-50 flex justify-center">
                 <HermesIntegrationForm 
                   initialClientId={integrations.find((i: any) => i.type === 'hermes')?.clientId || ''}
                   initialConfig={(integrations.find((i: any) => i.type === 'hermes')?.metadata as any) ?? undefined}
                 />
               </div>
-            </section>
+            </CollapsibleSection>
           </div>
         </div>
       </div>

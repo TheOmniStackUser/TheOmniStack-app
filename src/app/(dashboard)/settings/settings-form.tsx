@@ -3,6 +3,7 @@
 import { useActionState } from 'react'
 import { saveCompanySettingsAction } from '@/app/actions/settings'
 import type { Company } from '@/db/schema/companies'
+import { CollapsibleSection } from '@/components/collapsible-section'
 
 export function SettingsForm({ company }: { company: Company }) {
   const [state, action, isPending] = useActionState(saveCompanySettingsAction, undefined)
@@ -10,11 +11,12 @@ export function SettingsForm({ company }: { company: Company }) {
   return (
     <form id="settings-profile-form" action={action} className="space-y-8 pb-12">
       {/* --- Section: Stammdaten --- */}
-      <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-gray-100 bg-gray-50/50">
-          <h3 className="text-lg font-bold text-gray-900">Allgemeine Informationen</h3>
-          <p className="text-sm text-gray-500">Grundlegende Firmendaten und Steuer-IDs.</p>
-        </div>
+      <CollapsibleSection
+        title="Allgemeine Informationen"
+        subtitle="Grundlegende Firmendaten und Steuer-IDs."
+        headerClassName="p-6 flex items-center justify-between cursor-pointer hover:bg-gray-50/50 bg-gray-50/50 transition-colors select-none"
+        defaultOpen={true}
+      >
         <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
             <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Unternehmensname (Anzeige)</label>
@@ -106,14 +108,15 @@ export function SettingsForm({ company }: { company: Company }) {
             </div>
           </div>
         </div>
-      </section>
+      </CollapsibleSection>
 
       {/* --- Section: Rechnungsadresse --- */}
-      <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-gray-100 bg-gray-50/50">
-          <h3 className="text-lg font-bold text-gray-900">Rechnungsadresse</h3>
-          <p className="text-sm text-gray-500">Diese Adresse wird auf Rechnungen und Dokumenten verwendet.</p>
-        </div>
+      <CollapsibleSection
+        title="Rechnungsadresse"
+        subtitle="Diese Adresse wird auf Rechnungen und Dokumenten verwendet."
+        headerClassName="p-6 flex items-center justify-between cursor-pointer hover:bg-gray-50/50 bg-gray-50/50 transition-colors select-none"
+        defaultOpen={false}
+      >
         <div className="p-6 space-y-6">
           <div className="space-y-2">
             <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Straße & Hausnummer</label>
@@ -164,16 +167,15 @@ export function SettingsForm({ company }: { company: Company }) {
             </select>
           </div>
         </div>
-      </section>
+      </CollapsibleSection>
 
       {/* --- Section: Lageradresse --- */}
-      <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-bold text-gray-900">Lageradresse / Absender</h3>
-            <p className="text-sm text-gray-500">Diese Adresse wird auf Versandlabels als Absender gedruckt.</p>
-          </div>
-        </div>
+      <CollapsibleSection
+        title="Lageradresse / Absender"
+        subtitle="Diese Adresse wird auf Versandlabels als Absender gedruckt."
+        headerClassName="p-6 flex items-center justify-between cursor-pointer hover:bg-gray-50/50 bg-gray-50/50 transition-colors select-none"
+        defaultOpen={false}
+      >
         <div className="p-6 space-y-6">
           <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl flex items-start gap-3">
             <svg className="w-5 h-5 text-blue-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -233,16 +235,15 @@ export function SettingsForm({ company }: { company: Company }) {
             </select>
           </div>
         </div>
-      </section>
+      </CollapsibleSection>
 
       {/* --- Section: Bank- & Rechtsdaten --- */}
-      <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-bold text-gray-900">Bank- & Rechtsdaten</h3>
-            <p className="text-sm text-gray-500">Diese Informationen werden in der Fußzeile von Lieferscheinen und Rechnungen gedruckt.</p>
-          </div>
-        </div>
+      <CollapsibleSection
+        title="Bank- & Rechtsdaten"
+        subtitle="Diese Informationen werden in der Fußzeile von Lieferscheinen und Rechnungen gedruckt."
+        headerClassName="p-6 flex items-center justify-between cursor-pointer hover:bg-gray-50/50 bg-gray-50/50 transition-colors select-none"
+        defaultOpen={false}
+      >
         <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2 md:col-span-2">
             <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Zahlungsempfänger</label>
@@ -305,16 +306,15 @@ export function SettingsForm({ company }: { company: Company }) {
             />
           </div>
         </div>
-      </section>
+      </CollapsibleSection>
 
       {/* --- Section: Dokumenten-Einstellungen --- */}
-      <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-bold text-gray-900">Dokumenten-Einstellungen</h3>
-            <p className="text-sm text-gray-500">Zusätzliche Texte für Lieferscheine und Rechnungen.</p>
-          </div>
-        </div>
+      <CollapsibleSection
+        title="Dokumenten-Einstellungen"
+        subtitle="Zusätzliche Texte für Lieferscheine und Rechnungen."
+        headerClassName="p-6 flex items-center justify-between cursor-pointer hover:bg-gray-50/50 bg-gray-50/50 transition-colors select-none"
+        defaultOpen={false}
+      >
         <div className="p-6 space-y-8">
           <div className="space-y-2">
             <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Sprache für internationale Sendungen</label>
@@ -355,7 +355,7 @@ export function SettingsForm({ company }: { company: Company }) {
             </div>
           </div>
         </div>
-      </section>
+      </CollapsibleSection>
 
 
       {/* --- Footer / Status --- */}

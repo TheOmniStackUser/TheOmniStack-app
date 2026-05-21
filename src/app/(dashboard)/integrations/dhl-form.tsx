@@ -68,7 +68,7 @@ export type DhlConfig = {
   defaultHeightCm: number
   zones: DhlShippingZone[]
   products: DhlProduct[]
-  platformReturns: Record<string, 'online' | 'enclosed_with_label' | 'enclosed_without_label'>
+  platformReturns: Record<string, 'none' | 'online' | 'enclosed_with_label' | 'enclosed_without_label'>
 }
 
 const DEFAULT_ZONES: DhlShippingZone[] = [
@@ -267,6 +267,8 @@ export function DhlIntegrationForm({ initialConfig }: { initialConfig?: DhlConfi
     otto: 'enclosed_without_label',
     amazon: 'online',
     mirakl_decathlon: 'online',
+    shopify: 'none',
+    aboutyou: 'none',
   }
   const [platformReturns, setPlatformReturns] = useState<DhlConfig['platformReturns']>(
     initialConfig?.platformReturns ?? DEFAULT_PLATFORM_RETURNS
@@ -505,8 +507,10 @@ export function DhlIntegrationForm({ initialConfig }: { initialConfig?: DhlConfi
             { key: 'otto',             label: 'Otto',              icon: '🟥', hint: 'Otto-Kunden drucken das Label über das Otto-Portal – kein eigenes Label nötig.' },
             { key: 'amazon',           label: 'Amazon',            icon: '🟧', hint: 'Amazon bietet ein eigenes Retouren-Portal an.' },
             { key: 'mirakl_decathlon', label: 'Decathlon (Mirakl)', icon: '🟦', hint: '' },
+            { key: 'shopify',          label: 'Shopify',           icon: '🟩', hint: '' },
+            { key: 'aboutyou',         label: 'About You',         icon: '⬜', hint: '' },
           ] as const).map(({ key, label, icon, hint }) => {
-            const value = platformReturns[key] ?? 'online'
+            const value = platformReturns[key] ?? (['shopify', 'aboutyou'].includes(key) ? 'none' : 'online')
             return (
               <div key={key} className="bg-white rounded-xl border border-gray-200 p-5">
                 <div className="flex items-center gap-3 mb-4">
@@ -516,8 +520,13 @@ export function DhlIntegrationForm({ initialConfig }: { initialConfig?: DhlConfi
                     {hint && <p className="text-xs text-gray-400 mt-0.5">{hint}</p>}
                   </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   {([
+                    {
+                      v: 'none' as const,
+                      title: 'Keine Retoure',
+                      desc: 'Es wird kein Retourenlabel generiert oder dem Paket beigelegt.',
+                    },
                     {
                       v: 'online' as const,
                       title: 'DHL Online Retoure',
