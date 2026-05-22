@@ -111,7 +111,7 @@ export function QuoteList({ initialQuotes }: { initialQuotes: Quote[] }) {
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Angebot suchen…"
-          className="w-full max-w-xs px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/30 bg-white"
+          className="w-full max-w-xs px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/30 bg-white text-slate-800 placeholder-slate-400 font-medium"
         />
       </div>
 
@@ -165,7 +165,7 @@ export function QuoteList({ initialQuotes }: { initialQuotes: Quote[] }) {
                   </td>
                   <td className="px-5 py-4">
                     <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
-                      quote.status === 'issued'
+                       quote.status === 'issued'
                         ? 'bg-emerald-100 text-emerald-700'
                         : 'bg-amber-100 text-amber-700'
                     }`}>
@@ -173,7 +173,7 @@ export function QuoteList({ initialQuotes }: { initialQuotes: Quote[] }) {
                     </span>
                   </td>
                   <td className="px-5 py-4">
-                    <div className="flex items-center gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-2 justify-end">
                       {/* PDF Download */}
                       {quote.pdfStorageKey && (
                         <button
