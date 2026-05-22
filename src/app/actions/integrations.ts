@@ -526,9 +526,21 @@ export async function saveSyncSettingsAction(
   // Clean up any existing repeatable sync jobs in Redis for this company
   try {
     const repeatableJobs = await marketplaceSyncQueue.getRepeatableJobs()
+    const client = await marketplaceSyncQueue.client
     for (const job of repeatableJobs) {
-      if (job.id?.startsWith(`daily-sync-${auth.activeCompanyId}`)) {
+      const redisKey = `${marketplaceSyncQueue.toKey('repeat')}:${job.key}:${job.next}`
+      const jobData = await client.hgetall(redisKey)
+      let jobId: string | null = null
+      if (jobData && jobData.opts) {
+        try {
+          const opts = JSON.parse(jobData.opts)
+          jobId = opts.repeat?.jobId || opts.jobId || null
+        } catch (e) {}
+      }
+
+      if (jobId?.startsWith(`daily-sync-${auth.activeCompanyId}`)) {
         await marketplaceSyncQueue.removeRepeatableByKey(job.key)
+        console.log(`   - Cleared old repeatable sync job: ${jobId}`)
       }
     }
 
@@ -546,6 +558,7 @@ export async function saveSyncSettingsAction(
           jobId: `daily-sync-${auth.activeCompanyId}`,
           repeat: {
             pattern: cronPattern,
+            tz: 'Europe/Berlin',
           },
           removeOnComplete: true,
         }

@@ -41,10 +41,21 @@ export async function setupScheduledSyncs() {
   // Clean up any existing repeatable marketplace sync jobs from the queue
   try {
     const repeatableJobs = await marketplaceSyncQueue.getRepeatableJobs()
+    const client = await marketplaceSyncQueue.client
     for (const job of repeatableJobs) {
-      if (job.id?.startsWith('daily-sync-')) {
+      const redisKey = `${marketplaceSyncQueue.toKey('repeat')}:${job.key}:${job.next}`
+      const jobData = await client.hgetall(redisKey)
+      let jobId: string | null = null
+      if (jobData && jobData.opts) {
+        try {
+          const opts = JSON.parse(jobData.opts)
+          jobId = opts.repeat?.jobId || opts.jobId || null
+        } catch (e) {}
+      }
+
+      if (jobId?.startsWith('daily-sync-')) {
         await marketplaceSyncQueue.removeRepeatableByKey(job.key)
-        console.log(`   - Cleared old repeatable sync job: ${job.id}`)
+        console.log(`   - Cleared old repeatable sync job: ${jobId}`)
       }
     }
   } catch (err) {
@@ -83,11 +94,12 @@ export async function setupScheduledSyncs() {
         jobId,
         repeat: {
           pattern: cronPattern,
+          tz: 'Europe/Berlin',
         },
         removeOnComplete: true,
       }
     )
-    console.log(`   - Scheduled daily sync at ${time} for company: ${company.name}`)
+    console.log(`   - Scheduled daily sync at ${time} (Europe/Berlin) for company: ${company.name}`)
   }
 }
 

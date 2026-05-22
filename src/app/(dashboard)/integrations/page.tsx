@@ -110,6 +110,16 @@ export default async function IntegrationsPage(props: {
           title="Automatischer Bestellabruf"
           icon={<svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
           defaultOpen={false}
+          badge={company?.fetchOrdersDaily ? (
+            <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
+              <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+              Aktiv
+            </span>
+          ) : (
+            <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
+              Inaktiv
+            </span>
+          )}
         >
           <div className="p-6 bg-gray-50">
             {company ? (
