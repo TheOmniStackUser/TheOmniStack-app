@@ -50,8 +50,9 @@ export function TwoFactorSettings({ initialEnabled }: Props) {
           </div>
         }
         badge={
-          <span className="px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold uppercase tracking-wider">
-            Aktiviert
+          <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
+            <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+            Aktiv
           </span>
         }
         defaultOpen={false}
@@ -75,7 +76,7 @@ export function TwoFactorSettings({ initialEnabled }: Props) {
         </div>
       }
       badge={
-        <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-bold uppercase tracking-wider">
+        <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
           Inaktiv
         </span>
       }
