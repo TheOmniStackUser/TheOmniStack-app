@@ -270,4 +270,63 @@ export class OttoAdapter implements MarketplaceAdapter {
       throw error
     }
   }
+
+  /**
+   * Fetches the official invoice PDF from Otto Market
+   */
+  async getInvoice(marketplaceOrderId: string): Promise<{ pdfBuffer: Buffer, receiptNumber: string } | null> {
+    console.log(`[OttoAdapter] Fetching receipts list for salesOrderId ${marketplaceOrderId}...`)
+    try {
+      const accessToken = await this.getAccessToken()
+      
+      const listUrl = `${this.baseUrl}/v3/receipts?salesOrderId=${marketplaceOrderId}`
+      const response = await fetch(listUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Accept': 'application/json'
+        }
+      })
+
+      if (!response.ok) {
+        const errText = await response.text()
+        console.warn(`[OttoAdapter] Failed to fetch receipts list for ${marketplaceOrderId}: ${response.status} - ${errText}`)
+        return null
+      }
+
+      const data = await response.json()
+      const purchaseReceipt = (data.resources || []).find((r: any) => r.receiptType === 'PURCHASE')
+      
+      if (!purchaseReceipt || !purchaseReceipt.receiptNumber) {
+        console.warn(`[OttoAdapter] No purchase receipt found for salesOrderId ${marketplaceOrderId}`)
+        return null
+      }
+
+      const receiptNumber = purchaseReceipt.receiptNumber
+      console.log(`[OttoAdapter] Found purchase receipt ${receiptNumber}. Downloading PDF...`)
+      
+      const downloadUrl = `${this.baseUrl}/v3/receipts/${receiptNumber}.pdf`
+      const pdfResponse = await fetch(downloadUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Accept': 'application/pdf'
+        }
+      })
+
+      if (!pdfResponse.ok) {
+        const errText = await pdfResponse.text()
+        throw new Error(`Otto API Fehler beim Download von Beleg ${receiptNumber}: ${pdfResponse.status} - ${errText}`)
+      }
+
+      const arrayBuffer = await pdfResponse.arrayBuffer()
+      return {
+        pdfBuffer: Buffer.from(arrayBuffer),
+        receiptNumber
+      }
+    } catch (error) {
+      console.error('[OttoAdapter] Error getting invoice:', error)
+      throw error
+    }
+  }
 }

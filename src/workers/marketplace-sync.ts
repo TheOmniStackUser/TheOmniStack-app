@@ -11,8 +11,10 @@ import { orders, orderItems } from '@/db/schema/orders'
 import { companies } from '@/db/schema/companies'
 import { vatSettings } from '@/db/schema/vat-settings'
 import { auditLog } from '@/lib/audit'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, desc } from 'drizzle-orm'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
+import { invoices, invoiceItems } from '@/db/schema/invoices'
+import { buildInvoiceKey, buildDeliveryNoteKey, documentExists, uploadDocument } from '@/lib/storage'
 import { OttoAdapter } from '@/adapters/marketplace/otto'
 import { MiraklAdapter } from '@/adapters/marketplace/mirakl'
 import { AmazonAdapter } from '@/adapters/marketplace/amazon'
@@ -250,6 +252,216 @@ export function createMarketplaceSyncWorker() {
   )
 }
 
+// ─── Pre-cache Delivery Notes and Download Marketplace Invoices ───────────────
+export async function generateOrDownloadDeliveryNote(
+  orderId: string,
+  companyId: string,
+  adapter?: MarketplaceAdapter | null
+) {
+  const cacheKey = buildDeliveryNoteKey(companyId, orderId)
+  try {
+    const exists = await documentExists(cacheKey)
+    if (exists) {
+      console.log(`[Worker] Delivery note already exists for order ${orderId}, skipping.`)
+      return
+    }
+  } catch (err) {
+    console.warn(`[Worker] Failed to check if delivery note exists:`, err)
+  }
+
+  console.log(`[Worker] Generating or downloading delivery note for order ${orderId}...`)
+
+  // Fetch order and items
+  const order = await db.query.orders.findFirst({
+    where: and(eq(orders.id, orderId), eq(orders.companyId, companyId)),
+    with: { items: true }
+  })
+
+  if (!order) {
+    console.error(`[Worker] Order ${orderId} not found when generating delivery note.`)
+    return
+  }
+
+  const [company] = await db
+    .select()
+    .from(companies)
+    .where(eq(companies.id, companyId))
+    .limit(1)
+
+  if (!company) {
+    console.error(`[Worker] Company ${companyId} not found when generating delivery note.`)
+    return
+  }
+
+  let pdfBuffer: Buffer
+  if (order.marketplace === 'aboutyou' && adapter && 'getDeliveryNote' in adapter && typeof (adapter as any).getDeliveryNote === 'function') {
+    try {
+      pdfBuffer = await (adapter as any).getDeliveryNote(order.marketplaceOrderId)
+    } catch (err) {
+      console.error(`[Worker] Failed to download delivery note from About You for order ${order.marketplaceOrderId}:`, err)
+      return
+    }
+  } else {
+    try {
+      const { renderToBuffer } = await import('@react-pdf/renderer')
+      const { DeliveryNoteDocument } = await import('@/components/pdf/delivery-note')
+      const React = await import('react')
+
+      const orderWithItems = {
+        ...order,
+        items: order.items.map((i) => ({
+          ...i,
+          quantity: parseInt(i.quantity)
+        }))
+      }
+
+      pdfBuffer = await renderToBuffer(
+        React.createElement(DeliveryNoteDocument, {
+          order: orderWithItems,
+          company: company
+        }) as any
+      )
+    } catch (err) {
+      console.error(`[Worker] Failed to generate delivery note for order ${order.marketplaceOrderId}:`, err)
+      return
+    }
+  }
+
+  try {
+    await uploadDocument(cacheKey, pdfBuffer)
+    console.log(`[Worker] Successfully uploaded delivery note for order ${order.marketplaceOrderId}`)
+  } catch (err) {
+    console.error(`[Worker] Failed to upload delivery note PDF to storage for order ${order.marketplaceOrderId}:`, err)
+  }
+}
+
+export async function downloadAndSaveMarketplaceInvoice(
+  orderId: string,
+  companyId: string,
+  adapter?: MarketplaceAdapter | null
+) {
+  if (!adapter || !adapter.getInvoice) {
+    console.log(`[Worker] Adapter does not support getInvoice for order ${orderId}`)
+    return
+  }
+
+  // Load order and items
+  const order = await db.query.orders.findFirst({
+    where: and(eq(orders.id, orderId), eq(orders.companyId, companyId)),
+    with: { items: true }
+  })
+
+  if (!order) {
+    console.error(`[Worker] Order ${orderId} not found when downloading invoice.`)
+    return
+  }
+
+  if (order.invoiceId) {
+    console.log(`[Worker] Order ${orderId} already has an invoice ${order.invoiceId}, skipping.`)
+    return
+  }
+
+  console.log(`[Worker] Downloading marketplace invoice for order ${order.marketplaceOrderId}...`)
+  try {
+    const result = await adapter.getInvoice(order.marketplaceOrderId)
+    if (!result) {
+      console.log(`[Worker] Adapter returned no invoice for order ${order.marketplaceOrderId}`)
+      return
+    }
+
+    let pdfBuffer: Buffer
+    let invoiceNumber: string
+
+    if (Buffer.isBuffer(result)) {
+      pdfBuffer = result
+      // Generate unique invoice number sequence
+      const [lastInvoice] = await db
+        .select({ invoiceNumber: invoices.invoiceNumber })
+        .from(invoices)
+        .where(and(eq(invoices.companyId, companyId), eq(invoices.documentType, 'invoice')))
+        .orderBy(desc(invoices.invoiceNumber))
+        .limit(1)
+
+      let nextNumber = 1
+      if (lastInvoice) {
+        const match = lastInvoice.invoiceNumber.match(/(\d+)$/)
+        if (match) nextNumber = parseInt(match[1]) + 1
+      }
+      invoiceNumber = `INV-${new Date().getFullYear()}-${nextNumber.toString().padStart(5, '0')}`
+    } else {
+      pdfBuffer = result.pdfBuffer
+      invoiceNumber = result.receiptNumber || `INV-${order.marketplaceOrderId}`
+    }
+
+    const storageKey = buildInvoiceKey(companyId, invoiceNumber)
+    await uploadDocument(storageKey, pdfBuffer)
+
+    await db.transaction(async (tx) => {
+      // Re-verify inside transaction to avoid race conditions
+      const currentOrder = await tx.query.orders.findFirst({
+        where: and(eq(orders.id, orderId), eq(orders.companyId, companyId)),
+        columns: { invoiceId: true }
+      })
+      if (currentOrder?.invoiceId) return
+
+      const calculatedSubtotal = order.items.reduce((sum: number, i: any) => sum + (parseFloat(i.unitPrice) * parseFloat(i.quantity)), 0)
+      const calculatedTax = order.items.reduce((sum: number, i: any) => sum + (parseFloat(i.unitPrice) * parseFloat(i.quantity) * parseFloat(i.taxRate)), 0)
+      const calculatedTotal = calculatedSubtotal + calculatedTax
+      const averageTaxRate = calculatedSubtotal > 0 ? (calculatedTax / calculatedSubtotal) : 0.19
+
+      const [newInvoice] = await tx
+        .insert(invoices)
+        .values({
+          companyId,
+          documentType: 'invoice',
+          invoiceNumber,
+          status: 'issued',
+          recipientName: order.shippingName || order.buyerName || 'Kunde',
+          recipientStreet: order.shippingStreet || '',
+          recipientZip: order.shippingZip || '',
+          recipientCity: order.shippingCity || '',
+          recipientCountry: order.shippingCountry || 'DE',
+          recipientEmail: order.buyerEmail || null,
+          currency: order.currency || 'EUR',
+          subtotalAmount: calculatedSubtotal.toFixed(2),
+          taxAmount: calculatedTax.toFixed(2),
+          totalAmount: calculatedTotal.toFixed(2),
+          taxRate: averageTaxRate.toFixed(4),
+          dueAt: order.marketplacePurchaseDate || new Date(),
+          pdfStorageKey: storageKey,
+          pdfGeneratedAt: new Date(),
+          issuedAt: new Date()
+        })
+        .returning({ id: invoices.id })
+
+      if (newInvoice && order.items.length > 0) {
+        await tx.insert(invoiceItems).values(
+          order.items.map((item: any, index: number) => ({
+            invoiceId: newInvoice.id,
+            companyId,
+            position: (index + 1).toString(),
+            sku: item.sku,
+            description: item.title || 'Produkt',
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            taxRate: item.taxRate,
+            lineTotal: (parseFloat(item.unitPrice) * parseFloat(item.quantity)).toFixed(2),
+          }))
+        )
+      }
+
+      // Link order to invoice
+      await tx.update(orders)
+        .set({ invoiceId: newInvoice.id })
+        .where(eq(orders.id, orderId))
+    })
+
+    console.log(`[Worker] Saved downloaded invoice ${invoiceNumber} for order ${order.marketplaceOrderId}`)
+  } catch (err) {
+    console.error(`[Worker] Error downloading and saving invoice for order ${order.marketplaceOrderId}:`, err)
+  }
+}
+
 // ─── Persist Orders ───────────────────────────────────────────────────────────
 /**
  * Upsert normalized orders into the database.
@@ -282,20 +494,28 @@ export async function persistOrders(
         affected++
       }
 
-      // If order exists but has no invoice and autoInvoice is on → generate it
-      if (integration?.autoInvoice && !existingOrder.invoiceId) {
-        console.log(`[Worker] Existing order ${order.marketplaceOrderId} has no invoice. Generating...`)
-        try {
-          const invResult = await createInvoiceForOrder(existingOrder.id, companyId)
-          if (invResult && 'pdfBuffer' in invResult && integration.uploadInvoice && adapter?.uploadInvoice) {
-            await adapter.uploadInvoice(
-              order.marketplaceOrderId,
-              invResult.pdfBuffer,
-              `${invResult.invoiceNumber}.pdf`
-            )
+      // Pre-cache/download delivery note for existing orders
+      await generateOrDownloadDeliveryNote(existingOrder.id, companyId, adapter)
+
+      // If order exists but has no invoice
+      if (!existingOrder.invoiceId) {
+        const downloadInvoice = !!integration?.metadata?.downloadInvoice
+        if (downloadInvoice) {
+          await downloadAndSaveMarketplaceInvoice(existingOrder.id, companyId, adapter)
+        } else if (integration?.autoInvoice) {
+          console.log(`[Worker] Existing order ${order.marketplaceOrderId} has no invoice. Generating...`)
+          try {
+            const invResult = await createInvoiceForOrder(existingOrder.id, companyId)
+            if (invResult && 'pdfBuffer' in invResult && integration.uploadInvoice && adapter?.uploadInvoice) {
+              await adapter.uploadInvoice(
+                order.marketplaceOrderId,
+                invResult.pdfBuffer,
+                `${invResult.invoiceNumber}.pdf`
+              )
+            }
+          } catch (invError) {
+            console.error(`[Worker] Error generating invoice for existing order ${order.marketplaceOrderId}:`, invError)
           }
-        } catch (invError) {
-          console.error(`[Worker] Error generating invoice for existing order ${order.marketplaceOrderId}:`, invError)
         }
       }
       // Skip the rest (don't re-insert)
@@ -411,22 +631,31 @@ export async function persistOrders(
       }
     })
 
-    // ── Step 3: Generate invoice AFTER the transaction is committed ────────
+    // ── Step 3: Generate or download invoice + delivery note AFTER the transaction is committed ────────
     // This avoids holding a DB lock during expensive PDF generation + S3 upload.
-    if (integration?.autoInvoice && newOrderId) {
-      try {
-        console.log(`[Worker] Auto-generating invoice for new order ${order.marketplaceOrderId}...`)
-        const invResult = await createInvoiceForOrder(newOrderId, companyId)
-        if (invResult && 'pdfBuffer' in invResult && integration.uploadInvoice && adapter?.uploadInvoice) {
-          console.log(`[Worker] Auto-uploading invoice for order ${order.marketplaceOrderId}...`)
-          await adapter.uploadInvoice(
-            order.marketplaceOrderId,
-            invResult.pdfBuffer,
-            `${invResult.invoiceNumber}.pdf`
-          )
+    if (newOrderId) {
+      // 1. Always generate or download delivery note
+      await generateOrDownloadDeliveryNote(newOrderId, companyId, adapter)
+
+      // 2. Handle invoice download or creation
+      const downloadInvoice = !!integration?.metadata?.downloadInvoice
+      if (downloadInvoice) {
+        await downloadAndSaveMarketplaceInvoice(newOrderId, companyId, adapter)
+      } else if (integration?.autoInvoice) {
+        try {
+          console.log(`[Worker] Auto-generating invoice for new order ${order.marketplaceOrderId}...`)
+          const invResult = await createInvoiceForOrder(newOrderId, companyId)
+          if (invResult && 'pdfBuffer' in invResult && integration.uploadInvoice && adapter?.uploadInvoice) {
+            console.log(`[Worker] Auto-uploading invoice for order ${order.marketplaceOrderId}...`)
+            await adapter.uploadInvoice(
+              order.marketplaceOrderId,
+              invResult.pdfBuffer,
+              `${invResult.invoiceNumber}.pdf`
+            )
+          }
+        } catch (invError) {
+          console.error(`[Worker] Error during auto-invoice for order ${order.marketplaceOrderId}:`, invError)
         }
-      } catch (invError) {
-        console.error(`[Worker] Error during auto-invoice for order ${order.marketplaceOrderId}:`, invError)
       }
     }
   }

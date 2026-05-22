@@ -166,16 +166,44 @@ export async function deleteVatSettingAction(id: string) {
   }
 }
 
-export async function saveMarketplaceAutomationAction(integrationId: string, autoInvoice: boolean, uploadInvoice: boolean) {
+export async function saveMarketplaceAutomationAction(
+  integrationId: string, 
+  autoInvoice: boolean, 
+  uploadInvoice: boolean,
+  downloadInvoice?: boolean
+) {
   const auth = await requireAuth()
   const { marketplaceIntegrations } = await import('@/db/schema/integrations')
-  const { and } = await import('drizzle-orm')
+  const { and, eq } = await import('drizzle-orm')
 
   try {
+    // Fetch current integration to retrieve existing metadata
+    const existing = await db
+      .select({ metadata: marketplaceIntegrations.metadata })
+      .from(marketplaceIntegrations)
+      .where(
+        and(
+          eq(marketplaceIntegrations.id, integrationId),
+          eq(marketplaceIntegrations.companyId, auth.activeCompanyId)
+        )
+      )
+      .limit(1)
+
+    if (existing.length === 0) {
+      return { success: false, message: 'Integration nicht gefunden.' }
+    }
+
+    const currentMetadata = (existing[0].metadata as Record<string, any>) || {}
+    const updatedMetadata = {
+      ...currentMetadata,
+      ...(downloadInvoice !== undefined ? { downloadInvoice } : {})
+    }
+
     await db.update(marketplaceIntegrations)
       .set({ 
         autoInvoice,
         uploadInvoice,
+        metadata: updatedMetadata,
         updatedAt: new Date()
       })
       .where(and(

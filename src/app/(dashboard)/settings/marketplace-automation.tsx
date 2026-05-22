@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { saveMarketplaceAutomationAction } from '@/app/actions/settings'
-import { RefreshCw, CheckCircle2, CloudUpload } from 'lucide-react'
+import { RefreshCw, CheckCircle2, CloudUpload, Download } from 'lucide-react'
 import { CollapsibleSection } from '@/components/collapsible-section'
 
 type Integration = {
@@ -10,30 +10,32 @@ type Integration = {
   type: string
   autoInvoice: boolean
   uploadInvoice: boolean
+  metadata?: any
 }
 
 export function MarketplaceAutomation({ integrations }: { integrations: Integration[] }) {
   const [loadingId, setLoadingId] = useState<string | null>(null)
 
-  // Filter out shipping providers and sort (Otto at the bottom)
+  // Filter out shipping providers and sort (Otto & About You at the bottom)
   const marketplaceIntegrations = integrations
     .filter(i => !['dhl', 'hermes'].includes(i.type))
     .sort((a, b) => {
-      if (a.type === 'otto') return 1
-      if (b.type === 'otto') return -1
+      if (['otto', 'aboutyou'].includes(a.type) && !['otto', 'aboutyou'].includes(b.type)) return 1
+      if (!['otto', 'aboutyou'].includes(a.type) && ['otto', 'aboutyou'].includes(b.type)) return -1
       return 0
     })
 
-  const handleToggle = async (id: string, field: 'autoInvoice' | 'uploadInvoice', currentVal: boolean) => {
+  const handleToggle = async (id: string, field: 'autoInvoice' | 'uploadInvoice' | 'downloadInvoice', currentVal: boolean) => {
     const integration = marketplaceIntegrations.find(i => i.id === id)
-    if (!integration || integration.type === 'otto') return
+    if (!integration) return
 
     setLoadingId(`${id}-${field}`)
     const newVal = !currentVal
     const result = await saveMarketplaceAutomationAction(
       id,
       field === 'autoInvoice' ? newVal : integration.autoInvoice,
-      field === 'uploadInvoice' ? newVal : integration.uploadInvoice
+      field === 'uploadInvoice' ? newVal : integration.uploadInvoice,
+      field === 'downloadInvoice' ? newVal : !!(integration.metadata as any)?.downloadInvoice
     )
 
     if (!result.success) {
@@ -50,6 +52,7 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
       'mirakl_decathlon_eu': 'Decathlon EU (Mirakl)',
       'mirakl_mediamarkt': 'MediaMarkt (Mirakl)',
       'shopify': 'Shopify',
+      'aboutyou': 'About You',
     }
     return labels[type] || type
   }
@@ -75,7 +78,8 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
         ) : (
           <div className="space-y-4">
             {marketplaceIntegrations.map((int) => {
-              const isOtto = int.type === 'otto'
+              const cannotCreateInvoice = int.type === 'otto' || int.type === 'aboutyou'
+              const downloadInvoice = !!(int.metadata as any)?.downloadInvoice
               
               return (
                 <div key={int.id} className="p-5 rounded-2xl border border-gray-100 bg-gray-50/30 flex flex-col lg:row md:flex-row md:items-center justify-between gap-6 transition-all hover:bg-gray-50/50">
@@ -83,6 +87,10 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
                     <div className="w-10 h-10 rounded-xl bg-white border border-gray-200 flex items-center justify-center shadow-sm">
                       {int.type === 'amazon' ? (
                         <span className="font-bold text-orange-500 text-xs">AMZ</span>
+                      ) : int.type === 'otto' ? (
+                        <span className="font-bold text-red-500 text-xs">OTTO</span>
+                      ) : int.type === 'aboutyou' ? (
+                        <span className="font-bold text-black text-xs">AY</span>
                       ) : (
                         <RefreshCw className="text-blue-500 w-5 h-5" />
                       )}
@@ -94,21 +102,36 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
                   </div>
 
                   <div className="flex flex-wrap items-center gap-4">
-                    {isOtto && (
+                    {cannotCreateInvoice && (
                       <div className="px-3 py-1 bg-amber-50 text-amber-700 text-[10px] font-bold rounded-lg border border-amber-200 uppercase tracking-tight">
-                        Otto erstellt eigene Rechnungen
+                        {getLabel(int.type)} erstellt eigene Rechnungen
                       </div>
                     )}
 
                     <div className="flex gap-2">
+                      {cannotCreateInvoice && (
+                        <button
+                          onClick={() => handleToggle(int.id, 'downloadInvoice', downloadInvoice)}
+                          disabled={loadingId === `${int.id}-downloadInvoice`}
+                          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                            downloadInvoice 
+                              ? 'bg-purple-600 border-purple-600 text-white shadow-md shadow-purple-200' 
+                              : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
+                          }`}
+                        >
+                          <Download size={14} />
+                          {loadingId === `${int.id}-downloadInvoice` ? '...' : 'Auto-Download'}
+                        </button>
+                      )}
+
                       <button
                         onClick={() => handleToggle(int.id, 'autoInvoice', int.autoInvoice)}
-                        disabled={loadingId === `${int.id}-autoInvoice` || isOtto}
+                        disabled={loadingId === `${int.id}-autoInvoice` || cannotCreateInvoice}
                         className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
                           int.autoInvoice 
                             ? 'bg-green-600 border-green-600 text-white shadow-md shadow-green-200' 
                             : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
-                        } ${isOtto ? 'opacity-40 cursor-not-allowed grayscale' : ''}`}
+                        } ${cannotCreateInvoice ? 'opacity-40 cursor-not-allowed grayscale' : ''}`}
                       >
                         <CheckCircle2 size={14} />
                         {loadingId === `${int.id}-autoInvoice` ? '...' : 'Auto-Rechnung'}
@@ -116,12 +139,12 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
 
                       <button
                         onClick={() => handleToggle(int.id, 'uploadInvoice', int.uploadInvoice)}
-                        disabled={loadingId === `${int.id}-uploadInvoice` || isOtto}
+                        disabled={loadingId === `${int.id}-uploadInvoice` || cannotCreateInvoice}
                         className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
                           int.uploadInvoice 
                             ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-200' 
                             : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
-                        } ${isOtto ? 'opacity-40 cursor-not-allowed grayscale' : ''}`}
+                        } ${cannotCreateInvoice ? 'opacity-40 cursor-not-allowed grayscale' : ''}`}
                       >
                         <CloudUpload size={14} />
                         {loadingId === `${int.id}-uploadInvoice` ? '...' : 'Auto-Upload'}

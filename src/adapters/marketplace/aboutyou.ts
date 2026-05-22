@@ -245,4 +245,28 @@ export class AboutYouAdapter implements MarketplaceAdapter {
     const arrayBuffer = await response.arrayBuffer()
     return Buffer.from(arrayBuffer)
   }
+
+  /**
+   * Fetches the official invoice PDF from About You
+   */
+  async getInvoice(marketplaceOrderId: string): Promise<Buffer> {
+    console.log(`[AboutYouAdapter] Fetching invoice for ${marketplaceOrderId}...`)
+    const url = `${this.baseUrl}/orders/${marketplaceOrderId}/invoice`
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'X-API-Key': this.config.apiKey,
+        'Accept': 'application/pdf'
+      }
+    })
+
+    if (!response.ok) {
+      const errText = await response.text()
+      throw new Error(`About You API Fehler beim Rechnungs-Abruf: ${response.status} - ${errText}`)
+    }
+
+    const arrayBuffer = await response.arrayBuffer()
+    return Buffer.from(arrayBuffer)
+  }
 }

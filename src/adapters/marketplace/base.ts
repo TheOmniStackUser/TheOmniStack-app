@@ -64,4 +64,18 @@ export interface MarketplaceAdapter {
     pdfBuffer: Buffer,
     fileName: string
   ): Promise<boolean>
+
+  /**
+   * Fetches the official invoice PDF from the marketplace.
+   */
+  getInvoice?(
+    marketplaceOrderId: string
+  ): Promise<Buffer | { pdfBuffer: Buffer; receiptNumber?: string } | null>
+
+  /**
+   * Fetches the official delivery note PDF from the marketplace.
+   */
+  getDeliveryNote?(
+    marketplaceOrderId: string
+  ): Promise<Buffer>
 }

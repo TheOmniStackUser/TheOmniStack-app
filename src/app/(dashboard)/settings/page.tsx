@@ -39,7 +39,8 @@ export default async function SettingsPage() {
         id: marketplaceIntegrations.id,
         type: marketplaceIntegrations.type,
         autoInvoice: marketplaceIntegrations.autoInvoice,
-        uploadInvoice: marketplaceIntegrations.uploadInvoice
+        uploadInvoice: marketplaceIntegrations.uploadInvoice,
+        metadata: marketplaceIntegrations.metadata
       })
       .from(marketplaceIntegrations)
       .where(eq(marketplaceIntegrations.companyId, auth.activeCompanyId))
