@@ -1055,10 +1055,11 @@ export function OrdersTable({
               {orders.filter(o => selectedIds.has(o.id) && o.status !== 'shipped').map((order) => {
                 const orderNum = (order.rawPayload as any)?.orderNumber || order.marketplaceOrderId
                 const currentSize = hermesSelections[order.id] || 'S'
+                const skus = order.items?.map(item => item.sku).filter(Boolean) || []
                 
                 return (
                   <div key={order.id} className="p-4 border border-slate-100 rounded-2xl bg-slate-50/50 hover:bg-slate-50 transition-colors">
-                    <div className="flex justify-between items-start mb-4">
+                    <div className="flex justify-between items-start mb-3">
                       <div>
                         <div className="text-xs font-bold text-blue-600 uppercase tracking-wider">Bestellung</div>
                         <div className="font-black text-slate-900">{orderNum}</div>
@@ -1068,6 +1069,17 @@ export function OrdersTable({
                         <div className="text-sm font-bold text-slate-700">{order.buyerName || 'Unbekannt'}</div>
                       </div>
                     </div>
+                    
+                    {skus.length > 0 && (
+                      <div className="mb-4 flex flex-wrap gap-1.5 items-center">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">SKU:</span>
+                        {skus.map((sku, idx) => (
+                          <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded-lg bg-slate-100 text-[10px] font-mono font-bold text-slate-600 border border-slate-200">
+                            {sku}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     
                     <div className="flex gap-2">
                       {['XS', 'S', 'M', 'L', 'XL'].map((size) => (
