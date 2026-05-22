@@ -38,8 +38,8 @@ export function SidebarNav({ role }: { role: string }) {
               {link.label}
             </Link>
 
-            {/* Nest Returns under Invoices if applicable */}
-            {link.href === '/invoices' && canSeeReturns && (
+            {/* Nest Returns under Quotes if applicable */}
+            {link.href === '/quotes' && canSeeReturns && (
               <Link
                 href="/returns"
                 className={`flex items-center px-4 py-2 mt-1 ml-4 text-xs font-medium rounded-lg transition-all duration-200 ${
