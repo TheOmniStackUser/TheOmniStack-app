@@ -6,6 +6,7 @@ import {
   pgEnum,
   numeric,
   boolean,
+  unique,
 } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { companies } from './companies'
@@ -33,7 +34,7 @@ export const invoices = pgTable('invoices', {
     .references(() => companies.id, { onDelete: 'restrict' }), // never cascade-delete financial records
   documentType: documentTypeEnum('document_type').notNull().default('invoice'),
   // Human-readable invoice number (e.g. "INV-2024-0042")
-  invoiceNumber: text('invoice_number').notNull().unique(),
+  invoiceNumber: text('invoice_number').notNull(),
   draftName: text('draft_name'),
   status: invoiceStatusEnum('status').notNull().default('draft'),
   // Recipient snapshot (immutable copy at time of issuance)
@@ -60,7 +61,9 @@ export const invoices = pgTable('invoices', {
   cancelsInvoiceId: uuid('cancels_invoice_id'), // self-reference
   // Immutable audit fields — set once, never updated
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-})
+}, (t) => ({
+  unqCompanyInvoice: unique('unq_company_invoice_number').on(t.companyId, t.invoiceNumber),
+}))
 
 // ─── Invoice Items ────────────────────────────────────────────────────────────
 export const invoiceItems = pgTable('invoice_items', {
