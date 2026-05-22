@@ -10,14 +10,22 @@ type Integration = {
   type: string
   autoInvoice: boolean
   uploadInvoice: boolean
-  metadata?: any
+  metadata?: unknown
 }
 
 export function MarketplaceAutomation({ integrations }: { integrations: Integration[] }) {
+  const [localIntegrations, setLocalIntegrations] = useState<Integration[]>(integrations)
   const [loadingId, setLoadingId] = useState<string | null>(null)
+  const [prevIntegrations, setPrevIntegrations] = useState<Integration[]>(integrations)
+
+  // Sync state if integrations prop updates from page reload/revalidation
+  if (prevIntegrations !== integrations) {
+    setPrevIntegrations(integrations)
+    setLocalIntegrations(integrations)
+  }
 
   // Filter out shipping providers and sort (Otto & About You at the bottom)
-  const marketplaceIntegrations = integrations
+  const marketplaceIntegrations = localIntegrations
     .filter(i => !['dhl', 'hermes'].includes(i.type))
     .sort((a, b) => {
       if (['otto', 'aboutyou'].includes(a.type) && !['otto', 'aboutyou'].includes(b.type)) return 1
@@ -26,19 +34,68 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
     })
 
   const handleToggle = async (id: string, field: 'autoInvoice' | 'uploadInvoice' | 'downloadInvoice', currentVal: boolean) => {
-    const integration = marketplaceIntegrations.find(i => i.id === id)
-    if (!integration) return
+    const newVal = !currentVal
+
+    // Optimistically update local state immediately
+    setLocalIntegrations(prev => prev.map(int => {
+      if (int.id === id) {
+        if (field === 'downloadInvoice') {
+          const currentMetadata = (int.metadata as Record<string, unknown>) || {}
+          return {
+            ...int,
+            metadata: {
+              ...currentMetadata,
+              downloadInvoice: newVal
+            }
+          }
+        } else {
+          return {
+            ...int,
+            [field]: newVal
+          }
+        }
+      }
+      return int
+    }))
 
     setLoadingId(`${id}-${field}`)
-    const newVal = !currentVal
+
+    // Find in current state for sending accurate payload
+    const integration = localIntegrations.find(i => i.id === id)
+    if (!integration) {
+      setLoadingId(null)
+      return
+    }
+
     const result = await saveMarketplaceAutomationAction(
       id,
       field === 'autoInvoice' ? newVal : integration.autoInvoice,
       field === 'uploadInvoice' ? newVal : integration.uploadInvoice,
-      field === 'downloadInvoice' ? newVal : !!(integration.metadata as any)?.downloadInvoice
+      field === 'downloadInvoice' ? newVal : !!(integration.metadata as Record<string, unknown>)?.downloadInvoice
     )
 
     if (!result.success) {
+      // Revert optimistic state on failure
+      setLocalIntegrations(prev => prev.map(int => {
+        if (int.id === id) {
+          if (field === 'downloadInvoice') {
+            const currentMetadata = (int.metadata as Record<string, unknown>) || {}
+            return {
+              ...int,
+              metadata: {
+                ...currentMetadata,
+                downloadInvoice: currentVal
+              }
+            }
+          } else {
+            return {
+              ...int,
+              [field]: currentVal
+            }
+          }
+        }
+        return int
+      }))
       alert(result.message)
     }
     setLoadingId(null)
@@ -73,13 +130,13 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
         {marketplaceIntegrations.length === 0 ? (
           <div className="text-center py-12 px-4">
             <p className="text-gray-400 text-sm">Keine Marktplatz-Integrationen gefunden.</p>
-            <p className="text-xs text-gray-400 mt-1">Verknüpfe erst einen Marktplatz unter "Integrationen".</p>
+            <p className="text-xs text-gray-400 mt-1">Verknüpfe erst einen Marktplatz unter &quot;Integrationen&quot;.</p>
           </div>
         ) : (
           <div className="space-y-4">
             {marketplaceIntegrations.map((int) => {
               const cannotCreateInvoice = int.type === 'otto' || int.type === 'aboutyou'
-              const downloadInvoice = !!(int.metadata as any)?.downloadInvoice
+              const downloadInvoice = !!(int.metadata as Record<string, unknown>)?.downloadInvoice
               
               return (
                 <div key={int.id} className="p-5 rounded-2xl border border-gray-100 bg-gray-50/30 flex flex-col lg:row md:flex-row md:items-center justify-between gap-6 transition-all hover:bg-gray-50/50">
@@ -115,7 +172,7 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
                           disabled={loadingId === `${int.id}-downloadInvoice`}
                           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
                             downloadInvoice 
-                              ? 'bg-purple-600 border-purple-600 text-white shadow-md shadow-purple-200' 
+                              ? 'bg-green-600 border-green-600 text-white shadow-md shadow-green-200' 
                               : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
                           }`}
                         >
@@ -142,7 +199,7 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
                         disabled={loadingId === `${int.id}-uploadInvoice` || cannotCreateInvoice}
                         className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
                           int.uploadInvoice 
-                            ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-200' 
+                            ? 'bg-green-600 border-green-600 text-white shadow-md shadow-green-200' 
                             : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
                         } ${cannotCreateInvoice ? 'opacity-40 cursor-not-allowed grayscale' : ''}`}
                       >
