@@ -139,6 +139,8 @@ function ZoneRow({ zone, onChange }: { zone: DhlShippingZone; onChange: (z: DhlS
 }
 
 function ProductRow({ product, onChange, onDelete }: { product: DhlProduct; onChange: (p: DhlProduct) => void; onDelete: () => void }) {
+  const [showServices, setShowServices] = useState(false)
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-5">
       <div className="grid grid-cols-12 gap-4 items-start">
@@ -203,25 +205,41 @@ function ProductRow({ product, onChange, onDelete }: { product: DhlProduct; onCh
                 <button
                   type="button"
                   onClick={() => onChange({ ...product, additionalServices: product.additionalServices.filter(s => s !== svc) })}
-                  className="text-gray-400 hover:text-red-500"
+                  className="text-gray-400 hover:text-red-500 font-bold cursor-pointer"
                 >×</button>
               </span>
             ))}
-            <div className="relative group">
+            <div className="relative">
               <button
                 type="button"
-                className="w-5 h-5 rounded-full border border-dashed border-gray-400 text-gray-400 hover:border-yellow-500 hover:text-yellow-600 flex items-center justify-center text-sm leading-none"
+                onClick={() => setShowServices(!showServices)}
+                className="w-5 h-5 rounded-full border border-dashed border-gray-400 text-gray-400 hover:border-yellow-500 hover:text-yellow-600 flex items-center justify-center text-sm leading-none cursor-pointer"
               >+</button>
-              <div className="absolute left-0 top-6 z-10 hidden group-hover:block bg-white border border-gray-200 rounded-lg shadow-lg p-1 w-48">
-                {DHL_SERVICES.filter(s => !product.additionalServices.includes(s)).map(svc => (
-                  <button
-                    key={svc}
-                    type="button"
-                    onClick={() => onChange({ ...product, additionalServices: [...product.additionalServices, svc] })}
-                    className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-yellow-50 hover:text-yellow-800 rounded-md"
-                  >{svc}</button>
-                ))}
-              </div>
+              
+              {showServices && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-10" 
+                    onClick={() => setShowServices(false)}
+                  />
+                  <div className="absolute left-0 top-6 z-20 bg-white border border-gray-200 rounded-lg shadow-lg p-1 w-48">
+                    {DHL_SERVICES.filter(s => !product.additionalServices.includes(s)).map(svc => (
+                      <button
+                        key={svc}
+                        type="button"
+                        onClick={() => {
+                          onChange({ ...product, additionalServices: [...product.additionalServices, svc] })
+                          setShowServices(false)
+                        }}
+                        className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-yellow-50 hover:text-yellow-800 rounded-md cursor-pointer"
+                      >{svc}</button>
+                    ))}
+                    {DHL_SERVICES.filter(s => !product.additionalServices.includes(s)).length === 0 && (
+                      <div className="px-3 py-1.5 text-xs text-gray-400 italic">Keine weiteren Leistungen</div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
