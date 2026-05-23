@@ -2,12 +2,18 @@
 
 import { CollapsibleSection } from '@/components/collapsible-section'
 import type { Company } from '@/db/schema/companies'
+import { FileText } from 'lucide-react'
 
 export function DocumentTextSettings({ company }: { company: Company }) {
   return (
     <CollapsibleSection
       title="Dokumenten-Einstellungen"
       subtitle="Zusätzliche Texte für Lieferscheine und Rechnungen."
+      icon={
+        <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center flex-shrink-0 border border-gray-100">
+          <FileText className="text-gray-500 w-6 h-6" />
+        </div>
+      }
       headerClassName="p-6 flex items-center justify-between cursor-pointer hover:bg-gray-50/50 bg-gray-50/50 transition-colors select-none"
       defaultOpen={false}
     >
