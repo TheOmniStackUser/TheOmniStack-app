@@ -30,6 +30,43 @@ const formatCountry = (code?: string | null) => {
   return map[code.toUpperCase()] || code.toUpperCase()
 }
 
+const formatMarketplaceName = (mp: string | null) => {
+  if (!mp || mp.toLowerCase() === 'manual') return 'Manuell'
+  if (mp === 'mirakl_decathlon') return 'Decathlon'
+  if (mp === 'mirakl_decathlon_eu') return 'MIRAKL Hauptaccount'
+  if (mp === 'mirakl_mediamarkt') return 'MediaMarkt'
+  if (mp === 'otto') return 'Otto'
+  if (mp === 'shopify') return 'Shopify'
+  if (mp === 'aboutyou') return 'About You'
+  if (mp === 'amazon') return 'Amazon'
+  // Capitalize first letter for others
+  return mp.charAt(0).toUpperCase() + mp.slice(1)
+}
+
+const getMarketplaceBadgeStyle = (mp: string | null) => {
+  const norm = mp ? mp.toLowerCase() : 'manual'
+  if (norm === 'manual') {
+    return { backgroundColor: '#f3f4f6', color: '#374151' }
+  }
+  switch (norm) {
+    case 'otto':
+      return { backgroundColor: '#ffebee', color: '#c62828' }
+    case 'aboutyou':
+      return { backgroundColor: '#f3e5f5', color: '#6a1b9a' }
+    case 'shopify':
+      return { backgroundColor: '#e8f5e9', color: '#2e7d32' }
+    case 'mirakl_decathlon':
+    case 'mirakl_decathlon_eu':
+    case 'mirakl_mediamarkt':
+      return { backgroundColor: '#e3f2fd', color: '#0d47a1' }
+    case 'amazon':
+      return { backgroundColor: '#fff3e0', color: '#e65100' }
+    default:
+      // Custom Mirakl integration style (nice clean green)
+      return { backgroundColor: '#e8f5e9', color: '#1b5e20' }
+  }
+}
+
 export function InvoiceList({ initialInvoices }: { initialInvoices: Invoice[] }) {
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [isExporting, setIsExporting] = useState(false)
@@ -366,8 +403,9 @@ export function InvoiceList({ initialInvoices }: { initialInvoices: Invoice[] })
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 uppercase tracking-wider">
-                    {invoice.marketplace || 'Manual'}
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize" 
+                    style={getMarketplaceBadgeStyle(invoice.marketplace)}>
+                    {formatMarketplaceName(invoice.marketplace)}
                   </span>
                 </td>
                 <td className="px-6 py-4 text-slate-600">

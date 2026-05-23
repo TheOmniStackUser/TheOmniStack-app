@@ -185,9 +185,33 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
             // Auto-download invoice after shipping confirmation if enabled
             if (downloadOttoInvoice) {
               console.log(`[Hermes-Action] Scheduled Otto invoice download for order ${order.marketplaceOrderId}`)
-              await new Promise(resolve => setTimeout(resolve, 2000))
-              const { downloadAndSaveMarketplaceInvoice } = await import('@/workers/marketplace-sync')
-              await downloadAndSaveMarketplaceInvoice(order.id, auth.activeCompanyId, ottoAdapter)
+              await new Promise(resolve => setTimeout(resolve, 1000))
+              try {
+                const { downloadAndSaveMarketplaceInvoice } = await import('@/workers/marketplace-sync')
+                await downloadAndSaveMarketplaceInvoice(order.id, auth.activeCompanyId, ottoAdapter)
+              } catch (err) {
+                console.error(`[Hermes-Action] Immediate Otto invoice download failed:`, err)
+              }
+
+              try {
+                const { marketplaceSyncQueue } = await import('@/workers/marketplace-sync')
+                await marketplaceSyncQueue.add(
+                  `sync-otto-invoices-${order.id}`,
+                  {
+                    companyId: auth.activeCompanyId,
+                    marketplace: 'otto',
+                    triggeredByUserId: auth.userId,
+                  },
+                  {
+                    delay: 240000, // 4 minutes delay
+                    removeOnComplete: true,
+                    removeOnFail: true,
+                  }
+                )
+                console.log(`[Hermes-Action] Enqueued delayed marketplace sync job for Otto invoice recovery of order ${order.marketplaceOrderId}`)
+              } catch (queueErr) {
+                console.error(`[Hermes-Action] Failed to enqueue delayed sync job:`, queueErr)
+              }
             }
           } catch (confirmErr: any) {
             const msg = confirmErr?.message ?? String(confirmErr)
@@ -211,9 +235,33 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
             // Auto-download invoice after shipping confirmation if enabled
             if (downloadAboutYouInvoice) {
               console.log(`[Hermes-Action] Scheduled About You invoice download for order ${order.marketplaceOrderId}`)
-              await new Promise(resolve => setTimeout(resolve, 2000))
-              const { downloadAndSaveMarketplaceInvoice } = await import('@/workers/marketplace-sync')
-              await downloadAndSaveMarketplaceInvoice(order.id, auth.activeCompanyId, aboutYouAdapter)
+              await new Promise(resolve => setTimeout(resolve, 1000))
+              try {
+                const { downloadAndSaveMarketplaceInvoice } = await import('@/workers/marketplace-sync')
+                await downloadAndSaveMarketplaceInvoice(order.id, auth.activeCompanyId, aboutYouAdapter)
+              } catch (err) {
+                console.error(`[Hermes-Action] Immediate About You invoice download failed:`, err)
+              }
+
+              try {
+                const { marketplaceSyncQueue } = await import('@/workers/marketplace-sync')
+                await marketplaceSyncQueue.add(
+                  `sync-aboutyou-invoices-${order.id}`,
+                  {
+                    companyId: auth.activeCompanyId,
+                    marketplace: 'aboutyou',
+                    triggeredByUserId: auth.userId,
+                  },
+                  {
+                    delay: 180000, // 3 minutes delay
+                    removeOnComplete: true,
+                    removeOnFail: true,
+                  }
+                )
+                console.log(`[Hermes-Action] Enqueued delayed marketplace sync job for About You invoice recovery of order ${order.marketplaceOrderId}`)
+              } catch (queueErr) {
+                console.error(`[Hermes-Action] Failed to enqueue delayed sync job:`, queueErr)
+              }
             }
           } catch (confirmErr: any) {
             const msg = confirmErr?.message ?? String(confirmErr)
@@ -624,9 +672,33 @@ export async function generateDhlLabelsAction(orderIds?: string[]) {
             // Auto-download invoice after shipping confirmation if enabled
             if (downloadOttoInvoice) {
               console.log(`[DHL-Action] Scheduled Otto invoice download for order ${order.marketplaceOrderId}`)
-              await new Promise(resolve => setTimeout(resolve, 2000))
-              const { downloadAndSaveMarketplaceInvoice } = await import('@/workers/marketplace-sync')
-              await downloadAndSaveMarketplaceInvoice(order.id, auth.activeCompanyId, ottoAdapter)
+              await new Promise(resolve => setTimeout(resolve, 1000))
+              try {
+                const { downloadAndSaveMarketplaceInvoice } = await import('@/workers/marketplace-sync')
+                await downloadAndSaveMarketplaceInvoice(order.id, auth.activeCompanyId, ottoAdapter)
+              } catch (err) {
+                console.error(`[DHL-Action] Immediate Otto invoice download failed:`, err)
+              }
+
+              try {
+                const { marketplaceSyncQueue } = await import('@/workers/marketplace-sync')
+                await marketplaceSyncQueue.add(
+                  `sync-otto-invoices-${order.id}`,
+                  {
+                    companyId: auth.activeCompanyId,
+                    marketplace: 'otto',
+                    triggeredByUserId: auth.userId,
+                  },
+                  {
+                    delay: 240000, // 4 minutes delay
+                    removeOnComplete: true,
+                    removeOnFail: true,
+                  }
+                )
+                console.log(`[DHL-Action] Enqueued delayed marketplace sync job for Otto invoice recovery of order ${order.marketplaceOrderId}`)
+              } catch (queueErr) {
+                console.error(`[DHL-Action] Failed to enqueue delayed sync job:`, queueErr)
+              }
             }
           } catch (confirmErr: any) {
             const msg = confirmErr?.message ?? String(confirmErr)
@@ -650,9 +722,33 @@ export async function generateDhlLabelsAction(orderIds?: string[]) {
             // Auto-download invoice after shipping confirmation if enabled
             if (downloadAboutYouInvoice) {
               console.log(`[DHL-Action] Scheduled About You invoice download for order ${order.marketplaceOrderId}`)
-              await new Promise(resolve => setTimeout(resolve, 2000))
-              const { downloadAndSaveMarketplaceInvoice } = await import('@/workers/marketplace-sync')
-              await downloadAndSaveMarketplaceInvoice(order.id, auth.activeCompanyId, aboutYouAdapterDhl)
+              await new Promise(resolve => setTimeout(resolve, 1000))
+              try {
+                const { downloadAndSaveMarketplaceInvoice } = await import('@/workers/marketplace-sync')
+                await downloadAndSaveMarketplaceInvoice(order.id, auth.activeCompanyId, aboutYouAdapterDhl)
+              } catch (err) {
+                console.error(`[DHL-Action] Immediate About You invoice download failed:`, err)
+              }
+
+              try {
+                const { marketplaceSyncQueue } = await import('@/workers/marketplace-sync')
+                await marketplaceSyncQueue.add(
+                  `sync-aboutyou-invoices-${order.id}`,
+                  {
+                    companyId: auth.activeCompanyId,
+                    marketplace: 'aboutyou',
+                    triggeredByUserId: auth.userId,
+                  },
+                  {
+                    delay: 180000, // 3 minutes delay
+                    removeOnComplete: true,
+                    removeOnFail: true,
+                  }
+                )
+                console.log(`[DHL-Action] Enqueued delayed marketplace sync job for About You invoice recovery of order ${order.marketplaceOrderId}`)
+              } catch (queueErr) {
+                console.error(`[DHL-Action] Failed to enqueue delayed sync job:`, queueErr)
+              }
             }
           } catch (confirmErr: any) {
             const msg = confirmErr?.message ?? String(confirmErr)

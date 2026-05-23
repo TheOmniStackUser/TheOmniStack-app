@@ -700,7 +700,7 @@ export function OrdersTable({
                 return (
                   <Fragment key={order.id}>
                     <tr 
-                      className={`hover:bg-gray-50 transition-colors cursor-pointer ${isSelected ? 'bg-blue-50' : ''}`}
+                      className={`group hover:bg-gray-50 transition-colors cursor-pointer ${isSelected ? 'bg-blue-50 hover:bg-blue-100/50' : ''}`}
                       onClick={() => toggleExpand(order.id)}
                     >
                       <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
@@ -756,7 +756,11 @@ export function OrdersTable({
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">
                         {formattedTotal}
                       </td>
-                      <td className={`px-6 py-4 whitespace-nowrap text-right text-sm font-medium sticky right-0 transition-colors shadow-[-4px_0_4px_-2px_rgba(0,0,0,0.05)] ${isSelected ? 'bg-blue-50' : 'bg-white'}`}>
+                      <td className={`px-6 py-4 whitespace-nowrap text-right text-sm font-medium sticky right-0 transition-colors shadow-[-4px_0_4px_-2px_rgba(0,0,0,0.05)] ${
+                        isSelected 
+                          ? 'bg-blue-50 group-hover:bg-blue-100/50' 
+                          : 'bg-white group-hover:bg-gray-50'
+                      }`}>
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
