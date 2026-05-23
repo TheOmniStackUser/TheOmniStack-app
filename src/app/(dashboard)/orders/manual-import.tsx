@@ -4,7 +4,15 @@ import { useState } from 'react'
 import { triggerManualSyncAction } from '@/app/actions/sync'
 import { useRouter } from 'next/navigation'
 
-export function ManualImport({ customMiraklIntegrations = [] }: { customMiraklIntegrations?: any[] }) {
+export function ManualImport({ 
+  customMiraklIntegrations = [],
+  hasKauflandIntegration = false,
+  hasEbayIntegration = false,
+}: { 
+  customMiraklIntegrations?: any[]
+  hasKauflandIntegration?: boolean
+  hasEbayIntegration?: boolean
+}) {
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(true)
   const [marketplace, setMarketplace] = useState('all')
@@ -75,6 +83,8 @@ export function ManualImport({ customMiraklIntegrations = [] }: { customMiraklIn
             <option value="aboutyou">About You</option>
             <option value="shopify">Shopify</option>
             <option value="mirakl_decathlon">Decathlon</option>
+            {hasKauflandIntegration && <option value="kaufland">Kaufland</option>}
+            {hasEbayIntegration && <option value="ebay">eBay</option>}
             {customMiraklIntegrations.map((integration) => {
               const name = (integration.metadata as any)?.customName || 'Unbenannter Mirakl Marktplatz'
               return (

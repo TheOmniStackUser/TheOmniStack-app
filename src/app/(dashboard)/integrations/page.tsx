@@ -10,6 +10,8 @@ import { AmazonIntegrationForm } from './amazon-form'
 import { DhlIntegrationForm } from './dhl-form'
 import { ShopifyIntegrationForm } from './shopify-form'
 import { AboutYouIntegrationForm } from './aboutyou-form'
+import { KauflandIntegrationForm } from './kaufland-form'
+import { EbayIntegrationForm } from './ebay-form'
 import { SyncSettingsForm } from './sync-settings-form'
 import type { DhlConfig } from './dhl-form'
 import { CollapsibleSection } from '@/components/collapsible-section'
@@ -48,6 +50,8 @@ export default async function IntegrationsPage(props: {
       else if (i.type === 'amazon') label = 'Amazon EU'
       else if (i.type === 'shopify') label = 'Shopify'
       else if (i.type === 'aboutyou') label = 'About You'
+      else if (i.type === 'kaufland') label = 'Kaufland'
+      else if (i.type === 'ebay') label = 'eBay'
       else if (i.type === 'mirakl_decathlon') label = 'Decathlon (Mirakl)'
       else if (i.type === 'mirakl_custom') {
         label = (i.metadata as any)?.customName || 'Anderer Mirakl Marktplatz'
@@ -232,6 +236,52 @@ export default async function IntegrationsPage(props: {
                 <AboutYouIntegrationForm 
                   initialApiKey={integrations.find((i: any) => i.type === 'aboutyou')?.apiKey || ''}
                   initialEnvironment={integrations.find((i: any) => i.type === 'aboutyou')?.environment || 'production'}
+                />
+              </div>
+            </CollapsibleSection>
+
+            {/* Kaufland Card */}
+            <CollapsibleSection
+              title="Kaufland"
+              subtitle="API Anbindung für Bestellimport & Bestandsabgleich"
+              badge={integrations.find((i: any) => i.type === 'kaufland')?.clientId ? (
+                <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  Verbunden
+                </span>
+              ) : (
+                <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
+                  Nicht verbunden
+                </span>
+              )}
+            >
+              <div className="p-6 bg-gray-50">
+                <KauflandIntegrationForm 
+                  initialClientId={integrations.find((i: any) => i.type === 'kaufland')?.clientId || ''}
+                  initialEnvironment={integrations.find((i: any) => i.type === 'kaufland')?.environment || 'production'}
+                />
+              </div>
+            </CollapsibleSection>
+
+            {/* eBay Card */}
+            <CollapsibleSection
+              title="eBay"
+              subtitle="API Anbindung für Bestellimport & Bestandsabgleich"
+              badge={integrations.find((i: any) => i.type === 'ebay')?.clientId ? (
+                <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  Verbunden
+                </span>
+              ) : (
+                <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
+                  Nicht verbunden
+                </span>
+              )}
+            >
+              <div className="p-6 bg-gray-50">
+                <EbayIntegrationForm 
+                  initialClientId={integrations.find((i: any) => i.type === 'ebay')?.clientId || ''}
+                  initialEnvironment={integrations.find((i: any) => i.type === 'ebay')?.environment || 'production'}
                 />
               </div>
             </CollapsibleSection>

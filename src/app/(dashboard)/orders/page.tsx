@@ -45,6 +45,9 @@ export default async function OrdersPage() {
   const dhlIntegration = integrations.find(i => i.type === 'dhl')
   const dhlConfig = dhlIntegration?.metadata as DhlConfig | null
 
+  const hasKauflandIntegration = integrations.some(i => i.type === 'kaufland' && i.clientId && i.clientSecret)
+  const hasEbayIntegration = integrations.some(i => i.type === 'ebay' && i.clientId && i.clientSecret)
+ 
   return (
     <div className="max-w-[1600px] mx-auto">
       <header className="mb-8">
@@ -52,13 +55,19 @@ export default async function OrdersPage() {
         <p className="text-gray-500 mt-2">Alle importierten Bestellungen im Überblick.</p>
       </header>
 
-      <ManualImport customMiraklIntegrations={customMiraklIntegrations} />
+      <ManualImport 
+        customMiraklIntegrations={customMiraklIntegrations} 
+        hasKauflandIntegration={hasKauflandIntegration}
+        hasEbayIntegration={hasEbayIntegration}
+      />
 
       <OrdersTable 
         orders={allOrders} 
         hermesDefaultParcelClass={defaultParcelClass} 
         customMiraklIntegrations={customMiraklIntegrations}
         dhlConfig={dhlConfig}
+        hasKauflandIntegration={hasKauflandIntegration}
+        hasEbayIntegration={hasEbayIntegration}
       />
     </div>
   )

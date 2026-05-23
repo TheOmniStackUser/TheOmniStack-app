@@ -39,6 +39,8 @@ const formatMarketplaceName = (mp: string | null) => {
   if (mp === 'shopify') return 'Shopify'
   if (mp === 'aboutyou') return 'About You'
   if (mp === 'amazon') return 'Amazon'
+  if (mp === 'kaufland') return 'Kaufland'
+  if (mp === 'ebay') return 'eBay'
   // Capitalize first letter for others
   return mp.charAt(0).toUpperCase() + mp.slice(1)
 }
@@ -61,13 +63,25 @@ const getMarketplaceBadgeStyle = (mp: string | null) => {
       return { backgroundColor: '#e3f2fd', color: '#0d47a1' }
     case 'amazon':
       return { backgroundColor: '#fff3e0', color: '#e65100' }
+    case 'kaufland':
+      return { backgroundColor: '#fce8e6', color: '#c5221f' }
+    case 'ebay':
+      return { backgroundColor: '#e8f0fe', color: '#1967d2' }
     default:
       // Custom Mirakl integration style (nice clean green)
       return { backgroundColor: '#e8f5e9', color: '#1b5e20' }
   }
 }
 
-export function InvoiceList({ initialInvoices }: { initialInvoices: Invoice[] }) {
+export function InvoiceList({ 
+  initialInvoices,
+  hasKauflandIntegration = false,
+  hasEbayIntegration = false,
+}: { 
+  initialInvoices: Invoice[]
+  hasKauflandIntegration?: boolean
+  hasEbayIntegration?: boolean
+}) {
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [isExporting, setIsExporting] = useState(false)
   const [showHistory, setShowHistory] = useState<string | null>(null)
@@ -320,6 +334,8 @@ export function InvoiceList({ initialInvoices }: { initialInvoices: Invoice[] })
             <option value="mirakl_mediamarkt">MediaMarkt</option>
             <option value="amazon">Amazon</option>
             <option value="shopify">Shopify</option>
+            {hasKauflandIntegration && <option value="kaufland">Kaufland</option>}
+            {hasEbayIntegration && <option value="ebay">eBay</option>}
           </select>
 
           <div className="flex items-center gap-2">

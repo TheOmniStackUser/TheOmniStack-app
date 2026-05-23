@@ -20,6 +20,8 @@ import { MiraklAdapter } from '@/adapters/marketplace/mirakl'
 import { AmazonAdapter } from '@/adapters/marketplace/amazon'
 import { AboutYouAdapter } from '@/adapters/marketplace/aboutyou'
 import { ShopifyAdapter } from '@/adapters/marketplace/shopify'
+import { KauflandAdapter } from '@/adapters/marketplace/kaufland'
+import { EbayAdapter } from '@/adapters/marketplace/ebay'
 import type { NormalizedOrder, MarketplaceAdapter } from '@/adapters/marketplace/base'
 import { createInvoiceForOrder, formatDocumentNumber } from '@/lib/invoice-service'
 
@@ -174,6 +176,16 @@ export function createMarketplaceSyncWorker() {
             fromDate: job.data.fromDate,
             toDate: job.data.toDate
           })
+        } else if (marketplace === 'kaufland') {
+          rawOrders = await adapter.fetchUnshippedOrders(companyId, {
+            fromDate: job.data.fromDate,
+            toDate: job.data.toDate
+          })
+        } else if (marketplace === 'ebay') {
+          rawOrders = await adapter.fetchUnshippedOrders(companyId, {
+            fromDate: job.data.fromDate,
+            toDate: job.data.toDate
+          })
         } else {
           throw new Error(`Adapter for ${marketplace} is not fully implemented yet`)
         }
@@ -264,6 +276,22 @@ export function getAdapterForIntegration(
     if (!integration.apiKey) return null
     return new AboutYouAdapter({
       apiKey: integration.apiKey,
+      environment: (integration.environment as 'sandbox' | 'production') || 'production'
+    })
+  }
+  if (integration.type === 'kaufland') {
+    if (!integration.clientId || !integration.clientSecret) return null
+    return new KauflandAdapter({
+      clientId: integration.clientId,
+      clientSecret: integration.clientSecret,
+      environment: (integration.environment as 'sandbox' | 'production') || 'production'
+    })
+  }
+  if (integration.type === 'ebay') {
+    if (!integration.clientId || !integration.clientSecret) return null
+    return new EbayAdapter({
+      clientId: integration.clientId,
+      clientSecret: integration.clientSecret,
       environment: (integration.environment as 'sandbox' | 'production') || 'production'
     })
   }

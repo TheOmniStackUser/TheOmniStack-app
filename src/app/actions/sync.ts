@@ -139,6 +139,30 @@ export async function triggerManualSyncAction(data: { marketplace: string, fromD
           fromDate: data.fromDate,
           toDate: data.toDate
         })
+      } else if (integration.type === 'kaufland') {
+        const { KauflandAdapter } = await import('@/adapters/marketplace/kaufland')
+        const kauflandAdapter = new KauflandAdapter({
+          clientId: integration.clientId!,
+          clientSecret: integration.clientSecret!,
+          environment: (integration.environment as 'sandbox' | 'production') || 'production'
+        })
+        adapter = kauflandAdapter
+        rawOrders = await adapter.fetchUnshippedOrders(auth.activeCompanyId, {
+          fromDate: data.fromDate,
+          toDate: data.toDate
+        })
+      } else if (integration.type === 'ebay') {
+        const { EbayAdapter } = await import('@/adapters/marketplace/ebay')
+        const ebayAdapter = new EbayAdapter({
+          clientId: integration.clientId!,
+          clientSecret: integration.clientSecret!,
+          environment: (integration.environment as 'sandbox' | 'production') || 'production'
+        })
+        adapter = ebayAdapter
+        rawOrders = await adapter.fetchUnshippedOrders(auth.activeCompanyId, {
+          fromDate: data.fromDate,
+          toDate: data.toDate
+        })
       }
 
       if (rawOrders && rawOrders.length > 0) {

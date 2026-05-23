@@ -8,30 +8,44 @@ import { InvoiceList } from './invoice-list'
 import { GenerateMissingButton } from './generate-missing-button'
 import { DraftsDropdown } from './drafts-dropdown'
 import { getDraftsAction } from '@/app/actions/manual-invoice'
+import { marketplaceIntegrations } from '@/db/schema/integrations'
 
 export default async function InvoicesPage() {
   const auth = await requireAuth()
   const drafts = await getDraftsAction()
 
-  const allInvoices = await db
-    .select({
-      id: invoices.id,
-      invoiceNumber: invoices.invoiceNumber,
-      recipientName: invoices.recipientName,
-      recipientCountry: invoices.recipientCountry,
-      totalAmount: invoices.totalAmount,
-      currency: invoices.currency,
-      createdAt: invoices.createdAt,
-      pdfStorageKey: invoices.pdfStorageKey,
-      marketplace: orders.marketplace,
-    })
-    .from(invoices)
-    .leftJoin(orders, eq(invoices.id, orders.invoiceId))
-    .where(and(
-      eq(invoices.companyId, auth.activeCompanyId),
-      ne(invoices.documentType, 'quote')
-    ))
-    .orderBy(desc(invoices.createdAt))
+  const [allInvoices, integrations] = await Promise.all([
+    db
+      .select({
+        id: invoices.id,
+        invoiceNumber: invoices.invoiceNumber,
+        recipientName: invoices.recipientName,
+        recipientCountry: invoices.recipientCountry,
+        totalAmount: invoices.totalAmount,
+        currency: invoices.currency,
+        createdAt: invoices.createdAt,
+        pdfStorageKey: invoices.pdfStorageKey,
+        marketplace: orders.marketplace,
+      })
+      .from(invoices)
+      .leftJoin(orders, eq(invoices.id, orders.invoiceId))
+      .where(and(
+        eq(invoices.companyId, auth.activeCompanyId),
+        ne(invoices.documentType, 'quote')
+      ))
+      .orderBy(desc(invoices.createdAt)),
+    db
+      .select({
+        type: marketplaceIntegrations.type,
+        clientId: marketplaceIntegrations.clientId,
+        clientSecret: marketplaceIntegrations.clientSecret,
+      })
+      .from(marketplaceIntegrations)
+      .where(eq(marketplaceIntegrations.companyId, auth.activeCompanyId))
+  ])
+
+  const hasKauflandIntegration = integrations.some(i => i.type === 'kaufland' && i.clientId && i.clientSecret)
+  const hasEbayIntegration = integrations.some(i => i.type === 'ebay' && i.clientId && i.clientSecret)
 
   return (
     <div className="p-8">
@@ -55,7 +69,11 @@ export default async function InvoicesPage() {
         </div>
       </div>
 
-      <InvoiceList initialInvoices={allInvoices} />
+      <InvoiceList 
+        initialInvoices={allInvoices} 
+        hasKauflandIntegration={hasKauflandIntegration}
+        hasEbayIntegration={hasEbayIntegration}
+      />
     </div>
   )
 }

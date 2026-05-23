@@ -35,9 +35,15 @@ interface ReturnLog {
 
 interface ReturnsListProps {
   initialLogs: any[]
+  hasKauflandIntegration?: boolean
+  hasEbayIntegration?: boolean
 }
 
-export function ReturnsList({ initialLogs }: ReturnsListProps) {
+export function ReturnsList({ 
+  initialLogs,
+  hasKauflandIntegration = false,
+  hasEbayIntegration = false,
+}: ReturnsListProps) {
   const [logs, setLogs] = useState<ReturnLog[]>(
     initialLogs.map((l) => ({
       ...l,
@@ -311,8 +317,8 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
             <option value="Amazon">Amazon</option>
             <option value="Otto">Otto</option>
             <option value="Zalando">Zalando</option>
-            <option value="Kaufland">Kaufland</option>
-            <option value="eBay">eBay</option>
+            {hasKauflandIntegration && <option value="Kaufland">Kaufland</option>}
+            {hasEbayIntegration && <option value="eBay">eBay</option>}
             <option value="Mirakl">Mirakl</option>
           </select>
 
@@ -776,8 +782,8 @@ export function ReturnsList({ initialLogs }: ReturnsListProps) {
                     <option value="Amazon">Amazon</option>
                     <option value="Otto">Otto</option>
                     <option value="Zalando">Zalando</option>
-                    <option value="Kaufland">Kaufland</option>
-                    <option value="eBay">eBay</option>
+                    {hasKauflandIntegration && <option value="Kaufland">Kaufland</option>}
+                    {hasEbayIntegration && <option value="eBay">eBay</option>}
                     <option value="Mirakl">Mirakl</option>
                   </select>
                 </div>

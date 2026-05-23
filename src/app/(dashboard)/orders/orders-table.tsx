@@ -32,6 +32,8 @@ const formatMarketplaceName = (mp: string) => {
   if (mp === 'shopify') return 'Shopify'
   if (mp === 'aboutyou') return 'About You'
   if (mp === 'amazon') return 'Amazon'
+  if (mp === 'kaufland') return 'Kaufland'
+  if (mp === 'ebay') return 'eBay'
   // Capitalize first letter for others
   return mp.charAt(0).toUpperCase() + mp.slice(1)
 }
@@ -50,6 +52,10 @@ const getMarketplaceBadgeStyle = (mp: string) => {
       return { backgroundColor: '#e3f2fd', color: '#0d47a1' }
     case 'amazon':
       return { backgroundColor: '#fff3e0', color: '#e65100' }
+    case 'kaufland':
+      return { backgroundColor: '#fce8e6', color: '#c5221f' }
+    case 'ebay':
+      return { backgroundColor: '#e8f0fe', color: '#1967d2' }
     default:
       // Custom Mirakl integration style (nice clean green)
       return { backgroundColor: '#e8f5e9', color: '#1b5e20' }
@@ -60,12 +66,16 @@ export function OrdersTable({
   orders, 
   hermesDefaultParcelClass = 'XS',
   customMiraklIntegrations = [],
-  dhlConfig = null
+  dhlConfig = null,
+  hasKauflandIntegration = false,
+  hasEbayIntegration = false,
 }: { 
   orders: OrderWithItems[]
   hermesDefaultParcelClass?: string
   customMiraklIntegrations?: any[]
   dhlConfig?: DhlConfig | null
+  hasKauflandIntegration?: boolean
+  hasEbayIntegration?: boolean
 }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
@@ -679,6 +689,8 @@ export function OrdersTable({
             <option value="mirakl_decathlon">Decathlon</option>
             <option value="amazon">Amazon</option>
             <option value="shopify">Shopify</option>
+            {hasKauflandIntegration && <option value="kaufland">Kaufland</option>}
+            {hasEbayIntegration && <option value="ebay">eBay</option>}
             {customMiraklIntegrations.map((integration) => {
               const name = (integration.metadata as any)?.customName || 'Unbenannter Mirakl Marktplatz'
               return (

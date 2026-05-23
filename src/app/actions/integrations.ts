@@ -477,6 +477,118 @@ export async function saveAboutYouIntegrationAction(
   return { success: true, message: 'About You Zugangsdaten wurden erfolgreich gespeichert!' }
 }
 
+const KauflandIntegrationSchema = z.object({
+  clientId: z.string().min(1, { message: 'Client Key ist erforderlich.' }).trim(),
+  clientSecret: z.string().min(1, { message: 'Secret Key ist erforderlich.' }).trim(),
+  environment: z.enum(['production', 'sandbox']).default('production'),
+})
+
+export async function saveKauflandIntegrationAction(
+  _state: IntegrationFormState,
+  formData: FormData
+): Promise<IntegrationFormState> {
+  const auth = await requireAuth()
+
+  const validated = KauflandIntegrationSchema.safeParse({
+    clientId: formData.get('clientId'),
+    clientSecret: formData.get('clientSecret'),
+    environment: formData.get('environment'),
+  })
+
+  if (!validated.success) {
+    return { errors: validated.error.flatten().fieldErrors }
+  }
+
+  const { clientId, clientSecret, environment } = validated.data
+
+  const [existing] = await db
+    .select({ id: marketplaceIntegrations.id })
+    .from(marketplaceIntegrations)
+    .where(
+      and(
+        eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
+        eq(marketplaceIntegrations.type, 'kaufland')
+      )
+    )
+    .limit(1)
+
+  if (existing) {
+    await db
+      .update(marketplaceIntegrations)
+      .set({ clientId, clientSecret, environment, updatedAt: new Date() })
+      .where(eq(marketplaceIntegrations.id, existing.id))
+  } else {
+    await db
+      .insert(marketplaceIntegrations)
+      .values({
+        companyId: auth.activeCompanyId,
+        type: 'kaufland',
+        clientId,
+        clientSecret,
+        environment,
+      })
+  }
+
+  revalidatePath('/integrations')
+  return { success: true, message: 'Kaufland Zugangsdaten wurden erfolgreich gespeichert!' }
+}
+
+const EbayIntegrationSchema = z.object({
+  clientId: z.string().min(1, { message: 'Client ID ist erforderlich.' }).trim(),
+  clientSecret: z.string().min(1, { message: 'Client Secret ist erforderlich.' }).trim(),
+  environment: z.enum(['production', 'sandbox']).default('production'),
+})
+
+export async function saveEbayIntegrationAction(
+  _state: IntegrationFormState,
+  formData: FormData
+): Promise<IntegrationFormState> {
+  const auth = await requireAuth()
+
+  const validated = EbayIntegrationSchema.safeParse({
+    clientId: formData.get('clientId'),
+    clientSecret: formData.get('clientSecret'),
+    environment: formData.get('environment'),
+  })
+
+  if (!validated.success) {
+    return { errors: validated.error.flatten().fieldErrors }
+  }
+
+  const { clientId, clientSecret, environment } = validated.data
+
+  const [existing] = await db
+    .select({ id: marketplaceIntegrations.id })
+    .from(marketplaceIntegrations)
+    .where(
+      and(
+        eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
+        eq(marketplaceIntegrations.type, 'ebay')
+      )
+    )
+    .limit(1)
+
+  if (existing) {
+    await db
+      .update(marketplaceIntegrations)
+      .set({ clientId, clientSecret, environment, updatedAt: new Date() })
+      .where(eq(marketplaceIntegrations.id, existing.id))
+  } else {
+    await db
+      .insert(marketplaceIntegrations)
+      .values({
+        companyId: auth.activeCompanyId,
+        type: 'ebay',
+        clientId,
+        clientSecret,
+        environment,
+      })
+  }
+
+  revalidatePath('/integrations')
+  return { success: true, message: 'eBay Zugangsdaten wurden erfolgreich gespeichert!' }
+}
+
 const SyncSettingsSchema = z.object({
   fetchOrdersDaily: z.boolean(),
   fetchOrdersTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'Ungültiges Uhrzeitformat (HH:MM).' }),

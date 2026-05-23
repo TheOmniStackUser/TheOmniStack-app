@@ -110,6 +110,8 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
       'mirakl_mediamarkt': 'MediaMarkt (Mirakl)',
       'shopify': 'Shopify',
       'aboutyou': 'About You',
+      'kaufland': 'Kaufland',
+      'ebay': 'eBay',
     }
     return labels[type] || type
   }
@@ -148,6 +150,10 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
                         <span className="font-bold text-red-500 text-xs">OTTO</span>
                       ) : int.type === 'aboutyou' ? (
                         <span className="font-bold text-black text-xs">AY</span>
+                      ) : int.type === 'kaufland' ? (
+                        <span className="font-bold text-rose-600 text-xs">KLD</span>
+                      ) : int.type === 'ebay' ? (
+                        <span className="font-bold text-blue-600 text-xs">EBAY</span>
                       ) : (
                         <RefreshCw className="text-blue-500 w-5 h-5" />
                       )}
