@@ -90,6 +90,15 @@ export default async function DashboardLayout({
               </Link>
             )}
 
+            <a 
+              href="/api/help" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="flex items-center px-3 py-2 text-sm font-medium rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all"
+            >
+              Hilfe
+            </a>
+
             <form action={logoutAction} className="pt-2">
               <button type="submit" className="w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-400/5 transition-all">
                 Abmelden
