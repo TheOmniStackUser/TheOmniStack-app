@@ -125,6 +125,43 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
           })
           .where(eq(orders.id, order.id))
 
+        // Auto-generate invoice if enabled for this marketplace (e.g. Decathlon, Shopify, Amazon)
+        try {
+          const [integration] = await db
+            .select()
+            .from(marketplaceIntegrations)
+            .where(
+              and(
+                eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
+                eq(marketplaceIntegrations.type, order.marketplace as any),
+                eq(marketplaceIntegrations.isActive, true)
+              )
+            )
+            .limit(1)
+
+          if (integration?.autoInvoice) {
+            console.log(`[Hermes-Action] Auto-generating invoice for order ${order.marketplaceOrderId} during label printing...`)
+            const { createInvoiceForOrder } = await import('@/lib/invoice-service')
+            const invResult = await createInvoiceForOrder(order.id, auth.activeCompanyId)
+            
+            // Upload if enabled
+            if (invResult && 'pdfBuffer' in invResult && integration.uploadInvoice) {
+              const { getAdapterForIntegration } = await import('@/workers/marketplace-sync')
+              const adapter = getAdapterForIntegration(integration)
+              if (adapter?.uploadInvoice) {
+                console.log(`[Hermes-Action] Auto-uploading invoice for order ${order.marketplaceOrderId}...`)
+                await adapter.uploadInvoice(
+                  order.marketplaceOrderId,
+                  invResult.pdfBuffer,
+                  `${invResult.invoiceNumber}.pdf`
+                )
+              }
+            }
+          }
+        } catch (invError) {
+          console.error(`[Hermes-Action] Failed to auto-generate/upload invoice for order ${order.marketplaceOrderId}:`, invError)
+        }
+
         const orderLabels: string[] = []
         if (labelUrl) orderLabels.push(labelUrl)
         if (returnLabelUrl) orderLabels.push(returnLabelUrl)
@@ -531,6 +568,43 @@ export async function generateDhlLabelsAction(orderIds?: string[]) {
             updatedAt: new Date() 
           })
           .where(eq(orders.id, order.id))
+
+        // Auto-generate invoice if enabled for this marketplace (e.g. Decathlon, Shopify, Amazon)
+        try {
+          const [integration] = await db
+            .select()
+            .from(marketplaceIntegrations)
+            .where(
+              and(
+                eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
+                eq(marketplaceIntegrations.type, order.marketplace as any),
+                eq(marketplaceIntegrations.isActive, true)
+              )
+            )
+            .limit(1)
+
+          if (integration?.autoInvoice) {
+            console.log(`[DHL-Action] Auto-generating invoice for order ${order.marketplaceOrderId} during label printing...`)
+            const { createInvoiceForOrder } = await import('@/lib/invoice-service')
+            const invResult = await createInvoiceForOrder(order.id, auth.activeCompanyId)
+            
+            // Upload if enabled
+            if (invResult && 'pdfBuffer' in invResult && integration.uploadInvoice) {
+              const { getAdapterForIntegration } = await import('@/workers/marketplace-sync')
+              const adapter = getAdapterForIntegration(integration)
+              if (adapter?.uploadInvoice) {
+                console.log(`[DHL-Action] Auto-uploading invoice for order ${order.marketplaceOrderId}...`)
+                await adapter.uploadInvoice(
+                  order.marketplaceOrderId,
+                  invResult.pdfBuffer,
+                  `${invResult.invoiceNumber}.pdf`
+                )
+              }
+            }
+          }
+        } catch (invError) {
+          console.error(`[DHL-Action] Failed to auto-generate/upload invoice for order ${order.marketplaceOrderId}:`, invError)
+        }
 
         let confirmError: string | undefined = undefined
 

@@ -292,7 +292,8 @@ export async function syncShippedOrdersInvoices(
 
     for (const integration of activeIntegrations) {
       const downloadInvoice = !!(integration.metadata as any)?.downloadInvoice
-      if (!downloadInvoice) {
+      const autoInvoice = integration.autoInvoice
+      if (!downloadInvoice && !autoInvoice) {
         continue
       }
 
@@ -314,19 +315,31 @@ export async function syncShippedOrdersInvoices(
         continue
       }
 
-      console.log(`[Worker] Found ${candidateOrders.length} orders without invoice for marketplace ${integration.type}`)
+      console.log(`[Worker] Found ${candidateOrders.length} shipped orders without invoice for marketplace ${integration.type}`)
 
       const adapter = getAdapterForIntegration(integration)
-      if (!adapter) {
-        console.error(`[Worker] Failed to initialize adapter for ${integration.type} during syncShippedOrdersInvoices`)
-        continue
-      }
 
       for (const order of candidateOrders) {
         try {
-          await downloadAndSaveMarketplaceInvoice(order.id, companyId, adapter)
+          if (downloadInvoice) {
+            if (!adapter) {
+              console.error(`[Worker] Failed to initialize adapter for ${integration.type} during syncShippedOrdersInvoices download`)
+              continue
+            }
+            await downloadAndSaveMarketplaceInvoice(order.id, companyId, adapter)
+          } else if (autoInvoice) {
+            console.log(`[Worker] Recovery: Auto-generating invoice for order ${order.marketplaceOrderId}...`)
+            const invResult = await createInvoiceForOrder(order.id, companyId)
+            if (invResult && 'pdfBuffer' in invResult && integration.uploadInvoice && adapter?.uploadInvoice) {
+              await adapter.uploadInvoice(
+                order.marketplaceOrderId,
+                invResult.pdfBuffer,
+                `${invResult.invoiceNumber}.pdf`
+              )
+            }
+          }
         } catch (err) {
-          console.error(`[Worker] Failed to download invoice for order ${order.marketplaceOrderId}:`, err)
+          console.error(`[Worker] Failed to generate/download invoice for order ${order.marketplaceOrderId}:`, err)
         }
       }
     }
@@ -584,24 +597,8 @@ export async function persistOrders(
       // Pre-cache/download delivery note for existing orders
       await generateOrDownloadDeliveryNote(existingOrder.id, companyId, adapter)
 
-      // If order exists but has no invoice and autoInvoice is enabled -> generate it (download is done on shipping)
-      if (!existingOrder.invoiceId) {
-        if (integration?.autoInvoice) {
-          console.log(`[Worker] Existing order ${order.marketplaceOrderId} has no invoice. Generating...`)
-          try {
-            const invResult = await createInvoiceForOrder(existingOrder.id, companyId)
-            if (invResult && 'pdfBuffer' in invResult && integration.uploadInvoice && adapter?.uploadInvoice) {
-              await adapter.uploadInvoice(
-                order.marketplaceOrderId,
-                invResult.pdfBuffer,
-                `${invResult.invoiceNumber}.pdf`
-              )
-            }
-          } catch (invError) {
-            console.error(`[Worker] Error generating invoice for existing order ${order.marketplaceOrderId}:`, invError)
-          }
-        }
-      }
+      // Note: Invoices are only created or downloaded on shipping confirmation.
+      // So we do not generate any invoices here for existing orders.
       // Skip the rest (don't re-insert)
       continue
     }
@@ -721,23 +718,8 @@ export async function persistOrders(
       // 1. Always generate or download delivery note
       await generateOrDownloadDeliveryNote(newOrderId, companyId, adapter)
 
-      // 2. Handle invoice creation (downloading is only done on shipping confirmation)
-      if (integration?.autoInvoice) {
-        try {
-          console.log(`[Worker] Auto-generating invoice for new order ${order.marketplaceOrderId}...`)
-          const invResult = await createInvoiceForOrder(newOrderId, companyId)
-          if (invResult && 'pdfBuffer' in invResult && integration.uploadInvoice && adapter?.uploadInvoice) {
-            console.log(`[Worker] Auto-uploading invoice for order ${order.marketplaceOrderId}...`)
-            await adapter.uploadInvoice(
-              order.marketplaceOrderId,
-              invResult.pdfBuffer,
-              `${invResult.invoiceNumber}.pdf`
-            )
-          }
-        } catch (invError) {
-          console.error(`[Worker] Error during auto-invoice for order ${order.marketplaceOrderId}:`, invError)
-        }
-      }
+      // Note: Invoices are only created or downloaded on shipping confirmation.
+      // So we do not generate any invoices here for new orders.
     }
   }
 
