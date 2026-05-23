@@ -227,10 +227,14 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
       )
     }
 
-    // Link to Order if it is a standard invoice
+    // Link to Order if it is a standard invoice and update status to invoiced if it was pending
     if (documentType === 'invoice') {
+      const newStatus = order.status === 'pending' ? 'invoiced' : order.status
       await tx.update(orders)
-        .set({ invoiceId: newInvoice.id })
+        .set({ 
+          invoiceId: newInvoice.id,
+          status: newStatus
+        })
         .where(eq(orders.id, orderId))
     }
 

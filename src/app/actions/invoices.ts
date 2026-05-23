@@ -112,7 +112,8 @@ export async function generateMissingInvoicesAction() {
     .select({ 
       id: orders.id, 
       marketplaceOrderId: orders.marketplaceOrderId,
-      marketplace: orders.marketplace
+      marketplace: orders.marketplace,
+      status: orders.status
     })
     .from(orders)
     .where(
@@ -134,6 +135,11 @@ export async function generateMissingInvoicesAction() {
       const downloadInvoice = !!(integration?.metadata as any)?.downloadInvoice
 
       if (downloadInvoice && integration) {
+        // Skip downloading invoice if the order has not been shipped yet
+        if (order.status !== 'shipped') {
+          console.log(`[Action] Skipping invoice download for order ${order.marketplaceOrderId} because it is not shipped yet (status: ${order.status}).`)
+          continue
+        }
         // Initialize adapter
         let adapter: any = null
         if (order.marketplace === 'otto') {

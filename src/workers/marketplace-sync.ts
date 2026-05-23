@@ -11,7 +11,7 @@ import { orders, orderItems } from '@/db/schema/orders'
 import { companies } from '@/db/schema/companies'
 import { vatSettings } from '@/db/schema/vat-settings'
 import { auditLog } from '@/lib/audit'
-import { eq, and, desc } from 'drizzle-orm'
+import { eq, and, desc, isNull, inArray } from 'drizzle-orm'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { invoices, invoiceItems } from '@/db/schema/invoices'
 import { buildInvoiceKey, buildDeliveryNoteKey, documentExists, uploadDocument } from '@/lib/storage'
@@ -141,19 +141,13 @@ export function createMarketplaceSyncWorker() {
         }
 
         let rawOrders: NormalizedOrder[] = []
-        let adapter: MarketplaceAdapter | null = null
+        const adapter = getAdapterForIntegration(integration)
+
+        if (!adapter) {
+          throw new Error(`Adapter for ${marketplace} could not be initialized (missing config or credentials).`)
+        }
 
         if (marketplace === 'otto') {
-          if (!integration.clientId || !integration.clientSecret) {
-            throw new Error('Otto integration is missing clientId or clientSecret')
-          }
-          adapter = new OttoAdapter({
-            clientId: integration.clientId,
-            clientSecret: integration.clientSecret,
-            environment: (integration.environment as 'sandbox' | 'production') || 'production',
-            installationId: (integration.metadata as any)?.installationId,
-            appId: (integration.metadata as any)?.appId
-          })
           rawOrders = await adapter.fetchUnshippedOrders(companyId, {
             fromDate: job.data.fromDate,
             toDate: job.data.toDate
@@ -164,51 +158,18 @@ export function createMarketplaceSyncWorker() {
           marketplace === 'mirakl_mediamarkt' ||
           marketplace === 'mirakl_custom'
         ) {
-          if (!integration.clientId) {
-            throw new Error(`${marketplace} integration is missing Client ID (or API Key)`)
-          }
-          const customName = integration.type === 'mirakl_custom'
-            ? ((integration.metadata as any)?.customName || 'mirakl_custom')
-            : integration.type
-          adapter = new MiraklAdapter({
-            instance: customName.toLowerCase(),
-            baseUrl: integration.environment!,
-            clientId: integration.clientId,
-            clientSecret: integration.clientSecret || '',
-            apiKey: integration.apiKey || undefined
-          })
           rawOrders = await adapter.fetchUnshippedOrders(companyId, {
             fromDate: job.data.fromDate,
             toDate: job.data.toDate
           })
         } else if (marketplace === 'amazon') {
-          if (!integration.sellerId || !integration.clientId || !integration.clientSecret || !integration.refreshToken) {
-            throw new Error('Amazon integration is missing required credentials')
-          }
-          adapter = new AmazonAdapter({
-            sellerId: integration.sellerId,
-            clientId: integration.clientId,
-            clientSecret: integration.clientSecret,
-            refreshToken: integration.refreshToken
-          })
           rawOrders = await adapter.fetchUnshippedOrders(companyId)
         } else if (marketplace === 'shopify') {
-          if (!integration.environment || !integration.clientId || !integration.clientSecret) {
-            throw new Error('Shopify integration is missing required credentials (URL, Client ID, Client Secret)')
-          }
-          adapter = new ShopifyAdapter()
           rawOrders = await adapter.fetchUnshippedOrders(companyId, {
             fromDate: job.data.fromDate,
             toDate: job.data.toDate
           })
         } else if (marketplace === 'aboutyou') {
-          if (!integration.apiKey) {
-            throw new Error('About You integration is missing API Key')
-          }
-          adapter = new AboutYouAdapter({
-            apiKey: integration.apiKey,
-            environment: (integration.environment as 'sandbox' | 'production') || 'production'
-          })
           rawOrders = await adapter.fetchUnshippedOrders(companyId, {
             fromDate: job.data.fromDate,
             toDate: job.data.toDate
@@ -221,6 +182,9 @@ export function createMarketplaceSyncWorker() {
           const isManualSync = job.name.startsWith('manual-sync')
           await persistOrders(companyId, rawOrders, isManualSync, integration, adapter)
         }
+
+        // Recovery: download invoices for shipped orders that are missing invoices
+        await syncShippedOrdersInvoices(companyId, marketplace as any, integration.id)
 
         await auditLog({
           companyId,
@@ -250,6 +214,125 @@ export function createMarketplaceSyncWorker() {
       concurrency: 5,
     }
   )
+}
+
+export function getAdapterForIntegration(
+  integration: typeof marketplaceIntegrations.$inferSelect
+): MarketplaceAdapter | null {
+  if (integration.type === 'otto') {
+    if (!integration.clientId || !integration.clientSecret) return null
+    return new OttoAdapter({
+      clientId: integration.clientId,
+      clientSecret: integration.clientSecret,
+      environment: (integration.environment as 'sandbox' | 'production') || 'production',
+      installationId: (integration.metadata as any)?.installationId,
+      appId: (integration.metadata as any)?.appId
+    })
+  }
+  if (
+    integration.type === 'mirakl_decathlon' ||
+    integration.type === 'mirakl_decathlon_eu' ||
+    integration.type === 'mirakl_mediamarkt' ||
+    integration.type === 'mirakl_custom'
+  ) {
+    if (!integration.clientId) return null
+    const customName = integration.type === 'mirakl_custom'
+      ? ((integration.metadata as any)?.customName || 'mirakl_custom')
+      : integration.type
+    return new MiraklAdapter({
+      instance: customName.toLowerCase(),
+      baseUrl: integration.environment!,
+      clientId: integration.clientId,
+      clientSecret: integration.clientSecret || '',
+      apiKey: integration.apiKey || undefined
+    })
+  }
+  if (integration.type === 'amazon') {
+    if (!integration.sellerId || !integration.clientId || !integration.clientSecret || !integration.refreshToken) return null
+    return new AmazonAdapter({
+      sellerId: integration.sellerId,
+      clientId: integration.clientId,
+      clientSecret: integration.clientSecret,
+      refreshToken: integration.refreshToken
+    })
+  }
+  if (integration.type === 'shopify') {
+    if (!integration.environment || !integration.clientId || !integration.clientSecret) return null
+    return new ShopifyAdapter()
+  }
+  if (integration.type === 'aboutyou') {
+    if (!integration.apiKey) return null
+    return new AboutYouAdapter({
+      apiKey: integration.apiKey,
+      environment: (integration.environment as 'sandbox' | 'production') || 'production'
+    })
+  }
+  return null
+}
+
+export async function syncShippedOrdersInvoices(
+  companyId: string,
+  marketplace?: NormalizedOrder['marketplace'] | null,
+  integrationId?: string | null
+) {
+  console.log(`[Worker] Starting syncShippedOrdersInvoices for company ${companyId}...`)
+  try {
+    let query: any = and(
+      eq(marketplaceIntegrations.companyId, companyId),
+      eq(marketplaceIntegrations.isActive, true)
+    )
+
+    if (integrationId) {
+      query = and(query, eq(marketplaceIntegrations.id, integrationId))
+    } else if (marketplace) {
+      query = and(query, eq(marketplaceIntegrations.type, marketplace as any))
+    }
+
+    const activeIntegrations = await db.select().from(marketplaceIntegrations).where(query)
+
+    for (const integration of activeIntegrations) {
+      const downloadInvoice = !!(integration.metadata as any)?.downloadInvoice
+      if (!downloadInvoice) {
+        continue
+      }
+
+      // Find orders for this company & marketplace that don't have an invoice yet
+      const candidateOrders = await db
+        .select()
+        .from(orders)
+        .where(
+          and(
+            eq(orders.companyId, companyId),
+            eq(orders.marketplace, integration.type),
+            inArray(orders.status, ['pending', 'invoiced', 'shipped']),
+            isNull(orders.invoiceId),
+            eq(orders.isArchived, false)
+          )
+        )
+
+      if (candidateOrders.length === 0) {
+        continue
+      }
+
+      console.log(`[Worker] Found ${candidateOrders.length} orders without invoice for marketplace ${integration.type}`)
+
+      const adapter = getAdapterForIntegration(integration)
+      if (!adapter) {
+        console.error(`[Worker] Failed to initialize adapter for ${integration.type} during syncShippedOrdersInvoices`)
+        continue
+      }
+
+      for (const order of candidateOrders) {
+        try {
+          await downloadAndSaveMarketplaceInvoice(order.id, companyId, adapter)
+        } catch (err) {
+          console.error(`[Worker] Failed to download invoice for order ${order.marketplaceOrderId}:`, err)
+        }
+      }
+    }
+  } catch (err) {
+    console.error(`[Worker] Error in syncShippedOrdersInvoices:`, err)
+  }
 }
 
 // ─── Pre-cache Delivery Notes and Download Marketplace Invoices ───────────────
@@ -450,9 +533,13 @@ export async function downloadAndSaveMarketplaceInvoice(
         )
       }
 
-      // Link order to invoice
+      // Link order to invoice and update status to shipped since the invoice is now available
+      const newStatus = order.status === 'pending' || order.status === 'invoiced' ? 'shipped' : order.status
       await tx.update(orders)
-        .set({ invoiceId: newInvoice.id })
+        .set({ 
+          invoiceId: newInvoice.id,
+          status: newStatus
+        })
         .where(eq(orders.id, orderId))
     })
 

@@ -44,6 +44,7 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
     // Initialize Otto adapter if needed for confirmation
     let ottoAdapter: OttoAdapter | null = null
     let ottoReturnAddressCarrierId: string | undefined = undefined
+    let downloadOttoInvoice = false
     const hasOttoOrders = pendingOrders.some(o => o.marketplace === 'otto')
     if (hasOttoOrders) {
       const [ottoIntegration] = await db
@@ -67,11 +68,13 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
           appId: (ottoIntegration.metadata as any)?.appId
         })
         ottoReturnAddressCarrierId = (ottoIntegration.metadata as any)?.returnAddressCarrierId
+        downloadOttoInvoice = !!(ottoIntegration.metadata as any)?.downloadInvoice
       }
     }
 
     // Initialize About You adapter if needed for confirmation
     let aboutYouAdapter: AboutYouAdapter | null = null
+    let downloadAboutYouInvoice = false
     const hasAboutYouOrders = pendingOrders.some(o => o.marketplace === 'aboutyou')
     if (hasAboutYouOrders) {
       const [aboutYouIntegration] = await db
@@ -91,6 +94,7 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
           apiKey: aboutYouIntegration.apiKey,
           environment: (aboutYouIntegration.environment as 'sandbox' | 'production') || 'production'
         })
+        downloadAboutYouInvoice = !!(aboutYouIntegration.metadata as any)?.downloadInvoice
       }
     }
 
@@ -140,6 +144,14 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
               order.rawPayload,
               ottoReturnAddressCarrierId
             )
+
+            // Auto-download invoice after shipping confirmation if enabled
+            if (downloadOttoInvoice) {
+              console.log(`[Hermes-Action] Scheduled Otto invoice download for order ${order.marketplaceOrderId}`)
+              await new Promise(resolve => setTimeout(resolve, 2000))
+              const { downloadAndSaveMarketplaceInvoice } = await import('@/workers/marketplace-sync')
+              await downloadAndSaveMarketplaceInvoice(order.id, auth.activeCompanyId, ottoAdapter)
+            }
           } catch (confirmErr: any) {
             const msg = confirmErr?.message ?? String(confirmErr)
             console.error(`[Otto] Failed to confirm shipment for ${order.marketplaceOrderId}:`, msg)
@@ -158,6 +170,14 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
               returnTrackingNumber || undefined,
               order.rawPayload
             )
+
+            // Auto-download invoice after shipping confirmation if enabled
+            if (downloadAboutYouInvoice) {
+              console.log(`[Hermes-Action] Scheduled About You invoice download for order ${order.marketplaceOrderId}`)
+              await new Promise(resolve => setTimeout(resolve, 2000))
+              const { downloadAndSaveMarketplaceInvoice } = await import('@/workers/marketplace-sync')
+              await downloadAndSaveMarketplaceInvoice(order.id, auth.activeCompanyId, aboutYouAdapter)
+            }
           } catch (confirmErr: any) {
             const msg = confirmErr?.message ?? String(confirmErr)
             console.error(`[AboutYou] Failed to confirm shipment for ${order.marketplaceOrderId}:`, msg)
@@ -292,6 +312,7 @@ export async function generateDhlLabelsAction(orderIds?: string[]) {
     // 4. Initialize Marketplace Adapters (for confirmation)
     let ottoAdapter: OttoAdapter | null = null
     let ottoReturnAddressCarrierId: string | undefined = undefined
+    let downloadOttoInvoice = false
     const hasOttoOrders = pendingOrders.some(o => o.marketplace === 'otto')
     if (hasOttoOrders) {
       const [ottoIntegration] = await db
@@ -315,11 +336,13 @@ export async function generateDhlLabelsAction(orderIds?: string[]) {
           appId: (ottoIntegration.metadata as any)?.appId
         })
         ottoReturnAddressCarrierId = (ottoIntegration.metadata as any)?.returnAddressCarrierId
+        downloadOttoInvoice = !!(ottoIntegration.metadata as any)?.downloadInvoice
       }
     }
 
     // Initialize About You adapter if needed for confirmation
     let aboutYouAdapterDhl: AboutYouAdapter | null = null
+    let downloadAboutYouInvoice = false
     const hasAboutYouOrdersDhl = pendingOrders.some(o => o.marketplace === 'aboutyou')
     if (hasAboutYouOrdersDhl) {
       const [aboutYouIntegration] = await db
@@ -339,6 +362,7 @@ export async function generateDhlLabelsAction(orderIds?: string[]) {
           apiKey: aboutYouIntegration.apiKey,
           environment: (aboutYouIntegration.environment as 'sandbox' | 'production') || 'production'
         })
+        downloadAboutYouInvoice = !!(aboutYouIntegration.metadata as any)?.downloadInvoice
       }
     }
 
@@ -522,6 +546,14 @@ export async function generateDhlLabelsAction(orderIds?: string[]) {
               order.rawPayload, // pass raw payload so Otto can find positionItemIds
               ottoReturnAddressCarrierId
             )
+
+            // Auto-download invoice after shipping confirmation if enabled
+            if (downloadOttoInvoice) {
+              console.log(`[DHL-Action] Scheduled Otto invoice download for order ${order.marketplaceOrderId}`)
+              await new Promise(resolve => setTimeout(resolve, 2000))
+              const { downloadAndSaveMarketplaceInvoice } = await import('@/workers/marketplace-sync')
+              await downloadAndSaveMarketplaceInvoice(order.id, auth.activeCompanyId, ottoAdapter)
+            }
           } catch (confirmErr: any) {
             const msg = confirmErr?.message ?? String(confirmErr)
             console.error(`[Otto] Failed to confirm shipment for ${order.marketplaceOrderId}:`, msg)
@@ -540,6 +572,14 @@ export async function generateDhlLabelsAction(orderIds?: string[]) {
               returnTrackingNumber || undefined,
               order.rawPayload
             )
+
+            // Auto-download invoice after shipping confirmation if enabled
+            if (downloadAboutYouInvoice) {
+              console.log(`[DHL-Action] Scheduled About You invoice download for order ${order.marketplaceOrderId}`)
+              await new Promise(resolve => setTimeout(resolve, 2000))
+              const { downloadAndSaveMarketplaceInvoice } = await import('@/workers/marketplace-sync')
+              await downloadAndSaveMarketplaceInvoice(order.id, auth.activeCompanyId, aboutYouAdapterDhl)
+            }
           } catch (confirmErr: any) {
             const msg = confirmErr?.message ?? String(confirmErr)
             console.error(`[AboutYou] Failed to confirm shipment for ${order.marketplaceOrderId}:`, msg)

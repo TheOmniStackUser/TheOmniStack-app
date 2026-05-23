@@ -150,6 +150,10 @@ export async function triggerManualSyncAction(data: { marketplace: string, fromD
       } else {
         console.log(`[Sync] No orders found for ${integration.type}`)
       }
+
+      // Also sync shipped orders invoices for this integration
+      const { syncShippedOrdersInvoices } = await import('@/workers/marketplace-sync')
+      await syncShippedOrdersInvoices(auth.activeCompanyId, integration.type, integration.id)
     } catch (error) {
       console.error(`Error manually syncing ${integration.type}:`, error)
       // Continue to next integration even if one fails

@@ -277,7 +277,10 @@ export function InvoiceList({ initialInvoices }: { initialInvoices: Invoice[] })
           >
             <option value="all">Alle Marktplätze</option>
             <option value="otto">Otto</option>
+            <option value="aboutyou">About You</option>
             <option value="mirakl_decathlon">Decathlon</option>
+            <option value="mirakl_decathlon_eu">Decathlon EU</option>
+            <option value="mirakl_mediamarkt">MediaMarkt</option>
             <option value="amazon">Amazon</option>
             <option value="shopify">Shopify</option>
           </select>
