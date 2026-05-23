@@ -8,11 +8,11 @@ export async function GET() {
     redirect('/login')
   }
 
-  const secretKey = process.env.NEXTAUTH_SECRET || process.env.SESSION_SECRET || 'fallback-secret-for-build-only-do-not-use-in-production'
+  // Must match SSO_SECRET in /var/www/ticketsystem/.env on the ticket server
+  const secretKey = process.env.NEXTAUTH_SECRET || 'fallback-secret-for-build-only-do-not-use-in-production'
   const encodedKey = new TextEncoder().encode(secretKey)
 
-  // Sign a short-lived token containing user credentials
-  // Include both 'email' and 'username' to cover any expected key in the ticket tool
+  // Sign a short-lived token with the user's email
   const token = await new SignJWT({
     email: user.email,
     username: user.email,
@@ -20,8 +20,9 @@ export async function GET() {
   })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime('5m') // Valid for 5 minutes
+    .setExpirationTime('5m')
     .sign(encodedKey)
 
-  redirect(`https://tickets.theomnistack.de/login?token=${token}`)
+  // Redirect to the /sso endpoint on the ticket system
+  redirect(`https://tickets.theomnistack.de/sso?token=${token}`)
 }

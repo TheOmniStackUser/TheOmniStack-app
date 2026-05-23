@@ -84,12 +84,6 @@ export default async function DashboardLayout({
               </Link>
             )}
 
-            {(user?.isSuperAdmin || isSupport) && (
-              <Link href="/admin" className="flex items-center px-3 py-2 text-sm font-bold rounded-lg text-cyan-400 hover:text-cyan-300 hover:bg-cyan-400/5 transition-all mt-4 border-t border-slate-800/50 pt-4">
-                Admin Panel →
-              </Link>
-            )}
-
             <a 
               href="/api/help" 
               target="_blank" 
@@ -98,6 +92,12 @@ export default async function DashboardLayout({
             >
               Hilfe
             </a>
+
+            {(user?.isSuperAdmin || isSupport) && (
+              <Link href="/admin" className="flex items-center px-3 py-2 text-sm font-bold rounded-lg text-cyan-400 hover:text-cyan-300 hover:bg-cyan-400/5 transition-all mt-4 border-t border-slate-800/50 pt-4">
+                Admin Panel →
+              </Link>
+            )}
 
             <form action={logoutAction} className="pt-2">
               <button type="submit" className="w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-400/5 transition-all">
