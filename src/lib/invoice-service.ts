@@ -6,6 +6,44 @@ import { eq, and, desc } from 'drizzle-orm'
 import React from 'react'
 import { uploadDocument, buildInvoiceKey } from '@/lib/storage'
 
+function getCalendarWeek(d: Date): number {
+  const target = new Date(d.valueOf())
+  const dayNr = (d.getDay() + 6) % 7
+  target.setDate(target.getDate() - dayNr + 3)
+  const firstThursday = target.valueOf()
+  target.setMonth(0, 1)
+  if (target.getDay() !== 4) {
+    target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7)
+  }
+  return 1 + Math.ceil((firstThursday - target.valueOf()) / 604800000)
+}
+
+export function formatDocumentNumber(
+  formatTemplate: string,
+  nextNum: number,
+  padding: number,
+  customerNumber?: string,
+  supplierNumber?: string,
+  date: Date = new Date()
+): string {
+  const year = date.getFullYear().toString()
+  const yearShort = year.substring(2)
+  const month = (date.getMonth() + 1).toString().padStart(2, '0')
+  const day = date.getDate().toString().padStart(2, '0')
+  const week = getCalendarWeek(date).toString().padStart(2, '0')
+  const numStr = nextNum.toString().padStart(padding || 1, '0')
+
+  return formatTemplate
+    .replace(/%jahr%/g, year)
+    .replace(/%jahr_kurz%/g, yearShort)
+    .replace(/%monat%/g, month)
+    .replace(/%woche%/g, week)
+    .replace(/%tag%/g, day)
+    .replace(/%kunde%/g, customerNumber || '')
+    .replace(/%lieferant%/g, supplierNumber || '')
+    .replace(/%nummer%/g, numStr)
+}
+
 /**
  * Automatically creates an invoice for a given order if one doesn't exist yet.
  * Returns the created invoice ID and the storage key of the generated PDF.
@@ -62,20 +100,50 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
   if (!company) throw new Error('Company not found')
 
   // 2. Generate Invoice Number
-  const [lastInvoice] = await dbClient
-    .select({ invoiceNumber: invoices.invoiceNumber })
-    .from(invoices)
-    .where(and(eq(invoices.companyId, companyId), eq(invoices.documentType, documentType)))
-    .orderBy(desc(invoices.invoiceNumber))
-    .limit(1)
-
-  let nextNumber = 1
-  if (lastInvoice) {
-    const match = lastInvoice.invoiceNumber.match(/(\d+)$/)
-    if (match) nextNumber = parseInt(match[1]) + 1
+  let settingsKey: 'invoice' | 'quote' | 'creditNote' | 'deliveryNote' | 'purchaseOrder' = 'invoice'
+  if (isCreditNote) {
+    settingsKey = 'creditNote'
+  } else if (documentType === 'quote') {
+    settingsKey = 'quote'
+  } else if (documentType === 'delivery_note') {
+    settingsKey = 'deliveryNote'
   }
-  const prefix = documentType === 'quote' ? 'ANG' : (documentType === 'delivery_note' ? 'LS' : 'INV')
-  const invoiceNumber = `${prefix}-${new Date().getFullYear()}-${nextNumber.toString().padStart(5, '0')}`
+
+  const dbSettings = company.documentNumberSettings as any
+  const config = dbSettings?.[settingsKey]
+
+  let invoiceNumber = ''
+  if (config && config.auto) {
+    const nextNum = parseInt(config.next, 10) || 1
+    const padding = config.padding || 5
+    const customerNumber = order.customerNumber || ''
+    
+    invoiceNumber = formatDocumentNumber(
+      config.format,
+      nextNum,
+      padding,
+      customerNumber,
+      ''
+    )
+  } else if (config && !config.auto) {
+    invoiceNumber = customOrderNumber || `MAN-${Date.now()}`
+  } else {
+    // Fallback to legacy sequence generation
+    const [lastInvoice] = await dbClient
+      .select({ invoiceNumber: invoices.invoiceNumber })
+      .from(invoices)
+      .where(and(eq(invoices.companyId, companyId), eq(invoices.documentType, documentType)))
+      .orderBy(desc(invoices.invoiceNumber))
+      .limit(1)
+
+    let nextNumber = 1
+    if (lastInvoice) {
+      const match = lastInvoice.invoiceNumber.match(/(\d+)$/)
+      if (match) nextNumber = parseInt(match[1]) + 1
+    }
+    const prefix = documentType === 'quote' ? 'ANG' : (documentType === 'delivery_note' ? 'LS' : 'INV')
+    invoiceNumber = `${prefix}-${new Date().getFullYear()}-${nextNumber.toString().padStart(5, '0')}`
+  }
 
   // 3. Generate PDF Buffer (CPU intensive)
   // Dynamic imports required to avoid ESM/CJS module conflict
@@ -178,6 +246,43 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
         columns: { invoiceId: true }
       })
       if (currentOrder?.invoiceId) return { skipped: true, reason: 'Invoice already exists' }
+    }
+
+    // Increment document next number if auto-numbering is enabled
+    const [dbCompany] = await tx
+      .select()
+      .from(companies)
+      .where(eq(companies.id, companyId))
+      .for('update')
+
+    if (dbCompany) {
+      const currentSettings = dbCompany.documentNumberSettings as any || {}
+      const config = currentSettings[settingsKey]
+      if (config && config.auto) {
+        const nextNum = parseInt(config.next, 10) || 1
+        const updatedSettings = {
+          ...currentSettings,
+          [settingsKey]: {
+            ...config,
+            next: (nextNum + 1).toString()
+          }
+        }
+        
+        const updateData: any = {
+          documentNumberSettings: updatedSettings,
+          updatedAt: new Date()
+        }
+        
+        if (settingsKey === 'invoice') {
+          updateData.nextInvoiceNumber = (nextNum + 1).toString()
+        } else if (settingsKey === 'deliveryNote') {
+          updateData.nextDeliveryNoteNumber = (nextNum + 1).toString()
+        }
+
+        await tx.update(companies)
+          .set(updateData)
+          .where(eq(companies.id, companyId))
+      }
     }
 
     const calculatedSubtotal = order.items.reduce((sum: number, i: typeof orderItems.$inferSelect) => sum + (parseFloat(i.unitPrice) * parseFloat(i.quantity)), 0)

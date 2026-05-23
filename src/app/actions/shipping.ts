@@ -320,7 +320,10 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
   }
 }
 
-export async function generateDhlLabelsAction(orderIds?: string[]) {
+export async function generateDhlLabelsAction(
+  orderIds?: string[],
+  orderConfigMap?: Record<string, { productCode: string; weight: number }>
+) {
   const auth = await requireAuth()
 
   try {
@@ -501,14 +504,58 @@ export async function generateDhlLabelsAction(orderIds?: string[]) {
           throw new Error('Retouren-Abrechnungsnummer fehlt. Bitte trage unter Integrationen -> DHL eine Retouren-Abrechnungsnummer ein, um Retourenlabels zu generieren.')
         }
         
+        const orderConfig = orderConfigMap?.[order.id]
+        const productCode = orderConfig?.productCode || domesticZone.productCode || 'V01PAK'
+
+        // Resolve billing number for this product code
+        let zone = config.zones?.find(z => z.productCode === productCode && z.billingNumber)
+        if (!zone) {
+          if (['V62WP', 'V66WPI', 'V86PARCEL', 'V87PARCEL'].includes(productCode)) {
+            zone = config.zones?.find(z => z.id === 'warenpost' && z.billingNumber)
+          }
+        }
+        if (!zone) {
+          zone = domesticZone
+        }
+
+        const billingNum = zone.billingNumber.replace(/\s/g, '')
+        if (billingNum.length !== 14) {
+          throw new Error(`Die Abrechnungsnummer für das ausgewählte Produkt ${productCode} muss exakt 14 Zeichen haben, aktuell: ${billingNum.length} Zeichen.`)
+        }
+        const resolvedReturnBillingNum = zone.returnBillingNumber?.replace(/\s/g, '')
+
+        if (needsEnclosedReturn && !resolvedReturnBillingNum) {
+          throw new Error(`Retouren-Abrechnungsnummer für Produkt ${productCode} fehlt. Bitte trage unter Integrationen -> DHL eine Retouren-Abrechnungsnummer ein.`)
+        }
+
         // Always false to keep return label separate from the outbound label
         const useCombine = false
-        
+
+        // Get weight from map, fallback to order.totalWeight, fallback to product-specific default weight, fallback to defaultWeight
+        let resolvedWeight = orderConfig?.weight
+        if (resolvedWeight === undefined || resolvedWeight === null) {
+          if (order.totalWeight && Number(order.totalWeight) > 0) {
+            resolvedWeight = Number(order.totalWeight)
+          } else {
+            if (productCode === 'V62WP') {
+              resolvedWeight = config.defaultWeightWarenpost ?? 0.2
+            } else if (productCode === 'V66WPI') {
+              resolvedWeight = config.defaultWeightWarenpostInternational ?? 0.2
+            } else if (productCode === 'V86PARCEL') {
+              resolvedWeight = config.defaultWeightKleinpaket ?? 0.5
+            } else if (productCode === 'V87PARCEL') {
+              resolvedWeight = config.defaultWeightKleinpaketInternational ?? 0.5
+            } else {
+              resolvedWeight = config.defaultWeight ?? 1
+            }
+          }
+        }
+
         const shipmentPayload: any = {
           profile: 'STANDARD_GRUPPENPROFIL',
           combinedPrinting: useCombine,
           shipments: [{
-            product: domesticZone.productCode || 'V01PAK',
+            product: productCode,
             billingNumber: billingNum,
             refNo: (() => {
               const raw = order.marketplaceOrderId ?? order.id.replace(/-/g, '')
@@ -534,17 +581,17 @@ export async function generateDhlLabelsAction(orderIds?: string[]) {
               country: toIso3(order.shippingCountry),
             },
             details: {
-              weight: { uom: 'kg', value: order.totalWeight ? Number(order.totalWeight) : (config.defaultWeight ?? 1) },
+              weight: { uom: 'kg', value: resolvedWeight },
             },
           }],
         }
 
         // Add return label if requested and billing number is present
-        if (needsEnclosedReturn && returnBillingNum) {
+        if (needsEnclosedReturn && resolvedReturnBillingNum) {
           shipmentPayload.shipments[0].services = {
             ...shipmentPayload.shipments[0].services,
             dhlRetoure: {
-              billingNumber: returnBillingNum,
+              billingNumber: resolvedReturnBillingNum,
               returnAddress: shipmentPayload.shipments[0].shipper
             }
           }

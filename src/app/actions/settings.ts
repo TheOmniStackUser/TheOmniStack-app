@@ -218,3 +218,48 @@ export async function saveMarketplaceAutomationAction(
     return { success: false, message: 'Fehler beim Speichern.' }
   }
 }
+
+export async function saveDocumentNumberSettingsAction(prevState: any, formData: FormData) {
+  const auth = await requireAuth()
+
+  const documentTypes = ['invoice', 'quote', 'creditNote', 'deliveryNote', 'purchaseOrder'] as const
+  const settings: Record<string, any> = {}
+
+  for (const type of documentTypes) {
+    const auto = formData.get(`${type}_auto`) === 'on'
+    const next = (formData.get(`${type}_next`) as string) || '1'
+    const format = (formData.get(`${type}_format`) as string) || '%nummer%'
+    const padding = parseInt(formData.get(`${type}_padding`) as string, 10) || 5
+    const perContact = formData.get(`${type}_perContact`) === 'on'
+
+    settings[type] = {
+      auto,
+      next,
+      format,
+      padding,
+      perContact
+    }
+  }
+
+  try {
+    const invoiceNext = settings.invoice?.next || '1'
+    const deliveryNoteNext = settings.deliveryNote?.next || '1'
+
+    await db
+      .update(companies)
+      .set({
+        documentNumberSettings: settings,
+        nextInvoiceNumber: invoiceNext,
+        nextDeliveryNoteNumber: deliveryNoteNext,
+        updatedAt: new Date()
+      })
+      .where(eq(companies.id, auth.activeCompanyId))
+
+    revalidatePath('/settings')
+    return { success: true, message: 'Dokumentennummern erfolgreich gespeichert.' }
+  } catch (error) {
+    console.error('Error saving document number settings:', error)
+    return { success: false, message: 'Fehler beim Speichern der Einstellungen.' }
+  }
+}
+
