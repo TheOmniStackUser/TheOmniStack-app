@@ -80,7 +80,7 @@ export default async function SettingsPage() {
       {/* Save Button for Main Profile Settings at the bottom */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div>
-          <h4 className="font-bold text-gray-900">Unternehmensdaten speichern</h4>
+          <h4 className="font-bold text-gray-900">Speichern</h4>
           <p className="text-sm text-gray-500">Klicke hier, um alle oben eingegebenen Stammdaten und Dokumenten-Einstellungen zu sichern.</p>
         </div>
         <button
