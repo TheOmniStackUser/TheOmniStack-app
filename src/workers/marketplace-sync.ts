@@ -296,7 +296,7 @@ export async function syncShippedOrdersInvoices(
         continue
       }
 
-      // Find orders for this company & marketplace that don't have an invoice yet
+      // Find shipped orders for this company & marketplace that don't have an invoice yet
       const candidateOrders = await db
         .select()
         .from(orders)
@@ -304,7 +304,7 @@ export async function syncShippedOrdersInvoices(
           and(
             eq(orders.companyId, companyId),
             eq(orders.marketplace, integration.type),
-            inArray(orders.status, ['pending', 'invoiced', 'shipped']),
+            eq(orders.status, 'shipped'),
             isNull(orders.invoiceId),
             eq(orders.isArchived, false)
           )
@@ -584,12 +584,9 @@ export async function persistOrders(
       // Pre-cache/download delivery note for existing orders
       await generateOrDownloadDeliveryNote(existingOrder.id, companyId, adapter)
 
-      // If order exists but has no invoice
+      // If order exists but has no invoice and autoInvoice is enabled -> generate it (download is done on shipping)
       if (!existingOrder.invoiceId) {
-        const downloadInvoice = !!integration?.metadata?.downloadInvoice
-        if (downloadInvoice) {
-          await downloadAndSaveMarketplaceInvoice(existingOrder.id, companyId, adapter)
-        } else if (integration?.autoInvoice) {
+        if (integration?.autoInvoice) {
           console.log(`[Worker] Existing order ${order.marketplaceOrderId} has no invoice. Generating...`)
           try {
             const invResult = await createInvoiceForOrder(existingOrder.id, companyId)
@@ -724,11 +721,8 @@ export async function persistOrders(
       // 1. Always generate or download delivery note
       await generateOrDownloadDeliveryNote(newOrderId, companyId, adapter)
 
-      // 2. Handle invoice download or creation
-      const downloadInvoice = !!integration?.metadata?.downloadInvoice
-      if (downloadInvoice) {
-        await downloadAndSaveMarketplaceInvoice(newOrderId, companyId, adapter)
-      } else if (integration?.autoInvoice) {
+      // 2. Handle invoice creation (downloading is only done on shipping confirmation)
+      if (integration?.autoInvoice) {
         try {
           console.log(`[Worker] Auto-generating invoice for new order ${order.marketplaceOrderId}...`)
           const invResult = await createInvoiceForOrder(newOrderId, companyId)
