@@ -78,11 +78,9 @@ export default async function DashboardLayout({
               </>
             )}
             
-            {canManage && (
-              <Link href="/settings/users" className="flex items-center px-3 py-2 text-sm font-medium rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all">
-                Team-Verwaltung
-              </Link>
-            )}
+            <Link href="/settings/users" className="flex items-center px-3 py-2 text-sm font-medium rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+              {canManage ? 'Team-Verwaltung' : 'Mein Profil'}
+            </Link>
 
             <a 
               href="/api/help" 

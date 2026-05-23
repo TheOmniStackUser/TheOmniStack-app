@@ -1,0 +1,7 @@
+FROM node:20-alpine
+RUN apk add --no-cache git
+WORKDIR /app
+COPY billing-app/package*.json ./
+RUN npm ci
+COPY billing-app/ .
+CMD ["npx", "tsx", "src/workers/run.ts"]

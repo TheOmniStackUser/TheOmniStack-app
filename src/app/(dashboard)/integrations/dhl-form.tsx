@@ -75,12 +75,15 @@ export type DhlConfig = {
   platformReturns: Record<string, 'none' | 'online' | 'enclosed_with_label' | 'enclosed_without_label'>
 }
 
+const DEFAULT_ZONE_IDS = ['domestic', 'connect', 'eu', 'international', 'warenpost', 'warenpost_international', 'cash_on_delivery']
+
 const DEFAULT_ZONES: DhlShippingZone[] = [
   { id: 'domestic', name: 'Versand innerhalb Deutschlands', billingNumber: '', returnBillingNumber: '', productCode: 'V01PAK', description: 'z.B. 33844215670101' },
   { id: 'connect', name: 'Versand in DHL-Connect-Länder', billingNumber: '', returnBillingNumber: '', productCode: 'V55PAK', description: 'Belgien, Deutschland, Luxemburg, NL, Österreich, Polen, Slowakei, Tschechien' },
   { id: 'eu', name: 'Versand innerhalb Europas', billingNumber: '', returnBillingNumber: '', productCode: 'V53WPAK', description: 'Ohne Zypern & Malta, zzgl. Schweiz' },
   { id: 'international', name: 'Versand außerhalb Europas', billingNumber: '', returnBillingNumber: '', productCode: 'V06PAK', description: 'Weltweit' },
   { id: 'warenpost', name: 'Warenpost / Kleinpaket', billingNumber: '', returnBillingNumber: '', productCode: 'V62WP', description: 'Für leichte Sendungen bis 1 kg' },
+  { id: 'warenpost_international', name: 'Warenpost International', billingNumber: '', returnBillingNumber: '', productCode: 'V66WPI', description: 'Internationale leichte Sendungen' },
   { id: 'cash_on_delivery', name: 'Nachnahme', billingNumber: '', returnBillingNumber: '', productCode: 'V01PAK', description: 'Zahlung bei Lieferung' },
 ]
 
@@ -90,14 +93,45 @@ function generateId() {
 
 // ─── Sub-Components ──────────────────────────────────────────────────────────
 
-function ZoneRow({ zone, onChange }: { zone: DhlShippingZone; onChange: (z: DhlShippingZone) => void }) {
+function ZoneRow({ zone, onChange, onDelete, isCustom }: { zone: DhlShippingZone; onChange: (z: DhlShippingZone) => void; onDelete?: () => void; isCustom?: boolean }) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
       <div className="flex items-center gap-3">
-        <div className="w-2 h-2 bg-yellow-400 rounded-full flex-shrink-0" />
-        <h4 className="font-semibold text-gray-800 text-sm">{zone.name}</h4>
-        {zone.description && (
+        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isCustom ? 'bg-blue-400' : 'bg-yellow-400'}`} />
+        {isCustom ? (
+          <input
+            type="text"
+            value={zone.name}
+            onChange={e => onChange({ ...zone, name: e.target.value })}
+            className="flex-1 px-2 py-1 text-sm font-semibold text-gray-800 border border-transparent rounded focus:outline-none focus:border-gray-300 focus:ring-1 focus:ring-yellow-400 bg-transparent hover:border-gray-200"
+            placeholder="Name der Abrechnungsnummer"
+          />
+        ) : (
+          <h4 className="font-semibold text-gray-800 text-sm">{zone.name}</h4>
+        )}
+        {!isCustom && zone.description && (
           <span className="text-xs text-gray-400 italic">{zone.description}</span>
+        )}
+        {isCustom && (
+          <input
+            type="text"
+            value={zone.description}
+            onChange={e => onChange({ ...zone, description: e.target.value })}
+            className="flex-1 px-2 py-1 text-xs text-gray-400 border border-transparent rounded focus:outline-none focus:border-gray-300 focus:ring-1 focus:ring-yellow-400 bg-transparent hover:border-gray-200 italic"
+            placeholder="Beschreibung (optional)"
+          />
+        )}
+        {isCustom && onDelete && (
+          <button
+            type="button"
+            onClick={onDelete}
+            className="ml-auto p-1.5 text-gray-300 hover:text-red-500 transition-colors flex-shrink-0"
+            title="Entfernen"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
         )}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -302,6 +336,21 @@ export function DhlIntegrationForm({ initialConfig }: { initialConfig?: DhlConfi
 
   const updateZone = (id: string, updated: DhlShippingZone) => {
     setZones(prev => prev.map(z => z.id === id ? updated : z))
+  }
+
+  const addCustomZone = () => {
+    setZones(prev => [...prev, {
+      id: `custom_${generateId()}`,
+      name: '',
+      billingNumber: '',
+      returnBillingNumber: '',
+      productCode: 'V01PAK',
+      description: '',
+    }])
+  }
+
+  const removeCustomZone = (id: string) => {
+    setZones(prev => prev.filter(z => z.id !== id))
   }
 
   const addProduct = () => {
@@ -551,9 +600,44 @@ export function DhlIntegrationForm({ initialConfig }: { initialConfig?: DhlConfi
           <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-600 border border-gray-200">
             <p>Die Abrechnungsnummern (auch Teilnahmenummern genannt) bestehen aus deiner <strong>Kundennummer (EKP)</strong> + Produkt-Kennzeichen + Teilnahme-Nummer. Du findest sie im DHL Geschäftskundenportal.</p>
           </div>
-          {zones.map(zone => (
+
+          {/* Standard-Zonen */}
+          {zones.filter(z => DEFAULT_ZONE_IDS.includes(z.id)).map(zone => (
             <ZoneRow key={zone.id} zone={zone} onChange={updated => updateZone(zone.id, updated)} />
           ))}
+
+          {/* Eigene Abrechnungsnummern */}
+          {zones.filter(z => !DEFAULT_ZONE_IDS.includes(z.id)).length > 0 && (
+            <div className="pt-2">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="h-px flex-1 bg-gray-200" />
+                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Eigene Abrechnungsnummern</span>
+                <div className="h-px flex-1 bg-gray-200" />
+              </div>
+              <div className="space-y-4">
+                {zones.filter(z => !DEFAULT_ZONE_IDS.includes(z.id)).map(zone => (
+                  <ZoneRow
+                    key={zone.id}
+                    zone={zone}
+                    onChange={updated => updateZone(zone.id, updated)}
+                    onDelete={() => removeCustomZone(zone.id)}
+                    isCustom
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={addCustomZone}
+            className="flex items-center gap-2 px-4 py-2 border-2 border-dashed border-blue-200 text-blue-600 rounded-lg text-sm font-medium hover:border-blue-300 hover:bg-blue-50 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+            </svg>
+            Eigene Abrechnungsnummer hinzufügen
+          </button>
         </div>
       )}
 

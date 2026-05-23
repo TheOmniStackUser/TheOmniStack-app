@@ -215,3 +215,78 @@ export async function getOrCreateInviteLinkAction(email: string) {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
   return { inviteLink: `${baseUrl}/invite?token=${token}` }
 }
+
+const UpdateProfileSchema = z.object({
+  name: z.string().min(2, 'Name muss mindestens 2 Zeichen lang sein.').trim(),
+  currentPassword: z.string().optional(),
+  newPassword: z.string().optional(),
+  confirmPassword: z.string().optional(),
+})
+
+export async function updateCurrentUserAction(formData: FormData) {
+  const auth = await requireAuth()
+
+  const data = {
+    name: formData.get('name') as string,
+    currentPassword: (formData.get('currentPassword') as string) || undefined,
+    newPassword: (formData.get('newPassword') as string) || undefined,
+    confirmPassword: (formData.get('confirmPassword') as string) || undefined,
+  }
+
+  const validated = UpdateProfileSchema.safeParse(data)
+  if (!validated.success) {
+    return { error: validated.error.issues[0].message }
+  }
+
+  const { name, currentPassword, newPassword, confirmPassword } = validated.data
+  const changePassword = formData.get('changePassword') === 'true'
+
+  try {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, auth.userId))
+      .limit(1)
+
+    if (!user) {
+      return { error: 'Benutzer nicht gefunden' }
+    }
+
+    const updateFields: any = {
+      name,
+      updatedAt: new Date(),
+    }
+
+    if (changePassword) {
+      if (!currentPassword) {
+        return { error: 'Das aktuelle Passwort ist erforderlich.' }
+      }
+      if (!newPassword || newPassword.length < 8) {
+        return { error: 'Das neue Passwort muss mindestens 8 Zeichen lang sein.' }
+      }
+      if (newPassword !== confirmPassword) {
+        return { error: 'Das neue Passwort und die Bestätigung stimmen nicht überein.' }
+      }
+
+      // Compare current password
+      const isCorrect = await bcrypt.compare(currentPassword, user.passwordHash)
+      if (!isCorrect) {
+        return { error: 'Das eingegebene aktuelle Passwort ist falsch.' }
+      }
+
+      updateFields.passwordHash = await bcrypt.hash(newPassword, 12)
+    }
+
+    await db
+      .update(users)
+      .set(updateFields)
+      .where(eq(users.id, auth.userId))
+
+    revalidatePath('/settings/users')
+    return { success: true }
+  } catch (e) {
+    console.error(e)
+    return { error: 'Fehler beim Aktualisieren des Profils.' }
+  }
+}
+
