@@ -63,6 +63,10 @@ export type DhlConfig = {
   accountNumber: string
   environment: 'production' | 'sandbox'
   defaultWeight: number
+  defaultWeightWarenpost?: number
+  defaultWeightWarenpostInternational?: number
+  defaultWeightKleinpaket?: number
+  defaultWeightKleinpaketInternational?: number
   defaultLengthCm: number
   defaultWidthCm: number
   defaultHeightCm: number
@@ -253,6 +257,10 @@ export function DhlIntegrationForm({ initialConfig }: { initialConfig?: DhlConfi
   const [env, setEnv] = useState<'production' | 'sandbox'>(initialConfig?.environment ?? 'production')
 
   const [defaultWeight, setDefaultWeight] = useState(initialConfig?.defaultWeight ?? 1)
+  const [defaultWeightWarenpost, setDefaultWeightWarenpost] = useState(initialConfig?.defaultWeightWarenpost ?? 0.2)
+  const [defaultWeightWarenpostInternational, setDefaultWeightWarenpostInternational] = useState(initialConfig?.defaultWeightWarenpostInternational ?? 0.2)
+  const [defaultWeightKleinpaket, setDefaultWeightKleinpaket] = useState(initialConfig?.defaultWeightKleinpaket ?? 0.5)
+  const [defaultWeightKleinpaketInternational, setDefaultWeightKleinpaketInternational] = useState(initialConfig?.defaultWeightKleinpaketInternational ?? 0.5)
   const [defaultLength, setDefaultLength] = useState(initialConfig?.defaultLengthCm ?? 30)
   const [defaultWidth, setDefaultWidth] = useState(initialConfig?.defaultWidthCm ?? 20)
   const [defaultHeight, setDefaultHeight] = useState(initialConfig?.defaultHeightCm ?? 10)
@@ -292,7 +300,12 @@ export function DhlIntegrationForm({ initialConfig }: { initialConfig?: DhlConfi
 
   const config: DhlConfig = {
     username, password, apiKey, apiSecret, accountNumber, environment: env,
-    defaultWeight, defaultLengthCm: defaultLength, defaultWidthCm: defaultWidth, defaultHeightCm: defaultHeight,
+    defaultWeight,
+    defaultWeightWarenpost,
+    defaultWeightWarenpostInternational,
+    defaultWeightKleinpaket,
+    defaultWeightKleinpaketInternational,
+    defaultLengthCm: defaultLength, defaultWidthCm: defaultWidth, defaultHeightCm: defaultHeight,
     zones, products, platformReturns,
   }
 
@@ -425,6 +438,75 @@ export function DhlIntegrationForm({ initialConfig }: { initialConfig?: DhlConfi
                   <span className="px-3 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg text-gray-600 text-sm">kg</span>
                 </div>
                 <p className="mt-1 text-xs text-gray-400">z.B. 2 kg</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-gray-100 pt-6">
+            <h4 className="text-sm font-semibold text-gray-700 mb-4">Standardgewichte für Warenpost & Kleinpaket</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Warenpost (National)</label>
+                <div className="flex">
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={defaultWeightWarenpost}
+                    onChange={e => setDefaultWeightWarenpost(Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 text-gray-900"
+                  />
+                  <span className="px-3 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg text-gray-600 text-sm">kg</span>
+                </div>
+                <p className="mt-1 text-xs text-gray-400">z.B. 0.2 kg</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Warenpost International</label>
+                <div className="flex">
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={defaultWeightWarenpostInternational}
+                    onChange={e => setDefaultWeightWarenpostInternational(Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 text-gray-900"
+                  />
+                  <span className="px-3 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg text-gray-600 text-sm">kg</span>
+                </div>
+                <p className="mt-1 text-xs text-gray-400">z.B. 0.2 kg</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Kleinpaket (National)</label>
+                <div className="flex">
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={defaultWeightKleinpaket}
+                    onChange={e => setDefaultWeightKleinpaket(Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 text-gray-900"
+                  />
+                  <span className="px-3 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg text-gray-600 text-sm">kg</span>
+                </div>
+                <p className="mt-1 text-xs text-gray-400">z.B. 0.5 kg</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Kleinpaket International</label>
+                <div className="flex">
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={defaultWeightKleinpaketInternational}
+                    onChange={e => setDefaultWeightKleinpaketInternational(Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 text-gray-900"
+                  />
+                  <span className="px-3 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg text-gray-600 text-sm">kg</span>
+                </div>
+                <p className="mt-1 text-xs text-gray-400">z.B. 0.5 kg</p>
               </div>
             </div>
           </div>

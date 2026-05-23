@@ -61,6 +61,43 @@ export const companies = pgTable('companies', {
   nextInvoiceNumber: text('next_invoice_number').notNull().default('1'),
   nextCustomerNumber: text('next_customer_number').notNull().default('1'),
   nextDeliveryNoteNumber: text('next_delivery_note_number').notNull().default('1'),
+  documentNumberSettings: jsonb('document_number_settings').$type<{
+    invoice?: {
+      auto: boolean;
+      next: string;
+      format: string;
+      padding: number;
+      perContact: boolean;
+    };
+    quote?: {
+      auto: boolean;
+      next: string;
+      format: string;
+      padding: number;
+      perContact: boolean;
+    };
+    creditNote?: {
+      auto: boolean;
+      next: string;
+      format: string;
+      padding: number;
+      perContact: boolean;
+    };
+    deliveryNote?: {
+      auto: boolean;
+      next: string;
+      format: string;
+      padding: number;
+      perContact: boolean;
+    };
+    purchaseOrder?: {
+      auto: boolean;
+      next: string;
+      format: string;
+      padding: number;
+      perContact: boolean;
+    };
+  }>(),
   apiKey: text('api_key').unique(), // For mobile app authentication
   trialExpiresAt: timestamp('trial_expires_at', { withTimezone: true }),
 

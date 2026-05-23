@@ -8,6 +8,7 @@ import { archiveOrderAction, archiveOrdersBulkAction, updateOrderStatusAction } 
 import { getInvoiceDownloadUrl } from '@/app/actions/invoices'
 import type { Order, OrderItem } from '@/db/schema/orders'
 import type { Invoice } from '@/db/schema/invoices'
+import type { DhlConfig } from '@/app/(dashboard)/integrations/dhl-form'
 
 export type OrderWithItems = Order & { items: OrderItem[], invoice?: Invoice | null }
 
@@ -58,11 +59,13 @@ const getMarketplaceBadgeStyle = (mp: string) => {
 export function OrdersTable({ 
   orders, 
   hermesDefaultParcelClass = 'XS',
-  customMiraklIntegrations = []
+  customMiraklIntegrations = [],
+  dhlConfig = null
 }: { 
   orders: OrderWithItems[]
   hermesDefaultParcelClass?: string
   customMiraklIntegrations?: any[]
+  dhlConfig?: DhlConfig | null
 }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
@@ -74,6 +77,9 @@ export function OrdersTable({
   const [showHermesModal, setShowHermesModal] = useState(false)
   const [hermesSelections, setHermesSelections] = useState<Record<string, string>>({})
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
+  
+  const [showDhlModal, setShowDhlModal] = useState(false)
+  const [dhlSelections, setDhlSelections] = useState<Record<string, { productCode: string; weight: number }>>({})
   
   const showToast = (message: string | undefined | null, type: 'success' | 'error' | 'info' = 'info') => {
     if (!message) return
@@ -375,18 +381,62 @@ export function OrdersTable({
   }
 
   const handleGenerateDhlLabels = async () => {
+    if (!dhlConfig) {
+      showToast('DHL ist nicht konfiguriert. Bitte richte die DHL-Verbindung unter Integrationen ein.', 'error')
+      return
+    }
+
     const unshippedIds = Array.from(selectedIds).filter(id => orders.find(o => o.id === id)?.status !== 'shipped')
     if (unshippedIds.length === 0) return
+
+    // Initialize selections for each order
+    const initialSelections: Record<string, { productCode: string; weight: number }> = {}
+    unshippedIds.forEach(id => {
+      const order = orders.find(o => o.id === id)
+      if (!order) return
+
+      // Determine if destination is domestic (Germany)
+      const isDomestic = !order.shippingCountry || ['DE', 'DEU'].includes(order.shippingCountry.toUpperCase())
+      
+      // Default to DHL Paket (V01PAK) for domestic, or DHL Paket International (V06PAK) for international
+      let productCode = isDomestic ? 'V01PAK' : 'V06PAK'
+      let weight = dhlConfig.defaultWeight ?? 1
+
+      if (order.totalWeight && Number(order.totalWeight) > 0) {
+        weight = Number(order.totalWeight)
+      } else {
+        // Fallback to configured default weight for that product type
+        if (productCode === 'V62WP') {
+          weight = dhlConfig.defaultWeightWarenpost ?? 0.2
+        } else if (productCode === 'V66WPI') {
+          weight = dhlConfig.defaultWeightWarenpostInternational ?? 0.2
+        } else if (productCode === 'V86PARCEL') {
+          weight = dhlConfig.defaultWeightKleinpaket ?? 0.5
+        } else if (productCode === 'V87PARCEL') {
+          weight = dhlConfig.defaultWeightKleinpaketInternational ?? 0.5
+        }
+      }
+
+      initialSelections[id] = { productCode, weight }
+    })
+
+    setDhlSelections(initialSelections)
+    setShowDhlModal(true)
+  }
+
+  const confirmGenerateDhlLabels = async () => {
+    setShowDhlModal(false)
     setIsDhlGenerating(true)
     try {
-      const result = await generateDhlLabelsAction(unshippedIds)
+      const ids = Array.from(selectedIds).filter(id => orders.find(o => o.id === id)?.status !== 'shipped')
+      const result = await generateDhlLabelsAction(ids, dhlSelections)
       if (result.error) {
         showToast(result.error, 'error')
       } else {
         showToast(result.message, 'success')
         setSelectedIds(new Set())
         if (result.labels && result.labels.length > 0) {
-          window.open(`/api/orders/bulk/shipping-labels?ids=${unshippedIds.join(',')}`, '_blank')
+          window.open(`/api/orders/bulk/shipping-labels?ids=${ids.join(',')}`, '_blank')
         }
       }
     } catch (e) {
@@ -394,6 +444,47 @@ export function OrdersTable({
     } finally {
       setIsDhlGenerating(false)
     }
+  }
+
+  const handleDhlProductChange = (orderId: string, newProductCode: string) => {
+    setDhlSelections(prev => {
+      const current = prev[orderId]
+      if (!current) return prev
+
+      // Determine default weight for the new product code
+      let defaultW = dhlConfig?.defaultWeight ?? 1
+      if (newProductCode === 'V62WP') {
+        defaultW = dhlConfig?.defaultWeightWarenpost ?? 0.2
+      } else if (newProductCode === 'V66WPI') {
+        defaultW = dhlConfig?.defaultWeightWarenpostInternational ?? 0.2
+      } else if (newProductCode === 'V86PARCEL') {
+        defaultW = dhlConfig?.defaultWeightKleinpaket ?? 0.5
+      } else if (newProductCode === 'V87PARCEL') {
+        defaultW = dhlConfig?.defaultWeightKleinpaketInternational ?? 0.5
+      }
+
+      return {
+        ...prev,
+        [orderId]: {
+          productCode: newProductCode,
+          weight: defaultW
+        }
+      }
+    })
+  }
+
+  const handleDhlWeightChange = (orderId: string, newWeight: number) => {
+    setDhlSelections(prev => {
+      const current = prev[orderId]
+      if (!current) return prev
+      return {
+        ...prev,
+        [orderId]: {
+          ...current,
+          weight: newWeight
+        }
+      }
+    })
   }
 
   const handleDelete = async (orderId: string) => {
@@ -1117,6 +1208,114 @@ export function OrdersTable({
                 className="flex-1 py-4 bg-blue-600 text-white font-black rounded-2xl hover:bg-blue-700 shadow-xl shadow-blue-600/30 transition-all transform active:scale-[0.98]"
               >
                 Labels erstellen ({selectedUnshippedCount})
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DHL Product & Weight Selection Modal */}
+      {showDhlModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowDhlModal(false)}></div>
+          <div className="relative bg-white rounded-2xl p-6 shadow-2xl w-full max-w-2xl border border-slate-200 flex flex-col max-h-[85vh]">
+            <div className="mb-6">
+              <h3 className="text-2xl font-black text-slate-900 flex items-center gap-2">
+                <span className="bg-yellow-400 text-gray-900 px-3 py-1 rounded-lg text-sm font-black tracking-wider uppercase">DHL</span>
+                Produktauswahl & Gewichte
+              </h3>
+              <p className="text-slate-500 text-sm mt-1">Passe das Versandprodukt und das Gewicht (kg) für jede Sendung an.</p>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar">
+              {orders.filter(o => selectedIds.has(o.id) && o.status !== 'shipped').map((order) => {
+                const orderNum = (order.rawPayload as any)?.orderNumber || order.marketplaceOrderId
+                const selection = dhlSelections[order.id] || { productCode: 'V01PAK', weight: 1 }
+                const skus = order.items?.map(item => item.sku).filter(Boolean) || []
+                
+                return (
+                  <div key={order.id} className="p-5 border border-slate-100 rounded-2xl bg-slate-50/50 hover:bg-slate-50 transition-colors">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <div className="text-xs font-bold text-yellow-600 uppercase tracking-wider">Bestellung</div>
+                        <div className="font-black text-slate-900">{orderNum}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Empfänger & Land</div>
+                        <div className="text-sm font-bold text-slate-700 flex items-center justify-end gap-1.5">
+                          {order.buyerName || 'Unbekannt'}
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-600 font-mono">
+                            {formatCountry(order.shippingCountry)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {skus.length > 0 && (
+                      <div className="mb-4 flex flex-wrap gap-1.5 items-center">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">SKU:</span>
+                        {skus.map((sku, idx) => (
+                          <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded-lg bg-slate-100 text-[10px] font-mono font-bold text-slate-600 border border-slate-200">
+                            {sku}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">DHL Produkt</label>
+                        <select
+                          value={selection.productCode}
+                          onChange={(e) => handleDhlProductChange(order.id, e.target.value)}
+                          className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent bg-white text-slate-800 font-bold"
+                        >
+                          <option value="V01PAK">DHL Paket</option>
+                          <option value="V62WP">Warenpost</option>
+                          <option value="V66WPI">Warenpost International</option>
+                          <option value="V86PARCEL">DHL Kleinpaket</option>
+                          <option value="V87PARCEL">DHL Kleinpaket International</option>
+                          <option value="V06PAK">DHL Paket International</option>
+                          <option value="V53WPAK">DHL Europaket</option>
+                          <option value="V55PAK">DHL Paket Connect</option>
+                        </select>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Gewicht (in kg)</label>
+                        <div className="flex">
+                          <input
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            value={selection.weight}
+                            onChange={(e) => handleDhlWeightChange(order.id, Number(e.target.value))}
+                            className="w-full px-3 py-2 text-sm border border-slate-200 rounded-l-xl focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent text-slate-800 font-bold"
+                            placeholder="z.B. 0.2"
+                          />
+                          <span className="px-3 py-2 bg-slate-100 border border-l-0 border-slate-200 rounded-r-xl text-slate-600 font-bold text-sm">
+                            kg
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="mt-8 flex gap-4 pt-4 border-t border-slate-100">
+              <button 
+                onClick={() => setShowDhlModal(false)} 
+                className="flex-1 py-3 border border-slate-200 rounded-xl font-bold text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors text-sm"
+              >
+                Abbrechen
+              </button>
+              <button 
+                onClick={confirmGenerateDhlLabels} 
+                className="flex-1 py-3 bg-yellow-400 hover:bg-yellow-500 text-gray-900 rounded-xl font-black shadow-lg shadow-yellow-400/20 transition-all text-sm"
+              >
+                Labels generieren
               </button>
             </div>
           </div>
