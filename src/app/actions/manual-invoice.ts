@@ -717,6 +717,7 @@ export async function editManualInvoiceAction(data: {
       await tx.insert(invoiceLogs).values({
         invoiceId: invoice.id,
         companyId,
+        userId: auth.userId,
         note: data.internalNote,
         action: 'edited'
       })

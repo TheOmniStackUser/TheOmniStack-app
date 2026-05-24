@@ -10,6 +10,7 @@ import {
 } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { companies } from './companies'
+import { users } from './auth'
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
 export const invoiceStatusEnum = pgEnum('invoice_status', [
@@ -88,6 +89,7 @@ export const invoiceLogs = pgTable('invoice_logs', {
     .notNull()
     .references(() => invoices.id, { onDelete: 'cascade' }),
   companyId: uuid('company_id').notNull(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
   action: text('action').notNull().default('edited'),
   note: text('note').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -108,6 +110,7 @@ export const invoicesRelations = relations(invoices, ({ one, many }) => ({
 
 export const invoiceLogsRelations = relations(invoiceLogs, ({ one }) => ({
   invoice: one(invoices, { fields: [invoiceLogs.invoiceId], references: [invoices.id] }),
+  user: one(users, { fields: [invoiceLogs.userId], references: [users.id] }),
 }))
 
 export const invoiceItemsRelations = relations(invoiceItems, ({ one }) => ({

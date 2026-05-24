@@ -224,7 +224,14 @@ export async function getInvoiceDetailsAction(invoiceId: string) {
     with: {
       items: true,
       logs: {
-        orderBy: (logs, { desc }) => [desc(logs.createdAt)]
+        orderBy: (logs, { desc }) => [desc(logs.createdAt)],
+        with: {
+          user: {
+            columns: {
+              name: true
+            }
+          }
+        }
       }
     }
   })
@@ -256,6 +263,7 @@ export async function addInvoiceLogAction(invoiceId: string, action: string, not
   await db.insert(invoiceLogs).values({
     invoiceId,
     companyId,
+    userId: auth.userId,
     action,
     note: note.trim()
   })
@@ -278,6 +286,7 @@ export async function markInvoiceAsPaidAction(invoiceId: string) {
   await db.insert(invoiceLogs).values({
     invoiceId,
     companyId,
+    userId: auth.userId,
     action: 'payment',
     note: 'Zahlungseingang erfasst. Das Dokument ist vollständig bezahlt.'
   })
@@ -388,12 +397,14 @@ export async function cancelInvoiceAction(invoiceId: string) {
         {
           invoiceId: invoice.id,
           companyId,
+          userId: auth.userId,
           action: 'edited',
           note: `Rechnung wurde storniert. Stornobeleg ${cancelsInvoiceNumber} wurde erstellt.`
         },
         {
           invoiceId: cancellationInvoice.id,
           companyId,
+          userId: auth.userId,
           action: 'edited',
           note: `Stornobeleg für Rechnung ${invoice.invoiceNumber} erstellt.`
         }
@@ -554,6 +565,7 @@ ${data.ccEmail ? `CC: ${data.ccEmail}\n` : ''}Betreff: ${data.subject}`
     await db.insert(invoiceLogs).values({
       invoiceId: invoice.id,
       companyId,
+      userId: auth.userId,
       action: 'email',
       note: logMessage
     })

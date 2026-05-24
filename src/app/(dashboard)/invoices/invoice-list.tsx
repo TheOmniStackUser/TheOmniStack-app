@@ -727,7 +727,7 @@ export function InvoiceList({
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                           </svg>
-                          Edit
+                          Bearbeiten
                         </a>
                         <button
                           onClick={(e) => { e.stopPropagation(); handleShowHistory(invoice.id); }}
@@ -1332,7 +1332,7 @@ export function InvoiceList({
                                     <div>
                                       <p className="font-bold text-slate-800">Version {versionNum}</p>
                                       <p className="text-slate-400 font-semibold mt-0.5">
-                                        {format(new Date(log.createdAt), 'dd.MM.yyyy HH:mm', { locale: de })} • Bearbeiter
+                                        {format(new Date(log.createdAt), 'dd.MM.yyyy HH:mm', { locale: de })} • {log.user?.name || 'Bearbeiter'}
                                       </p>
                                       {log.note && (
                                         <p className="text-[10px] text-slate-500 font-semibold italic mt-1 leading-normal">
@@ -1420,7 +1420,7 @@ export function InvoiceList({
                                     <span>{format(new Date(log.createdAt), 'dd.MM.yyyy HH:mm', { locale: de })}</span>
                                     <span>•</span>
                                     <span className="text-slate-500">
-                                      {log.action === 'email' ? 'System' : 'Bearbeiter'}
+                                      {log.action === 'email' ? 'System' : (log.user?.name || 'Bearbeiter')}
                                     </span>
                                     {isPayment && <span className="text-emerald-600 font-bold uppercase text-[9px]">Zahlung</span>}
                                     {isComment && <span className="text-blue-600 font-bold uppercase text-[9px]">Kommentar</span>}
