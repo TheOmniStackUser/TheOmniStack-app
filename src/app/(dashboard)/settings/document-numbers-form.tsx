@@ -247,9 +247,6 @@ export function DocumentNumbersForm({ company }: { company: Company }) {
               <strong>Beispiel:</strong> Format <code className="bg-white px-1.5 py-0.5 rounded border font-mono">%jahr%-%kunde%-%nummer%</code> 
               ergibt z.B. <code className="bg-white px-1.5 py-0.5 rounded border font-mono">2026-13001-10001</code>
             </span>
-            <span className="text-amber-700 mt-1">
-              <strong>Hinweis zu Kundenfiltern:</strong> Für Kundennummern verwenden wir standardmäßig <code className="font-mono">13001</code> und für Lieferanten <code className="font-mono">50021</code> in dieser Vorschau.
-            </span>
           </div>
         </div>
 
