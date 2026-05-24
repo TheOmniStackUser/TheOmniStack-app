@@ -445,7 +445,7 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
         <View style={styles.summarySection} wrap={false}>
           <View style={{ flex: 1, marginRight: 20 }}>
             <View style={{ fontSize: 9 }}>
-              {customText !== undefined ? (
+              {cancelsInvoiceNumber ? null : (customText !== undefined ? (
                 customText.split('\n').map((line, i) => (
                   <Text key={i} style={{ marginBottom: 2 }}>{line}</Text>
                 ))
@@ -453,7 +453,7 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
                 (isCreditNote ? t.thanksCredit : (documentType === 'quote' ? t.thanksQuote : t.thanks)).split('\n').map((line, i) => (
                   <Text key={i} style={{ marginBottom: 2 }}>{line}</Text>
                 ))
-              )}
+              ))}
             </View>
           </View>
           <View style={styles.summaryTable}>

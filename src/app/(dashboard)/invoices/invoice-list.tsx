@@ -783,7 +783,7 @@ export function InvoiceList({
                       </svg>
                       XML
                     </button>
-                    {invoice.marketplace === 'manual' && (
+                    {invoice.marketplace === 'manual' && invoice.status !== 'cancelled' && (
                       <>
                         <a
                           href={`/invoices/new?edit=${invoice.id}`}
@@ -1178,7 +1178,7 @@ export function InvoiceList({
                         </button>
 
                         {/* Bearbeiten */}
-                        {(details.linkedOrder?.marketplace || 'manual') === 'manual' && (
+                        {(details.linkedOrder?.marketplace || 'manual') === 'manual' && details.invoice.status !== 'cancelled' && (
                           <a
                             href={`/invoices/new?edit=${details.invoice.id}`}
                             className="inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 transition-all shadow-sm"
@@ -1279,7 +1279,7 @@ export function InvoiceList({
                                     Storno erstellen
                                   </button>
                                 )}
-                                {details.invoice.documentType === 'invoice' && (
+                                {details.invoice.documentType === 'invoice' && details.invoice.status !== 'cancelled' && (
                                   <a
                                     href={`/invoices/new?clone=${details.invoice.id}&isCreditNote=true`}
                                     onClick={() => setShowMoreMenu(false)}
