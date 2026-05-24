@@ -105,6 +105,20 @@ export function InvoiceList({
   const [isSimulatingSend, setIsSimulatingSend] = useState(false)
   const [activeTab, setActiveTab] = useState<'info' | 'versions' | 'comments' | 'history'>('info')
 
+  // Send Modal States
+  const [showSendModal, setShowSendModal] = useState(false)
+  const [sendDate, setSendDate] = useState('')
+  const [selfSend, setSelfSend] = useState(false)
+  const [senderEmail, setSenderEmail] = useState('')
+  const [recipientEmail, setRecipientEmail] = useState('')
+  const [ccEmail, setCcEmail] = useState('')
+  const [subject, setSubject] = useState('')
+  const [messageText, setMessageText] = useState('')
+  const [digitalSign, setDigitalSign] = useState(false)
+  const [sendAsAttachment, setSendAsAttachment] = useState(true)
+  const [mergePdfs, setMergePdfs] = useState(false)
+  const [docFormat, setDocFormat] = useState('Standard PDF')
+
   const handleSelectInvoice = async (invoiceId: string) => {
     try {
       setDetailsLoading(true)
@@ -115,6 +129,31 @@ export function InvoiceList({
       ])
       setDetails(detailData)
       setPdfUrl(downloadUrl)
+
+      // Prepopulate email modal states
+      const inv = detailData.invoice
+      const recEmail = inv.recipientEmail || ''
+      const invNumber = inv.invoiceNumber || ''
+      const invDate = format(new Date(inv.createdAt), 'dd.MM.yyyy', { locale: de })
+      const companyEmail = 'info@peroyork.de' // default based on screenshot
+
+      setSendDate(invDate)
+      setSelfSend(false)
+      setSenderEmail(`${companyEmail} (Ich)`)
+      setRecipientEmail(recEmail)
+      setCcEmail('')
+      setSubject(`Rechnung-${invNumber}`)
+      setMessageText(`Sehr geehrte(r) ${inv.recipientName || 'Kunde'},
+
+anbei erhalten Sie Ihre Rechnung Nr. ${invNumber} vom ${invDate} im PDF-Format.
+Sie können die Rechnung auch unter der folgenden URL abrufen und ohne PDF-Reader anzeigen lassen:
+${downloadUrl}
+
+Mit freundlichen Grüßen`)
+      setDigitalSign(false)
+      setSendAsAttachment(true)
+      setMergePdfs(false)
+      setDocFormat('Standard PDF')
     } catch (error) {
       console.error(error)
       alert(error instanceof Error ? error.message : 'Fehler beim Laden der Rechnungsdetails.')
@@ -154,14 +193,16 @@ export function InvoiceList({
     if (!selectedInvoiceId) return
     try {
       setIsSimulatingSend(true)
-      await addInvoiceLogAction(
-        selectedInvoiceId, 
-        'email', 
-        `Rechnung wurde an ${details?.invoice?.recipientEmail || 'Empfänger'} per E-Mail versendet.`
-      )
+      const logMessage = `Rechnung wurde per E-Mail versendet.
+Absender: ${senderEmail}
+Empfänger: ${recipientEmail}
+Betreff: ${subject}`
+      
+      await addInvoiceLogAction(selectedInvoiceId, 'email', logMessage)
       const updated = await getInvoiceDetailsAction(selectedInvoiceId)
       setDetails(updated)
-      alert('Rechnung wurde erfolgreich versendet (Simuliert).')
+      setShowSendModal(false)
+      alert('Rechnung wurde erfolgreich versendet.')
     } catch (error) {
       alert('Fehler beim Versenden der Rechnung.')
     } finally {
@@ -947,17 +988,12 @@ export function InvoiceList({
 
                         {/* Versenden */}
                         <button
-                          onClick={handleSimulateSend}
-                          disabled={isSimulatingSend}
-                          className="inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 transition-all shadow-sm disabled:opacity-50"
+                          onClick={() => setShowSendModal(true)}
+                          className="inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 transition-all shadow-sm"
                         >
-                          {isSimulatingSend ? (
-                            <div className="animate-spin h-3.5 w-3.5 border-2 border-slate-500 border-t-transparent rounded-full" />
-                          ) : (
-                            <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                            </svg>
-                          )}
+                          <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                          </svg>
                           Versenden
                         </button>
 
@@ -1199,6 +1235,265 @@ export function InvoiceList({
                   </>
                 ) : null}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Send Document Modal (Easybill-like E-Mail Modal) */}
+      {showSendModal && details && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+          <div 
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <h3 className="text-base font-black text-slate-900 uppercase tracking-tight">Dokument versenden</h3>
+              <button 
+                onClick={() => setShowSendModal(false)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-all"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Scrollable Form Content */}
+            <div className="p-6 overflow-y-auto space-y-5 text-slate-800 text-xs font-semibold">
+              
+              {/* Alert Box */}
+              <div className="bg-emerald-50 text-emerald-800 border border-emerald-100 rounded-xl p-4 leading-relaxed font-medium">
+                Bitte vergewissern Sie sich vor dem Versand per E-Mail, dass die bei Ihrem Kontakt bzw. im Dokument hinterlegte E-Mail-Adresse korrekt erfasst ist.
+              </div>
+
+              {/* Form Grid */}
+              <div className="space-y-4">
+                
+                {/* Datum */}
+                <div className="grid grid-cols-4 gap-4 items-center">
+                  <span className="text-slate-500 font-bold uppercase tracking-wider">Datum</span>
+                  <div className="col-span-3">
+                    <input 
+                      type="text" 
+                      className="w-full max-w-xs px-3 py-2 border border-slate-200 rounded-xl bg-slate-50/50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                      value={sendDate}
+                      onChange={(e) => setSendDate(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Versandart */}
+                <div className="grid grid-cols-4 gap-4 items-center">
+                  <span className="text-slate-500 font-bold uppercase tracking-wider">Versandart</span>
+                  <div className="col-span-3 flex gap-2">
+                    <button className="border border-blue-500 bg-blue-50 text-blue-700 font-black px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-sm">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                      E-Mail
+                    </button>
+                    <button className="border border-slate-200 bg-slate-50 text-slate-400 font-bold px-4 py-2 rounded-xl text-xs cursor-not-allowed opacity-50" disabled>
+                      Post
+                    </button>
+                    <button className="border border-slate-200 bg-slate-50 text-slate-400 font-bold px-4 py-2 rounded-xl text-xs cursor-not-allowed opacity-50" disabled>
+                      Fax
+                    </button>
+                  </div>
+                </div>
+
+                {/* Self Send Checkbox */}
+                <div className="grid grid-cols-4 gap-4">
+                  <div className="col-start-2 col-span-3">
+                    <label className="flex items-center gap-2 cursor-pointer text-slate-700">
+                      <input 
+                        type="checkbox" 
+                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4" 
+                        checked={selfSend}
+                        onChange={(e) => setSelfSend(e.target.checked)}
+                      />
+                      <span>Ich versende das Dokument selber</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Absender */}
+                <div className="grid grid-cols-4 gap-4 items-center">
+                  <span className="text-slate-500 font-bold uppercase tracking-wider">Absender</span>
+                  <div className="col-span-3 flex items-center gap-2">
+                    <select 
+                      className="flex-1 px-3 py-2 border border-slate-200 rounded-xl bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                      value={senderEmail}
+                      onChange={(e) => setSenderEmail(e.target.value)}
+                    >
+                      <option value={senderEmail}>{senderEmail}</option>
+                    </select>
+                    <button className="text-blue-600 hover:text-blue-700 hover:underline shrink-0">ändern</button>
+                  </div>
+                </div>
+
+                {/* Empfänger */}
+                <div className="grid grid-cols-4 gap-4 items-center">
+                  <span className="text-slate-500 font-bold uppercase tracking-wider">Empfänger</span>
+                  <div className="col-span-3 flex gap-2">
+                    <input 
+                      type="text" 
+                      className="flex-1 px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                      value={recipientEmail}
+                      onChange={(e) => setRecipientEmail(e.target.value)}
+                      placeholder="empfaenger@email.de"
+                    />
+                    <button className="px-3 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-xl text-slate-600 flex items-center justify-center font-bold">
+                      +
+                    </button>
+                  </div>
+                </div>
+
+                {/* Weitere Empfänger */}
+                <div className="grid grid-cols-4 gap-4 items-center">
+                  <span className="text-slate-500 font-bold uppercase tracking-wider">Weitere Empfänger</span>
+                  <div className="col-span-3 flex gap-2">
+                    <input 
+                      type="text" 
+                      className="flex-1 px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                      value={ccEmail}
+                      onChange={(e) => setCcEmail(e.target.value)}
+                      placeholder="weitere-empfaenger@email.de"
+                    />
+                    <button className="px-3 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-xl text-slate-600 flex items-center justify-center font-bold">
+                      +
+                    </button>
+                  </div>
+                </div>
+
+                {/* Betreff */}
+                <div className="grid grid-cols-4 gap-4 items-center">
+                  <span className="text-slate-500 font-bold uppercase tracking-wider">Betreff</span>
+                  <div className="col-span-3">
+                    <input 
+                      type="text" 
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                      value={subject}
+                      onChange={(e) => setSubject(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Nachricht */}
+                <div className="grid grid-cols-4 gap-4 items-start">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-slate-500 font-bold uppercase tracking-wider">Nachricht</span>
+                    <button className="text-blue-600 hover:text-blue-700 hover:underline text-left mt-1 text-[10px]">Standardtext ändern</button>
+                  </div>
+                  <div className="col-span-3">
+                    <textarea 
+                      rows={6}
+                      className="w-full p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 leading-relaxed font-medium font-sans"
+                      value={messageText}
+                      onChange={(e) => setMessageText(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Options Checkboxes */}
+                <div className="grid grid-cols-4 gap-4">
+                  <div className="col-start-2 col-span-3 space-y-2 text-slate-700">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4" 
+                        checked={digitalSign}
+                        onChange={(e) => setDigitalSign(e.target.checked)}
+                      />
+                      <span>Dokument digital signieren</span>
+                    </label>
+
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4" 
+                        checked={sendAsAttachment}
+                        onChange={(e) => setSendAsAttachment(e.target.checked)}
+                      />
+                      <span>Dokument(e) als Anhang in der E-Mail versenden</span>
+                    </label>
+
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4" 
+                        checked={mergePdfs}
+                        onChange={(e) => setMergePdfs(e.target.checked)}
+                      />
+                      <span>Anhänge im PDF-Format zu einer einzigen PDF zusammenfügen</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Dokumentformat */}
+                <div className="grid grid-cols-4 gap-4 items-center">
+                  <span className="text-slate-500 font-bold uppercase tracking-wider">Dokumentformat</span>
+                  <div className="col-span-3">
+                    <select 
+                      className="w-full max-w-xs px-3 py-2 border border-slate-200 rounded-xl bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                      value={docFormat}
+                      onChange={(e) => setDocFormat(e.target.value)}
+                    >
+                      <option value="Standard PDF">Standard PDF</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Anhänge */}
+                <div className="grid grid-cols-4 gap-4 items-center pt-2">
+                  <span className="text-slate-500 font-bold uppercase tracking-wider">Anhänge (1) :</span>
+                  <div className="col-span-3 flex items-center gap-2 text-slate-700 bg-slate-50 px-3 py-2 rounded-xl border border-slate-100 max-w-max">
+                    <svg className="w-4 h-4 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                    <span className="font-bold font-mono text-[11px] truncate max-w-xs">
+                      Rechnung-{details.invoice.invoiceNumber}.pdf
+                    </span>
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end items-center gap-3 shrink-0">
+              <button 
+                onClick={() => setShowSendModal(false)}
+                className="px-5 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-black uppercase rounded-xl transition-all shadow-sm"
+              >
+                Abbrechen
+              </button>
+              
+              <button 
+                onClick={() => alert('Vorschau wird geladen... (Simuliert)')}
+                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase rounded-xl transition-all shadow-md"
+              >
+                Vorschau
+              </button>
+
+              <button 
+                onClick={handleSimulateSend}
+                disabled={isSimulatingSend}
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black uppercase rounded-xl transition-all shadow-md flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {isSimulatingSend ? (
+                  <div className="animate-spin h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full" />
+                ) : (
+                  <>
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    </svg>
+                    Versenden
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
