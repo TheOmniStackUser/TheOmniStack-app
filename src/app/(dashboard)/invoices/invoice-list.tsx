@@ -1356,27 +1356,6 @@ Mit freundlichen Grüßen`)
                       </svg>
                       E-Mail
                     </button>
-                    <button className="border border-slate-200 bg-slate-50 text-slate-400 font-bold px-4 py-2 rounded-xl text-xs cursor-not-allowed opacity-50" disabled>
-                      Post
-                    </button>
-                    <button className="border border-slate-200 bg-slate-50 text-slate-400 font-bold px-4 py-2 rounded-xl text-xs cursor-not-allowed opacity-50" disabled>
-                      Fax
-                    </button>
-                  </div>
-                </div>
-
-                {/* Self Send Checkbox */}
-                <div className="grid grid-cols-4 gap-4">
-                  <div className="col-start-2 col-span-3">
-                    <label className="flex items-center gap-2 cursor-pointer text-slate-700">
-                      <input 
-                        type="checkbox" 
-                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4" 
-                        checked={selfSend}
-                        onChange={(e) => setSelfSend(e.target.checked)}
-                      />
-                      <span>Ich versende das Dokument selber</span>
-                    </label>
                   </div>
                 </div>
 
@@ -1491,15 +1470,7 @@ Mit freundlichen Grüßen`)
                       <span>Dokument(e) als Anhang in der E-Mail versenden</span>
                     </label>
 
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4" 
-                        checked={mergePdfs}
-                        onChange={(e) => setMergePdfs(e.target.checked)}
-                      />
-                      <span>Anhänge im PDF-Format zu einer einzigen PDF zusammenfügen</span>
-                    </label>
+
                   </div>
                 </div>
 
