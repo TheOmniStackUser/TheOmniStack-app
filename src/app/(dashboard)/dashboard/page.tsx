@@ -50,9 +50,9 @@ export default async function DashboardPage() {
 
   const [invoicesStats] = await db
     .select({
-      monthCount: sql<number>`count(case when coalesce(${invoices.issuedAt}, ${invoices.createdAt}) >= ${startOfMonth} then 1 end)::int`,
-      monthRevenue: sql<number>`COALESCE(sum(case when coalesce(${invoices.issuedAt}, ${invoices.createdAt}) >= ${startOfMonth} then (case when ${invoices.isCreditNote} then -${invoices.totalAmount}::numeric else ${invoices.totalAmount}::numeric end) end), 0)::float`,
-      monthTax: sql<number>`COALESCE(sum(case when coalesce(${invoices.issuedAt}, ${invoices.createdAt}) >= ${startOfMonth} then (case when ${invoices.isCreditNote} then -${invoices.taxAmount}::numeric else ${invoices.taxAmount}::numeric end) end), 0)::float`,
+      monthCount: sql<number>`count(case when coalesce(${invoices.issuedAt}, ${invoices.createdAt}) >= ${startOfMonth.toISOString()} then 1 end)::int`,
+      monthRevenue: sql<number>`COALESCE(sum(case when coalesce(${invoices.issuedAt}, ${invoices.createdAt}) >= ${startOfMonth.toISOString()} then (case when ${invoices.isCreditNote} then -${invoices.totalAmount}::numeric else ${invoices.totalAmount}::numeric end) end), 0)::float`,
+      monthTax: sql<number>`COALESCE(sum(case when coalesce(${invoices.issuedAt}, ${invoices.createdAt}) >= ${startOfMonth.toISOString()} then (case when ${invoices.isCreditNote} then -${invoices.taxAmount}::numeric else ${invoices.taxAmount}::numeric end) end), 0)::float`,
       totalCount: sql<number>`count(*)::int`,
       totalRevenue: sql<number>`COALESCE(sum(case when ${invoices.isCreditNote} then -${invoices.totalAmount}::numeric else ${invoices.totalAmount}::numeric end), 0)::float`,
       totalTax: sql<number>`COALESCE(sum(case when ${invoices.isCreditNote} then -${invoices.taxAmount}::numeric else ${invoices.taxAmount}::numeric end), 0)::float`,
