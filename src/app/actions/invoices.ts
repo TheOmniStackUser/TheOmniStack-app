@@ -474,3 +474,76 @@ export async function getInvoiceDetailsForCloneAction(invoiceId: string) {
     }))
   }
 }
+
+export async function sendInvoiceEmailAction(data: {
+  invoiceId: string
+  recipientEmail: string
+  ccEmail?: string
+  subject: string
+  messageText: string
+  sendAsAttachment?: boolean
+}) {
+  const auth = await requireAuth()
+  const companyId = auth.activeCompanyId
+
+  try {
+    // 1. Fetch invoice and company details
+    const invoice = await db.query.invoices.findFirst({
+      where: and(eq(invoices.id, data.invoiceId), eq(invoices.companyId, companyId))
+    })
+
+    if (!invoice) throw new Error('Rechnung nicht gefunden')
+
+    const [company] = await db
+      .select({ email: companies.email, name: companies.name })
+      .from(companies)
+      .where(eq(companies.id, companyId))
+      .limit(1)
+
+    const replyTo = company?.email || ''
+
+    // 2. Download PDF if sending as attachment
+    let pdfBuffer: Buffer | undefined
+    let pdfFilename: string | undefined
+
+    if (data.sendAsAttachment !== false && invoice.pdfStorageKey) {
+      const { downloadDocument } = await import('@/lib/storage')
+      pdfBuffer = await downloadDocument(invoice.pdfStorageKey)
+      pdfFilename = `Rechnung-${invoice.invoiceNumber}.pdf`
+    }
+
+    // 3. Send Email
+    const { sendInvoiceEmail } = await import('@/lib/email')
+    const emailResult = await sendInvoiceEmail({
+      toEmail: data.recipientEmail,
+      ccEmail: data.ccEmail,
+      replyTo,
+      subject: data.subject,
+      html: data.messageText,
+      pdfBuffer,
+      pdfFilename
+    })
+
+    if (!emailResult.success) {
+      throw new Error((emailResult.error as any)?.message || 'Fehler beim E-Mail-Dienst (Resend)')
+    }
+
+    // 4. Create log entry
+    const logMessage = `Rechnung wurde per E-Mail versendet.
+Empfänger: ${data.recipientEmail}
+${data.ccEmail ? `CC: ${data.ccEmail}\n` : ''}Betreff: ${data.subject}`
+
+    await db.insert(invoiceLogs).values({
+      invoiceId: invoice.id,
+      companyId,
+      action: 'email',
+      note: logMessage
+    })
+
+    return { success: true }
+  } catch (err: any) {
+    console.error('[Action] Failed to send invoice email:', err)
+    return { error: err.message || 'Fehler beim Versenden der E-Mail.' }
+  }
+}
+

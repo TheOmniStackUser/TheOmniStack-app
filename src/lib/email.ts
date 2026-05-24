@@ -57,3 +57,51 @@ export async function sendInvitationEmail(toEmail: string, inviterName: string, 
     return { success: false, error }
   }
 }
+
+export async function sendInvoiceEmail({
+  toEmail,
+  ccEmail,
+  replyTo,
+  subject,
+  html,
+  pdfBuffer,
+  pdfFilename
+}: {
+  toEmail: string
+  ccEmail?: string
+  replyTo: string
+  subject: string
+  html: string
+  pdfBuffer?: Buffer
+  pdfFilename?: string
+}) {
+  try {
+    const attachments = pdfBuffer && pdfFilename ? [
+      {
+        filename: pdfFilename,
+        content: pdfBuffer.toString('base64'),
+      }
+    ] : undefined
+
+    const { data, error } = await resend.emails.send({
+      from: DEFAULT_SENDER,
+      to: [toEmail],
+      cc: ccEmail ? [ccEmail] : undefined,
+      replyTo: replyTo,
+      subject: subject,
+      html: html.replace(/\n/g, '<br />'),
+      attachments,
+    })
+
+    if (error) {
+      console.error('[Email Service] Error sending invoice email:', error)
+      return { success: false, error }
+    }
+
+    return { success: true, data }
+  } catch (error) {
+    console.error('[Email Service] Fatal error sending invoice email:', error)
+    return { success: false, error }
+  }
+}
+

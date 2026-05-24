@@ -11,7 +11,8 @@ import {
   getInvoiceDetailsAction,
   addInvoiceLogAction,
   markInvoiceAsPaidAction,
-  cancelInvoiceAction
+  cancelInvoiceAction,
+  sendInvoiceEmailAction
 } from '@/app/actions/invoices'
 import { getInvoiceLogsAction } from '@/app/actions/manual-invoice'
 import { exportInvoiceJournalAction } from '@/app/actions/export'
@@ -196,18 +197,26 @@ Mit freundlichen Grüßen`)
     if (!selectedInvoiceId) return
     try {
       setIsSimulatingSend(true)
-      const logMessage = `Rechnung wurde per E-Mail versendet.
-Absender: ${senderEmail}
-Empfänger: ${recipientEmail}
-Betreff: ${subject}`
       
-      await addInvoiceLogAction(selectedInvoiceId, 'email', logMessage)
+      const result = await sendInvoiceEmailAction({
+        invoiceId: selectedInvoiceId,
+        recipientEmail,
+        ccEmail,
+        subject,
+        messageText,
+        sendAsAttachment
+      })
+
+      if (result.error) {
+        throw new Error(result.error)
+      }
+
       const updated = await getInvoiceDetailsAction(selectedInvoiceId)
       setDetails(updated)
       setShowSendModal(false)
       alert('Rechnung wurde erfolgreich versendet.')
-    } catch (error) {
-      alert('Fehler beim Versenden der Rechnung.')
+    } catch (error: any) {
+      alert(error.message || 'Fehler beim Versenden der Rechnung.')
     } finally {
       setIsSimulatingSend(false)
     }
