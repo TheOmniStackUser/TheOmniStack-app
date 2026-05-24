@@ -99,6 +99,15 @@ export function InvoiceList({
   }
 }) {
   const router = useRouter()
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ message, type })
+    setTimeout(() => {
+      setToast(current => current?.message === message ? null : current)
+    }, 5000)
+  }
+
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [isExporting, setIsExporting] = useState(false)
   const [showHistory, setShowHistory] = useState<string | null>(null)
@@ -169,7 +178,7 @@ Mit freundlichen Grüßen`)
       setDocFormat('Standard PDF')
     } catch (error) {
       console.error(error)
-      alert(error instanceof Error ? error.message : 'Fehler beim Laden der Rechnungsdetails.')
+      showToast(error instanceof Error ? error.message : 'Fehler beim Laden der Rechnungsdetails.', 'error')
       setSelectedInvoiceId(null)
     } finally {
       setDetailsLoading(false)
@@ -185,7 +194,7 @@ Mit freundlichen Grüßen`)
       setDetails(updated)
       setCommentText('')
     } catch (error) {
-      alert('Fehler beim Speichern des Kommentars.')
+      showToast('Fehler beim Speichern des Kommentars.', 'error')
     } finally {
       setIsAddingComment(false)
     }
@@ -198,7 +207,7 @@ Mit freundlichen Grüßen`)
       const updated = await getInvoiceDetailsAction(selectedInvoiceId)
       setDetails(updated)
     } catch (error) {
-      alert('Fehler beim Markieren als bezahlt.')
+      showToast('Fehler beim Markieren als bezahlt.', 'error')
     }
   }
 
@@ -224,9 +233,9 @@ Mit freundlichen Grüßen`)
       const updated = await getInvoiceDetailsAction(selectedInvoiceId)
       setDetails(updated)
       setShowSendModal(false)
-      alert('Rechnung wurde erfolgreich versendet.')
+      showToast('Rechnung wurde erfolgreich versendet.', 'success')
     } catch (error: any) {
-      alert(error.message || 'Fehler beim Versenden der Rechnung.')
+      showToast(error.message || 'Fehler beim Versenden der Rechnung.', 'error')
     } finally {
       setIsSimulatingSend(false)
     }
@@ -284,7 +293,7 @@ Mit freundlichen Grüßen`)
       const url = await getInvoiceDownloadUrl(invoiceId)
       window.open(url, '_blank')
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'Fehler beim Laden der Rechnung.')
+      showToast(error instanceof Error ? error.message : 'Fehler beim Laden der Rechnung.', 'error')
     } finally {
       setLoadingId(null)
     }
@@ -304,7 +313,7 @@ Mit freundlichen Grüßen`)
       link.click()
       document.body.removeChild(link)
     } catch (error) {
-      alert('Fehler beim Generieren der E-Rechnung (XML).')
+      showToast('Fehler beim Generieren der E-Rechnung (XML).', 'error')
     } finally {
       setLoadingId(null)
     }
@@ -319,7 +328,7 @@ Mit freundlichen Grüßen`)
       const url = await getInvoiceDownloadUrl(invoiceId)
       window.open(url, '_blank')
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'Fehler beim Aktualisieren der Rechnung.')
+      showToast(error instanceof Error ? error.message : 'Fehler beim Aktualisieren der Rechnung.', 'error')
     } finally {
       setLoadingId(null)
     }
@@ -331,13 +340,13 @@ Mit freundlichen Grüßen`)
       setLoadingId(invoiceId)
       const result = await cancelInvoiceAction(invoiceId)
       if (result && result.success) {
-        alert(`Rechnung wurde storniert. Stornobeleg ${result.cancellationInvoiceNumber} wurde erstellt.`)
+        showToast(`Rechnung wurde storniert. Stornobeleg ${result.cancellationInvoiceNumber} wurde erstellt.`, 'success')
         router.refresh()
         const updated = await getInvoiceDetailsAction(invoiceId)
         setDetails(updated)
       }
     } catch (error: any) {
-      alert(error.message || 'Fehler beim Stornieren der Rechnung.')
+      showToast(error.message || 'Fehler beim Stornieren der Rechnung.', 'error')
     } finally {
       setLoadingId(null)
     }
@@ -363,7 +372,7 @@ Mit freundlichen Grüßen`)
       link.click()
       document.body.removeChild(link)
     } catch (error) {
-      alert('Fehler beim Exportieren des Rechnungsausgangsbuchs.')
+      showToast('Fehler beim Exportieren des Rechnungsausgangsbuchs.', 'error')
     } finally {
       setIsExporting(false)
     }
@@ -376,7 +385,7 @@ Mit freundlichen Grüßen`)
       const result = await getInvoiceLogsAction(invoiceId)
       setLogs(result)
     } catch (error) {
-      alert('Fehler beim Laden der Historie.')
+      showToast('Fehler beim Laden der Historie.', 'error')
     } finally {
       setIsLoadingLogs(false)
     }
@@ -1519,7 +1528,7 @@ Mit freundlichen Grüßen`)
                   if (pdfUrl) {
                     window.open(pdfUrl, '_blank')
                   } else {
-                    alert('Fehler: Die Dokumentenvorschau konnte nicht geladen werden.')
+                    showToast('Fehler: Die Dokumentenvorschau konnte nicht geladen werden.', 'error')
                   }
                 }}
                 className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase rounded-xl transition-all shadow-md"
@@ -1545,6 +1554,44 @@ Mit freundlichen Grüßen`)
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Floating Toast Notification */}
+      {toast && (
+        <div className="fixed top-6 right-6 z-[99999] flex items-center gap-3 bg-white/90 backdrop-blur-md border border-slate-100 shadow-2xl p-4 rounded-xl max-w-sm animate-in slide-in-from-top-5 duration-300">
+          <div className={`p-2 rounded-lg ${
+            toast.type === 'success' ? 'bg-emerald-50 text-emerald-600' :
+            toast.type === 'error' ? 'bg-rose-50 text-rose-600' :
+            'bg-blue-50 text-blue-600'
+          }`}>
+            {toast.type === 'success' && (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            )}
+            {toast.type === 'error' && (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            )}
+            {toast.type === 'info' && (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-slate-800 break-words">{toast.message}</p>
+          </div>
+          <button 
+            onClick={() => setToast(null)} 
+            className="text-slate-400 hover:text-slate-600 transition-colors p-1 cursor-pointer"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
       )}
     </div>
