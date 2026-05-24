@@ -1,10 +1,10 @@
 import { requireAuth } from '@/lib/session'
 import { db } from '@/db/client'
 import { companies } from '@/db/schema/companies'
-import { eq, and } from 'drizzle-orm'
-import { revalidatePath } from 'next/cache'
+import { eq } from 'drizzle-orm'
+import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { CheckCircle2, XCircle, ArrowRight } from 'lucide-react'
+import { XCircle } from 'lucide-react'
 
 export default async function VerifyEmailPage({
   searchParams,
@@ -34,16 +34,11 @@ export default async function VerifyEmailPage({
     )
   }
 
-  // Look up the company by id and token
+  // Look up the company by verification token
   const [company] = await db
     .select()
     .from(companies)
-    .where(
-      and(
-        eq(companies.id, auth.activeCompanyId),
-        eq(companies.emailVerificationToken, token)
-      )
-    )
+    .where(eq(companies.emailVerificationToken, token))
     .limit(1)
 
   if (!company || !company.newPendingEmail) {
@@ -80,31 +75,6 @@ export default async function VerifyEmailPage({
     })
     .where(eq(companies.id, company.id))
 
-  revalidatePath('/settings')
-
-  return (
-    <div className="max-w-md mx-auto mt-12 p-8 bg-white border border-green-100 rounded-2xl shadow-sm space-y-6 text-center">
-      <div className="flex justify-center text-green-500">
-        <CheckCircle2 size={56} className="animate-bounce" />
-      </div>
-      <div className="space-y-2">
-        <h2 className="text-2xl font-bold text-slate-900">E-Mail verifiziert</h2>
-        <p className="text-sm text-slate-600">
-          Die E-Mail-Adresse <span className="font-semibold text-slate-900">{verifiedEmail}</span> wurde erfolgreich bestätigt.
-        </p>
-        <p className="text-xs text-slate-400">
-          Dokumente und E-Mails werden nun von dieser Adresse versendet.
-        </p>
-      </div>
-      <div className="pt-2">
-        <Link
-          href="/settings"
-          className="inline-flex items-center justify-center gap-2 w-full px-5 py-3 bg-blue-600 text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 hover:bg-blue-700 hover:shadow-blue-500/30 transition-all cursor-pointer"
-        >
-          Zurück zu den Einstellungen
-          <ArrowRight size={18} />
-        </Link>
-      </div>
-    </div>
-  )
+  // Redirect directly to settings with query param
+  redirect('/settings?email_verified=true')
 }

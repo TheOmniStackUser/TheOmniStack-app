@@ -14,8 +14,12 @@ import { vatSettings } from '@/db/schema/vat-settings'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { users } from '@/db/schema/auth'
 
-export default async function SettingsPage() {
+export default async function SettingsPage(props: {
+  searchParams: Promise<{ email_verified?: string }>
+}) {
   const auth = await requireAuth()
+  const resolvedSearchParams = await props.searchParams
+  const emailVerified = resolvedSearchParams?.email_verified === 'true'
 
   const [
     [company],
@@ -63,6 +67,18 @@ export default async function SettingsPage() {
         <h1 className="text-2xl font-bold text-gray-900">Unternehmenseinstellungen</h1>
         <p className="text-gray-500 mt-1">Verwalte deine Stammdaten, Rechnungs- und Lageradresse sowie Automatisierungen.</p>
       </div>
+
+      {emailVerified && (
+        <div className="p-4 bg-green-50 border border-green-200 rounded-2xl flex items-start gap-3 text-green-800 shadow-sm">
+          <svg className="w-5 h-5 text-green-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <div>
+            <p className="font-bold text-sm">E-Mail-Adresse erfolgreich verifiziert!</p>
+            <p className="text-xs text-green-700/90 mt-1">Deine neue Absenderadresse ist nun aktiv und wird für alle zukünftigen Dokumentenversendungen verwendet.</p>
+          </div>
+        </div>
+      )}
 
       <SettingsForm company={company} />
 
