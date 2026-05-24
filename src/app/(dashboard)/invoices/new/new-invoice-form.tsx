@@ -922,7 +922,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
               <label className="block text-xs font-black text-red-600 uppercase mb-2 tracking-widest">Interner Vermerk (Warum wurde die Rechnung bearbeitet?)</label>
               <textarea 
                 required
-                onInvalid={e => (e.target as HTMLTextAreaElement).setCustomValidity('Bitte füllen Sie dieses Feld aus.')}
+                onInvalid={e => (e.target as HTMLTextAreaElement).setCustomValidity('Dieses Feld muss ausgefüllt werden.')}
                 onInput={e => (e.target as HTMLTextAreaElement).setCustomValidity('')}
                 className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl font-bold text-slate-900 outline-none bg-slate-50/30 focus:border-slate-400 focus:bg-slate-50/50 transition-all placeholder:text-slate-400/50"
                 value={internalNote}
