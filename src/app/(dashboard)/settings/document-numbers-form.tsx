@@ -11,7 +11,6 @@ interface DocumentTypeConfig {
   next: string
   format: string
   padding: number
-  perContact: boolean
 }
 
 interface DocumentNumberSettings {
@@ -68,31 +67,25 @@ export function DocumentNumbersForm({ company }: { company: Company }) {
   const [invoiceNext, setInvoiceNext] = useState(dbSettings.invoice?.next ?? company.nextInvoiceNumber ?? '1')
   const [invoiceFormat, setInvoiceFormat] = useState(dbSettings.invoice?.format ?? '%jahr%%nummer%')
   const [invoicePadding, setInvoicePadding] = useState(dbSettings.invoice?.padding ?? 5)
-  const [invoicePerContact, setInvoicePerContact] = useState(dbSettings.invoice?.perContact ?? false)
-
   const [quoteAuto, setQuoteAuto] = useState(dbSettings.quote?.auto ?? true)
   const [quoteNext, setQuoteNext] = useState(dbSettings.quote?.next ?? '10001')
   const [quoteFormat, setQuoteFormat] = useState(dbSettings.quote?.format ?? '%nummer%')
   const [quotePadding, setQuotePadding] = useState(dbSettings.quote?.padding ?? 5)
-  const [quotePerContact, setQuotePerContact] = useState(dbSettings.quote?.perContact ?? false)
 
   const [creditNoteAuto, setCreditNoteAuto] = useState(dbSettings.creditNote?.auto ?? true)
   const [creditNoteNext, setCreditNoteNext] = useState(dbSettings.creditNote?.next ?? '10001')
   const [creditNoteFormat, setCreditNoteFormat] = useState(dbSettings.creditNote?.format ?? '%nummer%')
   const [creditNotePadding, setCreditNotePadding] = useState(dbSettings.creditNote?.padding ?? 5)
-  const [creditNotePerContact, setCreditNotePerContact] = useState(dbSettings.creditNote?.perContact ?? false)
 
   const [deliveryNoteAuto, setDeliveryNoteAuto] = useState(dbSettings.deliveryNote?.auto ?? true)
   const [deliveryNoteNext, setDeliveryNoteNext] = useState(dbSettings.deliveryNote?.next ?? company.nextDeliveryNoteNumber ?? '1')
   const [deliveryNoteFormat, setDeliveryNoteFormat] = useState(dbSettings.deliveryNote?.format ?? '%nummer%')
   const [deliveryNotePadding, setDeliveryNotePadding] = useState(dbSettings.deliveryNote?.padding ?? 5)
-  const [deliveryNotePerContact, setDeliveryNotePerContact] = useState(dbSettings.deliveryNote?.perContact ?? false)
 
   const [purchaseOrderAuto, setPurchaseOrderAuto] = useState(dbSettings.purchaseOrder?.auto ?? true)
   const [purchaseOrderNext, setPurchaseOrderNext] = useState(dbSettings.purchaseOrder?.next ?? '10001')
   const [purchaseOrderFormat, setPurchaseOrderFormat] = useState(dbSettings.purchaseOrder?.format ?? '%nummer%')
   const [purchaseOrderPadding, setPurchaseOrderPadding] = useState(dbSettings.purchaseOrder?.padding ?? 5)
-  const [purchaseOrderPerContact, setPurchaseOrderPerContact] = useState(dbSettings.purchaseOrder?.perContact ?? false)
 
   const appendPlaceholder = (type: string, placeholder: string) => {
     switch (type) {
@@ -138,8 +131,6 @@ export function DocumentNumbersForm({ company }: { company: Company }) {
       setFormat: setInvoiceFormat,
       padding: invoicePadding,
       setPadding: setInvoicePadding,
-      perContact: invoicePerContact,
-      setPerContact: setInvoicePerContact,
     },
     {
       key: 'quote' as const,
@@ -153,8 +144,6 @@ export function DocumentNumbersForm({ company }: { company: Company }) {
       setFormat: setQuoteFormat,
       padding: quotePadding,
       setPadding: setQuotePadding,
-      perContact: quotePerContact,
-      setPerContact: setQuotePerContact,
     },
     {
       key: 'creditNote' as const,
@@ -168,8 +157,6 @@ export function DocumentNumbersForm({ company }: { company: Company }) {
       setFormat: setCreditNoteFormat,
       padding: creditNotePadding,
       setPadding: setCreditNotePadding,
-      perContact: creditNotePerContact,
-      setPerContact: setCreditNotePerContact,
     },
     {
       key: 'deliveryNote' as const,
@@ -183,8 +170,6 @@ export function DocumentNumbersForm({ company }: { company: Company }) {
       setFormat: setDeliveryNoteFormat,
       padding: deliveryNotePadding,
       setPadding: setDeliveryNotePadding,
-      perContact: deliveryNotePerContact,
-      setPerContact: setDeliveryNotePerContact,
     },
     {
       key: 'purchaseOrder' as const,
@@ -198,8 +183,6 @@ export function DocumentNumbersForm({ company }: { company: Company }) {
       setFormat: setPurchaseOrderFormat,
       padding: purchaseOrderPadding,
       setPadding: setPurchaseOrderPadding,
-      perContact: purchaseOrderPerContact,
-      setPerContact: setPurchaseOrderPerContact,
     }
   ]
 
@@ -357,29 +340,7 @@ export function DocumentNumbersForm({ company }: { company: Company }) {
                         </div>
                       </div>
 
-                      {/* Per Contact Checkbox */}
-                      <div className="md:col-span-3 pt-2">
-                        <label className="flex items-start gap-2.5 cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            name={`${type.key}_perContact`}
-                            checked={type.perContact}
-                            onChange={(e) => type.setPerContact(e.target.checked)}
-                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-0.5"
-                          />
-                          <div>
-                            <span className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                              Für jeden Kontakt separat hochzählen
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                                Nicht empfohlen
-                              </span>
-                            </span>
-                            <p className="text-xs text-gray-400 mt-0.5">
-                              Startet die laufende Nummer jeweils kontaktbezogen bei &quot;1&quot;. Davon raten wir aus steuerlichen Gründen ab.
-                            </p>
-                          </div>
-                        </label>
-                      </div>
+
 
                     </div>
                   )}

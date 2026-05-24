@@ -230,14 +230,13 @@ export async function saveDocumentNumberSettingsAction(prevState: any, formData:
     const next = (formData.get(`${type}_next`) as string) || '1'
     const format = (formData.get(`${type}_format`) as string) || '%nummer%'
     const padding = parseInt(formData.get(`${type}_padding`) as string, 10) || 5
-    const perContact = formData.get(`${type}_perContact`) === 'on'
 
     settings[type] = {
       auto,
       next,
       format,
       padding,
-      perContact
+      perContact: false
     }
   }
 
