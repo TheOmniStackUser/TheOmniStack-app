@@ -11,12 +11,13 @@ import { getDraftsAction } from '@/app/actions/manual-invoice'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { companies } from '@/db/schema/companies'
 import { invoiceTextTemplates } from '@/db/schema/templates'
+import { users } from '@/db/schema/auth'
 
 export default async function InvoicesPage() {
   const auth = await requireAuth()
   const drafts = await getDraftsAction()
 
-  const [allInvoices, integrations, company, emailTemplate] = await Promise.all([
+  const [allInvoices, integrations, company, emailTemplate, currentUser] = await Promise.all([
     db
       .select({
         id: invoices.id,
@@ -64,7 +65,15 @@ export default async function InvoicesPage() {
         eq(invoiceTextTemplates.name, 'email_invoice_default')
       ))
       .limit(1)
-      .then(rows => rows[0]?.content || null)
+      .then(rows => rows[0]?.content || null),
+    db
+      .select({
+        name: users.name,
+      })
+      .from(users)
+      .where(eq(users.id, auth.userId))
+      .limit(1)
+      .then(rows => rows[0] || null)
   ])
 
   const hasKauflandIntegration = integrations.some(i => i.type === 'kaufland' && i.clientId && i.clientSecret)
@@ -98,6 +107,7 @@ export default async function InvoicesPage() {
         hasEbayIntegration={hasEbayIntegration}
         company={company ? { email: company.email, smtpSettings: company.smtpSettings } : undefined}
         initialEmailTemplate={emailTemplate}
+        currentUserName={currentUser?.name || ''}
       />
     </div>
   )

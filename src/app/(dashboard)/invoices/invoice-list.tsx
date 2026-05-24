@@ -57,6 +57,14 @@ const formatMarketplaceName = (mp: string | null) => {
   return mp.charAt(0).toUpperCase() + mp.slice(1)
 }
 
+const getInitials = (name?: string | null) => {
+  if (!name) return 'U'
+  const parts = name.trim().split(/\s+/)
+  if (parts.length === 0) return 'U'
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
+
 const getMarketplaceBadgeStyle = (mp: string | null) => {
   const norm = mp ? mp.toLowerCase() : 'manual'
   if (norm === 'manual') {
@@ -99,6 +107,7 @@ export function InvoiceList({
   hasEbayIntegration = false,
   company,
   initialEmailTemplate = null,
+  currentUserName = '',
 }: { 
   initialInvoices: Invoice[]
   hasKauflandIntegration?: boolean
@@ -108,6 +117,7 @@ export function InvoiceList({
     smtpSettings: any
   }
   initialEmailTemplate?: string | null
+  currentUserName?: string
 }) {
   const router = useRouter()
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
@@ -1360,7 +1370,7 @@ export function InvoiceList({
                         
                         <div className="flex gap-3">
                           <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-xs shrink-0 select-none">
-                            PL
+                            {getInitials(currentUserName)}
                           </div>
                           <div className="flex-1 space-y-2">
                             <textarea
