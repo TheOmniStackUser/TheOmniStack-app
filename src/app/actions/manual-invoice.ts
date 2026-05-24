@@ -203,6 +203,16 @@ export async function createManualInvoiceAction(data: {
     documentType: data.documentType || 'invoice'
   })
 
+  if (invoiceResult && (invoiceResult as any).invoiceId) {
+    await db.insert(invoiceLogs).values({
+      invoiceId: (invoiceResult as any).invoiceId,
+      companyId,
+      userId: auth.userId,
+      action: 'created',
+      note: data.documentType === 'quote' ? 'Angebot manuell erstellt.' : (data.documentType === 'delivery_note' ? 'Lieferschein manuell erstellt.' : 'Rechnung manuell erstellt.')
+    })
+  }
+
   const redirectTarget = data.documentType === 'quote' ? '/quotes' : '/invoices'
   if (data.status !== 'draft') {
     redirect(redirectTarget)

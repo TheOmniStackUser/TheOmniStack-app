@@ -1314,7 +1314,11 @@ export function InvoiceList({
                               <div>
                                 <p className="font-bold text-slate-800">Version 1.0 (Original)</p>
                                 <p className="text-slate-400 font-semibold mt-0.5">
-                                  {format(new Date(details.invoice.createdAt), 'dd.MM.yyyy HH:mm', { locale: de })} • System
+                                  {(() => {
+                                    const createdLog = details.invoice.logs?.find((log: any) => log.action === 'created')
+                                    const creator = createdLog?.user?.name || (details.linkedOrder?.marketplace === 'manual' ? 'Bearbeiter' : 'System')
+                                    return `${format(new Date(details.invoice.createdAt), 'dd.MM.yyyy HH:mm', { locale: de })} • ${creator}`
+                                  })()}
                                 </p>
                               </div>
                             </div>
