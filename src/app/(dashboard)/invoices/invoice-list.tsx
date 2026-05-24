@@ -1515,7 +1515,13 @@ Betreff: ${subject}`
               </button>
               
               <button 
-                onClick={() => alert('Vorschau wird geladen... (Simuliert)')}
+                onClick={() => {
+                  if (pdfUrl) {
+                    window.open(pdfUrl, '_blank')
+                  } else {
+                    alert('Fehler: Die Dokumentenvorschau konnte nicht geladen werden.')
+                  }
+                }}
                 className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase rounded-xl transition-all shadow-md"
               >
                 Vorschau
