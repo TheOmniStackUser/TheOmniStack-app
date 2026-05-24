@@ -228,7 +228,7 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
         invoiceNumber,
         date: new Date(),
         dueDate: customDueDate || new Date(),
-        orderNumber: customOrderNumber || metadata.orderNumber || order.marketplaceOrderId,
+        orderNumber: customOrderNumber || metadata.orderNumber || (order.marketplace === 'manual' ? undefined : order.marketplaceOrderId),
         orderDate: customOrderDate || order.marketplacePurchaseDate || undefined,
         buyerReference: buyerReference || metadata.buyerReference,
         externalId: externalId || metadata.externalId,
@@ -460,6 +460,7 @@ export async function regenerateInvoicePdf(invoiceId: string, companyId: string)
   const { InvoiceDocument } = await import('@/components/pdf/invoice')
 
   const paymentInfo = order ? extractPaymentInfo(order) : { paymentMethod: 'Marketplace', isPaid: true }
+  const metadata = (order?.rawPayload as any)?.manualMetadata || {}
 
   let pdfBuffer;
   if (invoice.documentType === 'delivery_note') {
@@ -493,9 +494,13 @@ export async function regenerateInvoicePdf(invoiceId: string, companyId: string)
         invoiceNumber: invoice.invoiceNumber,
         date: invoice.createdAt,
         dueDate: invoice.dueAt || invoice.createdAt,
-        orderNumber: order?.marketplaceOrderId || '–',
+        orderNumber: (order?.marketplace === 'manual' ? (metadata.orderNumber || undefined) : order?.marketplaceOrderId) || undefined,
         orderDate: order?.marketplacePurchaseDate || undefined,
         customerNumber: order?.customerNumber || '–',
+        customText: metadata.customText || undefined,
+        taxOption: metadata.taxOption || undefined,
+        buyerReference: metadata.buyerReference || undefined,
+        externalId: metadata.externalId || undefined,
         company: {
           name: company.legalName || company.name,
           street: company.street || undefined,

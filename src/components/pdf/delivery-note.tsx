@@ -174,6 +174,10 @@ function DeliveryNotePage({ order, company }: DeliveryNoteProps) {
       return raw.display_id || order.marketplaceOrderId
     }
     
+    if (order.marketplace === 'manual') {
+      return raw.manualMetadata?.orderNumber || undefined
+    }
+    
     return order.marketplaceOrderId
   }
 

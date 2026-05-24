@@ -1077,7 +1077,13 @@ export function InvoiceList({
                       {/* Subheading */}
                       <p className="text-xs text-slate-500 font-bold uppercase truncate max-w-full">
                         {details.invoice.recipientName}
-                        {details.linkedOrder && ` • Bestellnr. ${details.linkedOrder.marketplaceOrderId}`}
+                        {details.linkedOrder && (() => {
+                          const isManual = details.linkedOrder.marketplace === 'manual'
+                          const orderNum = isManual 
+                            ? (details.linkedOrder.rawPayload as any)?.manualMetadata?.orderNumber 
+                            : details.linkedOrder.marketplaceOrderId
+                          return orderNum ? ` • Bestellnr. ${orderNum}` : ''
+                        })()}
                       </p>
 
                       {/* Action Buttons Row */}
@@ -1247,18 +1253,26 @@ export function InvoiceList({
                             <span className="col-span-2 text-slate-800 font-bold">Standardvorlage (deutsch)</span>
                           </div>
 
-                          {details.linkedOrder && (
-                            <>
-                              <div className="grid grid-cols-3 border-b border-slate-100 p-3 bg-white">
-                                <span className="text-slate-400 font-semibold uppercase tracking-wider">Bestellnr.</span>
-                                <span className="col-span-2 text-slate-800 font-bold">{details.linkedOrder.marketplaceOrderId}</span>
-                              </div>
-                              <div className="grid grid-cols-3 border-b border-slate-100 p-3 bg-white">
-                                <span className="text-slate-400 font-semibold uppercase tracking-wider">Kundenportal</span>
-                                <span className="col-span-2 text-blue-600 font-bold">Nicht vorhanden</span>
-                              </div>
-                            </>
-                          )}
+                          {details.linkedOrder && (() => {
+                            const isManual = details.linkedOrder.marketplace === 'manual'
+                            const orderNum = isManual 
+                              ? (details.linkedOrder.rawPayload as any)?.manualMetadata?.orderNumber 
+                              : details.linkedOrder.marketplaceOrderId
+                            return (
+                              <>
+                                {(!isManual || orderNum) && (
+                                  <div className="grid grid-cols-3 border-b border-slate-100 p-3 bg-white">
+                                    <span className="text-slate-400 font-semibold uppercase tracking-wider">Bestellnr.</span>
+                                    <span className="col-span-2 text-slate-800 font-bold">{orderNum}</span>
+                                  </div>
+                                )}
+                                <div className="grid grid-cols-3 border-b border-slate-100 p-3 bg-white">
+                                  <span className="text-slate-400 font-semibold uppercase tracking-wider">Kundenportal</span>
+                                  <span className="col-span-2 text-blue-600 font-bold">Nicht vorhanden</span>
+                                </div>
+                              </>
+                            )
+                          })()}
 
                           <div className="grid grid-cols-3 border-b border-slate-100 p-3 bg-white">
                             <span className="text-slate-400 font-semibold uppercase tracking-wider">Empfängerland</span>
