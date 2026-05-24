@@ -685,7 +685,7 @@ export function InvoiceList({
                       </span>
                     )}
                     {invoice.status === 'cancelled' && (
-                      <span className="text-[10px] text-slate-500 font-semibold mt-0.5">
+                      <span className="text-[10px] text-red-600 font-bold mt-0.5">
                         Storniert (Stornobeleg: gleiche Nr.)
                       </span>
                     )}
