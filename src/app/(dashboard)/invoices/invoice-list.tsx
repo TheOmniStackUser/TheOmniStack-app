@@ -489,7 +489,6 @@ export function InvoiceList({
           </thead>
           <tbody>
             {paginatedInvoices.map((invoice) => (
-             {paginatedInvoices.map((invoice) => (
               <tr 
                 key={invoice.id} 
                 onClick={() => handleSelectInvoice(invoice.id)} 
