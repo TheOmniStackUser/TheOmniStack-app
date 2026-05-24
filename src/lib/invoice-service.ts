@@ -44,6 +44,50 @@ export function formatDocumentNumber(
     .replace(/%nummer%/g, numStr)
 }
 
+export function getDefaultSettings(
+  settingsKey: 'invoice' | 'quote' | 'creditNote' | 'deliveryNote' | 'purchaseOrder',
+  company: { nextInvoiceNumber?: string; nextDeliveryNoteNumber?: string }
+) {
+  const defaults = {
+    invoice: {
+      auto: true,
+      next: company.nextInvoiceNumber || '1',
+      format: '%jahr%%nummer%',
+      padding: 5,
+      perContact: false
+    },
+    quote: {
+      auto: true,
+      next: '10001',
+      format: '%nummer%',
+      padding: 5,
+      perContact: false
+    },
+    creditNote: {
+      auto: true,
+      next: '10001',
+      format: '%nummer%',
+      padding: 5,
+      perContact: false
+    },
+    deliveryNote: {
+      auto: true,
+      next: company.nextDeliveryNoteNumber || '1',
+      format: '%nummer%',
+      padding: 5,
+      perContact: false
+    },
+    purchaseOrder: {
+      auto: true,
+      next: '10001',
+      format: '%nummer%',
+      padding: 5,
+      perContact: false
+    }
+  }
+  return defaults[settingsKey]
+}
+
 /**
  * Automatically creates an invoice for a given order if one doesn't exist yet.
  * Returns the created invoice ID and the storage key of the generated PDF.
@@ -110,7 +154,7 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
   }
 
   const dbSettings = company.documentNumberSettings as any
-  const config = dbSettings?.[settingsKey]
+  const config = dbSettings?.[settingsKey] || getDefaultSettings(settingsKey, company)
 
   let invoiceNumber = ''
   if (config && config.auto) {
@@ -257,7 +301,7 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
 
     if (dbCompany) {
       const currentSettings = dbCompany.documentNumberSettings as any || {}
-      const config = currentSettings[settingsKey]
+      const config = currentSettings[settingsKey] || getDefaultSettings(settingsKey, dbCompany)
       if (config && config.auto) {
         const nextNum = parseInt(config.next, 10) || 1
         const updatedSettings = {
