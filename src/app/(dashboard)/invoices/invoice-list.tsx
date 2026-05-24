@@ -657,7 +657,7 @@ export function InvoiceList({
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
               <th className="px-6 py-4 font-semibold text-slate-700">Datum</th>
-              <th className="px-6 py-4 font-semibold text-slate-700">Rechnungsnummer</th>
+              <th className="px-6 py-4 font-semibold text-slate-700">Belegnummer</th>
               <th className="px-6 py-4 font-semibold text-slate-700">Typ</th>
               <th className="px-6 py-4 font-semibold text-slate-700">Marktplatz</th>
               <th className="px-6 py-4 font-semibold text-slate-700">Kunde</th>
@@ -1159,7 +1159,7 @@ export function InvoiceList({
                         </div>
                       )}
                       {details.invoice.status === 'cancelled' && (
-                        <div className="mt-1.5 inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 uppercase tracking-wide">
+                        <div className="mt-1.5 inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-100 uppercase tracking-wide">
                           Rechnung storniert (Stornobeleg vorhanden)
                         </div>
                       )}
