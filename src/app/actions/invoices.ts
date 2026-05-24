@@ -561,7 +561,37 @@ ${data.ccEmail ? `CC: ${data.ccEmail}\n` : ''}Betreff: ${data.subject}`
     return { success: true }
   } catch (err: any) {
     console.error('[Action] Failed to send invoice email:', err)
-    return { error: err.message || 'Fehler beim Versenden der E-Mail.' }
+    
+    let errorMessage = err.message || 'Fehler beim Versenden der E-Mail.'
+    const lowerMessage = errorMessage.toLowerCase()
+    
+    if (
+      lowerMessage.includes("invalid `to` field") || 
+      lowerMessage.includes("invalid 'to' field") || 
+      lowerMessage.includes("invalid to field") ||
+      lowerMessage.includes("recipient address rejected") ||
+      (lowerMessage.includes("invalid address") && lowerMessage.includes("recipient"))
+    ) {
+      errorMessage = "Die E-Mail-Adresse des Empfängers ist ungültig. Bitte gib eine korrekte E-Mail-Adresse an."
+    } else if (
+      lowerMessage.includes("invalid `cc` field") || 
+      lowerMessage.includes("invalid 'cc' field") || 
+      lowerMessage.includes("invalid cc field")
+    ) {
+      errorMessage = "Die E-Mail-Adresse unter 'Weitere Empfänger' ist ungültig."
+    } else if (
+      lowerMessage.includes("invalid `from` field") || 
+      lowerMessage.includes("invalid 'from' field") || 
+      lowerMessage.includes("invalid from field") ||
+      lowerMessage.includes("sender address rejected") ||
+      (lowerMessage.includes("invalid address") && lowerMessage.includes("sender"))
+    ) {
+      errorMessage = "Die Absender-E-Mail-Adresse ist ungültig. Bitte überprüfe deine E-Mail-Konfiguration."
+    } else if (lowerMessage.includes("rate limit")) {
+      errorMessage = "E-Mail-Limit überschritten. Bitte versuche es in wenigen Minuten erneut."
+    }
+
+    return { error: errorMessage }
   }
 }
 
