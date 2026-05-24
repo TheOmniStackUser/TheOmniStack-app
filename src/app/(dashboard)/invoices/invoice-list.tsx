@@ -150,9 +150,11 @@ export function InvoiceList({
   const [docFormat, setDocFormat] = useState('Standard PDF')
   const [emailTemplate, setEmailTemplate] = useState(initialEmailTemplate || DEFAULT_TEMPLATE)
   const [isSavingTemplate, setIsSavingTemplate] = useState(false)
+  const [showMoreMenu, setShowMoreMenu] = useState(false)
 
   const handleSelectInvoice = async (invoiceId: string) => {
     try {
+      setShowMoreMenu(false)
       setDetailsLoading(true)
       setSelectedInvoiceId(invoiceId)
       const [detailData, downloadUrl] = await Promise.all([
@@ -1123,58 +1125,82 @@ export function InvoiceList({
                         )}
 
                         {/* Mehr Dropdown / Options Menu */}
-                        <div className="relative group">
-                          <button className="inline-flex items-center gap-1 px-2.5 py-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 transition-all shadow-sm">
+                        <div className="relative">
+                          <button 
+                            type="button"
+                            onClick={() => setShowMoreMenu(!showMoreMenu)}
+                            className="inline-flex items-center gap-1 px-2.5 py-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 transition-all shadow-sm"
+                          >
                             Mehr
                             <svg className="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                             </svg>
                           </button>
-                          <div className="absolute right-0 bottom-full mb-1 sm:bottom-auto sm:top-full sm:mt-1 hidden group-hover:block bg-white border border-slate-200 rounded-xl shadow-xl py-1.5 z-[60] w-48 overflow-hidden">
-                            <button
-                              onClick={() => {
-                                handleRegenerate(details.invoice.id)
-                                handleSelectInvoice(details.invoice.id)
-                              }}
-                              className="w-full text-left px-4 py-2 hover:bg-slate-50 text-xs font-bold text-slate-700 flex items-center gap-2"
-                            >
-                              <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                              </svg>
-                              PDF regenerieren
-                            </button>
-                            <button
-                              onClick={() => handleDownloadXml(details.invoice.id, details.invoice.invoiceNumber)}
-                              className="w-full text-left px-4 py-2 hover:bg-slate-50 text-xs font-bold text-slate-700 flex items-center gap-2"
-                            >
-                              <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                              </svg>
-                              XML herunterladen
-                            </button>
-                            {details.invoice.documentType === 'invoice' && !details.invoice.isCreditNote && details.invoice.status !== 'cancelled' && (
-                              <button
-                                onClick={() => handleCreateStorno(details.invoice.id)}
-                                className="w-full text-left px-4 py-2 hover:bg-slate-50 text-xs font-bold text-red-600 hover:text-red-700 flex items-center gap-2 border-t border-slate-100"
-                              >
-                                <svg className="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                Storno erstellen
-                              </button>
-                            )}
-                            {details.invoice.documentType === 'invoice' && (
-                              <a
-                                href={`/invoices/new?clone=${details.invoice.id}&isCreditNote=true`}
-                                className="w-full text-left px-4 py-2 hover:bg-slate-50 text-xs font-bold text-red-600 hover:text-red-700 flex items-center gap-2 border-t border-slate-100"
-                              >
-                                <svg className="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                Gutschrift erstellen
-                              </a>
-                            )}
-                          </div>
+                          {showMoreMenu && (
+                            <>
+                              {/* Backdrop to capture clicks outside and close the menu */}
+                              <div 
+                                className="fixed inset-0 z-50 cursor-default" 
+                                onClick={() => setShowMoreMenu(false)}
+                              />
+                              <div className="absolute right-0 bottom-full mb-1 sm:bottom-auto sm:top-full sm:mt-1 bg-white border border-slate-200 rounded-xl shadow-xl py-1.5 z-[60] w-48 overflow-hidden">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setShowMoreMenu(false)
+                                    handleRegenerate(details.invoice.id)
+                                    handleSelectInvoice(details.invoice.id)
+                                  }}
+                                  className="w-full text-left px-4 py-2 hover:bg-slate-50 text-xs font-bold text-slate-700 flex items-center gap-2"
+                                >
+                                  <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                  </svg>
+                                  PDF regenerieren
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setShowMoreMenu(false)
+                                    handleDownloadXml(details.invoice.id, details.invoice.invoiceNumber)
+                                  }}
+                                  className="w-full text-left px-4 py-2 hover:bg-slate-50 text-xs font-bold text-slate-700 flex items-center gap-2"
+                                >
+                                  <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                                  </svg>
+                                  XML herunterladen
+                                </button>
+                                {details.invoice.documentType === 'invoice' && !details.invoice.isCreditNote && details.invoice.status !== 'cancelled' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setShowMoreMenu(false)
+                                      handleCreateStorno(details.invoice.id)
+                                    }}
+                                    className="w-full text-left px-4 py-2 hover:bg-slate-50 text-xs font-bold text-red-600 hover:text-red-700 flex items-center gap-2 border-t border-slate-100"
+                                  >
+                                    <svg className="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Storno erstellen
+                                  </button>
+                                )}
+                                {details.invoice.documentType === 'invoice' && (
+                                  <a
+                                    href={`/invoices/new?clone=${details.invoice.id}&isCreditNote=true`}
+                                    onClick={() => setShowMoreMenu(false)}
+                                    className="w-full text-left px-4 py-2 hover:bg-slate-50 text-xs font-bold text-red-600 hover:text-red-700 flex items-center gap-2 border-t border-slate-100"
+                                  >
+                                    <svg className="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Gutschrift erstellen
+                                  </a>
+                                )}
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
