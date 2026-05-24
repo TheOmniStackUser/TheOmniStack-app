@@ -1079,9 +1079,9 @@ Betreff: ${subject}`
                             {details.invoice.documentType === 'invoice' && (
                               <a
                                 href={`/invoices/new?clone=${details.invoice.id}&isCreditNote=true`}
-                                className="w-full text-left px-4 py-2 hover:bg-slate-50 text-xs font-bold text-slate-700 flex items-center gap-2 border-t border-slate-100"
+                                className="w-full text-left px-4 py-2 hover:bg-slate-50 text-xs font-bold text-red-600 hover:text-red-700 flex items-center gap-2 border-t border-slate-100"
                               >
-                                <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                                 Gutschrift erstellen
