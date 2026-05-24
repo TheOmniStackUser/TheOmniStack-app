@@ -3,6 +3,7 @@ import { db } from '@/db/client'
 import { invoices } from '@/db/schema/invoices'
 import { orders } from '@/db/schema/orders'
 import { eq, desc, and, ne } from 'drizzle-orm'
+import { alias } from 'drizzle-orm/pg-core'
 import Link from 'next/link'
 import { InvoiceList } from './invoice-list'
 import { GenerateMissingButton } from './generate-missing-button'
@@ -13,6 +14,8 @@ import { companies } from '@/db/schema/companies'
 import { invoiceTextTemplates } from '@/db/schema/templates'
 import { users } from '@/db/schema/auth'
 
+const originalInvoice = alias(invoices, 'original_invoice')
+
 export default async function InvoicesPage() {
   const auth = await requireAuth()
   const drafts = await getDraftsAction()
@@ -22,6 +25,7 @@ export default async function InvoicesPage() {
       .select({
         id: invoices.id,
         invoiceNumber: invoices.invoiceNumber,
+        status: invoices.status,
         recipientName: invoices.recipientName,
         recipientCountry: invoices.recipientCountry,
         totalAmount: invoices.totalAmount,
@@ -32,9 +36,12 @@ export default async function InvoicesPage() {
         cancelsInvoiceId: invoices.cancelsInvoiceId,
         isCreditNote: invoices.isCreditNote,
         documentType: invoices.documentType,
+        originalInvoiceNumber: originalInvoice.invoiceNumber,
+        originalInvoiceCreatedAt: originalInvoice.createdAt,
       })
       .from(invoices)
       .leftJoin(orders, eq(invoices.id, orders.invoiceId))
+      .leftJoin(originalInvoice, eq(invoices.cancelsInvoiceId, originalInvoice.id))
       .where(and(
         eq(invoices.companyId, auth.activeCompanyId),
         ne(invoices.documentType, 'quote'),

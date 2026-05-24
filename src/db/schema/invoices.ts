@@ -7,8 +7,9 @@ import {
   numeric,
   boolean,
   unique,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core'
-import { relations } from 'drizzle-orm'
+import { relations, sql } from 'drizzle-orm'
 import { companies } from './companies'
 import { users } from './auth'
 
@@ -63,7 +64,9 @@ export const invoices = pgTable('invoices', {
   // Immutable audit fields — set once, never updated
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({
-  unqCompanyInvoice: unique('unq_company_invoice_number').on(t.companyId, t.invoiceNumber),
+  unqCompanyInvoiceIndex: uniqueIndex('unq_company_invoice_idx')
+    .on(t.companyId, t.invoiceNumber)
+    .where(sql`cancels_invoice_id IS NULL`),
 }))
 
 // ─── Invoice Items ────────────────────────────────────────────────────────────

@@ -113,6 +113,8 @@ interface InvoiceProps {
   customText?: string
   taxOption?: string
   documentType?: 'invoice' | 'quote' | 'delivery_note'
+  cancelsInvoiceNumber?: string
+  cancelsInvoiceDate?: Date
 }
 
 export const InvoiceDocument: React.FC<InvoiceProps> = ({
@@ -134,10 +136,13 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
   taxOption,
   orderDate,
   documentType = 'invoice',
+  cancelsInvoiceNumber,
+  cancelsInvoiceDate,
 }) => {
   const countryCode = (recipient.country || '').toUpperCase()
   const isGerman = countryCode === 'DE' || countryCode === 'DEU' || countryCode === 'GERMANY' || countryCode === 'DEUTSCHLAND'
   const lang = isGerman ? 'de' : (company.internationalLanguage === 'de' ? 'de' : 'en')
+  const factor = cancelsInvoiceNumber ? -1 : 1
 
   const getCountryName = (code: string, currentLang: string) => {
     const names: Record<string, { de: string, en: string }> = {
@@ -358,7 +363,7 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
                 <Text style={styles.valueBold}>{customerNumber}</Text>
               </View>
               <View style={styles.row}>
-                <Text style={styles.label}>{t.invoiceNr}</Text>
+                <Text style={styles.label}>{cancelsInvoiceNumber ? 'Storno' : t.invoiceNr}</Text>
                 <Text style={styles.valueBold}>{invoiceNumber}</Text>
               </View>
               {orderNumber && (
@@ -390,7 +395,12 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
         </View>
 
         <View style={styles.titleBlock} fixed>
-          <Text style={styles.mainTitle}>{isCreditNote ? t.creditNoteTitle : (documentType === 'quote' ? t.quoteTitle : t.invoiceTitle)} {invoiceNumber}</Text>
+          <Text style={styles.mainTitle}>
+            {cancelsInvoiceNumber 
+              ? `Storno-Rechnung ${invoiceNumber} zu Rechnung ${cancelsInvoiceNumber} vom ${format(new Date(cancelsInvoiceDate!), 'dd.MM.yyyy')}`
+              : (isCreditNote ? t.creditNoteTitle : (documentType === 'quote' ? t.quoteTitle : t.invoiceTitle)) + ' ' + invoiceNumber
+            }
+          </Text>
           
           <View style={{ flexDirection: 'row', marginTop: 5, fontSize: 9 }}>
             {paymentMethod && (
@@ -426,8 +436,8 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
                 )}
               </View>
               <Text style={styles.colMenge}>{item.quantity}</Text>
-              <Text style={styles.colPrice}>{formatPrice(item.unitPrice)}</Text>
-              <Text style={styles.colTotal}>{formatPrice(item.unitPrice * item.quantity)}</Text>
+              <Text style={styles.colPrice}>{formatPrice(item.unitPrice * factor)}</Text>
+              <Text style={styles.colTotal}>{formatPrice(item.unitPrice * item.quantity * factor)}</Text>
             </View>
           ))}
         </View>
@@ -449,17 +459,17 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
           <View style={styles.summaryTable}>
             <View style={styles.summaryRow}>
               <Text>{t.net}</Text>
-              <Text>{formatPrice(totalNet)}</Text>
+              <Text>{formatPrice(totalNet * factor)}</Text>
             </View>
             {Object.entries(taxesByRate).map(([rate, vals]) => (
               <View key={rate} style={styles.summaryRow}>
                 <Text>{t.vat} ({parseFloat(rate) * 100}%)</Text>
-                <Text>{formatPrice(vals.tax)}</Text>
+                <Text>{formatPrice(vals.tax * factor)}</Text>
               </View>
             ))}
             <View style={styles.totalRow}>
               <Text>{t.totalGross}</Text>
-              <Text>{formatPrice(subtotal)}</Text>
+              <Text>{formatPrice(subtotal * factor)}</Text>
             </View>
           </View>
         </View>

@@ -1,0 +1,2 @@
+ALTER TABLE "invoices" DROP CONSTRAINT "unq_company_invoice_number";--> statement-breakpoint
+CREATE UNIQUE INDEX "unq_company_invoice_idx" ON "invoices" USING btree ("company_id","invoice_number") WHERE cancels_invoice_id IS NULL;

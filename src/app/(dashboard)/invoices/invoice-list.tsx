@@ -22,6 +22,7 @@ import { exportInvoiceJournalAction } from '@/app/actions/export'
 interface Invoice {
   id: string
   invoiceNumber: string
+  status: string
   recipientName: string | null
   recipientCountry: string | null
   totalAmount: string
@@ -32,6 +33,8 @@ interface Invoice {
   cancelsInvoiceId: string | null
   isCreditNote: boolean
   documentType: string
+  originalInvoiceNumber?: string | null
+  originalInvoiceCreatedAt?: Date | null
 }
 
 const formatCountry = (code?: string | null) => {
@@ -676,7 +679,17 @@ export function InvoiceList({
                 <td className="px-6 py-4 font-medium text-slate-900">
                   <div className="flex flex-col">
                     <span>{invoice.invoiceNumber}</span>
-                    <span className="text-[10px] text-blue-600 font-bold uppercase tracking-tighter">E-Rechnung (ZUGFeRD)</span>
+                    {invoice.cancelsInvoiceId && invoice.originalInvoiceNumber && (
+                      <span className="text-[10px] text-rose-600 font-bold mt-0.5">
+                        Storno zu {invoice.originalInvoiceNumber} vom {format(new Date(invoice.originalInvoiceCreatedAt!), 'dd.MM.yyyy')}
+                      </span>
+                    )}
+                    {invoice.status === 'cancelled' && (
+                      <span className="text-[10px] text-slate-500 font-semibold mt-0.5">
+                        Storniert (Stornobeleg: gleiche Nr.)
+                      </span>
+                    )}
+                    <span className="text-[10px] text-blue-600 font-bold uppercase tracking-tighter mt-0.5">E-Rechnung (ZUGFeRD)</span>
                   </div>
                 </td>
                 <td className="px-6 py-4">
@@ -731,7 +744,9 @@ export function InvoiceList({
                   </span>
                 </td>
                 <td className="px-6 py-4 text-right font-medium text-slate-900">
-                  {new Intl.NumberFormat('de-DE', { style: 'currency', currency: invoice.currency }).format(Number(invoice.totalAmount))}
+                  {new Intl.NumberFormat('de-DE', { style: 'currency', currency: invoice.currency }).format(
+                    invoice.cancelsInvoiceId ? -Number(invoice.totalAmount) : Number(invoice.totalAmount)
+                  )}
                 </td>
                  <td className="px-6 py-4 text-right">
                   <div className="flex justify-end gap-2 min-w-max whitespace-nowrap">
@@ -1115,7 +1130,7 @@ export function InvoiceList({
                       <div className="flex justify-between items-start mb-2">
                         <div>
                           <span className="text-xs font-black uppercase text-blue-600 tracking-wider">
-                            {details.invoice.documentType === 'quote' ? 'Angebot' : (details.invoice.documentType === 'delivery_note' ? 'Lieferschein' : 'Rechnung')}
+                            {details.invoice.cancelsInvoiceId ? 'Storno' : (details.invoice.documentType === 'quote' ? 'Angebot' : (details.invoice.documentType === 'delivery_note' ? 'Lieferschein' : 'Rechnung'))}
                           </span>
                           <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
                             {details.invoice.invoiceNumber}
@@ -1137,6 +1152,17 @@ export function InvoiceList({
                           return orderNum ? ` • Bestellnr. ${orderNum}` : ''
                         })()}
                       </p>
+
+                      {details.invoice.cancelsInvoiceId && details.invoice.originalInvoice && (
+                        <div className="mt-1.5 inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-100 uppercase tracking-wide">
+                          Storno zu {details.invoice.originalInvoice.invoiceNumber} vom {format(new Date(details.invoice.originalInvoice.createdAt), 'dd.MM.yyyy')}
+                        </div>
+                      )}
+                      {details.invoice.status === 'cancelled' && (
+                        <div className="mt-1.5 inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 uppercase tracking-wide">
+                          Rechnung storniert (Stornobeleg vorhanden)
+                        </div>
+                      )}
 
                       {/* Action Buttons Row */}
                       <div className="mt-5 flex flex-wrap gap-2">

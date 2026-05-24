@@ -223,6 +223,7 @@ export async function getInvoiceDetailsAction(invoiceId: string) {
     where: and(eq(invoices.id, invoiceId), eq(invoices.companyId, companyId)),
     with: {
       items: true,
+      originalInvoice: true,
       logs: {
         orderBy: (logs, { desc }) => [desc(logs.createdAt)],
         with: {
@@ -319,30 +320,10 @@ export async function cancelInvoiceAction(invoiceId: string) {
         .for('update')
       if (!company) throw new Error('Mandant nicht gefunden')
 
-      const dbSettings = company.documentNumberSettings as any || {}
-      const config = dbSettings.creditNote || getDefaultSettings('creditNote', company)
-
       // 3. Generate cancellation invoice number (Stornonummer)
-      let cancelsInvoiceNumber = ''
-      if (config && config.auto) {
-        const nextNum = parseInt(config.next, 10) || 1
-        const padding = config.padding || 5
-        cancelsInvoiceNumber = formatDocumentNumber(config.format, nextNum, padding, '', '')
-        
-        // Update next number
-        const updatedSettings = {
-          ...dbSettings,
-          creditNote: {
-            ...config,
-            next: (nextNum + 1).toString()
-          }
-        }
-        await tx.update(companies)
-          .set({ documentNumberSettings: updatedSettings, updatedAt: new Date() })
-          .where(eq(companies.id, companyId))
-      } else {
-        cancelsInvoiceNumber = `STO-${invoice.invoiceNumber}`
-      }
+      // For cancellations, the Storno invoice number is exactly the same as the original invoice's number.
+      const cancelsInvoiceNumber = invoice.invoiceNumber
+
 
       // 4. Create new invoice as a credit note (cancellation)
       const [cancellationInvoice] = await tx

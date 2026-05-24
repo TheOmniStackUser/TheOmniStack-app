@@ -442,7 +442,10 @@ function extractPaymentInfo(order: any) {
 export async function regenerateInvoicePdf(invoiceId: string, companyId: string) {
   const invoice = await db.query.invoices.findFirst({
     where: and(eq(invoices.id, invoiceId), eq(invoices.companyId, companyId)),
-    with: { items: true }
+    with: {
+      items: true,
+      originalInvoice: true,
+    }
   })
 
   if (!invoice) throw new Error('Invoice not found')
@@ -539,6 +542,8 @@ export async function regenerateInvoicePdf(invoiceId: string, companyId: string)
         paymentMethod: paymentInfo.paymentMethod,
         isCreditNote: invoice.isCreditNote || false,
         documentType: invoice.documentType || 'invoice',
+        cancelsInvoiceNumber: invoice.originalInvoice?.invoiceNumber || undefined,
+        cancelsInvoiceDate: invoice.originalInvoice?.createdAt || undefined,
       }) as any
     )
   }
