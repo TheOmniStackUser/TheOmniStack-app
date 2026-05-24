@@ -1,12 +1,31 @@
 'use client'
 
-import { useActionState } from 'react'
-import { saveCompanySettingsAction } from '@/app/actions/settings'
+import { useActionState, useState } from 'react'
+import { saveCompanySettingsAction, resendCompanyVerificationEmailAction } from '@/app/actions/settings'
 import type { Company } from '@/db/schema/companies'
 import { CollapsibleSection } from '@/components/collapsible-section'
 
 export function SettingsForm({ company }: { company: Company }) {
   const [state, action, isPending] = useActionState(saveCompanySettingsAction, undefined)
+  const [resending, setResending] = useState(false)
+  const [resendMessage, setResendMessage] = useState<{ success: boolean; text: string } | null>(null)
+
+  const handleResendVerification = async () => {
+    setResending(true)
+    setResendMessage(null)
+    try {
+      const res = await resendCompanyVerificationEmailAction()
+      if (res.success) {
+        setResendMessage({ success: true, text: res.message || 'Bestätigungs-E-Mail gesendet.' })
+      } else {
+        setResendMessage({ success: false, text: res.message || 'Fehler beim Senden.' })
+      }
+    } catch (err) {
+      setResendMessage({ success: false, text: 'Verbindungsfehler. Bitte versuche es später erneut.' })
+    } finally {
+      setResending(false)
+    }
+  }
 
   return (
     <form id="settings-profile-form" action={action} className="space-y-8 pb-12">
@@ -63,9 +82,33 @@ export function SettingsForm({ company }: { company: Company }) {
             <input
               name="email"
               type="email"
-              defaultValue={company.email || ''}
+              defaultValue={company.newPendingEmail || company.email || ''}
               className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-gray-900"
             />
+            {company.newPendingEmail && (
+              <div className="mt-2 p-3 bg-amber-50/70 border border-amber-200/65 rounded-xl space-y-1">
+                <p className="text-xs text-amber-800 leading-normal">
+                  Ausstehende Verifizierung für:{' '}
+                  <span className="font-semibold text-amber-900">{company.newPendingEmail}</span>.
+                  Bis zur Bestätigung wird weiterhin <span className="font-semibold text-amber-900">{company.email || 'keine E-Mail'}</span> verwendet.
+                </p>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleResendVerification}
+                    disabled={resending}
+                    className="inline-flex items-center text-xs font-bold text-amber-700 hover:text-amber-900 underline cursor-pointer disabled:opacity-50"
+                  >
+                    {resending ? 'Sende...' : 'Bestätigungs-Link erneut senden'}
+                  </button>
+                </div>
+                {resendMessage && (
+                  <p className={`text-[11px] font-medium ${resendMessage.success ? 'text-green-600' : 'text-red-600'}`}>
+                    {resendMessage.text}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
           <div className="space-y-2">
             <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Telefon</label>

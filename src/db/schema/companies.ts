@@ -100,6 +100,9 @@ export const companies = pgTable('companies', {
   }>(),
   apiKey: text('api_key').unique(), // For mobile app authentication
   trialExpiresAt: timestamp('trial_expires_at', { withTimezone: true }),
+  newPendingEmail: text('new_pending_email'),
+  emailVerificationToken: text('email_verification_token'),
+  emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
 
   // Configurable daily automated order sync
   fetchOrdersDaily: boolean('fetch_orders_daily').notNull().default(false),

@@ -50,6 +50,41 @@ export async function saveCompanySettingsAction(prevState: any, formData: FormDa
   const internationalLanguage = formData.get('internationalLanguage') as string || 'en'
 
   try {
+    const [company] = await db
+      .select()
+      .from(companies)
+      .where(eq(companies.id, auth.activeCompanyId))
+      .limit(1)
+
+    if (!company) {
+      return { success: false, message: 'Unternehmen nicht gefunden.' }
+    }
+
+    let emailToUpdate: string | null = company.email
+    let newPendingEmail: string | null = company.newPendingEmail
+    let emailVerificationToken: string | null = company.emailVerificationToken
+    let emailVerifiedAt: Date | null = company.emailVerifiedAt
+    let sentVerification = false
+
+    const submittedEmail = email?.trim().toLowerCase() || ''
+    const currentEmail = company.email?.trim().toLowerCase() || ''
+
+    if (!submittedEmail) {
+      emailToUpdate = null
+      newPendingEmail = null
+      emailVerificationToken = null
+      emailVerifiedAt = null
+    } else if (submittedEmail !== currentEmail) {
+      // It's a new email address, keep current active email until verified
+      newPendingEmail = submittedEmail
+      const crypto = await import('crypto')
+      emailVerificationToken = crypto.randomUUID()
+      
+      const { sendCompanyEmailVerificationEmail } = await import('@/lib/email')
+      await sendCompanyEmailVerificationEmail(submittedEmail, name || company.name, emailVerificationToken)
+      sentVerification = true
+    }
+
     await db
       .update(companies)
       .set({
@@ -65,7 +100,10 @@ export async function saveCompanySettingsAction(prevState: any, formData: FormDa
         warehouseZip,
         warehouseCity,
         warehouseCountry,
-        email,
+        email: emailToUpdate,
+        newPendingEmail,
+        emailVerificationToken,
+        emailVerifiedAt,
         phone,
         website,
         logoUrl,
@@ -85,10 +123,45 @@ export async function saveCompanySettingsAction(prevState: any, formData: FormDa
       .where(eq(companies.id, auth.activeCompanyId))
 
     revalidatePath('/settings')
+    
+    if (sentVerification) {
+      return { 
+        success: true, 
+        message: 'Einstellungen gespeichert. Bitte bestätige die neue E-Mail-Adresse (Link gesendet).' 
+      }
+    }
+
     return { success: true, message: 'Unternehmensdaten erfolgreich gespeichert.' }
   } catch (error) {
     console.error('Error saving company settings:', error)
     return { success: false, message: 'Fehler beim Speichern der Daten.' }
+  }
+}
+
+export async function resendCompanyVerificationEmailAction() {
+  const auth = await requireAuth()
+  try {
+    const [company] = await db
+      .select()
+      .from(companies)
+      .where(eq(companies.id, auth.activeCompanyId))
+      .limit(1)
+
+    if (!company || !company.newPendingEmail || !company.emailVerificationToken) {
+      return { success: false, message: 'Keine ausstehende E-Mail-Verifizierung gefunden.' }
+    }
+
+    const { sendCompanyEmailVerificationEmail } = await import('@/lib/email')
+    await sendCompanyEmailVerificationEmail(
+      company.newPendingEmail,
+      company.name,
+      company.emailVerificationToken
+    )
+
+    return { success: true, message: 'Bestätigungslink wurde erneut gesendet.' }
+  } catch (err: any) {
+    console.error('Error resending verification email:', err)
+    return { success: false, message: 'Fehler beim Senden der Bestätigungs-E-Mail.' }
   }
 }
 
