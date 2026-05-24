@@ -66,7 +66,8 @@ export async function sendInvoiceEmail({
   subject,
   html,
   pdfBuffer,
-  pdfFilename
+  pdfFilename,
+  smtpConfig
 }: {
   toEmail: string
   ccEmail?: string
@@ -75,31 +76,81 @@ export async function sendInvoiceEmail({
   html: string
   pdfBuffer?: Buffer
   pdfFilename?: string
+  smtpConfig?: {
+    host?: string
+    port?: number
+    username?: string
+    password?: string
+    encryption?: 'ssl' | 'tls' | 'none'
+    fromEmail?: string
+    fromName?: string
+  }
 }) {
   try {
-    const attachments = pdfBuffer && pdfFilename ? [
-      {
-        filename: pdfFilename,
-        content: pdfBuffer.toString('base64'),
+    if (smtpConfig && smtpConfig.host && smtpConfig.fromEmail) {
+      const nodemailer = await import('nodemailer')
+      const secure = smtpConfig.encryption === 'ssl' || smtpConfig.port === 465
+
+      const transporter = nodemailer.createTransport({
+        host: smtpConfig.host,
+        port: smtpConfig.port || 587,
+        secure,
+        auth: smtpConfig.username && smtpConfig.password ? {
+          user: smtpConfig.username,
+          pass: smtpConfig.password,
+        } : undefined,
+        tls: {
+          rejectUnauthorized: false
+        }
+      })
+
+      const attachments = pdfBuffer && pdfFilename ? [
+        {
+          filename: pdfFilename,
+          content: pdfBuffer,
+        }
+      ] : undefined
+
+      const from = smtpConfig.fromName 
+        ? `"${smtpConfig.fromName}" <${smtpConfig.fromEmail}>` 
+        : smtpConfig.fromEmail
+
+      const info = await transporter.sendMail({
+        from,
+        to: toEmail,
+        cc: ccEmail,
+        replyTo: replyTo || undefined,
+        subject: subject,
+        html: html.replace(/\n/g, '<br />'),
+        attachments,
+      })
+
+      return { success: true, data: info }
+    } else {
+      const attachments = pdfBuffer && pdfFilename ? [
+        {
+          filename: pdfFilename,
+          content: pdfBuffer.toString('base64'),
+        }
+      ] : undefined
+
+      const { data, error } = await resend.emails.send({
+        from: DEFAULT_SENDER,
+        to: [toEmail],
+        cc: ccEmail ? [ccEmail] : undefined,
+        replyTo: replyTo,
+        subject: subject,
+        html: html.replace(/\n/g, '<br />'),
+        attachments,
+      })
+
+      if (error) {
+        console.error('[Email Service] Error sending invoice email:', error)
+        return { success: false, error }
       }
-    ] : undefined
 
-    const { data, error } = await resend.emails.send({
-      from: DEFAULT_SENDER,
-      to: [toEmail],
-      cc: ccEmail ? [ccEmail] : undefined,
-      replyTo: replyTo,
-      subject: subject,
-      html: html.replace(/\n/g, '<br />'),
-      attachments,
-    })
-
-    if (error) {
-      console.error('[Email Service] Error sending invoice email:', error)
-      return { success: false, error }
+      return { success: true, data }
     }
-
-    return { success: true, data }
   } catch (error) {
     console.error('[Email Service] Fatal error sending invoice email:', error)
     return { success: false, error }

@@ -335,3 +335,104 @@ export async function saveDocumentNumberSettingsAction(prevState: any, formData:
   }
 }
 
+export async function saveCompanySmtpSettingsAction(prevState: any, formData: FormData) {
+  const auth = await requireAuth()
+  const enabled = formData.get('enabled') === 'on'
+  const host = formData.get('host') as string
+  const portRaw = formData.get('port') as string
+  const username = formData.get('username') as string
+  const password = formData.get('password') as string
+  const encryption = formData.get('encryption') as 'ssl' | 'tls' | 'none'
+  const fromEmail = formData.get('fromEmail') as string
+  const fromName = formData.get('fromName') as string
+
+  const port = portRaw ? parseInt(portRaw, 10) : undefined
+
+  try {
+    const smtpSettings = {
+      enabled,
+      host: host || undefined,
+      port: isNaN(port as any) ? undefined : port,
+      username: username || undefined,
+      password: password || undefined,
+      encryption: encryption || undefined,
+      fromEmail: fromEmail || undefined,
+      fromName: fromName || undefined,
+    }
+
+    await db
+      .update(companies)
+      .set({
+        smtpSettings,
+        updatedAt: new Date(),
+      })
+      .where(eq(companies.id, auth.activeCompanyId))
+
+    revalidatePath('/settings')
+    return { success: true, message: 'SMTP-Einstellungen erfolgreich gespeichert.' }
+  } catch (error) {
+    console.error('Error saving SMTP settings:', error)
+    return { success: false, message: 'Fehler beim Speichern der SMTP-Einstellungen.' }
+  }
+}
+
+export async function testSmtpConnectionAction(formData: FormData) {
+  const auth = await requireAuth()
+  const { getCurrentUser } = await import('@/lib/session')
+  const user = await getCurrentUser()
+
+  if (!user || !user.email) {
+    return { success: false, message: 'Keine Empfänger-E-Mail-Adresse für den Test gefunden.' }
+  }
+
+  const host = formData.get('host') as string
+  const portRaw = formData.get('port') as string
+  const username = formData.get('username') as string
+  const password = formData.get('password') as string
+  const encryption = formData.get('encryption') as 'ssl' | 'tls' | 'none'
+  const fromEmail = formData.get('fromEmail') as string
+  const fromName = formData.get('fromName') as string
+
+  const port = portRaw ? parseInt(portRaw, 10) : undefined
+
+  if (!host || !fromEmail) {
+    return { success: false, message: 'SMTP-Host und Absender-E-Mail sind erforderlich.' }
+  }
+
+  try {
+    const nodemailer = await import('nodemailer')
+    const secure = encryption === 'ssl' || port === 465
+
+    const transporter = nodemailer.createTransport({
+      host,
+      port: port || 587,
+      secure,
+      auth: username && password ? {
+        user: username,
+        pass: password,
+      } : undefined,
+      tls: {
+        rejectUnauthorized: false
+      }
+    })
+
+    const from = fromName ? `"${fromName}" <${fromEmail}>` : fromEmail
+
+    await transporter.sendMail({
+      from,
+      to: user.email,
+      subject: 'Test-E-Mail von TheOmniStack',
+      html: `<h3>SMTP-Verbindungstest erfolgreich!</h3>
+             <p>Diese E-Mail wurde gesendet, um deine SMTP-Einstellungen in TheOmniStack zu überprüfen.</p>
+             <p>Absender: ${from}</p>
+             <p>Server: ${host}:${port || 587} (${encryption})</p>`,
+    })
+
+    return { success: true, message: `Test-E-Mail wurde erfolgreich an ${user.email} gesendet.` }
+  } catch (error: any) {
+    console.error('SMTP test failed:', error)
+    return { success: false, message: `Verbindung fehlgeschlagen: ${error.message || error}` }
+  }
+}
+
+

@@ -482,6 +482,7 @@ export async function sendInvoiceEmailAction(data: {
   subject: string
   messageText: string
   sendAsAttachment?: boolean
+  senderEmail: string
 }) {
   const auth = await requireAuth()
   const companyId = auth.activeCompanyId
@@ -495,7 +496,11 @@ export async function sendInvoiceEmailAction(data: {
     if (!invoice) throw new Error('Rechnung nicht gefunden')
 
     const [company] = await db
-      .select({ email: companies.email, name: companies.name })
+      .select({ 
+        email: companies.email, 
+        name: companies.name,
+        smtpSettings: companies.smtpSettings
+      })
       .from(companies)
       .where(eq(companies.id, companyId))
       .limit(1)
@@ -512,6 +517,16 @@ export async function sendInvoiceEmailAction(data: {
       pdfFilename = `Rechnung-${invoice.invoiceNumber}.pdf`
     }
 
+    // Determine if custom SMTP should be used
+    let smtpConfig: any = undefined
+    if (
+      company?.smtpSettings?.enabled &&
+      company.smtpSettings.fromEmail &&
+      data.senderEmail === company.smtpSettings.fromEmail
+    ) {
+      smtpConfig = company.smtpSettings
+    }
+
     // 3. Send Email
     const { sendInvoiceEmail } = await import('@/lib/email')
     const emailResult = await sendInvoiceEmail({
@@ -521,15 +536,17 @@ export async function sendInvoiceEmailAction(data: {
       subject: data.subject,
       html: data.messageText,
       pdfBuffer,
-      pdfFilename
+      pdfFilename,
+      smtpConfig
     })
 
     if (!emailResult.success) {
-      throw new Error((emailResult.error as any)?.message || 'Fehler beim E-Mail-Dienst (Resend)')
+      throw new Error((emailResult.error as any)?.message || 'Fehler beim E-Mail-Dienst')
     }
 
     // 4. Create log entry
     const logMessage = `Rechnung wurde per E-Mail versendet.
+Absender: ${data.senderEmail}
 Empfänger: ${data.recipientEmail}
 ${data.ccEmail ? `CC: ${data.ccEmail}\n` : ''}Betreff: ${data.subject}`
 

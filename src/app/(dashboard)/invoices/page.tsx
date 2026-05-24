@@ -9,12 +9,13 @@ import { GenerateMissingButton } from './generate-missing-button'
 import { DraftsDropdown } from './drafts-dropdown'
 import { getDraftsAction } from '@/app/actions/manual-invoice'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
+import { companies } from '@/db/schema/companies'
 
 export default async function InvoicesPage() {
   const auth = await requireAuth()
   const drafts = await getDraftsAction()
 
-  const [allInvoices, integrations] = await Promise.all([
+  const [allInvoices, integrations, company] = await Promise.all([
     db
       .select({
         id: invoices.id,
@@ -42,7 +43,16 @@ export default async function InvoicesPage() {
         clientSecret: marketplaceIntegrations.clientSecret,
       })
       .from(marketplaceIntegrations)
-      .where(eq(marketplaceIntegrations.companyId, auth.activeCompanyId))
+      .where(eq(marketplaceIntegrations.companyId, auth.activeCompanyId)),
+    db
+      .select({
+        email: companies.email,
+        smtpSettings: companies.smtpSettings,
+      })
+      .from(companies)
+      .where(eq(companies.id, auth.activeCompanyId))
+      .limit(1)
+      .then(rows => rows[0] || null)
   ])
 
   const hasKauflandIntegration = integrations.some(i => i.type === 'kaufland' && i.clientId && i.clientSecret)
@@ -74,6 +84,7 @@ export default async function InvoicesPage() {
         initialInvoices={allInvoices} 
         hasKauflandIntegration={hasKauflandIntegration}
         hasEbayIntegration={hasEbayIntegration}
+        company={company ? { email: company.email, smtpSettings: company.smtpSettings } : undefined}
       />
     </div>
   )

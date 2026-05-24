@@ -103,6 +103,16 @@ export const companies = pgTable('companies', {
   newPendingEmail: text('new_pending_email'),
   emailVerificationToken: text('email_verification_token'),
   emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
+  smtpSettings: jsonb('smtp_settings').$type<{
+    enabled: boolean;
+    host?: string;
+    port?: number;
+    username?: string;
+    password?: string;
+    encryption?: 'ssl' | 'tls' | 'none';
+    fromEmail?: string;
+    fromName?: string;
+  }>(),
 
   // Configurable daily automated order sync
   fetchOrdersDaily: boolean('fetch_orders_daily').notNull().default(false),

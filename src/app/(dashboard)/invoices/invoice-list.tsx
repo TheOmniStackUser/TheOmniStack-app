@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
 import { 
@@ -87,10 +88,15 @@ export function InvoiceList({
   initialInvoices,
   hasKauflandIntegration = false,
   hasEbayIntegration = false,
+  company,
 }: { 
   initialInvoices: Invoice[]
   hasKauflandIntegration?: boolean
   hasEbayIntegration?: boolean
+  company?: {
+    email: string | null
+    smtpSettings: any
+  }
 }) {
   const router = useRouter()
   const [loadingId, setLoadingId] = useState<string | null>(null)
@@ -139,11 +145,14 @@ export function InvoiceList({
       const recEmail = inv.recipientEmail || ''
       const invNumber = inv.invoiceNumber || ''
       const invDate = format(new Date(inv.createdAt), 'dd.MM.yyyy', { locale: de })
-      const companyEmail = 'info@peroyork.de' // default based on screenshot
+
+      const defaultSender = (company?.smtpSettings?.enabled && company.smtpSettings.fromEmail)
+        ? company.smtpSettings.fromEmail
+        : 'noreply@theomnistack.de'
 
       setSendDate(invDate)
       setSelfSend(false)
-      setSenderEmail(`${companyEmail} (Ich)`)
+      setSenderEmail(defaultSender)
       setRecipientEmail(recEmail)
       setCcEmail('')
       setSubject(`Rechnung-${invNumber}`)
@@ -202,6 +211,7 @@ Mit freundlichen Grüßen`)
         invoiceId: selectedInvoiceId,
         recipientEmail,
         ccEmail,
+        senderEmail,
         subject,
         messageText,
         sendAsAttachment
@@ -1379,9 +1389,19 @@ Mit freundlichen Grüßen`)
                       value={senderEmail}
                       onChange={(e) => setSenderEmail(e.target.value)}
                     >
-                      <option value={senderEmail}>{senderEmail}</option>
+                      <option value="noreply@theomnistack.de">noreply@theomnistack.de (System-Standard)</option>
+                      {company?.smtpSettings?.enabled && company.smtpSettings.fromEmail && (
+                        <option value={company.smtpSettings.fromEmail}>
+                          {company.smtpSettings.fromEmail} (Eigener Mailserver)
+                        </option>
+                      )}
                     </select>
-                    <button className="text-blue-600 hover:text-blue-700 hover:underline shrink-0">ändern</button>
+                    <Link 
+                      href="/settings#smtp-settings"
+                      className="text-blue-600 hover:text-blue-700 hover:underline shrink-0 text-sm font-semibold"
+                    >
+                      ändern
+                    </Link>
                   </div>
                 </div>
 
