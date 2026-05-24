@@ -356,6 +356,7 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
         dueAt: customDueDate || new Date(),
         pdfStorageKey: storageKey,
         pdfGeneratedAt: new Date(),
+        issuedAt: status === 'issued' ? new Date() : null,
       })
       .returning({ id: invoices.id })
 

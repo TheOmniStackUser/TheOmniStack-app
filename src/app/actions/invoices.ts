@@ -6,7 +6,7 @@ import { invoices } from '@/db/schema/invoices'
 import { orders } from '@/db/schema/orders'
 import { eq, and, isNull, desc } from 'drizzle-orm'
 import { getDocumentUrl } from '@/lib/storage'
-import { createInvoiceForOrder, regenerateInvoicePdf } from '@/lib/invoice-service'
+import { createInvoiceForOrder, regenerateInvoicePdf, getDefaultSettings, formatDocumentNumber } from '@/lib/invoice-service'
 import { generateZugferdXml } from '@/lib/e-invoice'
 import { companies } from '@/db/schema/companies'
 import { invoiceItems, invoiceLogs } from '@/db/schema/invoices'
@@ -282,4 +282,195 @@ export async function markInvoiceAsPaidAction(invoiceId: string) {
   })
 
   return { success: true }
+}
+
+export async function cancelInvoiceAction(invoiceId: string) {
+  const auth = await requireAuth()
+  const companyId = auth.activeCompanyId
+
+  try {
+    const result = await db.transaction(async (tx) => {
+      // 1. Fetch original invoice
+      const invoice = await tx.query.invoices.findFirst({
+        where: and(eq(invoices.id, invoiceId), eq(invoices.companyId, companyId)),
+        with: { items: true }
+      })
+
+      if (!invoice) throw new Error('Rechnung nicht gefunden')
+      if (invoice.status === 'cancelled') throw new Error('Rechnung ist bereits storniert')
+      if (invoice.documentType !== 'invoice') throw new Error('Nur Rechnungen können storniert werden')
+      if (invoice.isCreditNote) throw new Error('Gutschriften können nicht storniert werden')
+
+      // 2. Fetch company document settings
+      const [company] = await tx
+        .select()
+        .from(companies)
+        .where(eq(companies.id, companyId))
+        .for('update')
+      if (!company) throw new Error('Mandant nicht gefunden')
+
+      const dbSettings = company.documentNumberSettings as any || {}
+      const config = dbSettings.creditNote || getDefaultSettings('creditNote', company)
+
+      // 3. Generate cancellation invoice number (Stornonummer)
+      let cancelsInvoiceNumber = ''
+      if (config && config.auto) {
+        const nextNum = parseInt(config.next, 10) || 1
+        const padding = config.padding || 5
+        cancelsInvoiceNumber = formatDocumentNumber(config.format, nextNum, padding, '', '')
+        
+        // Update next number
+        const updatedSettings = {
+          ...dbSettings,
+          creditNote: {
+            ...config,
+            next: (nextNum + 1).toString()
+          }
+        }
+        await tx.update(companies)
+          .set({ documentNumberSettings: updatedSettings, updatedAt: new Date() })
+          .where(eq(companies.id, companyId))
+      } else {
+        cancelsInvoiceNumber = `STO-${invoice.invoiceNumber}`
+      }
+
+      // 4. Create new invoice as a credit note (cancellation)
+      const [cancellationInvoice] = await tx
+        .insert(invoices)
+        .values({
+          companyId,
+          invoiceNumber: cancelsInvoiceNumber,
+          status: 'issued',
+          documentType: 'invoice',
+          recipientName: invoice.recipientName,
+          recipientStreet: invoice.recipientStreet,
+          recipientZip: invoice.recipientZip,
+          recipientCity: invoice.recipientCity,
+          recipientCountry: invoice.recipientCountry,
+          recipientEmail: invoice.recipientEmail,
+          currency: invoice.currency,
+          subtotalAmount: invoice.subtotalAmount,
+          taxAmount: invoice.taxAmount,
+          totalAmount: invoice.totalAmount,
+          taxRate: invoice.taxRate,
+          isCreditNote: true,
+          cancelsInvoiceId: invoice.id,
+          dueAt: new Date(),
+          issuedAt: new Date()
+        })
+        .returning({ id: invoices.id })
+
+      // Copy items
+      if (invoice.items.length > 0) {
+        await tx.insert(invoiceItems).values(
+          invoice.items.map((item, index) => ({
+            invoiceId: cancellationInvoice.id,
+            companyId,
+            position: (index + 1).toString(),
+            sku: item.sku,
+            description: item.description,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            taxRate: item.taxRate,
+            lineTotal: item.lineTotal,
+          }))
+        )
+      }
+
+      // 5. Update original invoice status to 'cancelled'
+      await tx.update(invoices)
+        .set({ status: 'cancelled' })
+        .where(eq(invoices.id, invoice.id))
+
+      // 6. Add logs
+      await tx.insert(invoiceLogs).values([
+        {
+          invoiceId: invoice.id,
+          companyId,
+          action: 'edited',
+          note: `Rechnung wurde storniert. Stornobeleg ${cancelsInvoiceNumber} wurde erstellt.`
+        },
+        {
+          invoiceId: cancellationInvoice.id,
+          companyId,
+          action: 'edited',
+          note: `Stornobeleg für Rechnung ${invoice.invoiceNumber} erstellt.`
+        }
+      ])
+
+      return {
+        success: true,
+        cancellationInvoiceId: cancellationInvoice.id,
+        cancellationInvoiceNumber: cancelsInvoiceNumber
+      }
+    })
+
+    if (result.success && result.cancellationInvoiceId) {
+      try {
+        await regenerateInvoicePdf(result.cancellationInvoiceId, companyId)
+      } catch (err) {
+        console.error('[CancelInvoice] Failed to generate PDF:', err)
+      }
+    }
+
+    const { revalidatePath } = await import('next/cache')
+    revalidatePath('/invoices')
+
+    return result
+  } catch (err: any) {
+    console.error('[Action] Failed to cancel invoice:', err)
+    throw new Error(err.message || 'Fehler beim Stornieren der Rechnung.')
+  }
+}
+
+export async function getInvoiceDetailsForCloneAction(invoiceId: string) {
+  const auth = await requireAuth()
+  const companyId = auth.activeCompanyId
+
+  const invoice = await db.query.invoices.findFirst({
+    where: and(eq(invoices.id, invoiceId), eq(invoices.companyId, companyId)),
+    with: { items: true }
+  })
+
+  if (!invoice) throw new Error('Dokument nicht gefunden')
+
+  const linkedOrder = await db.query.orders.findFirst({
+    where: eq(orders.invoiceId, invoiceId)
+  })
+
+  const metadata = (linkedOrder?.rawPayload as any)?.manualMetadata || {}
+
+  return {
+    invoice: {
+      recipientName: invoice.recipientName,
+      recipientStreet: invoice.recipientStreet || '',
+      recipientZip: invoice.recipientZip || '',
+      recipientCity: invoice.recipientCity || '',
+      recipientCountry: invoice.recipientCountry || 'DE',
+      recipientEmail: invoice.recipientEmail || '',
+      currency: invoice.currency || 'EUR',
+      taxRate: parseFloat(invoice.taxRate) * 100,
+      customText: metadata.customText || '',
+      taxOption: metadata.taxOption || 'standard',
+      shippingCountry: metadata.shippingCountry || invoice.recipientCountry || 'DE',
+      destinationCountry: metadata.destinationCountry || invoice.recipientCountry || 'DE',
+      taxCountry: metadata.taxCountry || 'DE',
+      orderNumber: metadata.orderNumber || '',
+      orderDate: metadata.orderDate ? new Date(metadata.orderDate).toISOString().split('T')[0] : '',
+      buyerReference: metadata.buyerReference || '',
+      externalId: metadata.externalId || '',
+      skontoRate: metadata.skontoRate || 0,
+      skontoDays: metadata.skontoDays || 7,
+      discountRate: metadata.discountRate || 0,
+      ossEnabled: metadata.ossEnabled || false,
+      dueDateDays: metadata.dueDateDays || 14,
+    },
+    items: invoice.items.map(i => ({
+      sku: i.sku || '',
+      title: i.description,
+      quantity: parseFloat(i.quantity),
+      unitPrice: parseFloat(i.unitPrice),
+      taxRate: parseFloat(i.taxRate) * 100
+    }))
+  }
 }

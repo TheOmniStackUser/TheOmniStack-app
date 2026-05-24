@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { createManualInvoiceAction, editManualInvoiceAction, previewInvoiceAction, getDraftsAction, getDraftDetailsAction, deleteDraftAction } from '@/app/actions/manual-invoice'
 import { getInvoiceSettingsAction, saveInvoiceTemplateAction } from '@/app/actions/invoice-settings'
 import { searchCustomersAction, validateVatAction } from '@/app/actions/customers'
+import { getInvoiceDetailsForCloneAction } from '@/app/actions/invoices'
 import { WORLD_COUNTRIES, EU_COUNTRIES } from '@/lib/countries'
 
 export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'invoice' | 'quote' | 'delivery_note' }) {
@@ -13,8 +14,9 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
   const [isPreviewing, setIsPreviewing] = useState(false)
   const [isLoadingSettings, setIsLoadingSettings] = useState(true)
   const [draftName, setDraftName] = useState('')
-  const [currentDraftId, setCurrentDraftId] = useState<string | null>(null)
   const [drafts, setDrafts] = useState<any[]>([])
+  const [currentDraftId, setCurrentDraftId] = useState<string | null>(null)
+  const [currentDraftName, setCurrentDraftName] = useState('')
   const [showDraftsList, setShowDraftsList] = useState(false)
   const [showCustomerSearch, setShowCustomerSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -27,6 +29,8 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
   const [notification, setNotification] = useState<{ message: string, type: 'success' | 'error' | 'info' } | null>(null)
   const searchParams = useSearchParams()
   const editId = searchParams.get('edit')
+  const cloneId = searchParams.get('clone')
+  const isCreditNoteParam = searchParams.get('isCreditNote')
 
   const [customer, setCustomer] = useState({
     id: undefined as string | undefined,
@@ -117,6 +121,12 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
       handleLoadDraft(editId)
     }
   }, [editId])
+
+  useEffect(() => {
+    if (cloneId) {
+      handleLoadClone(cloneId)
+    }
+  }, [cloneId])
   const [companyVatId, setCompanyVatId] = useState('')
   const [showVatModal, setShowVatModal] = useState(false)
 
@@ -199,6 +209,40 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
       setTimeout(() => setNotification(null), 5000)
     } catch (error) {
       setNotification({ message: 'Fehler beim Laden des Entwurfs', type: 'error' })
+    }
+  }
+
+  const handleLoadClone = async (id: string) => {
+    try {
+      const { invoice, items: clonedItems } = await getInvoiceDetailsForCloneAction(id)
+      setCustomer({
+        id: undefined,
+        name: invoice.recipientName || '',
+        street: invoice.recipientStreet || '',
+        zip: invoice.recipientZip || '',
+        city: invoice.recipientCity || '',
+        country: invoice.recipientCountry || 'DE',
+        email: invoice.recipientEmail || '',
+        vatId: '',
+        customerNumber: ''
+      })
+      setItems(clonedItems.map(i => ({
+        sku: i.sku || '',
+        title: i.title,
+        quantity: i.quantity,
+        unitPrice: i.unitPrice,
+        taxRate: i.taxRate
+      })))
+      setSettings(prev => ({
+        ...prev,
+        ...invoice,
+        isCreditNote: isCreditNoteParam === 'true',
+      }))
+      setCustomText(invoice.customText || '')
+      setNotification({ message: 'Rechnungsdaten erfolgreich kopiert!', type: 'success' })
+      setTimeout(() => setNotification(null), 5000)
+    } catch (error) {
+      setNotification({ message: 'Fehler beim Kopieren der Rechnungsdaten', type: 'error' })
     }
   }
 

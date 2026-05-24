@@ -735,7 +735,8 @@ export async function editManualInvoiceAction(data: {
         taxRate: (tax / subtotal || 0).toFixed(4),
         isCreditNote: data.isCreditNote,
         dueAt: data.dueDate || new Date(),
-        currency: data.currency
+        currency: data.currency,
+        issuedAt: invoice.issuedAt || new Date()
       }).where(eq(invoices.id, invoice.id))
 
       // c) Refresh Items (Delete and Re-insert)
