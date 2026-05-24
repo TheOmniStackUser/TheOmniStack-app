@@ -3,7 +3,7 @@
 import { db } from '@/db/client'
 import { invoices } from '@/db/schema/invoices'
 import { orders } from '@/db/schema/orders'
-import { eq, and, gte, lte, sql, inArray } from 'drizzle-orm'
+import { eq, and, gte, lte, sql, inArray, ne } from 'drizzle-orm'
 import { requireAuth } from '@/lib/session'
 
 export async function exportInvoiceJournalAction(filters: {
@@ -15,7 +15,11 @@ export async function exportInvoiceJournalAction(filters: {
   const auth = await requireAuth()
   const companyId = auth.activeCompanyId
 
-  const conditions = [eq(invoices.companyId, companyId)]
+  const conditions = [
+    eq(invoices.companyId, companyId),
+    ne(invoices.documentType, 'quote'),
+    ne(invoices.status, 'draft')
+  ]
 
   if (filters.fromDate) {
     conditions.push(gte(invoices.createdAt, new Date(filters.fromDate)))

@@ -31,7 +31,8 @@ export default async function InvoicesPage() {
       .leftJoin(orders, eq(invoices.id, orders.invoiceId))
       .where(and(
         eq(invoices.companyId, auth.activeCompanyId),
-        ne(invoices.documentType, 'quote')
+        ne(invoices.documentType, 'quote'),
+        ne(invoices.status, 'draft')
       ))
       .orderBy(desc(invoices.createdAt)),
     db
