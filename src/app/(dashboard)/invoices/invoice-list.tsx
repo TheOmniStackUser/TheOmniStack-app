@@ -1280,28 +1280,70 @@ export function InvoiceList({
                           Versionen
                         </h3>
                         
-                        <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 text-xs flex justify-between items-center bg-white shadow-sm hover:border-slate-200 transition-colors">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-black">
-                              1
+                        <div className="space-y-3">
+                          {/* Base Version 1.0 */}
+                          <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 text-xs flex justify-between items-center bg-white shadow-sm hover:border-slate-200 transition-colors">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-black">
+                                1.0
+                              </div>
+                              <div>
+                                <p className="font-bold text-slate-800">Version 1.0 (Original)</p>
+                                <p className="text-slate-400 font-semibold mt-0.5">
+                                  {format(new Date(details.invoice.createdAt), 'dd.MM.yyyy HH:mm', { locale: de })} • System
+                                </p>
+                              </div>
                             </div>
-                            <div>
-                              <p className="font-bold text-slate-800">Version 1.0</p>
-                              <p className="text-slate-400 font-semibold mt-0.5">
-                                {format(new Date(details.invoice.createdAt), 'dd.MM.yyyy HH:mm', { locale: de })} • System
-                              </p>
-                            </div>
+                            
+                            <button 
+                              onClick={() => window.open(pdfUrl || '', '_blank')}
+                              className="p-2 hover:bg-slate-50 rounded-lg border border-slate-200 shadow-sm transition-all text-slate-500 hover:text-slate-700"
+                              title="Rechnung downloaden"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                              </svg>
+                            </button>
                           </div>
-                          
-                          <button 
-                            onClick={() => window.open(pdfUrl || '', '_blank')}
-                            className="p-2 hover:bg-slate-50 rounded-lg border border-slate-200 shadow-sm transition-all text-slate-500 hover:text-slate-700"
-                            title="Rechnung downloaden"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                            </svg>
-                          </button>
+
+                          {/* Chronological Edits */}
+                          {details.invoice.logs && details.invoice.logs
+                            .filter((log: any) => log.action === 'edited')
+                            .slice()
+                            .reverse()
+                            .map((log: any, idx: number) => {
+                              const versionNum = `1.${idx + 1}`
+                              return (
+                                <div key={log.id} className="bg-slate-50 border border-slate-100 rounded-xl p-4 text-xs flex justify-between items-center bg-white shadow-sm hover:border-slate-200 transition-colors">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-black">
+                                      {versionNum}
+                                    </div>
+                                    <div>
+                                      <p className="font-bold text-slate-800">Version {versionNum}</p>
+                                      <p className="text-slate-400 font-semibold mt-0.5">
+                                        {format(new Date(log.createdAt), 'dd.MM.yyyy HH:mm', { locale: de })} • Bearbeiter
+                                      </p>
+                                      {log.note && (
+                                        <p className="text-[10px] text-slate-500 font-semibold italic mt-1 leading-normal">
+                                          Vermerk: {log.note}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  
+                                  <button 
+                                    onClick={() => window.open(pdfUrl || '', '_blank')}
+                                    className="p-2 hover:bg-slate-50 rounded-lg border border-slate-200 shadow-sm transition-all text-slate-500 hover:text-slate-700"
+                                    title="Aktuelle PDF herunterladen"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    </svg>
+                                  </button>
+                                </div>
+                              )
+                            })}
                         </div>
                       </div>
 
@@ -1367,7 +1409,9 @@ export function InvoiceList({
                                   <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-2">
                                     <span>{format(new Date(log.createdAt), 'dd.MM.yyyy HH:mm', { locale: de })}</span>
                                     <span>•</span>
-                                    <span className="text-slate-500">Patricia Leis</span>
+                                    <span className="text-slate-500">
+                                      {log.action === 'email' ? 'System' : 'Bearbeiter'}
+                                    </span>
                                     {isPayment && <span className="text-emerald-600 font-bold uppercase text-[9px]">Zahlung</span>}
                                     {isComment && <span className="text-blue-600 font-bold uppercase text-[9px]">Kommentar</span>}
                                     {isEmail && <span className="text-amber-600 font-bold uppercase text-[9px]">E-Mail</span>}
