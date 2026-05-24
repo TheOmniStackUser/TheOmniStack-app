@@ -1057,8 +1057,8 @@ export function InvoiceList({
                             {details.invoice.invoiceNumber}
                           </h2>
                         </div>
-                        <span className="px-2.5 py-1 text-xs font-bold rounded-lg border bg-white shadow-sm flex items-center gap-1.5" style={getMarketplaceBadgeStyle(details.invoice.marketplace)}>
-                          {formatMarketplaceName(details.invoice.marketplace)}
+                        <span className="px-2.5 py-1 text-xs font-bold rounded-lg border bg-white shadow-sm flex items-center gap-1.5" style={getMarketplaceBadgeStyle(details.linkedOrder?.marketplace || 'manual')}>
+                          {formatMarketplaceName(details.linkedOrder?.marketplace || 'manual')}
                         </span>
                       </div>
                       
@@ -1082,7 +1082,7 @@ export function InvoiceList({
                         </button>
 
                         {/* Bearbeiten */}
-                        {details.invoice.marketplace === 'manual' && (
+                        {(details.linkedOrder?.marketplace || 'manual') === 'manual' && (
                           <a
                             href={`/invoices/new?edit=${details.invoice.id}`}
                             className="inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 transition-all shadow-sm"
