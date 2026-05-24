@@ -29,6 +29,9 @@ interface Invoice {
   createdAt: Date
   pdfStorageKey: string | null
   marketplace: string | null
+  cancelsInvoiceId: string | null
+  isCreditNote: boolean
+  documentType: string
 }
 
 const formatCountry = (code?: string | null) => {
@@ -652,6 +655,7 @@ export function InvoiceList({
             <tr className="bg-slate-50 border-b border-slate-200">
               <th className="px-6 py-4 font-semibold text-slate-700">Datum</th>
               <th className="px-6 py-4 font-semibold text-slate-700">Rechnungsnummer</th>
+              <th className="px-6 py-4 font-semibold text-slate-700">Typ</th>
               <th className="px-6 py-4 font-semibold text-slate-700">Marktplatz</th>
               <th className="px-6 py-4 font-semibold text-slate-700">Kunde</th>
               <th className="px-6 py-4 font-semibold text-slate-700">Land</th>
@@ -674,6 +678,43 @@ export function InvoiceList({
                     <span>{invoice.invoiceNumber}</span>
                     <span className="text-[10px] text-blue-600 font-bold uppercase tracking-tighter">E-Rechnung (ZUGFeRD)</span>
                   </div>
+                </td>
+                <td className="px-6 py-4">
+                  {(() => {
+                    if (invoice.cancelsInvoiceId) {
+                      return (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-rose-50 text-rose-700 border border-rose-100">
+                          Storno
+                        </span>
+                      )
+                    }
+                    if (invoice.isCreditNote) {
+                      return (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                          Gutschrift
+                        </span>
+                      )
+                    }
+                    if (invoice.documentType === 'quote') {
+                      return (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                          Angebot
+                        </span>
+                      )
+                    }
+                    if (invoice.documentType === 'delivery_note') {
+                      return (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-slate-50 text-slate-700 border border-slate-200">
+                          Lieferschein
+                        </span>
+                      )
+                    }
+                    return (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                        Rechnung
+                      </span>
+                    )
+                  })()}
                 </td>
                 <td className="px-6 py-4">
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize" 
@@ -758,7 +799,7 @@ export function InvoiceList({
             ))}
             {filteredInvoices.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
+                <td colSpan={8} className="px-6 py-12 text-center text-slate-500">
                   Keine Rechnungen entsprechen deiner Suche.
                 </td>
               </tr>

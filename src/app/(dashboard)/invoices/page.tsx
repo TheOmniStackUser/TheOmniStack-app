@@ -29,6 +29,9 @@ export default async function InvoicesPage() {
         createdAt: invoices.createdAt,
         pdfStorageKey: invoices.pdfStorageKey,
         marketplace: orders.marketplace,
+        cancelsInvoiceId: invoices.cancelsInvoiceId,
+        isCreditNote: invoices.isCreditNote,
+        documentType: invoices.documentType,
       })
       .from(invoices)
       .leftJoin(orders, eq(invoices.id, orders.invoiceId))
