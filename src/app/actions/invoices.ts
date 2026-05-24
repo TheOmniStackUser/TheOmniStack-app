@@ -4,12 +4,12 @@ import { requireAuth } from '@/lib/session'
 import { db } from '@/db/client'
 import { invoices } from '@/db/schema/invoices'
 import { orders } from '@/db/schema/orders'
-import { eq, and, isNull } from 'drizzle-orm'
+import { eq, and, isNull, desc } from 'drizzle-orm'
 import { getDocumentUrl } from '@/lib/storage'
 import { createInvoiceForOrder, regenerateInvoicePdf } from '@/lib/invoice-service'
 import { generateZugferdXml } from '@/lib/e-invoice'
 import { companies } from '@/db/schema/companies'
-import { invoiceItems } from '@/db/schema/invoices'
+import { invoiceItems, invoiceLogs } from '@/db/schema/invoices'
 
 export async function getInvoiceDownloadUrl(invoiceId: string) {
   const auth = await requireAuth()
@@ -212,4 +212,74 @@ export async function regenerateInvoicePdfAction(invoiceId: string) {
     console.error('[Action] Failed to regenerate invoice:', err)
     throw new Error('Fehler beim Aktualisieren der Rechnung.')
   }
+}
+
+export async function getInvoiceDetailsAction(invoiceId: string) {
+  const auth = await requireAuth()
+  const companyId = auth.activeCompanyId
+
+  const invoice = await db.query.invoices.findFirst({
+    where: and(eq(invoices.id, invoiceId), eq(invoices.companyId, companyId)),
+    with: {
+      items: true,
+      logs: {
+        orderBy: (logs, { desc }) => [desc(logs.createdAt)]
+      }
+    }
+  })
+
+  if (!invoice) throw new Error('Rechnung nicht gefunden')
+
+  const linkedOrder = await db.query.orders.findFirst({
+    where: eq(orders.invoiceId, invoiceId)
+  })
+
+  return {
+    invoice,
+    linkedOrder: linkedOrder || null
+  }
+}
+
+export async function addInvoiceLogAction(invoiceId: string, action: string, note: string) {
+  const auth = await requireAuth()
+  const companyId = auth.activeCompanyId
+
+  const [invoice] = await db
+    .select({ id: invoices.id })
+    .from(invoices)
+    .where(and(eq(invoices.id, invoiceId), eq(invoices.companyId, companyId)))
+    .limit(1)
+
+  if (!invoice) throw new Error('Rechnung nicht gefunden')
+
+  await db.insert(invoiceLogs).values({
+    invoiceId,
+    companyId,
+    action,
+    note: note.trim()
+  })
+
+  return { success: true }
+}
+
+export async function markInvoiceAsPaidAction(invoiceId: string) {
+  const auth = await requireAuth()
+  const companyId = auth.activeCompanyId
+
+  const [invoice] = await db
+    .select({ id: invoices.id })
+    .from(invoices)
+    .where(and(eq(invoices.id, invoiceId), eq(invoices.companyId, companyId)))
+    .limit(1)
+
+  if (!invoice) throw new Error('Rechnung nicht gefunden')
+
+  await db.insert(invoiceLogs).values({
+    invoiceId,
+    companyId,
+    action: 'payment',
+    note: 'Zahlungseingang erfasst. Das Dokument ist vollständig bezahlt.'
+  })
+
+  return { success: true }
 }
