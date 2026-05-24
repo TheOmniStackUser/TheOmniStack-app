@@ -10,6 +10,7 @@ import { createInvoiceForOrder, regenerateInvoicePdf, getDefaultSettings, format
 import { generateZugferdXml } from '@/lib/e-invoice'
 import { companies } from '@/db/schema/companies'
 import { invoiceItems, invoiceLogs } from '@/db/schema/invoices'
+import { invoiceTextTemplates } from '@/db/schema/templates'
 
 export async function getInvoiceDownloadUrl(invoiceId: string) {
   const auth = await requireAuth()
@@ -563,4 +564,43 @@ ${data.ccEmail ? `CC: ${data.ccEmail}\n` : ''}Betreff: ${data.subject}`
     return { error: err.message || 'Fehler beim Versenden der E-Mail.' }
   }
 }
+
+export async function saveEmailTemplateAction(content: string) {
+  const auth = await requireAuth()
+  const companyId = auth.activeCompanyId
+
+  try {
+    const existing = await db
+      .select()
+      .from(invoiceTextTemplates)
+      .where(
+        and(
+          eq(invoiceTextTemplates.companyId, companyId),
+          eq(invoiceTextTemplates.name, 'email_invoice_default')
+        )
+      )
+      .limit(1)
+
+    if (existing.length > 0) {
+      await db
+        .update(invoiceTextTemplates)
+        .set({ content })
+        .where(eq(invoiceTextTemplates.id, existing[0].id))
+    } else {
+      await db
+        .insert(invoiceTextTemplates)
+        .values({
+          companyId,
+          name: 'email_invoice_default',
+          content
+        })
+    }
+
+    return { success: true }
+  } catch (err: any) {
+    console.error('[Action] Failed to save email template:', err)
+    return { error: err.message || 'Fehler beim Speichern der Vorlage.' }
+  }
+}
+
 

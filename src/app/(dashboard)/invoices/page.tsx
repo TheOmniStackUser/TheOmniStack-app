@@ -10,12 +10,13 @@ import { DraftsDropdown } from './drafts-dropdown'
 import { getDraftsAction } from '@/app/actions/manual-invoice'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { companies } from '@/db/schema/companies'
+import { invoiceTextTemplates } from '@/db/schema/templates'
 
 export default async function InvoicesPage() {
   const auth = await requireAuth()
   const drafts = await getDraftsAction()
 
-  const [allInvoices, integrations, company] = await Promise.all([
+  const [allInvoices, integrations, company, emailTemplate] = await Promise.all([
     db
       .select({
         id: invoices.id,
@@ -52,7 +53,18 @@ export default async function InvoicesPage() {
       .from(companies)
       .where(eq(companies.id, auth.activeCompanyId))
       .limit(1)
-      .then(rows => rows[0] || null)
+      .then(rows => rows[0] || null),
+    db
+      .select({
+        content: invoiceTextTemplates.content,
+      })
+      .from(invoiceTextTemplates)
+      .where(and(
+        eq(invoiceTextTemplates.companyId, auth.activeCompanyId),
+        eq(invoiceTextTemplates.name, 'email_invoice_default')
+      ))
+      .limit(1)
+      .then(rows => rows[0]?.content || null)
   ])
 
   const hasKauflandIntegration = integrations.some(i => i.type === 'kaufland' && i.clientId && i.clientSecret)
@@ -85,6 +97,7 @@ export default async function InvoicesPage() {
         hasKauflandIntegration={hasKauflandIntegration}
         hasEbayIntegration={hasEbayIntegration}
         company={company ? { email: company.email, smtpSettings: company.smtpSettings } : undefined}
+        initialEmailTemplate={emailTemplate}
       />
     </div>
   )

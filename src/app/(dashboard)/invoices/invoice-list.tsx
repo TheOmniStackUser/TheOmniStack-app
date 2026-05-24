@@ -13,7 +13,8 @@ import {
   addInvoiceLogAction,
   markInvoiceAsPaidAction,
   cancelInvoiceAction,
-  sendInvoiceEmailAction
+  sendInvoiceEmailAction,
+  saveEmailTemplateAction
 } from '@/app/actions/invoices'
 import { getInvoiceLogsAction } from '@/app/actions/manual-invoice'
 import { exportInvoiceJournalAction } from '@/app/actions/export'
@@ -84,11 +85,20 @@ const getMarketplaceBadgeStyle = (mp: string | null) => {
   }
 }
 
+const DEFAULT_TEMPLATE = `Sehr geehrte(r) {Empfänger},
+
+anbei erhalten Sie Ihre Rechnung Nr. {Nummer} vom {Datum} im PDF-Format.
+Sie können die Rechnung auch unter der folgenden URL abrufen und ohne PDF-Reader anzeigen lassen:
+{Link}
+
+Mit freundlichen Grüßen`
+
 export function InvoiceList({ 
   initialInvoices,
   hasKauflandIntegration = false,
   hasEbayIntegration = false,
   company,
+  initialEmailTemplate = null,
 }: { 
   initialInvoices: Invoice[]
   hasKauflandIntegration?: boolean
@@ -97,6 +107,7 @@ export function InvoiceList({
     email: string | null
     smtpSettings: any
   }
+  initialEmailTemplate?: string | null
 }) {
   const router = useRouter()
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
@@ -137,6 +148,8 @@ export function InvoiceList({
   const [sendAsAttachment, setSendAsAttachment] = useState(true)
   const [mergePdfs, setMergePdfs] = useState(false)
   const [docFormat, setDocFormat] = useState('Standard PDF')
+  const [emailTemplate, setEmailTemplate] = useState(initialEmailTemplate || DEFAULT_TEMPLATE)
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false)
 
   const handleSelectInvoice = async (invoiceId: string) => {
     try {
@@ -159,19 +172,19 @@ export function InvoiceList({
         ? company.smtpSettings.fromEmail
         : 'noreply@theomnistack.de'
 
+      const resolvedText = emailTemplate
+        .split('{Empfänger}').join(inv.recipientName || 'Kunde')
+        .split('{Nummer}').join(invNumber)
+        .split('{Datum}').join(invDate)
+        .split('{Link}').join(downloadUrl)
+
       setSendDate(invDate)
       setSelfSend(false)
       setSenderEmail(defaultSender)
       setRecipientEmail(recEmail)
       setCcEmail('')
       setSubject(`Rechnung-${invNumber}`)
-      setMessageText(`Sehr geehrte(r) ${inv.recipientName || 'Kunde'},
-
-anbei erhalten Sie Ihre Rechnung Nr. ${invNumber} vom ${invDate} im PDF-Format.
-Sie können die Rechnung auch unter der folgenden URL abrufen und ohne PDF-Reader anzeigen lassen:
-${downloadUrl}
-
-Mit freundlichen Grüßen`)
+      setMessageText(resolvedText)
       setDigitalSign(false)
       setSendAsAttachment(true)
       setMergePdfs(false)
@@ -238,6 +251,52 @@ Mit freundlichen Grüßen`)
       showToast(error.message || 'Fehler beim Versenden der Rechnung.', 'error')
     } finally {
       setIsSimulatingSend(false)
+    }
+  }
+
+  const handleSaveTemplate = async () => {
+    if (!selectedInvoiceId || !details) {
+      showToast('Bitte wählen Sie zuerst eine Rechnung aus.', 'error')
+      return
+    }
+    try {
+      setIsSavingTemplate(true)
+      
+      const inv = details.invoice
+      const invNumber = inv.invoiceNumber || ''
+      const invDate = format(new Date(inv.createdAt), 'dd.MM.yyyy', { locale: de })
+      const recipientVal = inv.recipientName || 'Kunde'
+      
+      let templateText = messageText
+      
+      // Order of replacement is crucial: URL first!
+      if (pdfUrl) {
+        templateText = templateText.split(pdfUrl).join('{Link}')
+      }
+      if (recipientVal) {
+        templateText = templateText.split(recipientVal).join('{Empfänger}')
+      }
+      if (inv.recipientName && inv.recipientName !== 'Kunde') {
+        templateText = templateText.split('Kunde').join('{Empfänger}')
+      }
+      if (invDate) {
+        templateText = templateText.split(invDate).join('{Datum}')
+      }
+      if (invNumber) {
+        templateText = templateText.split(invNumber).join('{Nummer}')
+      }
+      
+      const result = await saveEmailTemplateAction(templateText)
+      if (result.error) {
+        throw new Error(result.error)
+      }
+      
+      setEmailTemplate(templateText)
+      showToast('Standardtext wurde erfolgreich als Vorlage gespeichert.', 'success')
+    } catch (error: any) {
+      showToast(error.message || 'Fehler beim Speichern des Standardtexts.', 'error')
+    } finally {
+      setIsSavingTemplate(false)
     }
   }
   // Applied Filters
@@ -1444,7 +1503,14 @@ Mit freundlichen Grüßen`)
                 <div className="grid grid-cols-4 gap-4 items-start">
                   <div className="flex flex-col gap-1">
                     <span className="text-slate-500 font-bold uppercase tracking-wider">Nachricht</span>
-                    <button className="text-blue-600 hover:text-blue-700 hover:underline text-left mt-1 text-[10px]">Standardtext ändern</button>
+                    <button 
+                      type="button"
+                      onClick={handleSaveTemplate}
+                      disabled={isSavingTemplate}
+                      className="text-blue-600 hover:text-blue-700 hover:underline text-left mt-1 text-[10px] disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isSavingTemplate ? 'Speichert...' : 'Standardtext ändern'}
+                    </button>
                   </div>
                   <div className="col-span-3">
                     <textarea 
