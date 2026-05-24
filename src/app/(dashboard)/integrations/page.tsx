@@ -145,6 +145,11 @@ export default async function IntegrationsPage(props: {
             <CollapsibleSection
               title="Otto.de Partner Connect"
               subtitle="API Anbindung für Bestellimport & Rechnungs-Upload"
+              icon={
+                <div className="w-10 h-10 bg-red-50 border border-red-200 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform duration-200 hover:scale-105">
+                  <span className="text-red-600 font-black text-xs tracking-tighter">OTTO</span>
+                </div>
+              }
               badge={ottoIntegration?.clientId ? (
                 <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
                   <span className="w-2 h-2 bg-green-500 rounded-full"></span>
@@ -169,6 +174,11 @@ export default async function IntegrationsPage(props: {
             <CollapsibleSection
               title="Amazon EU"
               subtitle="SP-API Anbindung für Bestellimport & Bestandsabgleich"
+              icon={
+                <div className="w-10 h-10 bg-slate-900 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform duration-200 hover:scale-105">
+                  <span className="text-[#FF9900] font-black text-[10px] tracking-tighter">amazon</span>
+                </div>
+              }
               badge={integrations.find((i: any) => i.type === 'amazon')?.refreshToken ? (
                 <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
                   <span className="w-2 h-2 bg-green-500 rounded-full"></span>
@@ -195,7 +205,7 @@ export default async function IntegrationsPage(props: {
               title="Shopify"
               subtitle="API Anbindung via Admin API für Bestellimport"
               icon={
-                <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform duration-200 hover:scale-105">
                   <span className="text-green-800 font-black text-xs tracking-tighter">Shopify</span>
                 </div>
               }
@@ -221,6 +231,12 @@ export default async function IntegrationsPage(props: {
             <CollapsibleSection
               title="About You"
               subtitle="API Anbindung für Bestellimport & Versandbestätigung"
+              icon={
+                <div className="w-10 h-10 bg-black rounded-lg flex flex-col items-center justify-center flex-shrink-0 transition-transform duration-200 hover:scale-105">
+                  <span className="text-white font-black text-[9px] uppercase tracking-tighter leading-none">About</span>
+                  <span className="text-white font-black text-[9px] uppercase tracking-tighter leading-none mt-0.5">You</span>
+                </div>
+              }
               badge={integrations.find((i: any) => i.type === 'aboutyou')?.apiKey ? (
                 <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
                   <span className="w-2 h-2 bg-green-500 rounded-full"></span>
@@ -244,6 +260,11 @@ export default async function IntegrationsPage(props: {
             <CollapsibleSection
               title="Kaufland"
               subtitle="API Anbindung für Bestellimport & Bestandsabgleich"
+              icon={
+                <div className="w-10 h-10 bg-red-50 border border-red-200 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform duration-200 hover:scale-105">
+                  <span className="text-red-600 font-black text-[9px] tracking-tighter">Kaufland</span>
+                </div>
+              }
               badge={integrations.find((i: any) => i.type === 'kaufland')?.clientId ? (
                 <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
                   <span className="w-2 h-2 bg-green-500 rounded-full"></span>
@@ -267,6 +288,16 @@ export default async function IntegrationsPage(props: {
             <CollapsibleSection
               title="eBay"
               subtitle="API Anbindung für Bestellimport & Bestandsabgleich"
+              icon={
+                <div className="w-10 h-10 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform duration-200 hover:scale-105">
+                  <span className="font-bold text-xs tracking-tight">
+                    <span className="text-[#e53238]">e</span>
+                    <span className="text-[#0064d2]">b</span>
+                    <span className="text-[#f5af02]">a</span>
+                    <span className="text-[#86b817]">y</span>
+                  </span>
+                </div>
+              }
               badge={integrations.find((i: any) => i.type === 'ebay')?.clientId ? (
                 <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
                   <span className="w-2 h-2 bg-green-500 rounded-full"></span>
@@ -290,6 +321,11 @@ export default async function IntegrationsPage(props: {
             <CollapsibleSection
               title="Decathlon (Mirakl)"
               subtitle="API Anbindung für Decathlon Bestellungen"
+              icon={
+                <div className="w-10 h-10 bg-sky-50 border border-sky-200 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform duration-200 hover:scale-105">
+                  <span className="text-[#0082C3] font-black text-[8px] tracking-tighter">DECATHLON</span>
+                </div>
+              }
               badge={integrations.find((i: any) => i.type === 'mirakl_decathlon')?.clientId ? (
                 <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
                   <span className="w-2 h-2 bg-green-500 rounded-full"></span>
@@ -321,6 +357,11 @@ export default async function IntegrationsPage(props: {
                 headerClassName="p-6 flex items-center justify-between cursor-pointer hover:bg-blue-50/20 bg-blue-50/50 transition-colors select-none"
                 title={`${(integration.metadata as any)?.customName || 'Unbenannter Marktplatz'} (Mirakl)`}
                 subtitle="Eigene API Anbindung"
+                icon={
+                  <div className="w-10 h-10 bg-indigo-50 border border-indigo-200 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform duration-200 hover:scale-105">
+                    <span className="text-indigo-700 font-black text-xs tracking-tighter">Mirakl</span>
+                  </div>
+                }
                 badge={
                   <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
                     <span className="w-2 h-2 bg-green-500 rounded-full"></span>
@@ -378,7 +419,7 @@ export default async function IntegrationsPage(props: {
               title="DHL Geschäftskunden"
               subtitle="Label-Erstellung & Versandzonen"
               icon={
-                <div className="w-10 h-10 bg-yellow-400 rounded-lg flex items-center justify-center flex-shrink-0">
+                <div className="w-10 h-10 bg-yellow-400 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform duration-200 hover:scale-105">
                   <span className="text-gray-900 font-black text-sm tracking-tighter">DHL</span>
                 </div>
               }
@@ -404,6 +445,11 @@ export default async function IntegrationsPage(props: {
             <CollapsibleSection
               title="Hermes Versand"
               subtitle="Offizielle Anbindung über die Hermes Login-Seite"
+              icon={
+                <div className="w-10 h-10 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform duration-200 hover:scale-105">
+                  <span className="text-[#005A9C] font-black text-xs tracking-tight">Hermes</span>
+                </div>
+              }
               badge={integrations.find((i: any) => i.type === 'hermes')?.clientId ? (
                 <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
                   <span className="w-2 h-2 bg-green-500 rounded-full"></span>
