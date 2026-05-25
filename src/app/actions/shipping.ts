@@ -626,12 +626,21 @@ export async function generateDhlLabelsAction(
           let apiMsg = responseText
           try {
             const parsed = JSON.parse(responseText)
-            // DHL often returns validation errors in items[0].message or detail
-            apiMsg = parsed?.items?.[0]?.validationMessages?.map((v: any) => v.validationMessage).join('; ')
+            let rawMsg = parsed?.items?.[0]?.validationMessages?.map((v: any) => v.validationMessage).join('; ')
               ?? parsed?.items?.[0]?.message
               ?? parsed?.detail
               ?? parsed?.title
               ?? responseText
+
+            if (rawMsg) {
+              rawMsg = rawMsg
+                .replace(/consignee\.addressHouse/g, 'Hausnummer der Lieferadresse')
+                .replace(/consignee\.addressStreet/g, 'Straße der Lieferadresse')
+                .replace(/consignee\.postalCode/g, 'Postleitzahl (PLZ) der Lieferadresse')
+                .replace(/consignee\.city/g, 'Ort/Stadt der Lieferadresse')
+                .replace(/consignee\.name1/g, 'Name der Lieferadresse')
+            }
+            apiMsg = rawMsg
           } catch {/* not JSON */}
           return { success: false, error: `Bestellung ${order.marketplaceOrderId ?? order.id}: HTTP ${response.status} – ${apiMsg}` }
         }

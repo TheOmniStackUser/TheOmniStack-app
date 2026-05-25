@@ -223,7 +223,33 @@ export class HermesAdapter {
 
     if (!response.ok) {
       const errText = await response.text()
-      throw new Error(`Hermes API Fehler: ${response.status} - ${errText}`)
+      let friendlyMsg = errText
+      try {
+        const parsed = JSON.parse(errText)
+        if (parsed.listOfResultCodes && parsed.listOfResultCodes.length > 0) {
+          friendlyMsg = parsed.listOfResultCodes.map((r: any) => {
+            const msg = r.message || ''
+            if (msg.includes('receiverAddress - houseNumber') || msg.includes('houseNumber')) {
+              return 'Die Hausnummer der Lieferadresse fehlt oder ist ungültig.'
+            }
+            if (msg.includes('receiverAddress - zipCode') || msg.includes('zipCode')) {
+              return 'Die Postleitzahl (PLZ) der Lieferadresse fehlt oder ist ungültig.'
+            }
+            if (msg.includes('receiverAddress - street') || msg.includes('street')) {
+              return 'Der Straßenname der Lieferadresse ist ungültig.'
+            }
+            if (msg.includes('receiverAddress - town') || msg.includes('town')) {
+              return 'Der Ort/die Stadt der Lieferadresse ist ungültig.'
+            }
+            return msg
+          }).join('; ')
+        } else if (parsed.message) {
+          friendlyMsg = parsed.message
+        }
+      } catch (e) {
+        // Fallback if not JSON
+      }
+      throw new Error(friendlyMsg)
     }
 
     const data = await response.json()
