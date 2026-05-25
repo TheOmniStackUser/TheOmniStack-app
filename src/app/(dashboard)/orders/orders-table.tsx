@@ -244,11 +244,18 @@ export function OrdersTable({
   }
 
   const toggleAll = () => {
-    if (selectedIds.size === filteredOrders.length && filteredOrders.length > 0) {
-      setSelectedIds(new Set())
-    } else {
-      setSelectedIds(new Set(filteredOrders.map(o => o.id)))
-    }
+    const pageIds = paginatedOrders.map(o => o.id)
+    const areAllOnPageSelected = paginatedOrders.length > 0 && paginatedOrders.every(o => selectedIds.has(o.id))
+    
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (areAllOnPageSelected) {
+        pageIds.forEach(id => next.delete(id))
+      } else {
+        pageIds.forEach(id => next.add(id))
+      }
+      return next
+    })
   }
 
   const toggleOne = (id: string) => {
@@ -775,7 +782,7 @@ export function OrdersTable({
                   <input
                     type="checkbox"
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    checked={filteredOrders.length > 0 && selectedIds.size === filteredOrders.length}
+                    checked={paginatedOrders.length > 0 && paginatedOrders.every(o => selectedIds.has(o.id))}
                     onChange={toggleAll}
                   />
                 </th>
