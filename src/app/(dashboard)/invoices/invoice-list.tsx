@@ -366,6 +366,15 @@ export function InvoiceList({
     setCurrentPage(1)
   }
 
+  const handleClearSearch = () => {
+    setDraftSearch('')
+    setActiveFilters(prev => ({
+      ...prev,
+      search: ''
+    }))
+    setCurrentPage(1)
+  }
+
   const handleDownload = async (invoiceId: string) => {
     try {
       setLoadingId(invoiceId)
@@ -555,11 +564,23 @@ export function InvoiceList({
               <input
                 type="text"
                 placeholder="Rechnungsnummer oder Kunde suchen..."
-                className="block w-full pl-10 pr-3 py-2.5 border border-slate-200 rounded-lg leading-5 bg-slate-50/30 text-slate-900 font-medium placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-all"
+                className="block w-full pl-10 pr-10 py-2.5 border border-slate-200 rounded-lg leading-5 bg-slate-50/30 text-slate-900 font-medium placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-all"
                 value={draftSearch}
                 onChange={(e) => setDraftSearch(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleApplyFilters()}
               />
+              {draftSearch && (
+                <button
+                  type="button"
+                  onClick={handleClearSearch}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                  title="Suche leeren"
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
             </div>
           </div>
           <div className="text-sm text-slate-500 font-medium px-2 bg-slate-50 py-2 rounded-lg border border-slate-100 min-w-[120px] text-center">
