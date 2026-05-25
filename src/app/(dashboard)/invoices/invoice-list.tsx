@@ -684,7 +684,7 @@ export function InvoiceList({
               <th className="px-6 py-4 font-semibold text-slate-700">Kunde</th>
               <th className="px-6 py-4 font-semibold text-slate-700">Land</th>
               <th className="px-6 py-4 font-semibold text-slate-700 text-right">Betrag</th>
-              <th className="px-6 py-4 font-semibold text-slate-700 text-right">Aktion</th>
+              <th className="px-6 py-4 font-semibold text-slate-700 text-left">Aktion</th>
             </tr>
           </thead>
           <tbody>
@@ -771,8 +771,8 @@ export function InvoiceList({
                     invoice.cancelsInvoiceId ? -Number(invoice.totalAmount) : Number(invoice.totalAmount)
                   )}
                 </td>
-                 <td className="px-6 py-4 text-right">
-                  <div className="flex justify-end gap-2 min-w-max whitespace-nowrap">
+                 <td className="px-6 py-4 text-left">
+                  <div className="flex justify-start gap-2 min-w-max whitespace-nowrap">
                     <button
                       onClick={(e) => { e.stopPropagation(); handleDownload(invoice.id); }}
                       disabled={loadingId === invoice.id || !invoice.pdfStorageKey}
@@ -806,28 +806,30 @@ export function InvoiceList({
                       </svg>
                       XML
                     </button>
-                    {invoice.marketplace === 'manual' && invoice.status !== 'cancelled' && (
+                    {invoice.marketplace === 'manual' && (
                       <>
-                        <a
-                          href={`/invoices/new?edit=${invoice.id}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg text-xs font-bold text-amber-700 hover:bg-amber-100 transition-all"
-                          title="Rechnung bearbeiten (GoBD-konform mit Log)"
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                          Bearbeiten
-                        </a>
+                        {invoice.status !== 'cancelled' && (
+                          <a
+                            href={`/invoices/new?edit=${invoice.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg text-xs font-bold text-amber-700 hover:bg-amber-100 transition-all"
+                            title="Rechnung bearbeiten (GoBD-konform mit Log)"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            Bearbeiten
+                          </a>
+                        )}
                         <button
                           onClick={(e) => { e.stopPropagation(); handleShowHistory(invoice.id); }}
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 transition-all"
-                          title="Änderungshistorie anzeigen"
+                          title="Änderungsverlauf anzeigen"
                         >
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
-                          History
+                          Verlauf
                         </button>
                       </>
                     )}
@@ -928,7 +930,7 @@ export function InvoiceList({
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
               <div>
-                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Änderungshistorie</h3>
+                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Änderungsverlauf</h3>
                 <p className="text-xs text-slate-500 font-bold uppercase mt-0.5">Interne Protokollierung der Bearbeitungen</p>
               </div>
               <button onClick={() => setShowHistory(null)} className="p-2 hover:bg-white rounded-full transition-all border border-transparent hover:border-slate-200 shadow-sm">
