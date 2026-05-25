@@ -850,7 +850,29 @@ export function OrdersTable({
               {paginatedOrders.map((order) => {
                 const formattedTotal = new Intl.NumberFormat('de-DE', { style: 'currency', currency: order.currency }).format(order.totalAmount ? Number(order.totalAmount) : 0)
                 const rawDate = order.marketplacePurchaseDate || order.invoice?.issuedAt || order.createdAt
-                const formattedDate = rawDate ? format(new Date(rawDate), 'dd.MM.yyyy HH:mm', { locale: de }) : 'Unbekannt'
+                const formattedDate = (() => {
+                  if (!rawDate) return 'Unbekannt'
+                  try {
+                    const formatter = new Intl.DateTimeFormat('de-DE', {
+                      timeZone: 'Europe/Berlin',
+                      year: 'numeric',
+                      month: '2-digit',
+                      day: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: false
+                    })
+                    const parts = formatter.formatToParts(new Date(rawDate))
+                    const day = parts.find(p => p.type === 'day')?.value
+                    const month = parts.find(p => p.type === 'month')?.value
+                    const year = parts.find(p => p.type === 'year')?.value
+                    const hour = parts.find(p => p.type === 'hour')?.value
+                    const minute = parts.find(p => p.type === 'minute')?.value
+                    return `${day}.${month}.${year} ${hour}:${minute}`
+                  } catch (e) {
+                    return 'Unbekannt'
+                  }
+                })()
                 const isSelected = selectedIds.has(order.id)
                 const isExpanded = expandedIds.has(order.id)
                 
@@ -1027,7 +1049,14 @@ export function OrdersTable({
                                       Label öffnen
                                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                                     </button>
-                                    <span className="text-xs text-gray-400 ml-2">(erstellt am {new Date(order.updatedAt).toLocaleDateString('de-DE')} um {new Date(order.updatedAt).toLocaleTimeString('de-DE', {hour: '2-digit', minute:'2-digit'})} Uhr)</span>
+                                    <span className="text-xs text-gray-400 ml-2">
+                                      {(() => {
+                                        const date = new Date(order.updatedAt)
+                                        const dateStr = date.toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin' })
+                                        const timeStr = date.toLocaleTimeString('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit' })
+                                        return `(erstellt am ${dateStr} um ${timeStr} Uhr)`
+                                      })()}
+                                    </span>
                                   </div>
                                 )}
                                 {order.returnTrackingNumber && (
