@@ -131,7 +131,30 @@ export class MiraklAdapter implements MarketplaceAdapter {
       
       console.log(`[MiraklAdapter:${this.marketplace}] Fetched ${rawOrders.length} raw orders.`)
 
-      return rawOrders.map((raw: any) => this.normalizeOrder(companyId, raw))
+      // Auto-accept orders in WAITING_ACCEPTANCE state
+      const waitingAcceptanceOrders = rawOrders.filter((raw: any) => raw.order_state === 'WAITING_ACCEPTANCE')
+      if (waitingAcceptanceOrders.length > 0) {
+        console.log(`[MiraklAdapter:${this.marketplace}] Found ${waitingAcceptanceOrders.length} orders in WAITING_ACCEPTANCE state. Auto-accepting...`)
+        for (const raw of waitingAcceptanceOrders) {
+          const lines = (raw.order_lines || []).map((line: any) => ({
+            id: line.order_line_id,
+            accepted: true
+          }))
+          if (lines.length > 0) {
+            await this.acceptOrder(raw.order_id, lines)
+          } else {
+            console.warn(`[MiraklAdapter:${this.marketplace}] Order ${raw.order_id} has no order lines, skipping auto-accept.`)
+          }
+        }
+      }
+
+      // Only normalize and return orders that are in 'SHIPPING' state,
+      // as they are ready to be imported and processed locally. WAITING_ACCEPTANCE orders
+      // will be fetched and processed as 'SHIPPING' in subsequent sync cycles after they transition.
+      const shippingOrders = rawOrders.filter((raw: any) => raw.order_state === 'SHIPPING')
+      console.log(`[MiraklAdapter:${this.marketplace}] Returning ${shippingOrders.length} orders in SHIPPING state.`)
+
+      return shippingOrders.map((raw: any) => this.normalizeOrder(companyId, raw))
     } catch (error) {
       console.error(`[MiraklAdapter:${this.marketplace}] Error fetching orders:`, error)
       throw error
@@ -230,6 +253,70 @@ export class MiraklAdapter implements MarketplaceAdapter {
       return true
     } catch (error) {
       console.error(`[MiraklAdapter:${this.marketplace}] Error uploading invoice to Mirakl:`, error)
+      return false
+    }
+  }
+
+  /**
+   * Accept specific order lines for an order in WAITING_ACCEPTANCE.
+   * Uses OR21 endpoint: PUT /api/orders/{order_id}/accept
+   */
+  async acceptOrder(orderId: string, orderLines: { id: string; accepted: boolean }[]): Promise<boolean> {
+    try {
+      const token = await this.getAccessToken()
+      const headers: Record<string, string> = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      } else {
+        const apiKey = this.config.clientSecret === '' || !this.config.clientSecret 
+          ? this.config.clientId 
+          : this.config.apiKey
+        
+        if (apiKey) {
+          headers['Authorization'] = apiKey
+          headers['X-Mirakl-Api-Key'] = apiKey
+        }
+      }
+
+      let acceptUrl = ''
+      const baseUrl = this.config.baseUrl.replace(/\/$/, '')
+      
+      if (baseUrl.includes('miraklconnect.com')) {
+        if (baseUrl.endsWith('/v1')) {
+          acceptUrl = `${baseUrl}/orders/${orderId}/accept`
+        } else {
+          acceptUrl = `${baseUrl}/api/v1/orders/${orderId}/accept`
+        }
+      } else {
+        if (baseUrl.endsWith('/api')) {
+          acceptUrl = `${baseUrl}/orders/${orderId}/accept`
+        } else {
+          acceptUrl = `${baseUrl}/api/orders/${orderId}/accept`
+        }
+      }
+
+      console.log(`[MiraklAdapter:${this.marketplace}] Accepting order ${orderId} via PUT ${acceptUrl}...`)
+
+      const response = await fetch(acceptUrl, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ order_lines: orderLines })
+      })
+
+      const bodyText = await response.text()
+      if (!response.ok) {
+        console.error(`[MiraklAdapter:${this.marketplace}] Accept Order failed (${response.status}): ${bodyText}`)
+        return false
+      }
+
+      console.log(`[MiraklAdapter:${this.marketplace}] Order ${orderId} successfully accepted: ${bodyText}`)
+      return true
+    } catch (error) {
+      console.error(`[MiraklAdapter:${this.marketplace}] Error accepting order ${orderId}:`, error)
       return false
     }
   }
