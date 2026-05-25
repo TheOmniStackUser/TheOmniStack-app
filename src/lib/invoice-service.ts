@@ -59,28 +59,28 @@ export function getDefaultSettings(
     quote: {
       auto: true,
       next: '10001',
-      format: '%nummer%',
+      format: 'ANG-%nummer%',
       padding: 5,
       perContact: false
     },
     creditNote: {
       auto: true,
       next: '10001',
-      format: '%nummer%',
+      format: 'GS-%nummer%',
       padding: 5,
       perContact: false
     },
     deliveryNote: {
       auto: true,
       next: company.nextDeliveryNoteNumber || '1',
-      format: '%nummer%',
+      format: 'LS-%nummer%',
       padding: 5,
       perContact: false
     },
     purchaseOrder: {
       auto: true,
       next: '10001',
-      format: '%nummer%',
+      format: 'B-%nummer%',
       padding: 5,
       perContact: false
     }

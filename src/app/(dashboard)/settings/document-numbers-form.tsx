@@ -69,22 +69,22 @@ export function DocumentNumbersForm({ company }: { company: Company }) {
   const [invoicePadding, setInvoicePadding] = useState(dbSettings.invoice?.padding ?? 5)
   const [quoteAuto, setQuoteAuto] = useState(dbSettings.quote?.auto ?? true)
   const [quoteNext, setQuoteNext] = useState(dbSettings.quote?.next ?? '10001')
-  const [quoteFormat, setQuoteFormat] = useState(dbSettings.quote?.format ?? '%nummer%')
+  const [quoteFormat, setQuoteFormat] = useState(dbSettings.quote?.format ?? 'ANG-%nummer%')
   const [quotePadding, setQuotePadding] = useState(dbSettings.quote?.padding ?? 5)
 
   const [creditNoteAuto, setCreditNoteAuto] = useState(dbSettings.creditNote?.auto ?? true)
   const [creditNoteNext, setCreditNoteNext] = useState(dbSettings.creditNote?.next ?? '10001')
-  const [creditNoteFormat, setCreditNoteFormat] = useState(dbSettings.creditNote?.format ?? '%nummer%')
+  const [creditNoteFormat, setCreditNoteFormat] = useState(dbSettings.creditNote?.format ?? 'GS-%nummer%')
   const [creditNotePadding, setCreditNotePadding] = useState(dbSettings.creditNote?.padding ?? 5)
 
   const [deliveryNoteAuto, setDeliveryNoteAuto] = useState(dbSettings.deliveryNote?.auto ?? true)
   const [deliveryNoteNext, setDeliveryNoteNext] = useState(dbSettings.deliveryNote?.next ?? company.nextDeliveryNoteNumber ?? '1')
-  const [deliveryNoteFormat, setDeliveryNoteFormat] = useState(dbSettings.deliveryNote?.format ?? '%nummer%')
+  const [deliveryNoteFormat, setDeliveryNoteFormat] = useState(dbSettings.deliveryNote?.format ?? 'LS-%nummer%')
   const [deliveryNotePadding, setDeliveryNotePadding] = useState(dbSettings.deliveryNote?.padding ?? 5)
 
   const [purchaseOrderAuto, setPurchaseOrderAuto] = useState(dbSettings.purchaseOrder?.auto ?? true)
   const [purchaseOrderNext, setPurchaseOrderNext] = useState(dbSettings.purchaseOrder?.next ?? '10001')
-  const [purchaseOrderFormat, setPurchaseOrderFormat] = useState(dbSettings.purchaseOrder?.format ?? '%nummer%')
+  const [purchaseOrderFormat, setPurchaseOrderFormat] = useState(dbSettings.purchaseOrder?.format ?? 'B-%nummer%')
   const [purchaseOrderPadding, setPurchaseOrderPadding] = useState(dbSettings.purchaseOrder?.padding ?? 5)
 
   const appendPlaceholder = (type: string, placeholder: string) => {
