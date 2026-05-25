@@ -701,8 +701,10 @@ export function InvoiceList({
                   <div className="flex flex-col">
                     <span>{invoice.invoiceNumber}</span>
                     {invoice.cancelsInvoiceId && invoice.originalInvoiceNumber && (
-                      <span className="text-[10px] text-rose-600 font-bold mt-0.5">
-                        Storno zu {invoice.originalInvoiceNumber} vom {format(new Date(invoice.originalInvoiceCreatedAt!), 'dd.MM.yyyy')}
+                      <span className={`text-[10px] font-bold mt-0.5 ${
+                        invoice.invoiceNumber === invoice.originalInvoiceNumber ? 'text-rose-600' : 'text-amber-600'
+                      }`}>
+                        {invoice.invoiceNumber === invoice.originalInvoiceNumber ? 'Storno' : 'Gutschrift'} zu {invoice.originalInvoiceNumber} vom {format(new Date(invoice.originalInvoiceCreatedAt!), 'dd.MM.yyyy')}
                       </span>
                     )}
                     {invoice.status === 'cancelled' && (
@@ -715,7 +717,7 @@ export function InvoiceList({
                 </td>
                 <td className="px-6 py-4">
                   {(() => {
-                    if (invoice.cancelsInvoiceId) {
+                    if (invoice.cancelsInvoiceId && invoice.invoiceNumber === invoice.originalInvoiceNumber) {
                       return (
                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-rose-50 text-rose-700 border border-rose-100">
                           Storno
@@ -724,7 +726,7 @@ export function InvoiceList({
                     }
                     if (invoice.isCreditNote) {
                       return (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-amber-50 text-amber-700 border border-amber-100">
                           Gutschrift
                         </span>
                       )

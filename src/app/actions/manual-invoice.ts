@@ -211,7 +211,13 @@ export async function createManualInvoiceAction(data: {
       companyId,
       userId: auth.userId,
       action: 'created',
-      note: data.documentType === 'quote' ? 'Angebot manuell erstellt.' : (data.documentType === 'delivery_note' ? 'Lieferschein manuell erstellt.' : 'Rechnung manuell erstellt.')
+      note: data.documentType === 'quote' 
+        ? 'Angebot manuell erstellt.' 
+        : (data.documentType === 'delivery_note' 
+          ? 'Lieferschein manuell erstellt.' 
+          : (data.isCreditNote 
+            ? 'Gutschrift manuell erstellt.' 
+            : 'Rechnung manuell erstellt.'))
     })
   }
 
