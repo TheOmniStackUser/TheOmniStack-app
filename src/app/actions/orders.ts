@@ -80,3 +80,42 @@ export async function updateOrderStatusAction(orderId: string, status: any) {
     return { error: 'Fehler beim Aktualisieren des Status.' }
   }
 }
+
+export async function updateOrderAddressAction(
+  orderId: string,
+  address: {
+    shippingName: string
+    shippingStreet: string
+    shippingZip: string
+    shippingCity: string
+    shippingCountry: string
+  }
+) {
+  try {
+    const auth = await requireAuth()
+
+    await db
+      .update(orders)
+      .set({
+        shippingName: address.shippingName,
+        shippingStreet: address.shippingStreet,
+        shippingZip: address.shippingZip,
+        shippingCity: address.shippingCity,
+        shippingCountry: address.shippingCountry,
+        updatedAt: new Date()
+      })
+      .where(
+        and(
+          eq(orders.id, orderId),
+          eq(orders.companyId, auth.activeCompanyId)
+        )
+      )
+
+    revalidatePath('/orders')
+    return { success: true, message: 'Lieferadresse wurde erfolgreich aktualisiert.' }
+  } catch (error) {
+    console.error('Error updating order address:', error)
+    return { error: 'Fehler beim Aktualisieren der Lieferadresse.' }
+  }
+}
+

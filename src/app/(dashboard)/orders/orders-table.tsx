@@ -4,7 +4,7 @@ import { useState, Fragment } from 'react'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
 import { generateHermesLabelsAction, generateDhlLabelsAction } from '@/app/actions/shipping'
-import { archiveOrderAction, archiveOrdersBulkAction, updateOrderStatusAction } from '@/app/actions/orders'
+import { archiveOrderAction, archiveOrdersBulkAction, updateOrderStatusAction, updateOrderAddressAction } from '@/app/actions/orders'
 import { getInvoiceDownloadUrl } from '@/app/actions/invoices'
 import type { Order, OrderItem } from '@/db/schema/orders'
 import type { Invoice } from '@/db/schema/invoices'
@@ -91,12 +91,53 @@ export function OrdersTable({
   const [showDhlModal, setShowDhlModal] = useState(false)
   const [dhlSelections, setDhlSelections] = useState<Record<string, { productCode: string; weight: number }>>({})
   
+  // Address editing states
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editStreet, setEditStreet] = useState('')
+  const [editZip, setEditZip] = useState('')
+  const [editCity, setEditCity] = useState('')
+  const [editCountry, setEditCountry] = useState('')
+  const [isUpdatingAddress, setIsUpdatingAddress] = useState(false)
+  
   const showToast = (message: string | undefined | null, type: 'success' | 'error' | 'info' = 'info') => {
     if (!message) return
     setToast({ message, type })
     setTimeout(() => {
       setToast(current => current?.message === message ? null : current)
     }, 5000)
+  }
+
+  const startEditingAddress = (order: OrderWithItems) => {
+    setEditingAddressId(order.id)
+    setEditName(order.shippingName || '')
+    setEditStreet(order.shippingStreet || '')
+    setEditZip(order.shippingZip || '')
+    setEditCity(order.shippingCity || '')
+    setEditCountry(order.shippingCountry || 'DE')
+  }
+
+  const handleSaveAddress = async (orderId: string) => {
+    setIsUpdatingAddress(true)
+    try {
+      const result = await updateOrderAddressAction(orderId, {
+        shippingName: editName,
+        shippingStreet: editStreet,
+        shippingZip: editZip,
+        shippingCity: editCity,
+        shippingCountry: editCountry,
+      })
+      if (result.error) {
+        showToast(result.error, 'error')
+      } else {
+        showToast(result.message, 'success')
+        setEditingAddressId(null)
+      }
+    } catch (e) {
+      showToast('Fehler beim Aktualisieren der Lieferadresse.', 'error')
+    } finally {
+      setIsUpdatingAddress(false)
+    }
   }
   
   // Applied Filters (The actual state used for filtering)
@@ -383,7 +424,11 @@ export function OrdersTable({
       if (result.error) {
         showToast(result.error, 'error')
       } else {
-        showToast(result.message, 'success')
+        if (result.warning) {
+          showToast(result.warning, 'error')
+        } else {
+          showToast(result.message, 'success')
+        }
         
         if (result.labels && result.labels.length > 0) {
           window.open(`/api/orders/bulk/shipping-labels?ids=${ids.join(',')}`, '_blank')
@@ -449,7 +494,11 @@ export function OrdersTable({
       if (result.error) {
         showToast(result.error, 'error')
       } else {
-        showToast(result.message, 'success')
+        if (result.warning) {
+          showToast(result.warning, 'error')
+        } else {
+          showToast(result.message, 'success')
+        }
         if (result.labels && result.labels.length > 0) {
           window.open(`/api/orders/bulk/shipping-labels?ids=${ids.join(',')}`, '_blank')
         }
@@ -1012,15 +1061,98 @@ export function OrdersTable({
                                     })()}
                                   </div>
                                 </div>
-                                <div>
-                                  <span className="font-medium">Lieferadresse:</span>
-                                  <div className="mt-1 text-gray-600 bg-white p-3 rounded-md border border-gray-200">
-                                    {order.shippingName}<br/>
-                                    {order.shippingStreet}<br/>
-                                    {order.shippingZip} {order.shippingCity}<br/>
-                                    {formatCountry(order.shippingCountry)}
+                                 {editingAddressId === order.id ? (
+                                  <div>
+                                    <span className="font-medium">Lieferadresse bearbeiten:</span>
+                                    <div className="mt-1 space-y-2 bg-white p-3 rounded-md border border-gray-200">
+                                      <div>
+                                        <label className="block text-[10px] uppercase font-bold text-gray-400">Name</label>
+                                        <input 
+                                          type="text" 
+                                          value={editName} 
+                                          onChange={(e) => setEditName(e.target.value)}
+                                          className="w-full text-sm p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="block text-[10px] uppercase font-bold text-gray-400">Straße & Hausnummer</label>
+                                        <input 
+                                          type="text" 
+                                          value={editStreet} 
+                                          onChange={(e) => setEditStreet(e.target.value)}
+                                          className="w-full text-sm p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                        />
+                                      </div>
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                          <label className="block text-[10px] uppercase font-bold text-gray-400">PLZ</label>
+                                          <input 
+                                            type="text" 
+                                            value={editZip} 
+                                            onChange={(e) => setEditZip(e.target.value)}
+                                            className="w-full text-sm p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-[10px] uppercase font-bold text-gray-400">Stadt</label>
+                                          <input 
+                                            type="text" 
+                                            value={editCity} 
+                                            onChange={(e) => setEditCity(e.target.value)}
+                                            className="w-full text-sm p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                          />
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <label className="block text-[10px] uppercase font-bold text-gray-400">Land (ISO 2)</label>
+                                        <input 
+                                          type="text" 
+                                          value={editCountry} 
+                                          onChange={(e) => setEditCountry(e.target.value)}
+                                          maxLength={3}
+                                          className="w-full text-sm p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                        />
+                                      </div>
+                                      <div className="flex justify-end gap-2 pt-1">
+                                        <button 
+                                          onClick={() => setEditingAddressId(null)}
+                                          disabled={isUpdatingAddress}
+                                          className="text-xs px-2.5 py-1.5 border border-gray-300 hover:bg-gray-50 rounded-md transition-colors"
+                                        >
+                                          Abbrechen
+                                        </button>
+                                        <button 
+                                          onClick={() => handleSaveAddress(order.id)}
+                                          disabled={isUpdatingAddress}
+                                          className="text-xs px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors disabled:opacity-50"
+                                        >
+                                          {isUpdatingAddress ? 'Speichert...' : 'Speichern'}
+                                        </button>
+                                      </div>
+                                    </div>
                                   </div>
-                                </div>
+                                ) : (
+                                  <div>
+                                    <div className="flex items-center justify-between">
+                                      <span className="font-medium">Lieferadresse:</span>
+                                      <button 
+                                        onClick={() => startEditingAddress(order)}
+                                        className="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1 transition-colors"
+                                      >
+                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                        </svg>
+                                        Bearbeiten
+                                      </button>
+                                    </div>
+                                    <div className="mt-1 text-gray-600 bg-white p-3 rounded-md border border-gray-200">
+                                      {order.shippingName}<br/>
+                                      {order.shippingStreet}<br/>
+                                      {order.shippingZip} {order.shippingCity}<br/>
+                                      {formatCountry(order.shippingCountry)}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             </div>
 
@@ -1343,7 +1475,7 @@ export function OrdersTable({
 
       {/* Floating Toast Notification */}
       {toast && (
-        <div className="fixed top-6 right-6 z-[99999] flex items-center gap-3 bg-white/90 backdrop-blur-md border border-slate-100 shadow-2xl p-4 rounded-xl max-w-sm animate-in slide-in-from-top-5 duration-300">
+        <div className="fixed top-6 right-6 z-[99999] flex items-center gap-3 bg-white/90 backdrop-blur-md border border-slate-100 shadow-2xl p-4 rounded-xl max-w-md animate-in slide-in-from-top-5 duration-300">
           <div className={`p-2 rounded-lg ${
             toast.type === 'success' ? 'bg-emerald-50 text-emerald-600' :
             toast.type === 'error' ? 'bg-rose-50 text-rose-600' :
@@ -1366,7 +1498,7 @@ export function OrdersTable({
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-slate-800 break-words">{toast.message}</p>
+            <p className="text-sm font-bold text-slate-800 break-words whitespace-pre-wrap">{toast.message}</p>
           </div>
           <button 
             onClick={() => setToast(null)} 

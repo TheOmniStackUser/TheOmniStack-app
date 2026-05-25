@@ -311,8 +311,16 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
       return { error: `Keine Labels konnten erstellt werden.${errorDetail}` }
     }
 
-    const warningNote = errors.length > 0 ? `\n\nDetails: ${errors.join('; ')}` : ''
-    return { success: true, message: `${successCount} Versandetiketten wurden über Hermes generiert!${warningNote}`, labels }
+    if (errors.length > 0) {
+      return {
+        success: true,
+        message: `${successCount} Versandetiketten wurden über Hermes generiert!`,
+        warning: `Erfolgreich: ${successCount} Hermes-Etikett(en) erstellt.\n\nFolgende Bestellungen konnten nicht versendet werden. Bitte die Lieferadresse prüfen:\n- ${errors.join('\n- ')}`,
+        labels
+      }
+    }
+
+    return { success: true, message: `${successCount} Versandetiketten wurden über Hermes generiert!`, labels }
 
   } catch (error) {
     console.error('[Hermes Action] Error:', error)
@@ -847,10 +855,18 @@ export async function generateDhlLabelsAction(
       return { error: `Keine Labels konnten erstellt werden.${errorDetail}` }
     }
 
-    const warningNote = errors.length > 0 ? `\n\nDetails: ${errors.join('; ')}` : ''
+    if (errors.length > 0) {
+      return {
+        success: true,
+        message: `${successCount} DHL-Versandetikett${successCount === 1 ? '' : 'en'} erstellt!`,
+        warning: `Erfolgreich: ${successCount} DHL-Etikett(en) erstellt.\n\nFolgende Bestellungen konnten nicht versendet werden. Bitte die Lieferadresse prüfen:\n- ${errors.join('\n- ')}`,
+        labels,
+      }
+    }
+
     return {
       success: true,
-      message: `${successCount} DHL-Versandetikett${successCount === 1 ? '' : 'en'} erstellt!${warningNote}`,
+      message: `${successCount} DHL-Versandetikett${successCount === 1 ? '' : 'en'} erstellt!`,
       labels,
     }
   } catch (error) {
