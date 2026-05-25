@@ -292,13 +292,14 @@ export function OrdersTable({
     const areAllOnPageSelected = paginatedOrders.length > 0 && paginatedOrders.every(o => selectedIds.has(o.id))
     
     setSelectedIds(prev => {
-      const next = new Set(prev)
       if (areAllOnPageSelected) {
-        pageIds.forEach(id => next.delete(id))
+        // Clear all selections across all pages when unchecking
+        return new Set()
       } else {
+        const next = new Set(prev)
         pageIds.forEach(id => next.add(id))
+        return next
       }
-      return next
     })
   }
 
