@@ -384,7 +384,6 @@ export function OrdersTable({
         showToast(result.error, 'error')
       } else {
         showToast(result.message, 'success')
-        setSelectedIds(new Set())
         
         if (result.labels && result.labels.length > 0) {
           window.open(`/api/orders/bulk/shipping-labels?ids=${ids.join(',')}`, '_blank')
@@ -451,7 +450,6 @@ export function OrdersTable({
         showToast(result.error, 'error')
       } else {
         showToast(result.message, 'success')
-        setSelectedIds(new Set())
         if (result.labels && result.labels.length > 0) {
           window.open(`/api/orders/bulk/shipping-labels?ids=${ids.join(',')}`, '_blank')
         }
