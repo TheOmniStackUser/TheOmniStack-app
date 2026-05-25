@@ -142,6 +142,7 @@ export function createMarketplaceSyncWorker() {
           throw new Error(`No active integration found for ${marketplace}`)
         }
 
+        const isInvoiceSync = job.name.includes('-invoices-')
         let rawOrders: NormalizedOrder[] = []
         const adapter = getAdapterForIntegration(integration)
 
@@ -149,50 +150,52 @@ export function createMarketplaceSyncWorker() {
           throw new Error(`Adapter for ${marketplace} could not be initialized (missing config or credentials).`)
         }
 
-        if (marketplace === 'otto') {
-          rawOrders = await adapter.fetchUnshippedOrders(companyId, {
-            fromDate: job.data.fromDate,
-            toDate: job.data.toDate
-          })
-        } else if (
-          marketplace === 'mirakl_decathlon' ||
-          marketplace === 'mirakl_decathlon_eu' ||
-          marketplace === 'mirakl_mediamarkt' ||
-          marketplace === 'mirakl_custom'
-        ) {
-          rawOrders = await adapter.fetchUnshippedOrders(companyId, {
-            fromDate: job.data.fromDate,
-            toDate: job.data.toDate
-          })
-        } else if (marketplace === 'amazon') {
-          rawOrders = await adapter.fetchUnshippedOrders(companyId)
-        } else if (marketplace === 'shopify') {
-          rawOrders = await adapter.fetchUnshippedOrders(companyId, {
-            fromDate: job.data.fromDate,
-            toDate: job.data.toDate
-          })
-        } else if (marketplace === 'aboutyou') {
-          rawOrders = await adapter.fetchUnshippedOrders(companyId, {
-            fromDate: job.data.fromDate,
-            toDate: job.data.toDate
-          })
-        } else if (marketplace === 'kaufland') {
-          rawOrders = await adapter.fetchUnshippedOrders(companyId, {
-            fromDate: job.data.fromDate,
-            toDate: job.data.toDate
-          })
-        } else if (marketplace === 'ebay') {
-          rawOrders = await adapter.fetchUnshippedOrders(companyId, {
-            fromDate: job.data.fromDate,
-            toDate: job.data.toDate
-          })
-        } else {
-          throw new Error(`Adapter for ${marketplace} is not fully implemented yet`)
-        }
+        if (!isInvoiceSync) {
+          if (marketplace === 'otto') {
+            rawOrders = await adapter.fetchUnshippedOrders(companyId, {
+              fromDate: job.data.fromDate,
+              toDate: job.data.toDate
+            })
+          } else if (
+            marketplace === 'mirakl_decathlon' ||
+            marketplace === 'mirakl_decathlon_eu' ||
+            marketplace === 'mirakl_mediamarkt' ||
+            marketplace === 'mirakl_custom'
+          ) {
+            rawOrders = await adapter.fetchUnshippedOrders(companyId, {
+              fromDate: job.data.fromDate,
+              toDate: job.data.toDate
+            })
+          } else if (marketplace === 'amazon') {
+            rawOrders = await adapter.fetchUnshippedOrders(companyId)
+          } else if (marketplace === 'shopify') {
+            rawOrders = await adapter.fetchUnshippedOrders(companyId, {
+              fromDate: job.data.fromDate,
+              toDate: job.data.toDate
+            })
+          } else if (marketplace === 'aboutyou') {
+            rawOrders = await adapter.fetchUnshippedOrders(companyId, {
+              fromDate: job.data.fromDate,
+              toDate: job.data.toDate
+            })
+          } else if (marketplace === 'kaufland') {
+            rawOrders = await adapter.fetchUnshippedOrders(companyId, {
+              fromDate: job.data.fromDate,
+              toDate: job.data.toDate
+            })
+          } else if (marketplace === 'ebay') {
+            rawOrders = await adapter.fetchUnshippedOrders(companyId, {
+              fromDate: job.data.fromDate,
+              toDate: job.data.toDate
+            })
+          } else {
+            throw new Error(`Adapter for ${marketplace} is not fully implemented yet`)
+          }
 
-        if (rawOrders.length > 0) {
-          const isManualSync = job.name.startsWith('manual-sync')
-          await persistOrders(companyId, rawOrders, isManualSync, integration, adapter)
+          if (rawOrders.length > 0) {
+            const isManualSync = job.name.startsWith('manual-sync')
+            await persistOrders(companyId, rawOrders, isManualSync, integration, adapter)
+          }
         }
 
         // Recovery: download invoices for shipped orders that are missing invoices
