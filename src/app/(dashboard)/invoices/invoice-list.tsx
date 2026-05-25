@@ -1175,8 +1175,15 @@ export function InvoiceList({
                       </p>
 
                       {details.invoice.cancelsInvoiceId && details.invoice.originalInvoice && (
-                        <div className="mt-1.5 inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-100 uppercase tracking-wide">
-                          Storno zu {details.invoice.originalInvoice.invoiceNumber} vom {format(new Date(details.invoice.originalInvoice.createdAt), 'dd.MM.yyyy')}
+                        <div className={`mt-1.5 inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wide ${
+                          details.invoice.invoiceNumber === details.invoice.originalInvoice.invoiceNumber
+                            ? 'bg-rose-50 text-rose-700 border-rose-100'
+                            : 'bg-amber-50 text-amber-700 border-amber-100'
+                        }`}>
+                          {details.invoice.invoiceNumber === details.invoice.originalInvoice.invoiceNumber
+                            ? `Storno zu ${details.invoice.originalInvoice.invoiceNumber} vom ${format(new Date(details.invoice.originalInvoice.createdAt), 'dd.MM.yyyy')}`
+                            : `Gutschrift zu ${details.invoice.originalInvoice.invoiceNumber} vom ${format(new Date(details.invoice.originalInvoice.createdAt), 'dd.MM.yyyy')}`
+                          }
                         </div>
                       )}
                       {details.invoice.status === 'cancelled' && (

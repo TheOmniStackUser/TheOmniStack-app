@@ -31,6 +31,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
   const editId = searchParams.get('edit')
   const cloneId = searchParams.get('clone')
   const isCreditNoteParam = searchParams.get('isCreditNote')
+  const [clonedFromInvoiceId, setClonedFromInvoiceId] = useState<string | null>(null)
 
   const [customer, setCustomer] = useState({
     id: undefined as string | undefined,
@@ -215,6 +216,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
   const handleLoadClone = async (id: string) => {
     try {
       const { invoice, items: clonedItems } = await getInvoiceDetailsForCloneAction(id)
+      setClonedFromInvoiceId(invoice.id || null)
       setCustomer({
         id: undefined,
         name: invoice.recipientName || '',
@@ -238,7 +240,16 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
         ...invoice,
         isCreditNote: isCreditNoteParam === 'true',
       }))
-      setCustomText(invoice.customText || '')
+      
+      if (isCreditNoteParam === 'true') {
+        const formattedDate = invoice.createdAt ? new Date(invoice.createdAt).toLocaleDateString('de-DE') : ''
+        const linkNote = `Gutschrift zu Rechnung ${invoice.invoiceNumber || ''}${formattedDate ? ` vom ${formattedDate}` : ''}`
+        const defaultCreditNoteText = `Sehr geehrte Damen und Herren,\n\nnachfolgend schreiben wir Ihnen wie vorab besprochen folgenden Betrag gut:\n\n${linkNote}`
+        setCustomText(defaultCreditNoteText)
+      } else {
+        setCustomText(invoice.customText || '')
+      }
+      
       setNotification({ message: 'Rechnungsdaten erfolgreich kopiert!', type: 'success' })
       setTimeout(() => setNotification(null), 5000)
     } catch (error) {
@@ -439,6 +450,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
         items: validItems,
         currency: settings.currency,
         isCreditNote: settings.isCreditNote,
+        cancelsInvoiceId: (settings.isCreditNote && clonedFromInvoiceId) ? clonedFromInvoiceId : undefined,
         customText,
         taxOption: settings.taxOption,
         dueDate,
@@ -586,6 +598,18 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
       </div>
     )}
 
+    <div className="max-w-5xl mx-auto mb-10">
+      <h1 className="text-3xl font-bold text-slate-900">
+        {settings.isCreditNote ? 'Gutschrift erstellen' : 'Neue Rechnung schreiben'}
+      </h1>
+      <p className="text-slate-500 mt-2">
+        {settings.isCreditNote 
+          ? 'Erstelle eine manuelle Gutschrift. Diese wird für die Buchhaltung sowie das Rechnungsausgangsbuch berücksichtigt.'
+          : 'Erstelle eine manuelle Rechnung. Diese wird automatisch als Bestellung im System erfasst und für die Buchhaltung sowie das Rechnungsausgangsbuch berücksichtigt.'
+        }
+      </p>
+    </div>
+
     <form onSubmit={handleSubmit} className="max-w-5xl mx-auto space-y-8 pb-32">
       {/* Top Header with Draft Loading */}
       <div className="flex justify-between items-center bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
@@ -595,9 +619,17 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
           </div>
           <div>
             <h1 className="text-xl font-bold text-slate-900">
-              {editId ? 'Rechnung bearbeiten' : 'Manuelle Erstellung'}
+              {editId 
+                ? (settings.isCreditNote ? 'Gutschrift bearbeiten' : 'Rechnung bearbeiten') 
+                : 'Manuelle Erstellung'
+              }
             </h1>
-            <p className="text-sm text-slate-500">Erstellen Sie Rechnungen oder Gutschriften manuell</p>
+            <p className="text-sm text-slate-500">
+              {settings.isCreditNote 
+                ? 'Erstellen Sie Gutschriften manuell' 
+                : 'Erstellen Sie Rechnungen oder Gutschriften manuell'
+              }
+            </p>
           </div>
         </div>
         <div className="relative">
@@ -1050,7 +1082,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
           <button type="button" onClick={(e) => handleSubmit(e, 'draft')} disabled={isSavingDraft || isSubmitting} className="px-8 py-3 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-all flex items-center gap-2 disabled:opacity-50">{isSavingDraft ? 'Wird gespeichert...' : documentType === 'quote' ? 'Als Entwurf speichern' : 'Als Entwurf speichern'}</button>
         )}
         <button type="submit" disabled={isSubmitting || isSavingDraft} className={`px-10 py-3 ${documentType === 'quote' ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-200' : settings.isCreditNote ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-200' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'} text-white font-bold rounded-xl transition-all shadow-lg disabled:opacity-50 flex items-center gap-2`}>
-          {isSubmitting ? 'Wird gespeichert...' : editId ? 'Änderungen speichern' : documentType === 'quote' ? 'Angebot erstellen' : settings.isCreditNote ? 'Gutschrift finalisieren' : 'Rechnung finalisieren'}
+          {isSubmitting ? 'Wird gespeichert...' : editId ? 'Änderungen speichern' : documentType === 'quote' ? 'Angebot erstellen' : settings.isCreditNote ? 'Gutschrift erstellen' : 'Rechnung finalisieren'}
         </button>
       </div>
     </form>

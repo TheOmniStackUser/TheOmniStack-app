@@ -98,6 +98,7 @@ export function getDefaultSettings(
 export async function createInvoiceForOrder(orderId: string, companyId: string, options: { 
   txContext?: any, 
   isCreditNote?: boolean, 
+  cancelsInvoiceId?: string,
   customText?: string, 
   taxOption?: string, 
   dueDate?: Date, 
@@ -115,6 +116,7 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
   const { 
     txContext, 
     isCreditNote = false, 
+    cancelsInvoiceId,
     customText, 
     taxOption, 
     dueDate: customDueDate, 
@@ -132,6 +134,19 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
   // 1. Fetch data needed for PDF (outside transaction for better performance)
   const dbClient = txContext || db
   
+  let cancelsInvoiceNumber: string | undefined
+  let cancelsInvoiceDate: Date | undefined
+
+  if (cancelsInvoiceId) {
+    const originalInvoice = await dbClient.query.invoices.findFirst({
+      where: eq(invoices.id, cancelsInvoiceId)
+    })
+    if (originalInvoice) {
+      cancelsInvoiceNumber = originalInvoice.invoiceNumber
+      cancelsInvoiceDate = originalInvoice.createdAt
+    }
+  }
+
   const order = await dbClient.query.orders.findFirst({
     where: and(eq(orders.id, orderId), eq(orders.companyId, companyId)),
     with: { items: true }
@@ -273,6 +288,8 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
         paymentMethod,
         isCreditNote,
         documentType,
+        cancelsInvoiceNumber,
+        cancelsInvoiceDate,
       }) as any
     )
   }
@@ -353,6 +370,7 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
         totalAmount: calculatedTotal.toFixed(2),
         taxRate: (calculatedTax / calculatedSubtotal || 0).toFixed(4),
         isCreditNote,
+        cancelsInvoiceId: cancelsInvoiceId || null,
         dueAt: customDueDate || new Date(),
         pdfStorageKey: storageKey,
         pdfGeneratedAt: new Date(),

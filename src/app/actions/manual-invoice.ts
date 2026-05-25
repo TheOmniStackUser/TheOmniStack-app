@@ -56,6 +56,7 @@ export async function createManualInvoiceAction(data: {
   currentDraftId?: string | null
   vatCheckStatus?: { status: string, lastChecked?: Date }
   documentType?: 'invoice' | 'quote' | 'delivery_note'
+  cancelsInvoiceId?: string
 }) {
   try {
     const auth = await requireAuth()
@@ -188,6 +189,7 @@ export async function createManualInvoiceAction(data: {
   const orderData = order[0]
   const invoiceResult = await createInvoiceForOrder(orderData.id, companyId, { 
     isCreditNote: data.isCreditNote,
+    cancelsInvoiceId: data.cancelsInvoiceId,
     customText: data.customText,
     taxOption: data.taxOption,
     dueDate: data.dueDate,

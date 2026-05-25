@@ -396,11 +396,20 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
 
         <View style={styles.titleBlock} fixed>
           <Text style={styles.mainTitle}>
-            {cancelsInvoiceNumber 
+            {cancelsInvoiceNumber && invoiceNumber === cancelsInvoiceNumber
               ? `Storno-Rechnung ${invoiceNumber} zu Rechnung ${cancelsInvoiceNumber} vom ${format(new Date(cancelsInvoiceDate!), 'dd.MM.yyyy')}`
               : (isCreditNote ? t.creditNoteTitle : (documentType === 'quote' ? t.quoteTitle : t.invoiceTitle)) + ' ' + invoiceNumber
             }
           </Text>
+          
+          {cancelsInvoiceNumber && invoiceNumber !== cancelsInvoiceNumber && (
+            <Text style={{ fontSize: 10, fontStyle: 'italic', marginTop: 5 }}>
+              {lang === 'de' 
+                ? `Gutschrift zu Rechnung ${cancelsInvoiceNumber} vom ${format(new Date(cancelsInvoiceDate!), 'dd.MM.yyyy')}`
+                : `Credit note for invoice ${cancelsInvoiceNumber} dated ${format(new Date(cancelsInvoiceDate!), 'dd.MM.yyyy')}`
+              }
+            </Text>
+          )}
           
           <View style={{ flexDirection: 'row', marginTop: 5, fontSize: 9 }}>
             {paymentMethod && (
