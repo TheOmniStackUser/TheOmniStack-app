@@ -598,17 +598,19 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
       </div>
     )}
 
-    <div className="max-w-5xl mx-auto mb-10">
-      <h1 className="text-3xl font-bold text-slate-900">
-        {settings.isCreditNote ? 'Gutschrift erstellen' : 'Neue Rechnung schreiben'}
-      </h1>
-      <p className="text-slate-500 mt-2">
-        {settings.isCreditNote 
-          ? 'Erstelle eine manuelle Gutschrift. Diese wird für die Buchhaltung sowie das Rechnungsausgangsbuch berücksichtigt.'
-          : 'Erstelle eine manuelle Rechnung. Diese wird automatisch als Bestellung im System erfasst und für die Buchhaltung sowie das Rechnungsausgangsbuch berücksichtigt.'
-        }
-      </p>
-    </div>
+    {documentType !== 'quote' && (
+      <div className="max-w-5xl mx-auto mb-10">
+        <h1 className="text-3xl font-bold text-slate-900">
+          {settings.isCreditNote ? 'Gutschrift erstellen' : 'Neue Rechnung schreiben'}
+        </h1>
+        <p className="text-slate-500 mt-2">
+          {settings.isCreditNote 
+            ? 'Erstelle eine manuelle Gutschrift. Diese wird für die Buchhaltung sowie das Rechnungsausgangsbuch berücksichtigt.'
+            : 'Erstelle eine manuelle Rechnung. Diese wird automatisch als Bestellung im System erfasst und für die Buchhaltung sowie das Rechnungsausgangsbuch berücksichtigt.'
+          }
+        </p>
+      </div>
+    )}
 
     <form onSubmit={handleSubmit} className="max-w-5xl mx-auto space-y-8 pb-32">
       {/* Top Header with Draft Loading */}
@@ -619,15 +621,19 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
           </div>
           <div>
             <h1 className="text-xl font-bold text-slate-900">
-              {editId 
-                ? (settings.isCreditNote ? 'Gutschrift bearbeiten' : 'Rechnung bearbeiten') 
-                : 'Manuelle Erstellung'
+              {documentType === 'quote'
+                ? (editId ? 'Angebot bearbeiten' : 'Manuelle Angebotserstellung')
+                : editId 
+                  ? (settings.isCreditNote ? 'Gutschrift bearbeiten' : 'Rechnung bearbeiten') 
+                  : 'Manuelle Erstellung'
               }
             </h1>
             <p className="text-sm text-slate-500">
-              {settings.isCreditNote 
-                ? 'Erstellen Sie Gutschriften manuell' 
-                : 'Erstellen Sie Rechnungen oder Gutschriften manuell'
+              {documentType === 'quote'
+                ? 'Erstellen Sie Angebote manuell'
+                : settings.isCreditNote 
+                  ? 'Erstellen Sie Gutschriften manuell' 
+                  : 'Erstellen Sie Rechnungen oder Gutschriften manuell'
               }
             </p>
           </div>
@@ -670,13 +676,15 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
       {/* Settings Info */}
       <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-8">
         <div className="flex flex-wrap items-center gap-8 border-b border-slate-100 pb-6">
-          <div className="space-y-2">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Dokumenttyp</span>
-            <div className="flex gap-2">
-              <button type="button" onClick={() => setSettings({ ...settings, isCreditNote: false })} className={`px-6 py-2.5 rounded-xl border-2 transition-all font-bold ${!settings.isCreditNote ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-200' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'}`}>Rechnung</button>
-              <button type="button" onClick={() => setSettings({ ...settings, isCreditNote: true })} className={`px-6 py-2.5 rounded-xl border-2 transition-all font-bold ${settings.isCreditNote ? 'bg-amber-600 border-amber-600 text-white shadow-lg shadow-amber-200' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'}`}>Gutschrift</button>
+          {documentType !== 'quote' && (
+            <div className="space-y-2">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Dokumenttyp</span>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setSettings({ ...settings, isCreditNote: false })} className={`px-6 py-2.5 rounded-xl border-2 transition-all font-bold ${!settings.isCreditNote ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-200' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'}`}>Rechnung</button>
+                <button type="button" onClick={() => setSettings({ ...settings, isCreditNote: true })} className={`px-6 py-2.5 rounded-xl border-2 transition-all font-bold ${settings.isCreditNote ? 'bg-amber-600 border-amber-600 text-white shadow-lg shadow-amber-200' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'}`}>Gutschrift</button>
+              </div>
             </div>
-          </div>
+          )}
           <div className="space-y-2">
             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Währung</label>
             <select className="px-4 py-2.5 border-2 border-slate-200 rounded-xl font-bold text-slate-900 outline-none focus:border-blue-500 bg-white" value={settings.currency} onChange={e => setSettings({ ...settings, currency: e.target.value })}>
@@ -968,19 +976,21 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
             </div>
           )}
           
-          <div className="pt-6 flex items-center gap-4 border-t border-slate-100 mt-4">
-            <button 
-              type="button"
-              onClick={() => setSettings({ ...settings, createOrder: !settings.createOrder })}
-              className={`w-14 h-7 rounded-full transition-all relative shadow-inner ${settings.createOrder ? 'bg-blue-600' : 'bg-slate-200'}`}
-            >
-              <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow-sm transition-all ${settings.createOrder ? 'left-8' : 'left-1'}`} />
-            </button>
-            <div>
-              <p className="text-sm font-black text-slate-900 uppercase tracking-tight">Bestellung unter "Bestellungen" erzeugen?</p>
-              <p className="text-[10px] text-slate-500 font-bold leading-tight mt-0.5">Standardmäßig deaktiviert. Falls aktiviert, erscheint diese manuelle Rechnung auch in der Bestellübersicht.</p>
+          {documentType !== 'quote' && (
+            <div className="pt-6 flex items-center gap-4 border-t border-slate-100 mt-4">
+              <button 
+                type="button"
+                onClick={() => setSettings({ ...settings, createOrder: !settings.createOrder })}
+                className={`w-14 h-7 rounded-full transition-all relative shadow-inner ${settings.createOrder ? 'bg-blue-600' : 'bg-slate-200'}`}
+              >
+                <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow-sm transition-all ${settings.createOrder ? 'left-8' : 'left-1'}`} />
+              </button>
+              <div>
+                <p className="text-sm font-black text-slate-900 uppercase tracking-tight">Bestellung unter "Bestellungen" erzeugen?</p>
+                <p className="text-[10px] text-slate-500 font-bold leading-tight mt-0.5">Standardmäßig deaktiviert. Falls aktiviert, erscheint diese manuelle Rechnung auch in der Bestellübersicht.</p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -1053,16 +1063,18 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
             </div>
           </div>
         </div>
-        <textarea className="w-full h-32 px-4 py-3 border-2 border-slate-100 rounded-xl focus:border-blue-400 outline-none font-bold text-slate-800 placeholder:text-slate-300 leading-relaxed" value={customText} onChange={e => setCustomText(e.target.value)} placeholder="Vielen Dank für Ihren Auftrag! Bitte begleichen Sie den offenen Betrag..." />
+        <textarea className="w-full h-32 px-4 py-3 border-2 border-slate-100 rounded-xl focus:border-blue-400 outline-none font-bold text-slate-800 placeholder:text-slate-300 leading-relaxed" value={customText} onChange={e => setCustomText(e.target.value)} placeholder={documentType === 'quote' ? 'Gerne erstellen wir Ihnen folgendes Angebot...' : 'Vielen Dank für Ihren Auftrag! Bitte begleichen Sie den offenen Betrag...'} />
       </div>
 
-      <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-6">
-        <div className="flex items-center gap-3"><h2 className="text-xl font-bold text-slate-900">Formatauswahl</h2><span className="px-2 py-0.5 bg-blue-600 text-white text-[10px] font-bold rounded-full uppercase">E-Rechnung</span></div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t border-slate-100">
-          <div className="space-y-4"><h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Standard</h3><div className="space-y-3"><label className="flex items-center gap-3 cursor-pointer group"><input type="checkbox" checked={formats.standardPdf} onChange={e => setFormats({ ...formats, standardPdf: e.target.checked })} className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500" /><span className="text-sm font-bold text-slate-700 group-hover:text-slate-900">Standard PDF</span></label><label className="flex items-center gap-3 cursor-pointer group"><input type="checkbox" checked={formats.standardPdfNoLetterhead} onChange={e => setFormats({ ...formats, standardPdfNoLetterhead: e.target.checked })} className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500" /><span className="text-sm font-bold text-slate-700 group-hover:text-slate-900">Standard PDF ohne Briefpapier</span></label></div></div>
-          <div className="space-y-4"><h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">E-Rechnung</h3><div className="space-y-3"><label className="flex items-center gap-3 cursor-pointer group"><input type="checkbox" checked={formats.zugferdEn16931} onChange={e => setFormats({ ...formats, zugferdEn16931: e.target.checked })} className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500" /><span className="text-sm font-bold text-slate-700 group-hover:text-slate-900">ZUGFeRD 2.4 EN16931 PDF</span></label><label className="flex items-center gap-3 cursor-pointer group"><input type="checkbox" checked={formats.zugferdExtended} onChange={e => setFormats({ ...formats, zugferdExtended: e.target.checked })} className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500" /><div className="flex items-center gap-2"><span className="text-sm font-bold text-slate-700 group-hover:text-slate-900">ZUGFeRD 2.4 EXTENDED PDF</span><span className="text-[9px] font-bold text-slate-400 border border-slate-200 px-1 rounded uppercase">Beta</span></div></label><label className="flex items-center gap-3 cursor-pointer group"><input type="checkbox" checked={formats.xrechnung} onChange={e => setFormats({ ...formats, xrechnung: e.target.checked })} className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500" /><span className="text-sm font-bold text-slate-700 group-hover:text-slate-900">XRechnung 3.0.2 XML</span></label></div></div>
+      {documentType !== 'quote' && (
+        <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+          <div className="flex items-center gap-3"><h2 className="text-xl font-bold text-slate-900">Formatauswahl</h2><span className="px-2 py-0.5 bg-blue-600 text-white text-[10px] font-bold rounded-full uppercase">E-Rechnung</span></div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t border-slate-100">
+            <div className="space-y-4"><h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Standard</h3><div className="space-y-3"><label className="flex items-center gap-3 cursor-pointer group"><input type="checkbox" checked={formats.standardPdf} onChange={e => setFormats({ ...formats, standardPdf: e.target.checked })} className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500" /><span className="text-sm font-bold text-slate-700 group-hover:text-slate-900">Standard PDF</span></label><label className="flex items-center gap-3 cursor-pointer group"><input type="checkbox" checked={formats.standardPdfNoLetterhead} onChange={e => setFormats({ ...formats, standardPdfNoLetterhead: e.target.checked })} className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500" /><span className="text-sm font-bold text-slate-700 group-hover:text-slate-900">Standard PDF ohne Briefpapier</span></label></div></div>
+            <div className="space-y-4"><h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">E-Rechnung</h3><div className="space-y-3"><label className="flex items-center gap-3 cursor-pointer group"><input type="checkbox" checked={formats.zugferdEn16931} onChange={e => setFormats({ ...formats, zugferdEn16931: e.target.checked })} className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500" /><span className="text-sm font-bold text-slate-700 group-hover:text-slate-900">ZUGFeRD 2.4 EN16931 PDF</span></label><label className="flex items-center gap-3 cursor-pointer group"><input type="checkbox" checked={formats.zugferdExtended} onChange={e => setFormats({ ...formats, zugferdExtended: e.target.checked })} className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500" /><div className="flex items-center gap-2"><span className="text-sm font-bold text-slate-700 group-hover:text-slate-900">ZUGFeRD 2.4 EXTENDED PDF</span><span className="text-[9px] font-bold text-slate-400 border border-slate-200 px-1 rounded uppercase">Beta</span></div></label><label className="flex items-center gap-3 cursor-pointer group"><input type="checkbox" checked={formats.xrechnung} onChange={e => setFormats({ ...formats, xrechnung: e.target.checked })} className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500" /><span className="text-sm font-bold text-slate-700 group-hover:text-slate-900">XRechnung 3.0.2 XML</span></label></div></div>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Draft Naming moved to bottom */}
       {!editId && (
