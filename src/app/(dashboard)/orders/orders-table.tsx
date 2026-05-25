@@ -103,9 +103,12 @@ export function OrdersTable({
   const showToast = (message: string | undefined | null, type: 'success' | 'error' | 'info' = 'info') => {
     if (!message) return
     setToast({ message, type })
-    setTimeout(() => {
-      setToast(current => current?.message === message ? null : current)
-    }, 5000)
+    // Only auto-dismiss success and info toasts. Error toasts must be explicitly closed by the user.
+    if (type !== 'error') {
+      setTimeout(() => {
+        setToast(current => current?.message === message ? null : current)
+      }, 5000)
+    }
   }
 
   const startEditingAddress = (order: OrderWithItems) => {
