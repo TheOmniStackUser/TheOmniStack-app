@@ -13,6 +13,7 @@ export function MiraklIntegrationForm({
   initialEnvironment,
   initialApiKey,
   initialCustomName,
+  initialShopId,
 }: { 
   id?: string
   type: 'mirakl_decathlon' | 'mirakl_decathlon_eu' | 'mirakl_mediamarkt' | 'mirakl_custom'
@@ -21,6 +22,7 @@ export function MiraklIntegrationForm({
   initialEnvironment: string
   initialApiKey: string
   initialCustomName?: string
+  initialShopId?: string
 }) {
   const [state, formAction, pending] = useActionState(saveMiraklIntegrationAction, undefined)
   
@@ -77,6 +79,31 @@ export function MiraklIntegrationForm({
           placeholder={`z.B. ${defaultUrl}`}
         />
         <p className="text-[11px] text-gray-400 italic px-1">Die URL deines Mirakl-Backends.</p>
+      </div>
+
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          <label htmlFor={`${type}-shopId`} className="block text-sm font-semibold text-gray-700">Shop ID (Optional)</label>
+          <div className="group relative">
+            <HelpCircle size={14} className="text-gray-400 cursor-help hover:text-blue-500 transition-colors" />
+            <div className="absolute left-6 top-0 w-64 p-3 bg-slate-900 text-white text-xs rounded-xl shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 transform -translate-y-1/4">
+              <p className="font-bold mb-1">Für mehrere Länder-Shops</p>
+              <p className="leading-relaxed text-slate-300">
+                Falls du unter derselben URL und demselben API-Key mehrere Länder bedienst (z.B. DE und NL bei Secret Sales), kannst du hier die spezifische Shop-ID eintragen (z.B. <strong>4357</strong> oder <strong>4361</strong>).
+              </p>
+              <div className="absolute left-0 top-3 -translate-x-full border-8 border-transparent border-r-slate-900"></div>
+            </div>
+          </div>
+        </div>
+        <input
+          type="text"
+          id={`${type}-shopId`}
+          name="shopId"
+          defaultValue={initialShopId || ''}
+          className="block w-full px-4 py-2.5 border border-gray-300 rounded-xl shadow-sm text-black focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all bg-white"
+          placeholder="z.B. 4357"
+        />
+        <p className="text-[11px] text-gray-400 italic px-1">Nur erforderlich, falls mehrere Shops pro API-Key getrennt angebunden werden sollen.</p>
       </div>
 
       {isHauptaccount ? (

@@ -259,7 +259,8 @@ export function getAdapterForIntegration(
       baseUrl: integration.environment!,
       clientId: integration.clientId,
       clientSecret: integration.clientSecret || '',
-      apiKey: integration.apiKey || undefined
+      apiKey: integration.apiKey || undefined,
+      shopId: (integration.metadata as any)?.shopId || undefined
     })
   }
   if (integration.type === 'amazon') {

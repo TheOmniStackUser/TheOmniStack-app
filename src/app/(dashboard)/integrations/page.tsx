@@ -345,6 +345,7 @@ export default async function IntegrationsPage(props: {
                   initialClientSecret={integrations.find((i: any) => i.type === 'mirakl_decathlon')?.clientSecret || ''} 
                   initialEnvironment={integrations.find((i: any) => i.type === 'mirakl_decathlon')?.environment || ''}
                   initialApiKey={integrations.find((i: any) => i.type === 'mirakl_decathlon')?.apiKey || ''}
+                  initialShopId={(integrations.find((i: any) => i.type === 'mirakl_decathlon')?.metadata as any)?.shopId || ''}
                 />
               </div>
             </CollapsibleSection>
@@ -378,6 +379,7 @@ export default async function IntegrationsPage(props: {
                     initialClientSecret={integration.clientSecret || ''} 
                     initialEnvironment={integration.environment || ''}
                     initialApiKey={integration.apiKey || ''}
+                    initialShopId={(integration.metadata as any)?.shopId || ''}
                   />
                 </div>
               </CollapsibleSection>

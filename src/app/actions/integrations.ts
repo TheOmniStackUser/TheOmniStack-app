@@ -156,6 +156,7 @@ const MiraklIntegrationSchema = z.object({
   clientSecret: z.string().trim().nullable().optional(),
   environment: z.string().url({ message: 'Bitte gib eine gültige API URL an (inkl. https://).' }).trim(),
   apiKey: z.string().nullable().optional(),
+  shopId: z.string().trim().nullable().optional(),
 })
 
 export async function saveMiraklIntegrationAction(
@@ -172,13 +173,14 @@ export async function saveMiraklIntegrationAction(
     clientSecret: formData.get('clientSecret') || undefined,
     environment: formData.get('environment'),
     apiKey: formData.get('apiKey') || undefined,
+    shopId: formData.get('shopId'),
   })
 
   if (!validated.success) {
     return { errors: validated.error.flatten().fieldErrors }
   }
 
-  const { id, type, customName, clientId, clientSecret, environment, apiKey } = validated.data
+  const { id, type, customName, clientId, clientSecret, environment, apiKey, shopId } = validated.data
 
   let existing = null
 
@@ -208,12 +210,19 @@ export async function saveMiraklIntegrationAction(
     existing = found
   }
 
-  const metadata = type === 'mirakl_custom' ? { customName: customName || 'Unbenannter Marktplatz' } : null
+  const metadata: Record<string, any> = {}
+  if (type === 'mirakl_custom') {
+    metadata.customName = customName || 'Unbenannter Marktplatz'
+  }
+  if (shopId) {
+    metadata.shopId = shopId
+  }
+  const finalMetadata = Object.keys(metadata).length > 0 ? metadata : null
 
   if (existing) {
     await db
       .update(marketplaceIntegrations)
-      .set({ clientId, clientSecret, environment, apiKey, metadata, updatedAt: new Date() })
+      .set({ clientId, clientSecret, environment, apiKey, metadata: finalMetadata, updatedAt: new Date() })
       .where(eq(marketplaceIntegrations.id, existing.id))
   } else {
     await db
@@ -225,7 +234,7 @@ export async function saveMiraklIntegrationAction(
         clientSecret,
         environment,
         apiKey,
-        metadata,
+        metadata: finalMetadata,
       })
   }
 

@@ -15,6 +15,7 @@ type MiraklAdapterConfig = {
   clientId: string
   clientSecret: string
   apiKey?: string // Stores 'audience' for OAuth2
+  shopId?: string // Optional shop identifier for multi-shop user accounts
 }
 
 export class MiraklAdapter implements MarketplaceAdapter {
@@ -107,6 +108,7 @@ export class MiraklAdapter implements MarketplaceAdapter {
       
       if (options?.fromDate) url += `&start_date=${options.fromDate}T00:00:00Z`
       if (options?.toDate) url += `&end_date=${options.toDate}T23:59:59Z`
+      if (this.config.shopId) url += `&shop_id=${this.config.shopId}`
 
       const response = await fetch(url, {
         method: 'GET',
@@ -234,8 +236,11 @@ export class MiraklAdapter implements MarketplaceAdapter {
       // Document type 'INVOICE'
       formData.append('document_type_code', 'INVOICE')
 
-      const url = `${this.config.baseUrl}/api/orders/${orderId}/documents`
-      console.log(`[MiraklAdapter:${this.marketplace}] Uploading invoice ${fileName} for order ${orderId}...`)
+      let url = `${this.config.baseUrl}/api/orders/${orderId}/documents`
+      if (this.config.shopId) {
+        url += `?shop_id=${this.config.shopId}`
+      }
+      console.log(`[MiraklAdapter:${this.marketplace}] Uploading invoice ${fileName} for order ${orderId} (shop_id: ${this.config.shopId || 'default'})...`)
 
       const response = await fetch(url, {
         method: 'POST',
@@ -297,6 +302,10 @@ export class MiraklAdapter implements MarketplaceAdapter {
         } else {
           acceptUrl = `${baseUrl}/api/orders/${orderId}/accept`
         }
+      }
+      
+      if (this.config.shopId) {
+        acceptUrl += `?shop_id=${this.config.shopId}`
       }
 
       console.log(`[MiraklAdapter:${this.marketplace}] Accepting order ${orderId} via PUT ${acceptUrl}...`)

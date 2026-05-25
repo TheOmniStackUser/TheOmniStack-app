@@ -105,7 +105,8 @@ export async function triggerManualSyncAction(data: { marketplace: string, fromD
           baseUrl: integration.environment!,
           clientId: integration.clientId!,
           clientSecret: integration.clientSecret!,
-          apiKey: integration.apiKey || undefined
+          apiKey: integration.apiKey || undefined,
+          shopId: (integration.metadata as any)?.shopId || undefined
         })
         adapter = miraklAdapter
         rawOrders = await adapter.fetchUnshippedOrders(auth.activeCompanyId, {
