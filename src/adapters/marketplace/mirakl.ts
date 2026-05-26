@@ -383,11 +383,47 @@ export class MiraklAdapter implements MarketplaceAdapter {
         trackingUrl += `?shop_id=${this.config.shopId}`
       }
 
-      const carrierMap: Record<string, string> = {
-        'dhl': 'DHL',
-        'hermes': 'Hermes'
+      let country = 'DE'
+      if (rawOrderPayload && typeof rawOrderPayload === 'object') {
+        const raw = rawOrderPayload as any
+        country = raw.customer?.shipping_address?.country_iso_code 
+          || raw.customer?.shipping_address?.country 
+          || 'DE'
       }
-      const resolvedCarrier = carrierMap[carrier.toLowerCase()] || carrier
+
+      const upperCountry = country.toUpperCase()
+      const isDe = ['DE', 'DEU'].includes(upperCountry)
+      const isNl = ['NL', 'NLD'].includes(upperCountry)
+      const isEs = ['ES', 'ESP'].includes(upperCountry)
+      const isBe = ['BE', 'BEL'].includes(upperCountry)
+      const isCh = ['CH', 'CHE'].includes(upperCountry)
+      const isFr = ['FR', 'FRA'].includes(upperCountry)
+      const isPl = ['PL', 'POL'].includes(upperCountry)
+      const isIt = ['IT', 'ITA'].includes(upperCountry)
+      const isCz = ['CZ', 'CZE'].includes(upperCountry)
+      const isHu = ['HU', 'HUN'].includes(upperCountry)
+      const isRo = ['RO', 'ROU'].includes(upperCountry)
+      const isGb = ['GB', 'GBR'].includes(upperCountry)
+
+      let resolvedCarrier = carrier
+      if (carrier.toLowerCase() === 'dhl') {
+        if (isDe) resolvedCarrier = 'DHLDE'
+        else if (isNl) resolvedCarrier = 'DHL (NL)'
+        else if (isEs) resolvedCarrier = 'DHLESP'
+        else if (isBe) resolvedCarrier = 'DHLBE'
+        else if (isCh) resolvedCarrier = 'DHL-CH'
+        else if (isFr) resolvedCarrier = 'DHLFR'
+        else if (isPl) resolvedCarrier = 'DHL PL'
+        else if (isIt) resolvedCarrier = 'DHL ITA'
+        else if (isCz) resolvedCarrier = 'DHL-CZ'
+        else if (isHu) resolvedCarrier = 'DHLHU'
+        else if (isRo) resolvedCarrier = 'DHL RO'
+        else if (isGb) resolvedCarrier = 'dhlUK'
+        else resolvedCarrier = 'DHLDE' // Default to Germany DHL
+      } else if (carrier.toLowerCase() === 'hermes') {
+        if (isGb) resolvedCarrier = 'HermesUK'
+        else resolvedCarrier = 'HermesGER' // Default to Germany Hermes
+      }
 
       const trackingPayload = {
         carrier_code: resolvedCarrier,
