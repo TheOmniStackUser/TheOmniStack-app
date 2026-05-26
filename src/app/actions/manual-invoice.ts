@@ -634,6 +634,8 @@ export async function previewInvoiceAction(data: {
         management: company.management || undefined,
         registrationCourt: company.registrationCourt || undefined,
         internationalLanguage: company.internationalLanguage || undefined,
+        footerText: data.documentType === 'quote' ? (company.offerFooter || undefined) : (company.invoiceFooter || undefined),
+        footerTextEn: data.documentType === 'quote' ? (company.offerFooterEn || undefined) : (company.invoiceFooterEn || undefined),
       },
       recipient: {
         name: data.customer.name || 'Empfänger Name',

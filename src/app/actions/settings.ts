@@ -45,6 +45,10 @@ export async function saveCompanySettingsAction(prevState: any, formData: FormDa
   const registrationCourt = formData.get('registrationCourt') as string
   const deliveryNoteFooter = formData.get('deliveryNoteFooter') as string
   const deliveryNoteFooterEn = formData.get('deliveryNoteFooterEn') as string
+  const invoiceFooter = formData.get('invoiceFooter') as string
+  const invoiceFooterEn = formData.get('invoiceFooterEn') as string
+  const offerFooter = formData.get('offerFooter') as string
+  const offerFooterEn = formData.get('offerFooterEn') as string
   const returnsNote = formData.get('returnsNote') as string
   const returnsNoteEn = formData.get('returnsNoteEn') as string
   const internationalLanguage = formData.get('internationalLanguage') as string || 'en'
@@ -115,6 +119,10 @@ export async function saveCompanySettingsAction(prevState: any, formData: FormDa
         registrationCourt,
         deliveryNoteFooter,
         deliveryNoteFooterEn,
+        invoiceFooter,
+        invoiceFooterEn,
+        offerFooter,
+        offerFooterEn,
         returnsNote,
         returnsNoteEn,
         internationalLanguage,

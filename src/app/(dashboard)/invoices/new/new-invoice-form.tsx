@@ -139,7 +139,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
   useEffect(() => {
     async function loadSettings() {
       try {
-        const data = await getInvoiceSettingsAction()
+        const data = await getInvoiceSettingsAction(documentType)
         setTemplates(data.templates)
         setDefaults(data.defaults)
         setHasVatId(data.hasVatId)

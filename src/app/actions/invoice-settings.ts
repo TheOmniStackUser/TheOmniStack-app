@@ -6,7 +6,7 @@ import { companies } from '@/db/schema/companies'
 import { requireAuth } from '@/lib/session'
 import { eq } from 'drizzle-orm'
 
-export async function getInvoiceSettingsAction() {
+export async function getInvoiceSettingsAction(documentType: 'invoice' | 'quote' | 'delivery_note' = 'invoice') {
   const auth = await requireAuth()
   const companyId = auth.activeCompanyId
 
@@ -28,11 +28,24 @@ export async function getInvoiceSettingsAction() {
     console.error('Database table for templates might be missing', error)
   }
 
+  let deFooter = ''
+  let enFooter = ''
+  if (documentType === 'quote') {
+    deFooter = company.offerFooter || ''
+    enFooter = company.offerFooterEn || ''
+  } else if (documentType === 'delivery_note') {
+    deFooter = company.deliveryNoteFooter || ''
+    enFooter = company.deliveryNoteFooterEn || ''
+  } else {
+    deFooter = company.invoiceFooter || ''
+    enFooter = company.invoiceFooterEn || ''
+  }
+
   return {
     templates,
     defaults: {
-      de: company.deliveryNoteFooter || '',
-      en: company.deliveryNoteFooterEn || '',
+      de: deFooter,
+      en: enFooter,
     },
     hasVatId: !!company.vatId,
     vatId: company.vatId || '',

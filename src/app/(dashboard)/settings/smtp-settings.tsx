@@ -61,7 +61,7 @@ export function SmtpSettings({ company }: { company: Company }) {
             className="w-4.5 h-4.5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
           />
           <label htmlFor="smtp-enabled" className="text-sm font-bold text-slate-800 cursor-pointer select-none">
-            Eigene SMTP-Anbindung aktivieren (Option 2)
+            Eigene SMTP-Anbindung aktivieren
           </label>
         </div>
 

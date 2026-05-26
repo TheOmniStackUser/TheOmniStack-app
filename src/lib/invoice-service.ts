@@ -269,6 +269,8 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
           management: company.management || undefined,
           registrationCourt: company.registrationCourt || undefined,
           internationalLanguage: company.internationalLanguage || undefined,
+          footerText: documentType === 'quote' ? (company.offerFooter || undefined) : (company.invoiceFooter || undefined),
+          footerTextEn: documentType === 'quote' ? (company.offerFooterEn || undefined) : (company.invoiceFooterEn || undefined),
         },
         recipient: {
           name: order.shippingName || order.buyerName || 'Kunde',
@@ -541,6 +543,8 @@ export async function regenerateInvoicePdf(invoiceId: string, companyId: string)
           management: company.management || undefined,
           registrationCourt: company.registrationCourt || undefined,
           internationalLanguage: company.internationalLanguage || undefined,
+          footerText: invoice.documentType === 'quote' ? (company.offerFooter || undefined) : (company.invoiceFooter || undefined),
+          footerTextEn: invoice.documentType === 'quote' ? (company.offerFooterEn || undefined) : (company.invoiceFooterEn || undefined),
         },
         recipient: {
           name: invoice.recipientName || 'Kunde',

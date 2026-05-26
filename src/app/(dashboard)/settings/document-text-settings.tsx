@@ -8,7 +8,7 @@ export function DocumentTextSettings({ company }: { company: Company }) {
   return (
     <CollapsibleSection
       title="Dokumenten-Einstellungen"
-      subtitle="Zusätzliche Texte für Lieferscheine und Rechnungen."
+      subtitle="Zusätzliche Texte für Lieferscheine, Rechnungen und Angebote."
       icon={
         <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center flex-shrink-0 border border-gray-100">
           <FileText className="text-gray-500 w-6 h-6" />
@@ -32,6 +32,7 @@ export function DocumentTextSettings({ company }: { company: Company }) {
           <p className="text-xs text-gray-500">Diese Sprache wird verwendet, wenn das Lieferland nicht Deutschland ist.</p>
         </div>
 
+        {/* Lieferschein footers */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div className="space-y-2">
             <label className="text-xs font-bold text-gray-500 uppercase tracking-wider text-blue-600">Lieferschein-Fußtext (DE)</label>
@@ -39,7 +40,7 @@ export function DocumentTextSettings({ company }: { company: Company }) {
               name="deliveryNoteFooter"
               form="settings-profile-form"
               defaultValue={company.deliveryNoteFooter || ''}
-              rows={8}
+              rows={6}
               placeholder="Bitte beachten Sie im Falle einer Retoure folgendes:..."
               className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all text-gray-900"
             />
@@ -52,11 +53,69 @@ export function DocumentTextSettings({ company }: { company: Company }) {
               name="deliveryNoteFooterEn"
               form="settings-profile-form"
               defaultValue={company.deliveryNoteFooterEn || ''}
-              rows={8}
+              rows={6}
               placeholder="In case of a return, please note the following:..."
               className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all text-gray-900"
             />
             <p className="text-xs text-gray-500">Wird bei internationalen Sendungen verwendet (falls Englisch gewählt).</p>
+          </div>
+        </div>
+
+        {/* Rechnungs-Fußtext */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-6 border-t border-gray-100">
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider text-blue-600">Rechnungs-Fußtext (DE)</label>
+            <textarea
+              name="invoiceFooter"
+              form="settings-profile-form"
+              defaultValue={company.invoiceFooter || ''}
+              rows={6}
+              placeholder="Vielen Dank für Ihren Auftrag! Bitte begleichen Sie den offenen Betrag..."
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all text-gray-900"
+            />
+            <p className="text-xs text-gray-500">Wird bei Rechnungen innerhalb Deutschlands verwendet.</p>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider text-blue-600">Rechnungs-Fußtext (EN)</label>
+            <textarea
+              name="invoiceFooterEn"
+              form="settings-profile-form"
+              defaultValue={company.invoiceFooterEn || ''}
+              rows={6}
+              placeholder="Thank you for your order! Please transfer the open amount..."
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all text-gray-900"
+            />
+            <p className="text-xs text-gray-500">Wird bei internationalen Rechnungen verwendet (falls Englisch gewählt).</p>
+          </div>
+        </div>
+
+        {/* Angebots-Fußtext */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-6 border-t border-gray-100">
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider text-blue-600">Angebots-Fußtext (DE)</label>
+            <textarea
+              name="offerFooter"
+              form="settings-profile-form"
+              defaultValue={company.offerFooter || ''}
+              rows={6}
+              placeholder="Gerne unterbreiten wir Ihnen folgendes Angebot..."
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all text-gray-900"
+            />
+            <p className="text-xs text-gray-500">Wird bei Angeboten innerhalb Deutschlands verwendet.</p>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider text-blue-600">Angebots-Fußtext (EN)</label>
+            <textarea
+              name="offerFooterEn"
+              form="settings-profile-form"
+              defaultValue={company.offerFooterEn || ''}
+              rows={6}
+              placeholder="We are pleased to submit the following quote..."
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all text-gray-900"
+            />
+            <p className="text-xs text-gray-500">Wird bei internationalen Angeboten verwendet (falls Englisch gewählt).</p>
           </div>
         </div>
       </div>
