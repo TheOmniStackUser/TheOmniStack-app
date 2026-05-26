@@ -1637,7 +1637,11 @@ export function OrdersTable({
 
       {/* Floating Toast Notification */}
       {toast && (
-        <div className="fixed top-6 right-6 z-[99999] flex items-center gap-3 bg-white/90 backdrop-blur-md border border-slate-100 shadow-2xl p-4 rounded-xl max-w-md animate-in slide-in-from-top-5 duration-300">
+        <div className={`fixed top-6 right-6 z-[99999] flex items-center gap-3 bg-white/95 backdrop-blur-md border shadow-2xl p-4 rounded-xl max-w-md animate-in slide-in-from-top-5 duration-300 ${
+          toast.type === 'error' ? 'border-rose-200 bg-rose-50/30' :
+          toast.type === 'success' ? 'border-emerald-100' :
+          'border-slate-100'
+        }`}>
           <div className={`p-2 rounded-lg ${
             toast.type === 'success' ? 'bg-emerald-50 text-emerald-600' :
             toast.type === 'error' ? 'bg-rose-50 text-rose-600' :
