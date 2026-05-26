@@ -406,7 +406,7 @@ export async function generateDhlLabelsAction(
           }
         }
         if (!zone) {
-          zone = domesticZone
+          throw new Error(`Für das Produkt ${productCode} ist keine Abrechnungsnummer unter Integrationen -> DHL hinterlegt. Bitte trage die Abrechnungsnummer unter Integrationen -> DHL ein.`)
         }
 
         const billingNum = zone.billingNumber.replace(/\s/g, '')

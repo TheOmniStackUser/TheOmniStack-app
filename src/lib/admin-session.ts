@@ -2,7 +2,8 @@ import 'server-only'
 import { redirect } from 'next/navigation'
 import { db } from '@/db/client'
 import { users } from '@/db/schema/auth'
-import { eq } from 'drizzle-orm'
+import { companyMembers } from '@/db/schema/companies'
+import { eq, and } from 'drizzle-orm'
 import { getSession } from './session'
 
 export async function requireSuperAdmin() {
@@ -15,7 +16,27 @@ export async function requireSuperAdmin() {
     .where(eq(users.id, payload.userId))
     .limit(1)
 
-  if (!user || !user.isSuperAdmin) redirect('/')
+  if (!user) redirect('/')
+
+  let isSupport = false
+  if (payload.activeCompanyId) {
+    const [member] = await db
+      .select({ role: companyMembers.role })
+      .from(companyMembers)
+      .where(
+        and(
+          eq(companyMembers.userId, payload.userId),
+          eq(companyMembers.companyId, payload.activeCompanyId)
+        )
+      )
+      .limit(1)
+    
+    if (member?.role === 'omnistack_support') {
+      isSupport = true
+    }
+  }
+
+  if (!user.isSuperAdmin && !isSupport) redirect('/')
 
   return user
 }

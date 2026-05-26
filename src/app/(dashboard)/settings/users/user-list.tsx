@@ -127,7 +127,7 @@ export function UserList({
     }
   }
 
-  const canManage = currentUserRole === 'owner' || currentUserRole === 'admin'
+  const canManage = currentUserRole === 'owner' || currentUserRole === 'admin' || currentUserRole === 'omnistack_support' || currentUserRole === 'omnistack_beta'
   const isLimitReached = initialMembers.length >= 10
 
   return (

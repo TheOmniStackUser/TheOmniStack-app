@@ -23,6 +23,45 @@ const formatCountry = (code?: string | null) => {
   return map[code.toUpperCase()] || code.toUpperCase()
 }
 
+const getDefaultDhlProductCode = (country: string | null | undefined, config: DhlConfig | null | undefined): string => {
+  if (!country) return 'V01PAK'
+  const c = country.toUpperCase()
+  const isDomestic = ['DE', 'DEU'].includes(c)
+  if (isDomestic) return 'V01PAK'
+
+  const connectCountries = ['BE', 'BEL', 'LU', 'LUX', 'NL', 'NLD', 'AT', 'AUT', 'PL', 'POL', 'SK', 'SVK', 'CZ', 'CZE']
+  const isConnect = connectCountries.includes(c)
+
+  // Check which zones actually have billing numbers configured
+  const hasZone = (prodCode: string) => {
+    return !!config?.zones?.find(z => z.productCode === prodCode && z.billingNumber?.trim())
+  }
+
+  if (isConnect) {
+    if (hasZone('V55PAK')) return 'V55PAK' // DHL Paket Connect
+    if (hasZone('V53WPAK')) return 'V53WPAK' // DHL Europaket
+    if (hasZone('V06PAK')) return 'V06PAK' // DHL Paket International
+  } else {
+    const europeanCountries = [
+      'FR', 'FRA', 'IT', 'ITA', 'ES', 'ESP', 'DK', 'DNK', 'SE', 'SWE', 'FI', 'FIN', 'EE', 'EST', 'LV', 'LVA', 'LT', 'LTU',
+      'IE', 'IRL', 'PT', 'PRT', 'GR', 'GRC', 'BG', 'BGR', 'RO', 'ROU', 'HU', 'HUN', 'HR', 'HRV', 'SI', 'SVN',
+      'CH', 'CHE', 'GB', 'GBR', 'NO', 'NOR'
+    ]
+    const isEurope = europeanCountries.includes(c)
+    if (isEurope) {
+      if (hasZone('V53WPAK')) return 'V53WPAK' // DHL Europaket
+      if (hasZone('V06PAK')) return 'V06PAK' // DHL Paket International
+    }
+  }
+
+  // Fallback / default international
+  if (hasZone('V06PAK')) return 'V06PAK'
+  if (hasZone('V53WPAK')) return 'V53WPAK'
+  if (hasZone('V55PAK')) return 'V55PAK'
+  
+  return 'V06PAK' // Default international if nothing is configured
+}
+
 const formatMarketplaceName = (mp: string) => {
   if (!mp) return 'N/A'
   if (mp === 'mirakl_decathlon') return 'Decathlon'
@@ -465,8 +504,8 @@ export function OrdersTable({
       // Determine if destination is domestic (Germany)
       const isDomestic = !order.shippingCountry || ['DE', 'DEU'].includes(order.shippingCountry.toUpperCase())
       
-      // Default to DHL Paket (V01PAK) for domestic, or DHL Paket International (V06PAK) for international
-      let productCode = isDomestic ? 'V01PAK' : 'V06PAK'
+      // Default dynamically based on country and user's DHL configurations
+      let productCode = getDefaultDhlProductCode(order.shippingCountry, dhlConfig)
       let weight = dhlConfig.defaultWeight ?? 1
 
       if (order.totalWeight && Number(order.totalWeight) > 0) {
@@ -1443,7 +1482,7 @@ export function OrdersTable({
             <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar">
               {orders.filter(o => selectedIds.has(o.id) && o.status !== 'shipped').map((order) => {
                 const orderNum = (order.rawPayload as any)?.orderNumber || order.marketplaceOrderId
-                const selection = dhlSelections[order.id] || { productCode: 'V01PAK', weight: 1 }
+                const selection = dhlSelections[order.id] || { productCode: getDefaultDhlProductCode(order.shippingCountry, dhlConfig), weight: 1 }
                 const skus = order.items?.map(item => item.sku).filter(Boolean) || []
                 
                 return (
