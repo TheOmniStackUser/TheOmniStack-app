@@ -415,8 +415,26 @@ export async function generateDhlLabelsAction(
         }
         const resolvedReturnBillingNum = zone.returnBillingNumber?.replace(/\s/g, '')
 
+        // Automatically correct productCode based on the procedure ID (Verfahrens-ID) in the billing number
+        let resolvedProductCode = productCode
+        const verfahrensId = billingNum.slice(10, 12)
+        const verfahrensMap: Record<string, string> = {
+          '01': 'V01PAK',      // DHL Paket (National)
+          '53': 'V53WPAK',     // DHL Europaket
+          '55': 'V55PAK',      // DHL Paket Connect
+          '54': 'V54EPAK',     // DHL Europäisches Paket
+          '62': 'V62WP',       // Warenpost (National)
+          '66': 'V66WPI',      // Warenpost International
+          '86': 'V86PARCEL',   // DHL Kleinpaket (National)
+          '87': 'V87PARCEL',   // DHL Kleinpaket International
+          '06': 'V06PAK',      // DHL Paket International (Weltweit)
+        }
+        if (verfahrensMap[verfahrensId]) {
+          resolvedProductCode = verfahrensMap[verfahrensId]
+        }
+
         if (needsEnclosedReturn && !resolvedReturnBillingNum) {
-          throw new Error(`Retouren-Abrechnungsnummer für Produkt ${productCode} fehlt. Bitte trage unter Integrationen -> DHL eine Retouren-Abrechnungsnummer ein.`)
+          throw new Error(`Retouren-Abrechnungsnummer für Produkt ${resolvedProductCode} fehlt. Bitte trage unter Integrationen -> DHL eine Retouren-Abrechnungsnummer ein.`)
         }
 
         // Always false to keep return label separate from the outbound label
@@ -428,13 +446,13 @@ export async function generateDhlLabelsAction(
           if (order.totalWeight && Number(order.totalWeight) > 0) {
             resolvedWeight = Number(order.totalWeight)
           } else {
-            if (productCode === 'V62WP') {
+            if (resolvedProductCode === 'V62WP') {
               resolvedWeight = config.defaultWeightWarenpost ?? 0.2
-            } else if (productCode === 'V66WPI') {
+            } else if (resolvedProductCode === 'V66WPI') {
               resolvedWeight = config.defaultWeightWarenpostInternational ?? 0.2
-            } else if (productCode === 'V86PARCEL') {
+            } else if (resolvedProductCode === 'V86PARCEL') {
               resolvedWeight = config.defaultWeightKleinpaket ?? 0.5
-            } else if (productCode === 'V87PARCEL') {
+            } else if (resolvedProductCode === 'V87PARCEL') {
               resolvedWeight = config.defaultWeightKleinpaketInternational ?? 0.5
             } else {
               resolvedWeight = config.defaultWeight ?? 1
@@ -446,7 +464,7 @@ export async function generateDhlLabelsAction(
           profile: 'STANDARD_GRUPPENPROFIL',
           combinedPrinting: useCombine,
           shipments: [{
-            product: productCode,
+            product: resolvedProductCode,
             billingNumber: billingNum,
             refNo: (() => {
               const raw = order.marketplaceOrderId ?? order.id.replace(/-/g, '')
