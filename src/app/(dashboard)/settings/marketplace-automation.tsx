@@ -101,7 +101,11 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
     setLoadingId(null)
   }
 
-  const getLabel = (type: string) => {
+  const getLabel = (int: Integration) => {
+    if (int.type === 'mirakl_custom') {
+      const customName = (int.metadata as any)?.customName
+      return customName ? `${customName} (Mirakl)` : 'Anderer Mirakl Marktplatz'
+    }
     const labels: Record<string, string> = {
       'amazon': 'Amazon SP-API',
       'otto': 'Otto Market',
@@ -113,7 +117,7 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
       'kaufland': 'Kaufland',
       'ebay': 'eBay',
     }
-    return labels[type] || type
+    return labels[int.type] || int.type
   }
 
   return (
@@ -159,7 +163,7 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
                       )}
                     </div>
                     <div>
-                      <h4 className="font-bold text-gray-900 leading-tight">{getLabel(int.type)}</h4>
+                      <h4 className="font-bold text-gray-900 leading-tight">{getLabel(int)}</h4>
                       <p className="text-[10px] text-gray-400 font-mono mt-1 uppercase tracking-wider">ID: {int.id.slice(0, 8)}</p>
                     </div>
                   </div>
@@ -167,7 +171,7 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
                   <div className="flex flex-wrap items-center gap-4">
                     {cannotCreateInvoice && (
                       <div className="px-3 py-1 bg-amber-50 text-amber-700 text-[10px] font-bold rounded-lg border border-amber-200 uppercase tracking-tight">
-                        {getLabel(int.type)} erstellt eigene Rechnungen
+                        {getLabel(int)} erstellt eigene Rechnungen
                       </div>
                     )}
 
