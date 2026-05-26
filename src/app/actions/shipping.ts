@@ -41,60 +41,23 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
       .where(eq(companies.id, auth.activeCompanyId))
       .limit(1)
 
-    // Initialize Otto adapter if needed for confirmation
-    let ottoAdapter: OttoAdapter | null = null
-    let ottoReturnAddressCarrierId: string | undefined = undefined
-    let downloadOttoInvoice = false
-    const hasOttoOrders = pendingOrders.some(o => o.marketplace === 'otto')
-    if (hasOttoOrders) {
-      const [ottoIntegration] = await db
-        .select()
-        .from(marketplaceIntegrations)
-        .where(
-          and(
-            eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
-            eq(marketplaceIntegrations.type, 'otto'),
-            eq(marketplaceIntegrations.isActive, true)
-          )
+    // Fetch active integrations and initialize adapters dynamically
+    const activeIntegrations = await db
+      .select()
+      .from(marketplaceIntegrations)
+      .where(
+        and(
+          eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
+          eq(marketplaceIntegrations.isActive, true)
         )
-        .limit(1)
-      
-      if (ottoIntegration?.clientId && ottoIntegration?.clientSecret) {
-        ottoAdapter = new OttoAdapter({
-          clientId: ottoIntegration.clientId,
-          clientSecret: ottoIntegration.clientSecret,
-          environment: (ottoIntegration.environment as 'sandbox' | 'production') || 'production',
-          installationId: (ottoIntegration.metadata as any)?.installationId,
-          appId: (ottoIntegration.metadata as any)?.appId
-        })
-        ottoReturnAddressCarrierId = (ottoIntegration.metadata as any)?.returnAddressCarrierId
-        downloadOttoInvoice = !!(ottoIntegration.metadata as any)?.downloadInvoice
-      }
-    }
+      )
 
-    // Initialize About You adapter if needed for confirmation
-    let aboutYouAdapter: AboutYouAdapter | null = null
-    let downloadAboutYouInvoice = false
-    const hasAboutYouOrders = pendingOrders.some(o => o.marketplace === 'aboutyou')
-    if (hasAboutYouOrders) {
-      const [aboutYouIntegration] = await db
-        .select()
-        .from(marketplaceIntegrations)
-        .where(
-          and(
-            eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
-            eq(marketplaceIntegrations.type, 'aboutyou'),
-            eq(marketplaceIntegrations.isActive, true)
-          )
-        )
-        .limit(1)
-      
-      if (aboutYouIntegration?.apiKey) {
-        aboutYouAdapter = new AboutYouAdapter({
-          apiKey: aboutYouIntegration.apiKey,
-          environment: (aboutYouIntegration.environment as 'sandbox' | 'production') || 'production'
-        })
-        downloadAboutYouInvoice = !!(aboutYouIntegration.metadata as any)?.downloadInvoice
+    const { getAdapterForIntegration } = await import('@/workers/marketplace-sync')
+    const adaptersMap = new Map<string, any>()
+    for (const integration of activeIntegrations) {
+      const adapter = getAdapterForIntegration(integration)
+      if (adapter) {
+        adaptersMap.set(integration.type, adapter)
       }
     }
 
@@ -168,38 +131,45 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
         
         let confirmError: string | undefined = undefined
 
-        // Confirm shipment in marketplace (e.g. Otto)
-        if (order.marketplace === 'otto' && ottoAdapter && order.marketplaceOrderId) {
-          console.log(`[Hermes-Action] Otto Check: order.id=${order.id}, marketplace=${order.marketplace}, tracking=${trackingNumber}, returnTracking=${returnTrackingNumber}`)
-          console.log(`[Hermes-Action] Triggering Otto confirmation for ${order.marketplaceOrderId}`)
+        // Confirm shipment in marketplace
+        const adapter = adaptersMap.get(order.marketplace)
+        if (adapter && typeof adapter.confirmShipment === 'function' && order.marketplaceOrderId) {
+          console.log(`[Hermes-Action] Triggering confirmation for ${order.marketplaceOrderId} on ${order.marketplace} with tracking ${trackingNumber}`)
           try {
-            await ottoAdapter.confirmShipment(
+            // Otto needs extra arguments (order.rawPayload, returnAddressCarrierId)
+            const isOtto = order.marketplace === 'otto'
+            const ottoIntegration = activeIntegrations.find(i => i.type === 'otto')
+            const ottoReturnAddressCarrierId = ottoIntegration ? (ottoIntegration.metadata as any)?.returnAddressCarrierId : undefined
+            
+            await adapter.confirmShipment(
               order.marketplaceOrderId, 
               trackingNumber, 
               'HERMES', 
               returnTrackingNumber || undefined,
               order.rawPayload,
-              ottoReturnAddressCarrierId
+              isOtto ? ottoReturnAddressCarrierId : undefined
             )
 
             // Auto-download invoice after shipping confirmation if enabled
-            if (downloadOttoInvoice) {
-              console.log(`[Hermes-Action] Scheduled Otto invoice download for order ${order.marketplaceOrderId}`)
+            const integration = activeIntegrations.find(i => i.type === order.marketplace)
+            const downloadInvoice = integration ? !!(integration.metadata as any)?.downloadInvoice : false
+            if (downloadInvoice) {
+              console.log(`[Hermes-Action] Scheduled invoice download for order ${order.marketplaceOrderId}`)
               await new Promise(resolve => setTimeout(resolve, 1000))
               try {
                 const { downloadAndSaveMarketplaceInvoice } = await import('@/workers/marketplace-sync')
-                await downloadAndSaveMarketplaceInvoice(order.id, auth.activeCompanyId, ottoAdapter)
+                await downloadAndSaveMarketplaceInvoice(order.id, auth.activeCompanyId, adapter)
               } catch (err) {
-                console.error(`[Hermes-Action] Immediate Otto invoice download failed:`, err)
+                console.error(`[Hermes-Action] Immediate invoice download failed:`, err)
               }
 
               try {
                 const { marketplaceSyncQueue } = await import('@/workers/marketplace-sync')
                 await marketplaceSyncQueue.add(
-                  `sync-otto-invoices-${order.id}`,
+                  `sync-${order.marketplace}-invoices-${order.id}`,
                   {
                     companyId: auth.activeCompanyId,
-                    marketplace: 'otto',
+                    marketplace: order.marketplace as any,
                     triggeredByUserId: auth.userId,
                   },
                   {
@@ -208,65 +178,15 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
                     removeOnFail: true,
                   }
                 )
-                console.log(`[Hermes-Action] Enqueued delayed marketplace sync job for Otto invoice recovery of order ${order.marketplaceOrderId}`)
+                console.log(`[Hermes-Action] Enqueued delayed marketplace sync job for invoice recovery of order ${order.marketplaceOrderId}`)
               } catch (queueErr) {
                 console.error(`[Hermes-Action] Failed to enqueue delayed sync job:`, queueErr)
               }
             }
           } catch (confirmErr: any) {
             const msg = confirmErr?.message ?? String(confirmErr)
-            console.error(`[Otto] Failed to confirm shipment for ${order.marketplaceOrderId}:`, msg)
-            confirmError = `Otto-Bestätigung fehlgeschlagen (${order.marketplaceOrderId}): ${msg}`
-          }
-        }
-
-        // Confirm shipment in marketplace (About You)
-        if (order.marketplace === 'aboutyou' && aboutYouAdapter && order.marketplaceOrderId) {
-          console.log(`[Hermes-Action] Triggering About You confirmation for ${order.marketplaceOrderId} with tracking ${trackingNumber}`)
-          try {
-            await aboutYouAdapter.confirmShipment(
-              order.marketplaceOrderId, 
-              trackingNumber, 
-              'HERMES', 
-              returnTrackingNumber || undefined,
-              order.rawPayload
-            )
-
-            // Auto-download invoice after shipping confirmation if enabled
-            if (downloadAboutYouInvoice) {
-              console.log(`[Hermes-Action] Scheduled About You invoice download for order ${order.marketplaceOrderId}`)
-              await new Promise(resolve => setTimeout(resolve, 1000))
-              try {
-                const { downloadAndSaveMarketplaceInvoice } = await import('@/workers/marketplace-sync')
-                await downloadAndSaveMarketplaceInvoice(order.id, auth.activeCompanyId, aboutYouAdapter)
-              } catch (err) {
-                console.error(`[Hermes-Action] Immediate About You invoice download failed:`, err)
-              }
-
-              try {
-                const { marketplaceSyncQueue } = await import('@/workers/marketplace-sync')
-                await marketplaceSyncQueue.add(
-                  `sync-aboutyou-invoices-${order.id}`,
-                  {
-                    companyId: auth.activeCompanyId,
-                    marketplace: 'aboutyou',
-                    triggeredByUserId: auth.userId,
-                  },
-                  {
-                    delay: 180000, // 3 minutes delay
-                    removeOnComplete: true,
-                    removeOnFail: true,
-                  }
-                )
-                console.log(`[Hermes-Action] Enqueued delayed marketplace sync job for About You invoice recovery of order ${order.marketplaceOrderId}`)
-              } catch (queueErr) {
-                console.error(`[Hermes-Action] Failed to enqueue delayed sync job:`, queueErr)
-              }
-            }
-          } catch (confirmErr: any) {
-            const msg = confirmErr?.message ?? String(confirmErr)
-            console.error(`[AboutYou] Failed to confirm shipment for ${order.marketplaceOrderId}:`, msg)
-            confirmError = `About You-Bestätigung fehlgeschlagen (${order.marketplaceOrderId}): ${msg}`
+            console.error(`[${order.marketplace}] Failed to confirm shipment for ${order.marketplaceOrderId}:`, msg)
+            confirmError = `Bestätigung für ${order.marketplace} fehlgeschlagen (${order.marketplaceOrderId}): ${msg}`
           }
         }
 
@@ -405,60 +325,23 @@ export async function generateDhlLabelsAction(
 
     const returnBillingNum = domesticZone.returnBillingNumber?.replace(/\s/g, '')
 
-    // 4. Initialize Marketplace Adapters (for confirmation)
-    let ottoAdapter: OttoAdapter | null = null
-    let ottoReturnAddressCarrierId: string | undefined = undefined
-    let downloadOttoInvoice = false
-    const hasOttoOrders = pendingOrders.some(o => o.marketplace === 'otto')
-    if (hasOttoOrders) {
-      const [ottoIntegration] = await db
-        .select()
-        .from(marketplaceIntegrations)
-        .where(
-          and(
-            eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
-            eq(marketplaceIntegrations.type, 'otto'),
-            eq(marketplaceIntegrations.isActive, true)
-          )
+    // Fetch active integrations and initialize adapters dynamically
+    const activeIntegrations = await db
+      .select()
+      .from(marketplaceIntegrations)
+      .where(
+        and(
+          eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
+          eq(marketplaceIntegrations.isActive, true)
         )
-        .limit(1)
-      
-      if (ottoIntegration?.clientId && ottoIntegration?.clientSecret) {
-        ottoAdapter = new OttoAdapter({
-          clientId: ottoIntegration.clientId,
-          clientSecret: ottoIntegration.clientSecret,
-          environment: (ottoIntegration.environment as 'sandbox' | 'production') || 'production',
-          installationId: (ottoIntegration.metadata as any)?.installationId,
-          appId: (ottoIntegration.metadata as any)?.appId
-        })
-        ottoReturnAddressCarrierId = (ottoIntegration.metadata as any)?.returnAddressCarrierId
-        downloadOttoInvoice = !!(ottoIntegration.metadata as any)?.downloadInvoice
-      }
-    }
+      )
 
-    // Initialize About You adapter if needed for confirmation
-    let aboutYouAdapterDhl: AboutYouAdapter | null = null
-    let downloadAboutYouInvoice = false
-    const hasAboutYouOrdersDhl = pendingOrders.some(o => o.marketplace === 'aboutyou')
-    if (hasAboutYouOrdersDhl) {
-      const [aboutYouIntegration] = await db
-        .select()
-        .from(marketplaceIntegrations)
-        .where(
-          and(
-            eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
-            eq(marketplaceIntegrations.type, 'aboutyou'),
-            eq(marketplaceIntegrations.isActive, true)
-          )
-        )
-        .limit(1)
-      
-      if (aboutYouIntegration?.apiKey) {
-        aboutYouAdapterDhl = new AboutYouAdapter({
-          apiKey: aboutYouIntegration.apiKey,
-          environment: (aboutYouIntegration.environment as 'sandbox' | 'production') || 'production'
-        })
-        downloadAboutYouInvoice = !!(aboutYouIntegration.metadata as any)?.downloadInvoice
+    const { getAdapterForIntegration } = await import('@/workers/marketplace-sync')
+    const adaptersMap = new Map<string, any>()
+    for (const integration of activeIntegrations) {
+      const adapter = getAdapterForIntegration(integration)
+      if (adapter) {
+        adaptersMap.set(integration.type, adapter)
       }
     }
 
@@ -723,37 +606,45 @@ export async function generateDhlLabelsAction(
 
         let confirmError: string | undefined = undefined
 
-        // Confirm shipment in marketplace (e.g. Otto)
-        if (order.marketplace === 'otto' && ottoAdapter && order.marketplaceOrderId) {
-          console.log(`[DHL-Action] Triggering Otto confirmation for ${order.marketplaceOrderId} with tracking ${trackingNumber}`)
+        // Confirm shipment in marketplace
+        const adapter = adaptersMap.get(order.marketplace)
+        if (adapter && typeof adapter.confirmShipment === 'function' && order.marketplaceOrderId) {
+          console.log(`[DHL-Action] Triggering confirmation for ${order.marketplaceOrderId} on ${order.marketplace} with tracking ${trackingNumber}`)
           try {
-            await ottoAdapter.confirmShipment(
+            // Otto needs extra arguments (order.rawPayload, returnAddressCarrierId)
+            const isOtto = order.marketplace === 'otto'
+            const ottoIntegration = activeIntegrations.find(i => i.type === 'otto')
+            const ottoReturnAddressCarrierId = ottoIntegration ? (ottoIntegration.metadata as any)?.returnAddressCarrierId : undefined
+            
+            await adapter.confirmShipment(
               order.marketplaceOrderId, 
               trackingNumber, 
               'DHL', 
               returnTrackingNumber || undefined,
-              order.rawPayload, // pass raw payload so Otto can find positionItemIds
-              ottoReturnAddressCarrierId
+              order.rawPayload,
+              isOtto ? ottoReturnAddressCarrierId : undefined
             )
 
             // Auto-download invoice after shipping confirmation if enabled
-            if (downloadOttoInvoice) {
-              console.log(`[DHL-Action] Scheduled Otto invoice download for order ${order.marketplaceOrderId}`)
+            const integration = activeIntegrations.find(i => i.type === order.marketplace)
+            const downloadInvoice = integration ? !!(integration.metadata as any)?.downloadInvoice : false
+            if (downloadInvoice) {
+              console.log(`[DHL-Action] Scheduled invoice download for order ${order.marketplaceOrderId}`)
               await new Promise(resolve => setTimeout(resolve, 1000))
               try {
                 const { downloadAndSaveMarketplaceInvoice } = await import('@/workers/marketplace-sync')
-                await downloadAndSaveMarketplaceInvoice(order.id, auth.activeCompanyId, ottoAdapter)
+                await downloadAndSaveMarketplaceInvoice(order.id, auth.activeCompanyId, adapter)
               } catch (err) {
-                console.error(`[DHL-Action] Immediate Otto invoice download failed:`, err)
+                console.error(`[DHL-Action] Immediate invoice download failed:`, err)
               }
 
               try {
                 const { marketplaceSyncQueue } = await import('@/workers/marketplace-sync')
                 await marketplaceSyncQueue.add(
-                  `sync-otto-invoices-${order.id}`,
+                  `sync-${order.marketplace}-invoices-${order.id}`,
                   {
                     companyId: auth.activeCompanyId,
-                    marketplace: 'otto',
+                    marketplace: order.marketplace as any,
                     triggeredByUserId: auth.userId,
                   },
                   {
@@ -762,65 +653,15 @@ export async function generateDhlLabelsAction(
                     removeOnFail: true,
                   }
                 )
-                console.log(`[DHL-Action] Enqueued delayed marketplace sync job for Otto invoice recovery of order ${order.marketplaceOrderId}`)
+                console.log(`[DHL-Action] Enqueued delayed marketplace sync job for invoice recovery of order ${order.marketplaceOrderId}`)
               } catch (queueErr) {
                 console.error(`[DHL-Action] Failed to enqueue delayed sync job:`, queueErr)
               }
             }
           } catch (confirmErr: any) {
             const msg = confirmErr?.message ?? String(confirmErr)
-            console.error(`[Otto] Failed to confirm shipment for ${order.marketplaceOrderId}:`, msg)
-            confirmError = `Otto-Bestätigung fehlgeschlagen (${order.marketplaceOrderId}): ${msg}`
-          }
-        }
-
-        // Confirm shipment in marketplace (About You)
-        if (order.marketplace === 'aboutyou' && aboutYouAdapterDhl && order.marketplaceOrderId) {
-          console.log(`[DHL-Action] Triggering About You confirmation for ${order.marketplaceOrderId} with tracking ${trackingNumber}`)
-          try {
-            await aboutYouAdapterDhl.confirmShipment(
-              order.marketplaceOrderId, 
-              trackingNumber, 
-              'DHL', 
-              returnTrackingNumber || undefined,
-              order.rawPayload
-            )
-
-            // Auto-download invoice after shipping confirmation if enabled
-            if (downloadAboutYouInvoice) {
-              console.log(`[DHL-Action] Scheduled About You invoice download for order ${order.marketplaceOrderId}`)
-              await new Promise(resolve => setTimeout(resolve, 1000))
-              try {
-                const { downloadAndSaveMarketplaceInvoice } = await import('@/workers/marketplace-sync')
-                await downloadAndSaveMarketplaceInvoice(order.id, auth.activeCompanyId, aboutYouAdapterDhl)
-              } catch (err) {
-                console.error(`[DHL-Action] Immediate About You invoice download failed:`, err)
-              }
-
-              try {
-                const { marketplaceSyncQueue } = await import('@/workers/marketplace-sync')
-                await marketplaceSyncQueue.add(
-                  `sync-aboutyou-invoices-${order.id}`,
-                  {
-                    companyId: auth.activeCompanyId,
-                    marketplace: 'aboutyou',
-                    triggeredByUserId: auth.userId,
-                  },
-                  {
-                    delay: 180000, // 3 minutes delay
-                    removeOnComplete: true,
-                    removeOnFail: true,
-                  }
-                )
-                console.log(`[DHL-Action] Enqueued delayed marketplace sync job for About You invoice recovery of order ${order.marketplaceOrderId}`)
-              } catch (queueErr) {
-                console.error(`[DHL-Action] Failed to enqueue delayed sync job:`, queueErr)
-              }
-            }
-          } catch (confirmErr: any) {
-            const msg = confirmErr?.message ?? String(confirmErr)
-            console.error(`[AboutYou] Failed to confirm shipment for ${order.marketplaceOrderId}:`, msg)
-            confirmError = `About You-Bestätigung fehlgeschlagen (${order.marketplaceOrderId}): ${msg}`
+            console.error(`[${order.marketplace}] Failed to confirm shipment for ${order.marketplaceOrderId}:`, msg)
+            confirmError = `Bestätigung für ${order.marketplace} fehlgeschlagen (${order.marketplaceOrderId}): ${msg}`
           }
         }
 

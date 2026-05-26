@@ -329,4 +329,125 @@ export class MiraklAdapter implements MarketplaceAdapter {
       return false
     }
   }
+
+  /**
+   * Confirm shipment for an order on Mirakl.
+   * Updates tracking info (OR23) and validates shipment (OR24).
+   */
+  async confirmShipment(
+    marketplaceOrderId: string, 
+    trackingNumber: string, 
+    carrier: string, 
+    returnTrackingNumber?: string,
+    rawOrderPayload?: unknown
+  ): Promise<void> {
+    try {
+      const token = await this.getAccessToken()
+      const headers: Record<string, string> = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      } else {
+        const apiKey = this.config.clientSecret === '' || !this.config.clientSecret 
+          ? this.config.clientId 
+          : this.config.apiKey
+        
+        if (apiKey) {
+          headers['Authorization'] = apiKey
+          headers['X-Mirakl-Api-Key'] = apiKey
+        }
+      }
+
+      const baseUrl = this.config.baseUrl.replace(/\/$/, '')
+
+      // 1. Update tracking info (OR23)
+      let trackingUrl = ''
+      if (baseUrl.includes('miraklconnect.com')) {
+        if (baseUrl.endsWith('/v1')) {
+          trackingUrl = `${baseUrl}/orders/${marketplaceOrderId}/tracking`
+        } else {
+          trackingUrl = `${baseUrl}/api/v1/orders/${marketplaceOrderId}/tracking`
+        }
+      } else {
+        if (baseUrl.endsWith('/api')) {
+          trackingUrl = `${baseUrl}/orders/${marketplaceOrderId}/tracking`
+        } else {
+          trackingUrl = `${baseUrl}/api/orders/${marketplaceOrderId}/tracking`
+        }
+      }
+
+      if (this.config.shopId) {
+        trackingUrl += `?shop_id=${this.config.shopId}`
+      }
+
+      const carrierMap: Record<string, string> = {
+        'dhl': 'DHL',
+        'hermes': 'Hermes'
+      }
+      const resolvedCarrier = carrierMap[carrier.toLowerCase()] || carrier
+
+      const trackingPayload = {
+        carrier_code: resolvedCarrier,
+        carrier_name: resolvedCarrier,
+        tracking_number: trackingNumber
+      }
+
+      console.log(`[MiraklAdapter:${this.marketplace}] Updating tracking info for order ${marketplaceOrderId} via PUT ${trackingUrl}...`)
+      
+      const trackingRes = await fetch(trackingUrl, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(trackingPayload)
+      })
+
+      if (!trackingRes.ok) {
+        const trackingErrText = await trackingRes.text()
+        console.warn(`[MiraklAdapter:${this.marketplace}] Update Tracking failed (${trackingRes.status}): ${trackingErrText}`)
+      } else {
+        console.log(`[MiraklAdapter:${this.marketplace}] Tracking info successfully updated for order ${marketplaceOrderId}`)
+      }
+
+      // 2. Validate shipment (OR24)
+      let shipUrl = ''
+      if (baseUrl.includes('miraklconnect.com')) {
+        if (baseUrl.endsWith('/v1')) {
+          shipUrl = `${baseUrl}/orders/${marketplaceOrderId}/ship`
+        } else {
+          shipUrl = `${baseUrl}/api/v1/orders/${marketplaceOrderId}/ship`
+        }
+      } else {
+        if (baseUrl.endsWith('/api')) {
+          shipUrl = `${baseUrl}/orders/${marketplaceOrderId}/ship`
+        } else {
+          shipUrl = `${baseUrl}/api/orders/${marketplaceOrderId}/ship`
+        }
+      }
+
+      if (this.config.shopId) {
+        shipUrl += `?shop_id=${this.config.shopId}`
+      }
+
+      console.log(`[MiraklAdapter:${this.marketplace}] Confirming/validating shipment for order ${marketplaceOrderId} via PUT ${shipUrl}...`)
+
+      const shipRes = await fetch(shipUrl, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({})
+      })
+
+      if (!shipRes.ok) {
+        const shipErrText = await shipRes.text()
+        console.error(`[MiraklAdapter:${this.marketplace}] Confirm Shipment failed (${shipRes.status}): ${shipErrText}`)
+        throw new Error(`Confirm Shipment failed (${shipRes.status}): ${shipErrText}`)
+      }
+
+      console.log(`[MiraklAdapter:${this.marketplace}] Order ${marketplaceOrderId} successfully confirmed as shipped.`)
+    } catch (error) {
+      console.error(`[MiraklAdapter:${this.marketplace}] Error confirming shipment for order ${marketplaceOrderId}:`, error)
+      throw error
+    }
+  }
 }
