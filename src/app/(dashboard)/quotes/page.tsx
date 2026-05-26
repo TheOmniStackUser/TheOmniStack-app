@@ -2,10 +2,46 @@ import { requireAuth } from '@/lib/session'
 import Link from 'next/link'
 import { getQuotesAction } from '@/app/actions/manual-invoice'
 import { QuoteList } from './quote-list'
+import { db } from '@/db/client'
+import { companies } from '@/db/schema/companies'
+import { invoiceTextTemplates } from '@/db/schema/templates'
+import { users } from '@/db/schema/auth'
+import { eq, and } from 'drizzle-orm'
 
 export default async function QuotesPage() {
-  await requireAuth()
+  const auth = await requireAuth()
   const quotes = await getQuotesAction()
+
+  const [company, emailTemplate, currentUser] = await Promise.all([
+    db
+      .select({
+        email: companies.email,
+        smtpSettings: companies.smtpSettings,
+      })
+      .from(companies)
+      .where(eq(companies.id, auth.activeCompanyId))
+      .limit(1)
+      .then(rows => rows[0] || null),
+    db
+      .select({
+        content: invoiceTextTemplates.content,
+      })
+      .from(invoiceTextTemplates)
+      .where(and(
+        eq(invoiceTextTemplates.companyId, auth.activeCompanyId),
+        eq(invoiceTextTemplates.name, 'email_quote_default')
+      ))
+      .limit(1)
+      .then(rows => rows[0]?.content || null),
+    db
+      .select({
+        name: users.name,
+      })
+      .from(users)
+      .where(eq(users.id, auth.userId))
+      .limit(1)
+      .then(rows => rows[0] || null)
+  ])
 
   return (
     <div className="p-8">
@@ -40,7 +76,12 @@ export default async function QuotesPage() {
         </p>
       </div>
 
-      <QuoteList initialQuotes={quotes} />
+      <QuoteList 
+        initialQuotes={quotes} 
+        company={company ? { email: company.email, smtpSettings: company.smtpSettings } : undefined}
+        initialEmailTemplate={emailTemplate}
+        currentUserName={currentUser?.name || ''}
+      />
     </div>
   )
 }

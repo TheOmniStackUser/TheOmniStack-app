@@ -13,6 +13,7 @@ import { customers } from '@/db/schema/customers'
 import { sql } from 'drizzle-orm'
 import React from 'react'
 import { saveCustomerAction } from './customers'
+import { invoiceTextTemplates } from '@/db/schema/templates'
 
 export async function createManualInvoiceAction(data: {
   customer: {
@@ -846,4 +847,42 @@ export async function getInvoiceLogsAction(invoiceId: string) {
   })
 
   return logs
+}
+
+export async function saveQuoteEmailTemplateAction(content: string) {
+  const auth = await requireAuth()
+  const companyId = auth.activeCompanyId
+
+  try {
+    const existing = await db
+      .select()
+      .from(invoiceTextTemplates)
+      .where(
+        and(
+          eq(invoiceTextTemplates.companyId, companyId),
+          eq(invoiceTextTemplates.name, 'email_quote_default')
+        )
+      )
+      .limit(1)
+
+    if (existing.length > 0) {
+      await db
+        .update(invoiceTextTemplates)
+        .set({ content })
+        .where(eq(invoiceTextTemplates.id, existing[0].id))
+    } else {
+      await db
+        .insert(invoiceTextTemplates)
+        .values({
+          companyId,
+          name: 'email_quote_default',
+          content
+        })
+    }
+
+    return { success: true }
+  } catch (err: any) {
+    console.error('[Action] Failed to save quote email template:', err)
+    return { error: err.message || 'Fehler beim Speichern der Vorlage.' }
+  }
 }

@@ -57,3 +57,68 @@ export const WORLD_COUNTRIES = [
   { code: 'MY', name: 'Malaysia' },
   { code: 'ID', name: 'Indonesien' },
 ].sort((a, b) => a.name.localeCompare(b.name))
+
+export function get2LetterCountryCode(country: string | null | undefined): string {
+  if (!country) return 'DE';
+  const clean = country.trim().toUpperCase();
+  if (clean.length === 2) return clean;
+
+  const mapping: Record<string, string> = {
+    DEU: 'DE',
+    AUT: 'AT',
+    FRA: 'FR',
+    ITA: 'IT',
+    ESP: 'ES',
+    CZE: 'CZ',
+    BEL: 'BE',
+    NLD: 'NL',
+    LUX: 'LU',
+    POL: 'PL',
+    DNK: 'DK',
+    SWE: 'SE',
+    FIN: 'FI',
+    IRL: 'IE',
+    PRT: 'PT',
+    GRC: 'GR',
+    HRV: 'HR',
+    BGR: 'BG',
+    ROU: 'RO',
+    HUN: 'HU',
+    SVK: 'SK',
+    SVN: 'SI',
+    EST: 'EE',
+    LVA: 'LV',
+    LTU: 'LT',
+    MLT: 'MT',
+    CYP: 'CY',
+    GBR: 'GB',
+    USA: 'US',
+    CAN: 'CA',
+    CHE: 'CH',
+    AUS: 'AU',
+    JPN: 'JP',
+    CHN: 'CN',
+    IND: 'IN',
+    BRA: 'BR',
+    MEX: 'MX',
+    NOR: 'NO',
+    TUR: 'TR',
+    ARE: 'AE',
+    SGP: 'SG',
+    HKG: 'HK',
+    ISR: 'IL',
+    ZAF: 'ZA',
+    LIE: 'LI',
+    ISL: 'IS',
+    MCO: 'MC',
+    NZL: 'NZ',
+    KOR: 'KR',
+    THA: 'TH',
+    VNM: 'VN',
+    MYS: 'MY',
+    IDN: 'ID',
+  };
+
+  return mapping[clean] || clean;
+}
+

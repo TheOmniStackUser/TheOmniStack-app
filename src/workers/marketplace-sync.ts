@@ -24,6 +24,7 @@ import { KauflandAdapter } from '@/adapters/marketplace/kaufland'
 import { EbayAdapter } from '@/adapters/marketplace/ebay'
 import type { NormalizedOrder, MarketplaceAdapter } from '@/adapters/marketplace/base'
 import { createInvoiceForOrder, formatDocumentNumber, getDefaultSettings } from '@/lib/invoice-service'
+import { get2LetterCountryCode } from '@/lib/countries'
 
 // ─── Queue Name Constants ─────────────────────────────────────────────────────
 export const QUEUE_MARKETPLACE_SYNC = 'marketplace-sync'
@@ -765,18 +766,19 @@ export async function persistOrders(
       await tx.update(companies).set({ nextDeliveryNoteNumber: nextDN }).where(eq(companies.id, companyId))
 
       // Lookup VAT Settings
+      const shippingCountryCode = get2LetterCountryCode(order.shippingAddress.country)
       const countryVat = await tx.query.vatSettings.findFirst({
         where: and(
           eq(vatSettings.companyId, companyId),
-          eq(vatSettings.countryCode, order.shippingAddress.country.toUpperCase())
+          eq(vatSettings.countryCode, shippingCountryCode)
         )
       })
 
       // Resolve the VAT rate to apply
       let resolvedVatRate = 0.19 // Default to German VAT
       if (countryVat) {
-        if (countryVat.vatType === 'oss' || countryVat.vatType === 'below_threshold') {
-          resolvedVatRate = 0.19 // OSS and below threshold use German VAT (19%)
+        if (countryVat.vatType === 'below_threshold') {
+          resolvedVatRate = 0.19 // below threshold uses German VAT (19%)
         } else if (countryVat.vatType === 'third_country') {
           resolvedVatRate = 0.00 // Third country uses 0%
         } else {
@@ -807,7 +809,7 @@ export async function persistOrders(
           shippingStreet: order.shippingAddress.street,
           shippingCity: order.shippingAddress.city,
           shippingZip: order.shippingAddress.zip,
-          shippingCountry: order.shippingAddress.country,
+          shippingCountry: shippingCountryCode,
           currency: order.currency,
           totalAmount: String(order.totalAmount),
           taxAmount: String(finalTaxAmount.toFixed(2)),

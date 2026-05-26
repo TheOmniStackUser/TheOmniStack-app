@@ -489,7 +489,9 @@ export async function sendInvoiceEmailAction(data: {
       where: and(eq(invoices.id, data.invoiceId), eq(invoices.companyId, companyId))
     })
 
-    if (!invoice) throw new Error('Rechnung nicht gefunden')
+    if (!invoice) throw new Error('Dokument nicht gefunden')
+
+    const label = invoice.documentType === 'quote' ? 'Angebot' : (invoice.isCreditNote ? 'Gutschrift' : 'Rechnung')
 
     const [company] = await db
       .select({ 
@@ -510,7 +512,7 @@ export async function sendInvoiceEmailAction(data: {
     if (data.sendAsAttachment !== false && invoice.pdfStorageKey) {
       const { downloadDocument } = await import('@/lib/storage')
       pdfBuffer = await downloadDocument(invoice.pdfStorageKey)
-      pdfFilename = `Rechnung-${invoice.invoiceNumber}.pdf`
+      pdfFilename = `${label}-${invoice.invoiceNumber}.pdf`
     }
 
     // Determine if custom SMTP should be used
@@ -541,7 +543,7 @@ export async function sendInvoiceEmailAction(data: {
     }
 
     // 4. Create log entry
-    const logMessage = `Rechnung wurde per E-Mail versendet.
+    const logMessage = `${label} wurde per E-Mail versendet.
 Absender: ${data.senderEmail}
 Empfänger: ${data.recipientEmail}
 ${data.ccEmail ? `CC: ${data.ccEmail}\n` : ''}Betreff: ${data.subject}`
