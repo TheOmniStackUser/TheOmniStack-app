@@ -78,6 +78,67 @@ export async function triggerManualSyncAction(data: { marketplace: string, fromD
   let totalChecked = 0
   let totalAffected = 0
 
+  // ─── TEMPORARY RECOVERY FOR PENDING DECATHLON/MIRAKL ORDERS MISSING INVOICES ───
+  try {
+    const { orders } = await import('@/db/schema/orders')
+    const { isNull, gte } = await import('drizzle-orm')
+    const { createInvoiceForOrder } = await import('@/lib/invoice-service')
+    const { downloadAndSaveMarketplaceInvoice, getAdapterForIntegration } = await import('@/workers/marketplace-sync')
+
+    const today = new Date('2026-05-26T00:00:00.000Z')
+    const candidateOrders = await db
+      .select()
+      .from(orders)
+      .where(
+        and(
+          eq(orders.companyId, auth.activeCompanyId),
+          eq(orders.status, 'pending'),
+          isNull(orders.invoiceId),
+          gte(orders.createdAt, today)
+        )
+      )
+
+    console.log(`[ManualSync-Recovery] Found ${candidateOrders.length} candidate pending orders created today.`)
+
+    for (const order of candidateOrders) {
+      if (
+        order.marketplace === 'mirakl_decathlon' ||
+        order.marketplace === 'mirakl_decathlon_eu' ||
+        order.marketplace === 'mirakl_custom'
+      ) {
+        console.log(`[ManualSync-Recovery] Processing order ${order.marketplaceOrderId}...`)
+        const integration = activeIntegrations.find(i => i.type === order.marketplace)
+        if (integration) {
+          const downloadInvoice = !!(integration.metadata as any)?.downloadInvoice
+          const autoInvoice = !!integration.autoInvoice
+          const adapter = getAdapterForIntegration(integration)
+
+          if (downloadInvoice && adapter) {
+            console.log(`[ManualSync-Recovery] Downloading invoice for ${order.marketplaceOrderId}...`)
+            await downloadAndSaveMarketplaceInvoice(order.id, order.companyId, adapter)
+            totalAffected++
+          } else if (autoInvoice) {
+            console.log(`[ManualSync-Recovery] Generating invoice for ${order.marketplaceOrderId}...`)
+            const invResult = await createInvoiceForOrder(order.id, order.companyId)
+            if (invResult && 'pdfBuffer' in invResult) {
+              if (integration.uploadInvoice && adapter?.uploadInvoice) {
+                console.log(`[ManualSync-Recovery] Uploading invoice for ${order.marketplaceOrderId}...`)
+                await adapter.uploadInvoice(
+                  order.marketplaceOrderId,
+                  invResult.pdfBuffer,
+                  `${invResult.invoiceNumber}.pdf`
+                )
+              }
+              totalAffected++
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error(`[ManualSync-Recovery] Failed to run pending order invoice recovery:`, err)
+  }
+
   for (const integration of activeIntegrations) {
     try {
       let rawOrders: NormalizedOrder[] = []
