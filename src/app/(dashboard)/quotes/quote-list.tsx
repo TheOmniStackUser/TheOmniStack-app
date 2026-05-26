@@ -3,8 +3,8 @@
 import { useState } from 'react'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
-import { getInvoiceDownloadUrl, getInvoiceDetailsAction, sendInvoiceEmailAction } from '@/app/actions/invoices'
-import { convertQuoteAction, deleteQuoteAction, addInvoiceLogAction, saveQuoteEmailTemplateAction } from '@/app/actions/manual-invoice'
+import { getInvoiceDownloadUrl, getInvoiceDetailsAction, sendInvoiceEmailAction, addInvoiceLogAction } from '@/app/actions/invoices'
+import { convertQuoteAction, deleteQuoteAction, saveQuoteEmailTemplateAction } from '@/app/actions/manual-invoice'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
