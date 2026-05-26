@@ -90,17 +90,11 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
 
         // Auto-generate invoice if enabled for this marketplace (e.g. Decathlon, Shopify, Amazon)
         try {
-          const [integration] = await db
-            .select()
-            .from(marketplaceIntegrations)
-            .where(
-              and(
-                eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
-                eq(marketplaceIntegrations.type, order.marketplace as any),
-                eq(marketplaceIntegrations.isActive, true)
-              )
-            )
-            .limit(1)
+          const integration = activeIntegrations.find(i => 
+            i.type === order.marketplace ||
+            (i.type === 'mirakl_custom' && 
+             ((i.metadata as any)?.customName || '').toLowerCase() === order.marketplace.toLowerCase())
+          )
 
           const autoInvoiceEnabledAt = (integration?.metadata as any)?.autoInvoiceEnabledAt
           const thresholdDate = autoInvoiceEnabledAt
@@ -607,17 +601,11 @@ export async function generateDhlLabelsAction(
 
         // Auto-generate invoice if enabled for this marketplace (e.g. Decathlon, Shopify, Amazon)
         try {
-          const [integration] = await db
-            .select()
-            .from(marketplaceIntegrations)
-            .where(
-              and(
-                eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
-                eq(marketplaceIntegrations.type, order.marketplace as any),
-                eq(marketplaceIntegrations.isActive, true)
-              )
-            )
-            .limit(1)
+          const integration = activeIntegrations.find(i => 
+            i.type === order.marketplace ||
+            (i.type === 'mirakl_custom' && 
+             ((i.metadata as any)?.customName || '').toLowerCase() === order.marketplace.toLowerCase())
+          )
 
           const autoInvoiceEnabledAt = (integration?.metadata as any)?.autoInvoiceEnabledAt
           const thresholdDate = autoInvoiceEnabledAt

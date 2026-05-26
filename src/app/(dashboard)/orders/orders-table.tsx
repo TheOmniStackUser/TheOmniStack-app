@@ -675,6 +675,17 @@ export function OrdersTable({
       const result = await generateOrDownloadInvoicesBulkAction(ids)
       if (result.error) {
         showToast(result.error, 'error')
+      } else if (result.errorCount && result.errorCount > 0) {
+        const details = result.errorsList?.map((e: any) => `• ${e.orderNumber}: ${e.error}`).join('\n') || ''
+        showToast(`Rechnungserstellung teilweise fehlgeschlagen (Fehler verschwinden nicht automatisch):\n${details}`, 'error')
+        
+        // Remove successfully processed orders from selection
+        setSelectedIds(prev => {
+          const next = new Set(prev)
+          const successIds = ids.filter(id => !result.errorsList?.some((err: any) => err.orderNumber === orders.find(o => o.id === id)?.marketplaceOrderId))
+          successIds.forEach(id => next.delete(id))
+          return next
+        })
       } else {
         showToast(result.message, 'success')
         setSelectedIds(prev => {

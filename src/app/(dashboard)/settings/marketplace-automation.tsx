@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { saveMarketplaceAutomationAction } from '@/app/actions/settings'
-import { RefreshCw, CheckCircle2, CloudUpload, Download } from 'lucide-react'
+import { RefreshCw, CheckCircle2, CloudUpload, Download, AlertCircle } from 'lucide-react'
 import { CollapsibleSection } from '@/components/collapsible-section'
 
 type Integration = {
@@ -133,6 +133,21 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
       defaultOpen={false}
     >
       <div className="p-6">
+        <div className="mb-6 p-4 rounded-xl bg-blue-50/50 border border-blue-100 text-blue-900 text-xs space-y-2">
+          <h5 className="font-bold text-blue-950 flex items-center gap-1.5">
+            <AlertCircle size={14} className="text-blue-600" />
+            Funktionsweise der Rechnungs-Automatisierung:
+          </h5>
+          <ul className="list-disc list-inside space-y-1.5 text-blue-800 leading-relaxed pl-1">
+            <li>
+              <strong>Auto-Rechnung / Auto-Download:</strong> Rechnungen werden automatisch erzeugt bzw. vom Marktplatz abgerufen, sobald Sie ein Versandlabel (DHL oder Hermes) drucken, oder im Hintergrund, wenn die Bestellung als versendet synchronisiert wird. Beim Import einer neuen Bestellung (Status: <em>Pending</em>) wird noch <strong>keine</strong> Rechnungsaktion durchgeführt.
+            </li>
+            <li>
+              <strong>Auto-Upload:</strong> Sobald die Rechnung erstellt bzw. heruntergeladen wurde, wird sie automatisch an den Marktplatz (z. B. Decathlon, Kaufland, eBay, Amazon) hochgeladen.
+            </li>
+          </ul>
+        </div>
+
         {marketplaceIntegrations.length === 0 ? (
           <div className="text-center py-12 px-4">
             <p className="text-gray-400 text-sm">Keine Marktplatz-Integrationen gefunden.</p>

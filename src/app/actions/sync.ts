@@ -101,15 +101,19 @@ export async function triggerManualSyncAction(data: { marketplace: string, fromD
     console.log(`[ManualSync-Recovery] Found ${candidateOrders.length} candidate pending orders created today.`)
 
     for (const order of candidateOrders) {
-      if (
-        order.marketplace === 'mirakl_decathlon' ||
-        order.marketplace === 'mirakl_decathlon_eu' ||
-        order.marketplace === 'mirakl_custom'
-      ) {
+      const integration = activeIntegrations.find(i => 
+        i.type === order.marketplace ||
+        (i.type === 'mirakl_custom' && 
+         ((i.metadata as any)?.customName || '').toLowerCase() === order.marketplace.toLowerCase())
+      )
+
+      if (integration && (
+        integration.type === 'mirakl_decathlon' ||
+        integration.type === 'mirakl_decathlon_eu' ||
+        integration.type === 'mirakl_custom'
+      )) {
         console.log(`[ManualSync-Recovery] Processing order ${order.marketplaceOrderId}...`)
-        const integration = activeIntegrations.find(i => i.type === order.marketplace)
-        if (integration) {
-          const downloadInvoice = !!(integration.metadata as any)?.downloadInvoice
+        const downloadInvoice = !!(integration.metadata as any)?.downloadInvoice
           const autoInvoice = !!integration.autoInvoice
           const adapter = getAdapterForIntegration(integration)
 
