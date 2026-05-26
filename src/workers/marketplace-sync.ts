@@ -37,25 +37,42 @@ export type MarketplaceSyncJobData = {
   integrationId?: string | null
 }
 
-// ─── Redis Connection ─────────────────────────────────────────────────────────
-const redisConnection = new IORedis(process.env.REDIS_URL ?? 'redis://localhost:6379', {
-  maxRetriesPerRequest: null, // Required by BullMQ
-})
-redisConnection.on('error', (err) => {
-  console.error('[Redis Error in marketplace-sync]', err)
-})
-
-// ─── Queue ────────────────────────────────────────────────────────────────────
-export const marketplaceSyncQueue = new Queue<MarketplaceSyncJobData>(
-  QUEUE_MARKETPLACE_SYNC,
-  { 
-    connection: redisConnection,
-    defaultJobOptions: {
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 5000 },
-    },
+// ─── Lazy Redis Connection & Queue Initialization ─────────────────────────────
+let _redisConnection: IORedis | null = null
+function getRedisConnection(): IORedis {
+  if (!_redisConnection) {
+    _redisConnection = new IORedis(process.env.REDIS_URL ?? 'redis://localhost:6379', {
+      maxRetriesPerRequest: null, // Required by BullMQ
+    })
+    _redisConnection.on('error', (err) => {
+      console.error('[Redis Error in marketplace-sync]', err)
+    })
   }
-)
+  return _redisConnection
+}
+
+let _queue: Queue | null = null
+export const marketplaceSyncQueue = new Proxy({} as Queue<MarketplaceSyncJobData>, {
+  get(target, prop, receiver) {
+    if (!_queue) {
+      _queue = new Queue<MarketplaceSyncJobData>(
+        QUEUE_MARKETPLACE_SYNC,
+        { 
+          connection: getRedisConnection(),
+          defaultJobOptions: {
+            attempts: 3,
+            backoff: { type: 'exponential', delay: 5000 },
+          },
+        }
+      )
+    }
+    const val = Reflect.get(_queue, prop)
+    if (typeof val === 'function') {
+      return val.bind(_queue)
+    }
+    return val
+  }
+})
 
 // ─── Worker ───────────────────────────────────────────────────────────────────
 export function createMarketplaceSyncWorker() {
@@ -225,7 +242,7 @@ export function createMarketplaceSyncWorker() {
       }
     },
     {
-      connection: redisConnection,
+      connection: getRedisConnection(),
       concurrency: 5,
     }
   )
