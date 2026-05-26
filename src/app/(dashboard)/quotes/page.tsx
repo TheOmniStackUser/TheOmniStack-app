@@ -78,7 +78,7 @@ export default async function QuotesPage() {
 
       <QuoteList 
         initialQuotes={quotes} 
-        company={company ? { email: company.email, smtpSettings: company.smtpSettings } : undefined}
+        company={company ? { email: company.email || '', smtpSettings: company.smtpSettings } : undefined}
         initialEmailTemplate={emailTemplate}
         currentUserName={currentUser?.name || ''}
       />
