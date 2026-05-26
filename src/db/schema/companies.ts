@@ -52,6 +52,10 @@ export const companies = pgTable('companies', {
   registrationCourt: text('registration_court'),
   deliveryNoteFooter: text('delivery_note_footer'),
   deliveryNoteFooterEn: text('delivery_note_footer_en'),
+  invoiceFooter: text('invoice_footer'),
+  invoiceFooterEn: text('invoice_footer_en'),
+  offerFooter: text('offer_footer'),
+  offerFooterEn: text('offer_footer_en'),
   returnsNote: text('returns_note'),
   returnsNoteEn: text('returns_note_en'),
   internationalLanguage: text('international_language').notNull().default('en'), // 'de' or 'en'

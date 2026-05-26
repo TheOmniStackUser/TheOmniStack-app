@@ -623,6 +623,9 @@ export async function generateDhlLabelsAction(
         console.log(`[DHL] Response ${response.status}:`, responseText)
 
         if (!response.ok) {
+          if (response.status === 401 || response.status === 403) {
+            return { success: false, error: `Bestellung ${order.marketplaceOrderId ?? order.id}: DHL-Authentifizierung fehlgeschlagen. Bitte überprüfe deine DHL-Zugangsdaten (Benutzername, Passwort und API-Key) unter Integrationen > DHL.` }
+          }
           let apiMsg = responseText
           try {
             const parsed = JSON.parse(responseText)

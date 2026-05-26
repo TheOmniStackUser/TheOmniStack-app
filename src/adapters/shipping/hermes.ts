@@ -112,6 +112,23 @@ export class HermesAdapter {
     if (!response.ok) {
       const errText = await response.text()
       console.error('[Hermes Adapter] Auth Error:', errText)
+      
+      let isCredentialError = false
+      try {
+        const parsed = JSON.parse(errText)
+        if (parsed.error === 'invalid_grant' || parsed.error_description?.toLowerCase().includes('credential')) {
+          isCredentialError = true
+        }
+      } catch (e) {
+        if (errText.includes('invalid_grant') || errText.includes('credentials')) {
+          isCredentialError = true
+        }
+      }
+
+      if (response.status === 401 || isCredentialError) {
+        throw new Error('Ungültige Hermes-Zugangsdaten. Bitte überprüfe deinen Benutzernamen und dein Passwort unter Integrationen > Hermes Versand.')
+      }
+
       throw new Error(`Hermes Auth Fehler: ${response.status} - ${errText}`)
     }
 

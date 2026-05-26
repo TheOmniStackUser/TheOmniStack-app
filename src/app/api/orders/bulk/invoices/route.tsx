@@ -96,10 +96,23 @@ export async function GET(request: Request) {
 
     const mergedPdfBytes = await mergedPdf.save()
 
+    const today = new Date()
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Europe/Berlin',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    })
+    const parts = formatter.formatToParts(today)
+    const year = parts.find(p => p.type === 'year')?.value
+    const month = parts.find(p => p.type === 'month')?.value
+    const day = parts.find(p => p.type === 'day')?.value
+    const dateStr = `${year}-${month}-${day}`
+
     return new Response(new Uint8Array(mergedPdfBytes), {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': 'inline; filename="Rechnungen_Sammel.pdf"',
+        'Content-Disposition': `inline; filename="Rechnungen_Sammel_${dateStr}.pdf"`,
       },
     })
   } catch (error: any) {

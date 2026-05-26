@@ -150,6 +150,22 @@ export function SettingsForm({ company }: { company: Company }) {
               </div>
             </div>
           </div>
+          <div className="md:col-span-2 flex flex-col sm:flex-row items-center gap-4 pt-4 border-t border-gray-100 mt-2">
+            <button
+              type="submit"
+              disabled={isPending}
+              className={`px-6 py-2.5 rounded-xl font-bold text-white text-sm shadow-md transition-all ${
+                isPending ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 hover:shadow-blue-500/20'
+              }`}
+            >
+              {isPending ? 'Speichert...' : 'Änderungen speichern'}
+            </button>
+            {state?.message && (
+              <div className={`text-xs font-medium px-3 py-1.5 rounded-lg ${state.success ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
+                {state.message}
+              </div>
+            )}
+          </div>
         </div>
       </CollapsibleSection>
 
@@ -208,6 +224,22 @@ export function SettingsForm({ company }: { company: Company }) {
               <option value="ES">Spanien</option>
               <option value="NL">Niederlande</option>
             </select>
+          </div>
+          <div className="flex flex-col sm:flex-row items-center gap-4 pt-4 border-t border-gray-100 mt-6">
+            <button
+              type="submit"
+              disabled={isPending}
+              className={`px-6 py-2.5 rounded-xl font-bold text-white text-sm shadow-md transition-all ${
+                isPending ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 hover:shadow-blue-500/20'
+              }`}
+            >
+              {isPending ? 'Speichert...' : 'Änderungen speichern'}
+            </button>
+            {state?.message && (
+              <div className={`text-xs font-medium px-3 py-1.5 rounded-lg ${state.success ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
+                {state.message}
+              </div>
+            )}
           </div>
         </div>
       </CollapsibleSection>
@@ -276,6 +308,22 @@ export function SettingsForm({ company }: { company: Company }) {
               <option value="ES">Spanien</option>
               <option value="NL">Niederlande</option>
             </select>
+          </div>
+          <div className="flex flex-col sm:flex-row items-center gap-4 pt-4 border-t border-gray-100 mt-6">
+            <button
+              type="submit"
+              disabled={isPending}
+              className={`px-6 py-2.5 rounded-xl font-bold text-white text-sm shadow-md transition-all ${
+                isPending ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 hover:shadow-blue-500/20'
+              }`}
+            >
+              {isPending ? 'Speichert...' : 'Änderungen speichern'}
+            </button>
+            {state?.message && (
+              <div className={`text-xs font-medium px-3 py-1.5 rounded-lg ${state.success ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
+                {state.message}
+              </div>
+            )}
           </div>
         </div>
       </CollapsibleSection>
@@ -347,6 +395,22 @@ export function SettingsForm({ company }: { company: Company }) {
               placeholder="Amtsgericht München, HRB 12345"
               className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-gray-900"
             />
+          </div>
+          <div className="md:col-span-2 flex flex-col sm:flex-row items-center gap-4 pt-4 border-t border-gray-100 mt-2">
+            <button
+              type="submit"
+              disabled={isPending}
+              className={`px-6 py-2.5 rounded-xl font-bold text-white text-sm shadow-md transition-all ${
+                isPending ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 hover:shadow-blue-500/20'
+              }`}
+            >
+              {isPending ? 'Speichert...' : 'Änderungen speichern'}
+            </button>
+            {state?.message && (
+              <div className={`text-xs font-medium px-3 py-1.5 rounded-lg ${state.success ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
+                {state.message}
+              </div>
+            )}
           </div>
         </div>
       </CollapsibleSection>
