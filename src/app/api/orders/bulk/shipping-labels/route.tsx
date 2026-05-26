@@ -36,10 +36,14 @@ export async function GET(request: Request) {
       return new Response('Keine Bestellungen gefunden', { status: 404 })
     }
 
+    // Sort ordersData to match the requested ids order
+    const ordersMap = new Map(ordersData.map(o => [o.id, o]))
+    const sortedOrders = ids.map(id => ordersMap.get(id)).filter((o): o is typeof ordersData[number] => !!o)
+
     // Collect all label URLs and base64 payloads
     const pdfBuffers: Buffer[] = []
 
-    for (const order of ordersData) {
+    for (const order of sortedOrders) {
       // Check both outbound and return labels
       const urls = [order.labelUrl, order.returnLabelUrl].filter((url): url is string => !!url)
       
