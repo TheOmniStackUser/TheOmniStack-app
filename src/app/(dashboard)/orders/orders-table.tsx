@@ -4,7 +4,7 @@ import { useState, Fragment } from 'react'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
 import { generateHermesLabelsAction, generateDhlLabelsAction } from '@/app/actions/shipping'
-import { archiveOrderAction, archiveOrdersBulkAction, updateOrderStatusAction, updateOrderAddressAction } from '@/app/actions/orders'
+import { archiveOrderAction, archiveOrdersBulkAction, updateOrderStatusAction, updateOrderAddressAction, generateOrDownloadInvoicesBulkAction } from '@/app/actions/orders'
 import { getInvoiceDownloadUrl } from '@/app/actions/invoices'
 import type { Order, OrderItem } from '@/db/schema/orders'
 import type { Invoice } from '@/db/schema/invoices'
@@ -123,6 +123,7 @@ export function OrdersTable({
   const [isGenerating, setIsGenerating] = useState(false)
   const [isDeletingBulk, setIsDeletingBulk] = useState(false)
   const [isDhlGenerating, setIsDhlGenerating] = useState(false)
+  const [isGeneratingInvoices, setIsGeneratingInvoices] = useState(false)
   const [isUpdatingStatus, setIsUpdatingStatus] = useState<string | null>(null)
   const [loadingInvoiceId, setLoadingInvoiceId] = useState<string | null>(null)
   const [showHermesModal, setShowHermesModal] = useState(false)
@@ -665,6 +666,30 @@ export function OrdersTable({
     window.open(`/api/orders/bulk/shipping-labels?ids=${ids.join(',')}`, '_blank')
   }
 
+  const handleBulkGenerateInvoices = async () => {
+    const ids = Array.from(selectedIds).filter(id => !orders.find(o => o.id === id)?.invoiceId)
+    if (ids.length === 0) return
+
+    setIsGeneratingInvoices(true)
+    try {
+      const result = await generateOrDownloadInvoicesBulkAction(ids)
+      if (result.error) {
+        showToast(result.error, 'error')
+      } else {
+        showToast(result.message, 'success')
+        setSelectedIds(prev => {
+          const next = new Set(prev)
+          ids.forEach(id => next.delete(id))
+          return next
+        })
+      }
+    } catch (e) {
+      showToast('Fehler beim Erstellen der Rechnungen: ' + (e instanceof Error ? e.message : String(e)), 'error')
+    } finally {
+      setIsGeneratingInvoices(false)
+    }
+  }
+
   // Count selected orders that have a stored label
   const selectedWithLabel = Array.from(selectedIds)
     .filter(id => orders.find(o => o.id === id)?.labelUrl).length
@@ -676,6 +701,10 @@ export function OrdersTable({
   // Count selected orders that are not shipped
   const selectedUnshippedCount = Array.from(selectedIds)
     .filter(id => orders.find(o => o.id === id)?.status !== 'shipped').length
+
+  // Count selected orders that do not have an invoice yet
+  const selectedWithoutInvoice = Array.from(selectedIds)
+    .filter(id => !orders.find(o => o.id === id)?.invoiceId).length
 
   return (
     <div className="relative">
@@ -707,6 +736,26 @@ export function OrdersTable({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
               Rechnungen ({selectedWithInvoice})
+            </button>
+          )}
+
+          {selectedWithoutInvoice > 0 && (
+            <button
+              onClick={handleBulkGenerateInvoices}
+              disabled={isGeneratingInvoices || isDeletingBulk || isGenerating || isDhlGenerating}
+              className="flex items-center gap-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 font-semibold py-2 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow-sm"
+            >
+              {isGeneratingInvoices ? (
+                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              ) : (
+                <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              )}
+              Rechnungen erstellen/abrufen ({selectedWithoutInvoice})
             </button>
           )}
 

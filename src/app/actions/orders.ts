@@ -119,3 +119,104 @@ export async function updateOrderAddressAction(
   }
 }
 
+export async function generateOrDownloadInvoicesBulkAction(orderIds: string[]) {
+  try {
+    const auth = await requireAuth()
+
+    if (!orderIds || orderIds.length === 0) {
+      return { error: 'Keine Bestellungen ausgewählt.' }
+    }
+
+    const { isNull, inArray } = await import('drizzle-orm')
+    const { marketplaceIntegrations } = await import('@/db/schema/integrations')
+    const { createInvoiceForOrder } = await import('@/lib/invoice-service')
+    const { downloadAndSaveMarketplaceInvoice, getAdapterForIntegration } = await import('@/workers/marketplace-sync')
+
+    // Fetch the candidate orders belonging to this company that don't have an invoice yet
+    const candidateOrders = await db
+      .select()
+      .from(orders)
+      .where(
+        and(
+          inArray(orders.id, orderIds),
+          eq(orders.companyId, auth.activeCompanyId),
+          isNull(orders.invoiceId)
+        )
+      )
+
+    if (candidateOrders.length === 0) {
+      return { error: 'Keine der ausgewählten Bestellungen benötigt eine neue Rechnung.' }
+    }
+
+    let successCount = 0
+    let errorCount = 0
+
+    // Fetch all integrations for the company once to avoid querying database in a loop
+    const integrations = await db
+      .select()
+      .from(marketplaceIntegrations)
+      .where(
+        and(
+          eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
+          eq(marketplaceIntegrations.isActive, true)
+        )
+      )
+
+    for (const order of candidateOrders) {
+      const integration = integrations.find(i => i.type === order.marketplace)
+      if (!integration) {
+        errorCount++
+        continue
+      }
+
+      const downloadInvoice = !!(integration.metadata as any)?.downloadInvoice
+      const autoInvoice = !!integration.autoInvoice
+
+      if (!downloadInvoice && !autoInvoice) {
+        errorCount++
+        continue
+      }
+
+      const adapter = getAdapterForIntegration(integration)
+
+      try {
+        if (downloadInvoice) {
+          if (adapter) {
+            await downloadAndSaveMarketplaceInvoice(order.id, order.companyId, adapter)
+            successCount++
+          } else {
+            errorCount++
+          }
+        } else if (autoInvoice) {
+          const invResult = await createInvoiceForOrder(order.id, order.companyId)
+          if (invResult && 'pdfBuffer' in invResult) {
+            if (integration.uploadInvoice && adapter?.uploadInvoice) {
+              await adapter.uploadInvoice(
+                order.marketplaceOrderId,
+                invResult.pdfBuffer,
+                `${invResult.invoiceNumber}.pdf`
+              )
+            }
+            successCount++
+          } else {
+            errorCount++
+          }
+        }
+      } catch (err) {
+        console.error(`[Bulk Invoices Action] Error generating invoice for order ${order.marketplaceOrderId}:`, err)
+        errorCount++
+      }
+    }
+
+    revalidatePath('/orders')
+
+    return {
+      success: true,
+      message: `${successCount} Rechnung(en) erfolgreich erstellt/abgerufen.${errorCount > 0 ? ` ${errorCount} Fehler aufgetreten.` : ''}`
+    }
+  } catch (error) {
+    console.error('Error generating or downloading bulk invoices:', error)
+    return { error: 'Fehler beim Erstellen/Abrufen der Rechnungen.' }
+  }
+}
+
