@@ -47,6 +47,7 @@ export default async function OrdersPage() {
 
   const hasKauflandIntegration = integrations.some(i => i.type === 'kaufland' && i.clientId && i.clientSecret)
   const hasEbayIntegration = integrations.some(i => i.type === 'ebay' && i.clientId && i.clientSecret)
+  const hasAboutYouIntegration = integrations.some(i => i.type === 'aboutyou' && i.apiKey)
  
   return (
     <div className="max-w-[1600px] mx-auto">
@@ -68,6 +69,7 @@ export default async function OrdersPage() {
         dhlConfig={dhlConfig}
         hasKauflandIntegration={hasKauflandIntegration}
         hasEbayIntegration={hasEbayIntegration}
+        hasAboutYouIntegration={hasAboutYouIntegration}
       />
     </div>
   )

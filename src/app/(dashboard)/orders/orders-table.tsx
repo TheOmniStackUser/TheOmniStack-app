@@ -69,6 +69,7 @@ export function OrdersTable({
   dhlConfig = null,
   hasKauflandIntegration = false,
   hasEbayIntegration = false,
+  hasAboutYouIntegration = false,
 }: { 
   orders: OrderWithItems[]
   hermesDefaultParcelClass?: string
@@ -76,6 +77,7 @@ export function OrdersTable({
   dhlConfig?: DhlConfig | null
   hasKauflandIntegration?: boolean
   hasEbayIntegration?: boolean
+  hasAboutYouIntegration?: boolean
 }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
@@ -774,6 +776,7 @@ export function OrdersTable({
             <option value="mirakl_decathlon">Decathlon</option>
             <option value="amazon">Amazon</option>
             <option value="shopify">Shopify</option>
+            {hasAboutYouIntegration && <option value="aboutyou">About You</option>}
             {hasKauflandIntegration && <option value="kaufland">Kaufland</option>}
             {hasEbayIntegration && <option value="ebay">eBay</option>}
             {customMiraklIntegrations.map((integration) => {
