@@ -260,7 +260,10 @@ export async function saveMarketplaceAutomationAction(
   try {
     // Fetch current integration to retrieve existing metadata
     const existing = await db
-      .select({ metadata: marketplaceIntegrations.metadata })
+      .select({ 
+        metadata: marketplaceIntegrations.metadata,
+        autoInvoice: marketplaceIntegrations.autoInvoice
+      })
       .from(marketplaceIntegrations)
       .where(
         and(
@@ -275,8 +278,18 @@ export async function saveMarketplaceAutomationAction(
     }
 
     const currentMetadata = (existing[0].metadata as Record<string, any>) || {}
+    
+    // Track when autoInvoice is enabled
+    let autoInvoiceEnabledAt = currentMetadata.autoInvoiceEnabledAt
+    if (autoInvoice && !existing[0].autoInvoice) {
+      autoInvoiceEnabledAt = new Date().toISOString()
+    } else if (!autoInvoice) {
+      autoInvoiceEnabledAt = undefined
+    }
+
     const updatedMetadata = {
       ...currentMetadata,
+      autoInvoiceEnabledAt,
       ...(downloadInvoice !== undefined ? { downloadInvoice } : {})
     }
 

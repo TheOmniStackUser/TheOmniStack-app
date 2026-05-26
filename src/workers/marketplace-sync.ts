@@ -11,7 +11,7 @@ import { orders, orderItems } from '@/db/schema/orders'
 import { companies } from '@/db/schema/companies'
 import { vatSettings } from '@/db/schema/vat-settings'
 import { auditLog } from '@/lib/audit'
-import { eq, and, desc, isNull, inArray } from 'drizzle-orm'
+import { eq, and, desc, isNull, inArray, gte } from 'drizzle-orm'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { invoices, invoiceItems } from '@/db/schema/invoices'
 import { buildInvoiceKey, buildDeliveryNoteKey, documentExists, uploadDocument } from '@/lib/storage'
@@ -330,6 +330,11 @@ export async function syncShippedOrdersInvoices(
       }
 
       // Find shipped orders for this company & marketplace that don't have an invoice yet
+      const autoInvoiceEnabledAt = (integration.metadata as any)?.autoInvoiceEnabledAt
+      const thresholdDate = autoInvoiceEnabledAt
+        ? new Date(autoInvoiceEnabledAt)
+        : new Date('2026-05-26T12:00:00Z') // Default threshold to today to prevent invoicing older orders
+
       const candidateOrders = await db
         .select()
         .from(orders)
@@ -339,7 +344,10 @@ export async function syncShippedOrdersInvoices(
             eq(orders.marketplace, integration.type),
             eq(orders.status, 'shipped'),
             isNull(orders.invoiceId),
-            eq(orders.isArchived, false)
+            eq(orders.isArchived, false),
+            autoInvoice 
+              ? gte(orders.createdAt, thresholdDate)
+              : undefined
           )
         )
 
@@ -745,12 +753,23 @@ export async function persistOrders(
         )
       })
 
+      // Resolve the VAT rate to apply
+      let resolvedVatRate = 0.19 // Default to German VAT
+      if (countryVat) {
+        if (countryVat.vatType === 'oss' || countryVat.vatType === 'below_threshold') {
+          resolvedVatRate = 0.19 // OSS and below threshold use German VAT (19%)
+        } else if (countryVat.vatType === 'third_country') {
+          resolvedVatRate = 0.00 // Third country uses 0%
+        } else {
+          resolvedVatRate = parseFloat(countryVat.vatRate)
+        }
+      }
+
       let finalTaxAmount = order.taxAmount
       if (countryVat) {
-        const rate = parseFloat(countryVat.vatRate)
         finalTaxAmount = order.items.reduce((sum, item) => {
           const gross = item.unitPrice * item.quantity
-          const net = gross / (1 + rate)
+          const net = gross / (1 + resolvedVatRate)
           return sum + (gross - net)
         }, 0)
       }
@@ -789,7 +808,7 @@ export async function persistOrders(
       if (order.items.length > 0) {
         await tx.insert(orderItems).values(
           order.items.map((item) => {
-            const rate = countryVat ? parseFloat(countryVat.vatRate) : 0.19
+            const rate = resolvedVatRate
             const gross = item.unitPrice
             const net = gross / (1 + rate)
             

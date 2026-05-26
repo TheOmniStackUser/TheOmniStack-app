@@ -102,7 +102,13 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
             )
             .limit(1)
 
-          if (integration?.autoInvoice) {
+          const autoInvoiceEnabledAt = (integration?.metadata as any)?.autoInvoiceEnabledAt
+          const thresholdDate = autoInvoiceEnabledAt
+            ? new Date(autoInvoiceEnabledAt)
+            : new Date('2026-05-26T12:00:00Z') // Default threshold to today to prevent invoicing older orders
+          const isOrderNew = order.createdAt >= thresholdDate
+
+          if (integration?.autoInvoice && isOrderNew) {
             console.log(`[Hermes-Action] Auto-generating invoice for order ${order.marketplaceOrderId} during label printing...`)
             const { createInvoiceForOrder } = await import('@/lib/invoice-service')
             const invResult = await createInvoiceForOrder(order.id, auth.activeCompanyId)
@@ -613,7 +619,13 @@ export async function generateDhlLabelsAction(
             )
             .limit(1)
 
-          if (integration?.autoInvoice) {
+          const autoInvoiceEnabledAt = (integration?.metadata as any)?.autoInvoiceEnabledAt
+          const thresholdDate = autoInvoiceEnabledAt
+            ? new Date(autoInvoiceEnabledAt)
+            : new Date('2026-05-26T12:00:00Z') // Default threshold to today to prevent invoicing older orders
+          const isOrderNew = order.createdAt >= thresholdDate
+
+          if (integration?.autoInvoice && isOrderNew) {
             console.log(`[DHL-Action] Auto-generating invoice for order ${order.marketplaceOrderId} during label printing...`)
             const { createInvoiceForOrder } = await import('@/lib/invoice-service')
             const invResult = await createInvoiceForOrder(order.id, auth.activeCompanyId)
