@@ -420,16 +420,20 @@ export async function generateDhlLabelsAction(
         const verfahrensId = billingNum.slice(10, 12)
         const verfahrensMap: Record<string, string> = {
           '01': 'V01PAK',      // DHL Paket (National)
-          '53': 'V53WPAK',     // DHL Europaket
           '55': 'V55PAK',      // DHL Paket Connect
           '54': 'V54EPAK',     // DHL Europäisches Paket
           '62': 'V62WP',       // Warenpost (National)
           '66': 'V66WPI',      // Warenpost International
           '86': 'V86PARCEL',   // DHL Kleinpaket (National)
           '87': 'V87PARCEL',   // DHL Kleinpaket International
-          '06': 'V06PAK',      // DHL Paket International (Weltweit)
         }
-        if (verfahrensMap[verfahrensId]) {
+        if (verfahrensId === '53') {
+          // Procedure 53 is valid for both DHL Paket International (V06PAK) and DHL Europaket (V53WPAK).
+          // We keep the user's selection if it is one of these two, otherwise default to V06PAK.
+          if (productCode !== 'V06PAK' && productCode !== 'V53WPAK') {
+            resolvedProductCode = 'V06PAK'
+          }
+        } else if (verfahrensMap[verfahrensId]) {
           resolvedProductCode = verfahrensMap[verfahrensId]
         }
 
@@ -460,6 +464,16 @@ export async function generateDhlLabelsAction(
           }
         }
 
+        // Normalize Dutch zip code to '9999 AA' format
+        let resolvedZip = order.shippingZip ?? ''
+        const upperCountry = toIso3(order.shippingCountry)
+        if (upperCountry === 'NLD') {
+          const cleanZip = resolvedZip.replace(/\s/g, '').toUpperCase()
+          if (/^\d{4}[A-Z]{2}$/.test(cleanZip)) {
+            resolvedZip = `${cleanZip.slice(0, 4)} ${cleanZip.slice(4)}`
+          }
+        }
+
         const shipmentPayload: any = {
           profile: 'STANDARD_GRUPPENPROFIL',
           combinedPrinting: useCombine,
@@ -485,7 +499,7 @@ export async function generateDhlLabelsAction(
               name1: order.shippingName ?? 'Empfänger',
               addressStreet: consigneeStreet,
               addressHouse: consigneeHouseNo,
-              postalCode: order.shippingZip ?? '',
+              postalCode: resolvedZip,
               city: order.shippingCity ?? '',
               country: toIso3(order.shippingCountry),
             },
