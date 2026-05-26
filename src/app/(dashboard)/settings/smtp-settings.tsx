@@ -42,7 +42,7 @@ export function SmtpSettings({ company }: { company: Company }) {
     <div id="smtp-settings">
       <CollapsibleSection
         title="E-Mail-Versand (SMTP-Anbindung)"
-        subtitle="Option 2: Verbinde deinen eigenen Mailserver, um Dokumente über deine eigene E-Mail-Adresse zu versenden."
+        subtitle="Verbinde deinen eigenen Mailserver, um Dokumente über deine eigene E-Mail-Adresse zu versenden."
         icon={
         <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center flex-shrink-0 border border-gray-100">
           <Mail className="w-6 h-6 text-gray-500" />

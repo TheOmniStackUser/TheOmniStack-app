@@ -601,6 +601,17 @@ export function OrdersTable({
     window.open(`/api/orders/bulk/delivery-note?ids=${ids}`, '_blank')
   }
 
+  const handleBulkInvoices = () => {
+    const ids = Array.from(selectedIds)
+      .filter(id => !!orders.find(o => o.id === id)?.invoiceId)
+
+    if (ids.length === 0) {
+      showToast('Keine Rechnungen für die ausgewählten Bestellungen gefunden.', 'error')
+      return
+    }
+    window.open(`/api/orders/bulk/invoices?ids=${ids.join(',')}`, '_blank')
+  }
+
   // Collect stored label URLs from already-processed orders and open them merged
   const handleReprintLabels = () => {
     const ids = Array.from(selectedIds)
@@ -616,6 +627,10 @@ export function OrdersTable({
   // Count selected orders that have a stored label
   const selectedWithLabel = Array.from(selectedIds)
     .filter(id => orders.find(o => o.id === id)?.labelUrl).length
+
+  // Count selected orders that have an invoice
+  const selectedWithInvoice = Array.from(selectedIds)
+    .filter(id => !!orders.find(o => o.id === id)?.invoiceId).length
 
   // Count selected orders that are not shipped
   const selectedUnshippedCount = Array.from(selectedIds)
@@ -639,6 +654,18 @@ export function OrdersTable({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
               </svg>
               Lieferscheine ({selectedIds.size})
+            </button>
+          )}
+
+          {selectedWithInvoice > 0 && (
+            <button
+              onClick={handleBulkInvoices}
+              className="flex items-center gap-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 font-semibold py-2 px-4 rounded-md transition-colors text-sm shadow-sm"
+            >
+              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Rechnungen ({selectedWithInvoice})
             </button>
           )}
 
