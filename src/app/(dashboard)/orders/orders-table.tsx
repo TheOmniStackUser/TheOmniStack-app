@@ -193,6 +193,7 @@ export function OrdersTable({
     country: 'all',
     fromDate: '',
     toDate: '',
+    invoiceFilter: 'all',
   })
 
   // Draft Filters (The state while typing/selecting)
@@ -202,6 +203,7 @@ export function OrdersTable({
   const [draftCountry, setDraftCountry] = useState('all')
   const [draftFromDate, setDraftFromDate] = useState('')
   const [draftToDate, setDraftToDate] = useState('')
+  const [draftInvoiceFilter, setDraftInvoiceFilter] = useState('all')
 
   // Pagination
   const [pageSize, setPageSize] = useState(25)
@@ -215,6 +217,7 @@ export function OrdersTable({
       country: draftCountry,
       fromDate: draftFromDate,
       toDate: draftToDate,
+      invoiceFilter: draftInvoiceFilter,
     })
     setCurrentPage(1)
   }
@@ -226,6 +229,7 @@ export function OrdersTable({
     setDraftCountry('all')
     setDraftFromDate('')
     setDraftToDate('')
+    setDraftInvoiceFilter('all')
     setActiveFilters({
       search: '',
       marketplace: 'all',
@@ -233,6 +237,7 @@ export function OrdersTable({
       country: 'all',
       fromDate: '',
       toDate: '',
+      invoiceFilter: 'all',
     })
     setCurrentPage(1)
   }
@@ -260,6 +265,15 @@ export function OrdersTable({
     // Filter by Status
     if (activeFilters.status !== 'all' && order.status !== activeFilters.status) {
       return false
+    }
+    // Filter by Invoice Status
+    if (activeFilters.invoiceFilter !== 'all') {
+      if (activeFilters.invoiceFilter === 'with_invoice' && !order.invoiceId) {
+        return false
+      }
+      if (activeFilters.invoiceFilter === 'without_invoice' && order.invoiceId) {
+        return false
+      }
     }
     // Filter by Date Range
     if (activeFilters.fromDate || activeFilters.toDate) {
@@ -909,6 +923,16 @@ export function OrdersTable({
             {uniqueCountries.map(c => (
               <option key={c} value={c}>{c}</option>
             ))}
+          </select>
+
+          <select
+            value={draftInvoiceFilter}
+            onChange={(e) => setDraftInvoiceFilter(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[150px] text-gray-900 font-medium text-sm"
+          >
+            <option value="all">Alle Rechnungen</option>
+            <option value="with_invoice">Mit Rechnung</option>
+            <option value="without_invoice">Ohne Rechnung</option>
           </select>
 
           <div className="flex items-center gap-2">
