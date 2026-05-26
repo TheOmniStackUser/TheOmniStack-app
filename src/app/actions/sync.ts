@@ -136,7 +136,6 @@ export async function triggerManualSyncAction(data: { marketplace: string, fromD
               totalAffected++
             }
           }
-        }
       }
     }
   } catch (err) {
