@@ -49,6 +49,10 @@ export default async function OrdersPage() {
   const dhlIntegration = integrations.find(i => i.type === 'dhl')
   const dhlConfig = dhlIntegration?.metadata as DhlConfig | null
 
+  const hasOttoIntegration = integrations.some(i => i.type === 'otto' && i.clientId)
+  const hasDecathlonIntegration = integrations.some(i => i.type === 'mirakl_decathlon' && i.clientId)
+  const hasAmazonIntegration = integrations.some(i => i.type === 'amazon' && i.refreshToken)
+  const hasShopifyIntegration = integrations.some(i => i.type === 'shopify' && i.accessToken)
   const hasKauflandIntegration = integrations.some(i => i.type === 'kaufland' && i.clientId && i.clientSecret)
   const hasEbayIntegration = integrations.some(i => i.type === 'ebay' && i.clientId && i.clientSecret)
   const hasAboutYouIntegration = integrations.some(i => i.type === 'aboutyou' && i.apiKey)
@@ -64,6 +68,10 @@ export default async function OrdersPage() {
         customMiraklIntegrations={customMiraklIntegrations} 
         hasKauflandIntegration={hasKauflandIntegration}
         hasEbayIntegration={hasEbayIntegration}
+        hasOttoIntegration={hasOttoIntegration}
+        hasDecathlonIntegration={hasDecathlonIntegration}
+        hasShopifyIntegration={hasShopifyIntegration}
+        hasAboutYouIntegration={hasAboutYouIntegration}
       />
 
       <OrdersTable 
@@ -74,6 +82,10 @@ export default async function OrdersPage() {
         hasKauflandIntegration={hasKauflandIntegration}
         hasEbayIntegration={hasEbayIntegration}
         hasAboutYouIntegration={hasAboutYouIntegration}
+        hasOttoIntegration={hasOttoIntegration}
+        hasDecathlonIntegration={hasDecathlonIntegration}
+        hasAmazonIntegration={hasAmazonIntegration}
+        hasShopifyIntegration={hasShopifyIntegration}
       />
     </div>
   )

@@ -8,10 +8,18 @@ export function ManualImport({
   customMiraklIntegrations = [],
   hasKauflandIntegration = false,
   hasEbayIntegration = false,
+  hasOttoIntegration = false,
+  hasDecathlonIntegration = false,
+  hasShopifyIntegration = false,
+  hasAboutYouIntegration = false,
 }: { 
   customMiraklIntegrations?: any[]
   hasKauflandIntegration?: boolean
   hasEbayIntegration?: boolean
+  hasOttoIntegration?: boolean
+  hasDecathlonIntegration?: boolean
+  hasShopifyIntegration?: boolean
+  hasAboutYouIntegration?: boolean
 }) {
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(true)
@@ -79,10 +87,10 @@ export function ManualImport({
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-900"
           >
             <option value="all">Alle Marktplätze</option>
-            <option value="otto">Otto</option>
-            <option value="aboutyou">About You</option>
-            <option value="shopify">Shopify</option>
-            <option value="mirakl_decathlon">Decathlon</option>
+            {hasOttoIntegration && <option value="otto">Otto</option>}
+            {hasAboutYouIntegration && <option value="aboutyou">About You</option>}
+            {hasShopifyIntegration && <option value="shopify">Shopify</option>}
+            {hasDecathlonIntegration && <option value="mirakl_decathlon">Decathlon</option>}
             {hasKauflandIntegration && <option value="kaufland">Kaufland</option>}
             {hasEbayIntegration && <option value="ebay">eBay</option>}
             {customMiraklIntegrations.map((integration) => {

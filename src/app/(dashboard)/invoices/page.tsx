@@ -48,14 +48,12 @@ export default async function InvoicesPage() {
         ne(invoices.status, 'draft')
       ))
       .orderBy(desc(invoices.createdAt)),
-    db
-      .select({
-        type: marketplaceIntegrations.type,
-        clientId: marketplaceIntegrations.clientId,
-        clientSecret: marketplaceIntegrations.clientSecret,
-      })
-      .from(marketplaceIntegrations)
-      .where(eq(marketplaceIntegrations.companyId, auth.activeCompanyId)),
+    db.query.marketplaceIntegrations.findMany({
+      where: and(
+        eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
+        eq(marketplaceIntegrations.isActive, true)
+      )
+    }),
     db
       .select({
         email: companies.email,
@@ -86,8 +84,17 @@ export default async function InvoicesPage() {
       .then(rows => rows[0] || null)
   ])
 
+  const customMiraklIntegrations = integrations.filter(i => i.type === 'mirakl_custom')
+
   const hasKauflandIntegration = integrations.some(i => i.type === 'kaufland' && i.clientId && i.clientSecret)
   const hasEbayIntegration = integrations.some(i => i.type === 'ebay' && i.clientId && i.clientSecret)
+  const hasOttoIntegration = integrations.some(i => i.type === 'otto' && i.clientId)
+  const hasAboutYouIntegration = integrations.some(i => i.type === 'aboutyou' && i.apiKey)
+  const hasDecathlonIntegration = integrations.some(i => i.type === 'mirakl_decathlon' && i.clientId)
+  const hasDecathlonEuIntegration = integrations.some(i => i.type === 'mirakl_decathlon_eu' && i.clientId)
+  const hasMediamarktIntegration = integrations.some(i => i.type === 'mirakl_mediamarkt' && i.clientId)
+  const hasAmazonIntegration = integrations.some(i => i.type === 'amazon' && i.refreshToken)
+  const hasShopifyIntegration = integrations.some(i => i.type === 'shopify' && i.accessToken)
 
   return (
     <div className="p-8">
@@ -115,6 +122,14 @@ export default async function InvoicesPage() {
         initialInvoices={allInvoices} 
         hasKauflandIntegration={hasKauflandIntegration}
         hasEbayIntegration={hasEbayIntegration}
+        hasOttoIntegration={hasOttoIntegration}
+        hasAboutYouIntegration={hasAboutYouIntegration}
+        hasDecathlonIntegration={hasDecathlonIntegration}
+        hasDecathlonEuIntegration={hasDecathlonEuIntegration}
+        hasMediamarktIntegration={hasMediamarktIntegration}
+        hasAmazonIntegration={hasAmazonIntegration}
+        hasShopifyIntegration={hasShopifyIntegration}
+        customMiraklIntegrations={customMiraklIntegrations}
         company={company ? { email: company.email, smtpSettings: company.smtpSettings } : undefined}
         initialEmailTemplate={emailTemplate}
         currentUserName={currentUser?.name || ''}

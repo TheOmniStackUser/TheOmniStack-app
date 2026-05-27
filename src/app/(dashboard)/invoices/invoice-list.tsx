@@ -126,6 +126,14 @@ export function InvoiceList({
   initialInvoices,
   hasKauflandIntegration = false,
   hasEbayIntegration = false,
+  hasOttoIntegration = false,
+  hasAboutYouIntegration = false,
+  hasDecathlonIntegration = false,
+  hasDecathlonEuIntegration = false,
+  hasMediamarktIntegration = false,
+  hasAmazonIntegration = false,
+  hasShopifyIntegration = false,
+  customMiraklIntegrations = [],
   company,
   initialEmailTemplate = null,
   currentUserName = '',
@@ -133,6 +141,14 @@ export function InvoiceList({
   initialInvoices: Invoice[]
   hasKauflandIntegration?: boolean
   hasEbayIntegration?: boolean
+  hasOttoIntegration?: boolean
+  hasAboutYouIntegration?: boolean
+  hasDecathlonIntegration?: boolean
+  hasDecathlonEuIntegration?: boolean
+  hasMediamarktIntegration?: boolean
+  hasAmazonIntegration?: boolean
+  hasShopifyIntegration?: boolean
+  customMiraklIntegrations?: any[]
   company?: {
     email: string | null
     smtpSettings: any
@@ -622,15 +638,23 @@ export function InvoiceList({
             className="px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px] text-sm text-slate-900 font-medium"
           >
             <option value="all">Alle Marktplätze</option>
-            <option value="otto">Otto</option>
-            <option value="aboutyou">About You</option>
-            <option value="mirakl_decathlon">Decathlon</option>
-            <option value="mirakl_decathlon_eu">Decathlon EU</option>
-            <option value="mirakl_mediamarkt">MediaMarkt</option>
-            <option value="amazon">Amazon</option>
-            <option value="shopify">Shopify</option>
+            {hasOttoIntegration && <option value="otto">Otto</option>}
+            {hasAboutYouIntegration && <option value="aboutyou">About You</option>}
+            {hasDecathlonIntegration && <option value="mirakl_decathlon">Decathlon</option>}
+            {hasDecathlonEuIntegration && <option value="mirakl_decathlon_eu">Decathlon EU</option>}
+            {hasMediamarktIntegration && <option value="mirakl_mediamarkt">MediaMarkt</option>}
+            {hasAmazonIntegration && <option value="amazon">Amazon</option>}
+            {hasShopifyIntegration && <option value="shopify">Shopify</option>}
             {hasKauflandIntegration && <option value="kaufland">Kaufland</option>}
             {hasEbayIntegration && <option value="ebay">eBay</option>}
+            {customMiraklIntegrations.map((integration) => {
+              const name = (integration.metadata as any)?.customName || 'Unbenannter Mirakl Marktplatz'
+              return (
+                <option key={integration.id} value={name.toLowerCase()}>
+                  {name}
+                </option>
+              )
+            })}
           </select>
 
           <div className="flex items-center gap-2">

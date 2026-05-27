@@ -415,26 +415,6 @@ export function SettingsForm({ company }: { company: Company }) {
         </div>
       </CollapsibleSection>
 
-
-
-      {/* --- Footer / Status --- */}
-      <div className="flex flex-col sm:flex-row items-center gap-4 pt-4 border-t border-gray-100">
-        <button
-          type="submit"
-          disabled={isPending}
-          className={`px-8 py-3 rounded-2xl font-bold text-white shadow-lg transition-all ${
-            isPending ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 hover:shadow-blue-500/30'
-          }`}
-        >
-          {isPending ? 'Speichert...' : 'Änderungen speichern'}
-        </button>
-
-        {state?.message && (
-          <div className={`text-sm font-medium px-4 py-2 rounded-lg ${state.success ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
-            {state.message}
-          </div>
-        )}
-      </div>
     </form>
   )
 }

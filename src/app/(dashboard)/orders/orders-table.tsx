@@ -307,6 +307,10 @@ export function OrdersTable({
   hasKauflandIntegration = false,
   hasEbayIntegration = false,
   hasAboutYouIntegration = false,
+  hasOttoIntegration = false,
+  hasDecathlonIntegration = false,
+  hasAmazonIntegration = false,
+  hasShopifyIntegration = false,
 }: { 
   orders: OrderWithItems[]
   hermesDefaultParcelClass?: string
@@ -315,6 +319,10 @@ export function OrdersTable({
   hasKauflandIntegration?: boolean
   hasEbayIntegration?: boolean
   hasAboutYouIntegration?: boolean
+  hasOttoIntegration?: boolean
+  hasDecathlonIntegration?: boolean
+  hasAmazonIntegration?: boolean
+  hasShopifyIntegration?: boolean
 }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
@@ -1307,10 +1315,10 @@ export function OrdersTable({
             className="px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[150px] text-gray-900 font-medium text-sm"
           >
             <option value="all">Alle Marktplätze</option>
-            <option value="otto">Otto</option>
-            <option value="mirakl_decathlon">Decathlon</option>
-            <option value="amazon">Amazon</option>
-            <option value="shopify">Shopify</option>
+            {hasOttoIntegration && <option value="otto">Otto</option>}
+            {hasDecathlonIntegration && <option value="mirakl_decathlon">Decathlon</option>}
+            {hasAmazonIntegration && <option value="amazon">Amazon</option>}
+            {hasShopifyIntegration && <option value="shopify">Shopify</option>}
             {hasAboutYouIntegration && <option value="aboutyou">About You</option>}
             {hasKauflandIntegration && <option value="kaufland">Kaufland</option>}
             {hasEbayIntegration && <option value="ebay">eBay</option>}

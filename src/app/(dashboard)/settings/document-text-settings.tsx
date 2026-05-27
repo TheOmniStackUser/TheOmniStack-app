@@ -118,6 +118,16 @@ export function DocumentTextSettings({ company }: { company: Company }) {
             <p className="text-xs text-gray-500">Wird bei internationalen Angeboten verwendet (falls Englisch gewählt).</p>
           </div>
         </div>
+
+        <div className="flex flex-col sm:flex-row items-center gap-4 pt-4 border-t border-gray-100 mt-2">
+          <button
+            type="submit"
+            form="settings-profile-form"
+            className="px-6 py-2.5 rounded-xl font-bold text-white text-sm shadow-md bg-blue-600 hover:bg-blue-700 hover:shadow-blue-500/20 transition-all cursor-pointer"
+          >
+            Änderungen speichern
+          </button>
+        </div>
       </div>
     </CollapsibleSection>
   )
