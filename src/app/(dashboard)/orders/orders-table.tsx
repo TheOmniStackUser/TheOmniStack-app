@@ -379,6 +379,24 @@ export function OrdersTable({
     setExpandedIds(next)
   }
 
+  const areAllExpanded = paginatedOrders.length > 0 && paginatedOrders.every(o => expandedIds.has(o.id))
+
+  const toggleExpandAll = () => {
+    if (areAllExpanded) {
+      setExpandedIds(prev => {
+        const next = new Set(prev)
+        paginatedOrders.forEach(o => next.delete(o.id))
+        return next
+      })
+    } else {
+      setExpandedIds(prev => {
+        const next = new Set(prev)
+        paginatedOrders.forEach(o => next.add(o.id))
+        return next
+      })
+    }
+  }
+
   // Helper: open a label — handles http URLs, data URIs, and raw base64 PDFs
 
 
@@ -735,9 +753,31 @@ export function OrdersTable({
     <div className="relative">
       <div>
       <div className="mb-4 flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
-        <p className="text-sm text-gray-500">
-          {selectedIds.size} von {filteredOrders.length} Bestellungen ausgewählt
-        </p>
+        <div className="flex items-center gap-4">
+          <p className="text-sm text-gray-500">
+            {selectedIds.size} von {filteredOrders.length} Bestellungen ausgewählt
+          </p>
+          <button
+            onClick={toggleExpandAll}
+            className="text-xs text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1.5 border border-blue-200 hover:bg-blue-50 px-2.5 py-1.5 rounded-md bg-white transition-all shadow-sm cursor-pointer"
+          >
+            {areAllExpanded ? (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7" />
+                </svg>
+                Details einklappen
+              </>
+            ) : (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                </svg>
+                Details aufklappen
+              </>
+            )}
+          </button>
+        </div>
         
         <div className="flex flex-wrap gap-2">
           {selectedIds.size > 0 && (
