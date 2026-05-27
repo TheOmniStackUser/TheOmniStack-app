@@ -4,7 +4,7 @@ import { db } from '@/db/client'
 import { orders, orderItems } from '@/db/schema/orders'
 import { requireAuth } from '@/lib/session'
 import { eq, and, desc, ne, isNull } from 'drizzle-orm'
-import { createInvoiceForOrder } from '@/lib/invoice-service'
+import { createInvoiceForOrder, formatDocumentNumber, getDefaultSettings } from '@/lib/invoice-service'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { companies } from '@/db/schema/companies'
@@ -104,12 +104,63 @@ export async function createManualInvoiceAction(data: {
       }
     }
 
+    // Fetch company to read documentNumberSettings
+    const [company] = await tx
+      .select()
+      .from(companies)
+      .where(eq(companies.id, companyId))
+      .for('update')
+
+    if (!company) throw new Error('Company not found')
+
+    let orderNumber = data.orderNumber?.trim()
+    if (!orderNumber) {
+      if (data.status === 'draft') {
+        orderNumber = `MAN-DRAFT-${Date.now()}`
+      } else {
+        const dbSettings = company.documentNumberSettings as any
+        const settingsKey = 'purchaseOrder'
+        const config = dbSettings?.[settingsKey] || getDefaultSettings(settingsKey, company)
+
+        if (config && config.auto) {
+          const nextNum = parseInt(config.next, 10) || 10001
+          const padding = config.padding || 5
+          const customerNumber = ''
+          orderNumber = formatDocumentNumber(
+            config.format || 'B-%nummer%',
+            nextNum,
+            padding,
+            customerNumber,
+            ''
+          )
+
+          // Increment document next number in settings
+          const updatedSettings = {
+            ...dbSettings,
+            [settingsKey]: {
+              ...config,
+              next: (nextNum + 1).toString()
+            }
+          }
+          await tx.update(companies)
+            .set({
+              documentNumberSettings: updatedSettings,
+              updatedAt: new Date()
+            })
+            .where(eq(companies.id, companyId))
+        } else {
+          // Fallback if not auto
+          orderNumber = `B-${Date.now()}`
+        }
+      }
+    }
+
     const [newOrder] = await tx
       .insert(orders)
       .values({
         companyId,
         marketplace: 'manual',
-        marketplaceOrderId: `MAN-${Date.now()}`,
+        marketplaceOrderId: orderNumber,
         marketplacePurchaseDate: data.orderDate || new Date(),
         status: data.status === 'draft' ? 'draft' : 'invoiced',
         buyerName: data.customer.name,
@@ -132,7 +183,7 @@ export async function createManualInvoiceAction(data: {
             shippingCountry: data.shippingCountry,
             destinationCountry: data.destinationCountry,
             taxCountry: data.taxCountry,
-            orderNumber: data.orderNumber,
+            orderNumber: orderNumber,
             orderDate: data.orderDate,
             buyerReference: data.buyerReference,
             externalId: data.externalId,
@@ -448,6 +499,117 @@ export async function convertQuoteAction(quoteId: string, targetType: 'invoice' 
     }
     console.error('[ConvertQuote] Error:', error)
     return { error: error.message || 'Fehler bei der Konvertierung' }
+  }
+}
+
+/**
+ * Converts a quote into a visible order (Bestellung) in the orders list.
+ * No invoice document is generated – the order appears directly under /orders.
+ */
+export async function convertQuoteToOrderAction(quoteId: string) {
+  try {
+    const auth = await requireAuth()
+    const companyId = auth.activeCompanyId
+
+    // 1. Fetch the quote
+    const quote = await db.query.invoices.findFirst({
+      where: and(
+        eq(invoices.id, quoteId),
+        eq(invoices.companyId, companyId),
+        eq(invoices.documentType, 'quote')
+      ),
+      with: { items: true }
+    })
+    if (!quote) throw new Error('Angebot nicht gefunden')
+
+    // 2. Fetch the linked (hidden) order
+    let linkedOrder = await db.query.orders.findFirst({
+      where: eq(orders.invoiceId, quoteId),
+      with: { items: true }
+    })
+
+    if (!linkedOrder) {
+      const potentialOrder = await db.query.orders.findFirst({
+        where: and(
+          isNull(orders.invoiceId),
+          eq(orders.marketplace, 'manual'),
+          eq(orders.buyerName, quote.recipientName || ''),
+          eq(orders.totalAmount, quote.totalAmount || '0.00')
+        ),
+        with: { items: true }
+      })
+      if (potentialOrder) {
+        await db.update(orders)
+          .set({ invoiceId: quoteId })
+          .where(eq(orders.id, potentialOrder.id))
+        linkedOrder = potentialOrder
+      }
+    }
+
+    if (!linkedOrder) throw new Error('Verknüpfte Bestellung nicht gefunden')
+
+    const subtotal = parseFloat(quote.subtotalAmount || '0')
+    const tax = parseFloat(quote.taxAmount || '0')
+    const total = parseFloat(quote.totalAmount || '0')
+
+    // 3. Create a new visible order (isArchived: false)
+    const [newOrder] = await db
+      .insert(orders)
+      .values({
+        companyId,
+        marketplace: 'manual',
+        marketplaceOrderId: `MAN-${Date.now()}`,
+        marketplacePurchaseDate: new Date(),
+        status: 'pending',
+        buyerName: quote.recipientName || '',
+        buyerEmail: quote.recipientEmail || undefined,
+        shippingName: quote.recipientName || '',
+        shippingStreet: quote.recipientStreet || '',
+        shippingZip: quote.recipientZip || '',
+        shippingCity: quote.recipientCity || '',
+        shippingCountry: quote.recipientCountry || 'DE',
+        currency: quote.currency || 'EUR',
+        subtotalAmount: subtotal.toFixed(2),
+        taxAmount: tax.toFixed(2),
+        totalAmount: total.toFixed(2),
+        isArchived: false, // visible in orders list
+        customerNumber: linkedOrder.customerNumber,
+        rawPayload: {
+          ...(linkedOrder.rawPayload as object || {}),
+          manualMetadata: {
+            ...((linkedOrder.rawPayload as any)?.manualMetadata || {}),
+            fromQuoteId: quoteId,
+            fromQuoteNumber: quote.invoiceNumber,
+          }
+        },
+      })
+      .returning({ id: orders.id })
+
+    // 4. Clone order items
+    if (linkedOrder.items && linkedOrder.items.length > 0) {
+      await db.insert(orderItems).values(
+        (linkedOrder.items as any[]).map((item: any) => ({
+          orderId: newOrder.id,
+          companyId,
+          title: item.title,
+          sku: item.sku,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          taxRate: item.taxRate,
+        }))
+      )
+    }
+
+    revalidatePath('/quotes')
+    revalidatePath('/orders')
+
+    redirect('/orders')
+  } catch (error: any) {
+    if (error.message === 'NEXT_REDIRECT' || error.digest?.includes('NEXT_REDIRECT')) {
+      throw error
+    }
+    console.error('[ConvertQuoteToOrder] Error:', error)
+    return { error: error.message || 'Fehler beim Erstellen der Bestellung' }
   }
 }
 
