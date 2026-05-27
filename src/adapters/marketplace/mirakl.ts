@@ -129,9 +129,25 @@ export class MiraklAdapter implements MarketplaceAdapter {
       }
 
       const data = JSON.parse(bodyText)
-      const rawOrders = data.orders || []
+      let rawOrders = data.orders || []
       
       console.log(`[MiraklAdapter:${this.marketplace}] Fetched ${rawOrders.length} raw orders.`)
+
+      // Filter orders by channel code if this instance is restricted to a specific country
+      const match = this.marketplace.match(/\s([a-z]{2})$/i)
+      if (match) {
+        const expectedChannel = match[1].toUpperCase()
+        rawOrders = rawOrders.filter((raw: any) => {
+          const channelCode = raw.channel?.code?.toUpperCase()
+          if (!channelCode) return false
+          return (
+            channelCode === expectedChannel ||
+            channelCode.endsWith('_' + expectedChannel) ||
+            channelCode.endsWith(expectedChannel)
+          )
+        })
+        console.log(`[MiraklAdapter:${this.marketplace}] Filtered orders by channel ${expectedChannel}: ${rawOrders.length} orders kept.`)
+      }
 
       // Auto-accept orders in WAITING_ACCEPTANCE state
       const waitingAcceptanceOrders = rawOrders.filter((raw: any) => raw.order_state === 'WAITING_ACCEPTANCE')

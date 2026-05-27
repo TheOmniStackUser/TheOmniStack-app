@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, Fragment } from 'react'
+import { useState, Fragment, ReactNode } from 'react'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
 import { generateHermesLabelsAction, generateDhlLabelsAction } from '@/app/actions/shipping'
@@ -178,7 +178,7 @@ const getMarketplaceBadgeStyle = (mp: string) => {
   }
 }
 
-const Tooltip = ({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) => {
+const Tooltip = ({ title, subtitle, children }: { title: string; subtitle: string; children: ReactNode }) => {
   return (
     <div className="relative group/tooltip flex items-center">
       <div className="cursor-help">
