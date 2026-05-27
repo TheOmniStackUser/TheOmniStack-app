@@ -297,7 +297,13 @@ function ProductRow({ product, onChange, onDelete }: { product: DhlProduct; onCh
 
 // ─── Main Form ────────────────────────────────────────────────────────────────
 
-export function DhlIntegrationForm({ initialConfig }: { initialConfig?: DhlConfig }) {
+export function DhlIntegrationForm({ 
+  initialConfig,
+  activeMarketplaces = []
+}: { 
+  initialConfig?: DhlConfig,
+  activeMarketplaces?: { key: string; label: string; type: string }[]
+}) {
   const [activeTab, setActiveTab] = useState<'connection' | 'general' | 'zones' | 'products' | 'returns'>('connection')
   const [state, formAction, pending] = useActionState(saveDhlIntegrationAction, undefined)
 
@@ -323,15 +329,29 @@ export function DhlIntegrationForm({ initialConfig }: { initialConfig?: DhlConfi
     { id: generateId(), productCode: 'V07PAK', name: 'DHL Retoure Online', returnType: '', exportAllowed: false, additionalServices: [] },
   ])
 
-  const DEFAULT_PLATFORM_RETURNS: DhlConfig['platformReturns'] = {
-    otto: 'enclosed_without_label',
-    amazon: 'online',
-    mirakl_decathlon: 'online',
-    shopify: 'none',
-    aboutyou: 'none',
+  const getInitialPlatformReturns = () => {
+    const defaults: Record<string, 'none' | 'online' | 'enclosed_with_label' | 'enclosed_without_label'> = {}
+    for (const mp of activeMarketplaces) {
+      if (['shopify', 'aboutyou'].includes(mp.key)) {
+        defaults[mp.key] = 'none'
+      } else {
+        defaults[mp.key] = 'online'
+      }
+    }
+    // Hardcoded defaults
+    defaults.otto = 'enclosed_without_label'
+    defaults.amazon = 'online'
+    defaults.mirakl_decathlon = 'online'
+    defaults.shopify = 'none'
+    defaults.aboutyou = 'none'
+
+    if (initialConfig?.platformReturns) {
+      return { ...defaults, ...initialConfig.platformReturns }
+    }
+    return defaults
   }
   const [platformReturns, setPlatformReturns] = useState<DhlConfig['platformReturns']>(
-    initialConfig?.platformReturns ?? DEFAULT_PLATFORM_RETURNS
+    getInitialPlatformReturns()
   )
 
   const updateZone = (id: string, updated: DhlShippingZone) => {
@@ -687,14 +707,19 @@ export function DhlIntegrationForm({ initialConfig }: { initialConfig?: DhlConfi
             <p>Lege hier fest, welche <strong>Retourenmethode</strong> für jede Plattform verwendet werden soll. Manche Plattformen (z. B. Otto) stellen das Retouren-Label selbst bereit – hier genügt ein beiliegender Retourenschein ohne Label.</p>
           </div>
 
-          {([
-            { key: 'otto',             label: 'Otto',              icon: '🟥', hint: 'Otto-Kunden drucken das Label über das Otto-Portal – kein eigenes Label nötig.' },
-            { key: 'amazon',           label: 'Amazon',            icon: '🟧', hint: 'Amazon bietet ein eigenes Retouren-Portal an.' },
-            { key: 'mirakl_decathlon', label: 'Decathlon (Mirakl)', icon: '🟦', hint: '' },
-            { key: 'shopify',          label: 'Shopify',           icon: '🟩', hint: '' },
-            { key: 'aboutyou',         label: 'About You',         icon: '⬜', hint: '' },
-          ] as const).map(({ key, label, icon, hint }) => {
+          {activeMarketplaces.map(({ key, label, type }) => {
+            const icon = type === 'otto' ? '🟥' :
+                         type === 'amazon' ? '🟧' :
+                         type === 'shopify' ? '🟩' :
+                         type === 'aboutyou' ? '⬜' :
+                         type === 'kaufland' ? '🟥' :
+                         type === 'ebay' ? '🟨' : '🟦'
             const value = platformReturns[key] ?? (['shopify', 'aboutyou'].includes(key) ? 'none' : 'online')
+            
+            let hint = ''
+            if (type === 'otto') hint = 'Otto-Kunden drucken das Label über das Otto-Portal – kein eigenes Label nötig.'
+            else if (type === 'amazon') hint = 'Amazon bietet ein eigenes Retouren-Portal an.'
+
             return (
               <div key={key} className="bg-white rounded-xl border border-gray-200 p-5">
                 <div className="flex items-center gap-3 mb-4">

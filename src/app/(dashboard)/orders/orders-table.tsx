@@ -7,10 +7,10 @@ import { generateHermesLabelsAction, generateDhlLabelsAction } from '@/app/actio
 import { archiveOrderAction, archiveOrdersBulkAction, updateOrderStatusAction, updateOrderAddressAction, generateOrDownloadInvoicesBulkAction } from '@/app/actions/orders'
 import { getInvoiceDownloadUrl } from '@/app/actions/invoices'
 import type { Order, OrderItem } from '@/db/schema/orders'
-import type { Invoice } from '@/db/schema/invoices'
+import type { Invoice, InvoiceLog } from '@/db/schema/invoices'
 import type { DhlConfig } from '@/app/(dashboard)/integrations/dhl-form'
 
-export type OrderWithItems = Order & { items: OrderItem[], invoice?: Invoice | null }
+export type OrderWithItems = Order & { items: OrderItem[], invoice?: (Invoice & { logs?: InvoiceLog[] }) | null }
 
 const formatCountry = (code?: string | null) => {
   if (!code) return 'DE'
@@ -178,6 +178,127 @@ const getMarketplaceBadgeStyle = (mp: string) => {
   }
 }
 
+const Tooltip = ({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) => {
+  return (
+    <div className="relative group/tooltip flex items-center">
+      <div className="cursor-help">
+        {children}
+      </div>
+      <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 hidden group-hover/tooltip:block bg-white text-slate-800 text-xs px-3 py-2 rounded-xl shadow-[0_10px_25px_-5px_rgba(0,0,0,0.1),_0_8px_10px_-6px_rgba(0,0,0,0.1)] border border-slate-100 whitespace-nowrap z-[100] transition-all duration-200 min-w-[120px] text-center">
+        <div className="font-bold text-slate-900 leading-tight">{title}</div>
+        {subtitle && <div className="text-[10px] text-slate-500 font-medium mt-0.5 leading-normal">{subtitle}</div>}
+        {/* Tooltip triangle */}
+        <div className="absolute top-full left-1/2 -translate-x-1/2 border-[5px] border-transparent border-t-white"></div>
+        {/* Tooltip triangle shadow/border */}
+        <div className="absolute top-full left-1/2 -translate-x-1/2 border-[5px] border-transparent border-t-slate-100 -z-10 mt-[0.5px]"></div>
+      </div>
+    </div>
+  )
+}
+
+const renderOrderProgress = (order: OrderWithItems) => {
+  // 1. Ordered (Bestellt)
+  const orderedDate = order.marketplacePurchaseDate || order.createdAt
+  const orderedDateStr = orderedDate ? format(new Date(orderedDate), 'dd.MM.yyyy HH:mm', { locale: de }) : '—'
+  const isOrderedActive = true
+
+  // 2. Paid (Bezahlt)
+  const isMarketplacePrepaid = ['otto', 'amazon', 'mirakl_decathlon', 'mirakl_decathlon_eu', 'mirakl_mediamarkt', 'aboutyou', 'kaufland', 'ebay'].includes(order.marketplace)
+  const isShopifyPaid = order.marketplace === 'shopify' && ((order.rawPayload as any)?.financial_status === 'paid' || (order.rawPayload as any)?.financial_status === undefined)
+  const paymentLog = order.invoice?.logs?.find((l: any) => l.action === 'payment')
+  const isInvoicePaid = !!paymentLog
+  const isPaidActive = isMarketplacePrepaid || isShopifyPaid || isInvoicePaid
+
+  let paidTooltipTitle = "Zahlung ausstehend"
+  let paidTooltipSubtitle = "Zahlung offen"
+  if (isPaidActive) {
+    paidTooltipTitle = "Zahlung erhalten"
+    if (paymentLog) {
+      const paymentDate = paymentLog.createdAt ? format(new Date(paymentLog.createdAt), 'dd.MM.yyyy HH:mm', { locale: de }) : ''
+      paidTooltipSubtitle = `Zahlung erfasst am ${paymentDate}`
+    } else if (isMarketplacePrepaid) {
+      paidTooltipSubtitle = `Zahlung über ${formatMarketplaceName(order.marketplace, order.shippingCountry)}`
+    } else if (order.marketplace === 'shopify') {
+      paidTooltipSubtitle = "Zahlung über Shopify abgewickelt"
+    } else {
+      paidTooltipSubtitle = "Zahlung abgeschlossen"
+    }
+  }
+
+  // 3. Shipped (Versendet)
+  const isShippedActive = order.status === 'shipped'
+  const shippedDate = isShippedActive ? order.updatedAt : null
+  const shippedDateStr = shippedDate ? format(new Date(shippedDate), 'dd.MM.yyyy', { locale: de }) : ''
+  const shippedTooltipTitle = isShippedActive ? "Versendet" : "Versand ausstehend"
+  const shippedTooltipSubtitle = isShippedActive ? `Versendet am ${shippedDateStr}` : "Noch nicht versendet"
+
+  // 4. Invoice (Rechnung)
+  const isInvoiceActive = !!order.invoiceId
+  const invoiceNumber = order.invoice?.invoiceNumber
+  const invoiceDate = order.invoice?.issuedAt || order.invoice?.createdAt
+  const invoiceDateStr = invoiceDate ? format(new Date(invoiceDate), 'dd.MM.yyyy', { locale: de }) : ''
+  const invoiceTooltipTitle = isInvoiceActive ? "Rechnung erstellt" : "Rechnung ausstehend"
+  const invoiceTooltipSubtitle = isInvoiceActive ? `Nr. ${invoiceNumber} vom ${invoiceDateStr}` : "Rechnung fehlt"
+
+  // 5. Shipping Label (Versandlabel)
+  const isLabelActive = !!order.labelUrl
+  const labelTooltipTitle = isLabelActive ? "Versandlabel erstellt" : "Kein Versandlabel"
+  const labelTooltipSubtitle = isLabelActive ? "Etikett generiert" : "Kein Label vorhanden"
+
+  const getIconClass = (isActive: boolean) => isActive ? 'text-emerald-500 hover:text-emerald-600 transition-colors' : 'text-gray-300 hover:text-gray-400 transition-colors'
+
+  return (
+    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+      {/* 1. Bestellt */}
+      <Tooltip title="Bestellt" subtitle={`Bestellt am ${orderedDateStr}`}>
+        <svg className={`w-5 h-5 ${getIconClass(isOrderedActive)}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="9" cy="21" r="1" />
+          <circle cx="20" cy="21" r="1" />
+          <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+        </svg>
+      </Tooltip>
+
+      {/* 2. Bezahlt */}
+      <Tooltip title={paidTooltipTitle} subtitle={paidTooltipSubtitle}>
+        <svg className={`w-5 h-5 ${getIconClass(isPaidActive)}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="6" width="20" height="12" rx="2" />
+          <circle cx="12" cy="12" r="2" />
+          <path d="M6 12h.01M18 12h.01" />
+        </svg>
+      </Tooltip>
+
+      {/* 3. Versendet */}
+      <Tooltip title={shippedTooltipTitle} subtitle={shippedTooltipSubtitle}>
+        <svg className={`w-5 h-5 ${getIconClass(isShippedActive)}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="7" width="13" height="10" rx="1" />
+          <polygon points="15 8 19 8 22 11 22 17 15 17 15 8" />
+          <circle cx="7" cy="17" r="2" />
+          <circle cx="17" cy="17" r="2" />
+        </svg>
+      </Tooltip>
+
+      {/* 4. Rechnung */}
+      <Tooltip title={invoiceTooltipTitle} subtitle={invoiceTooltipSubtitle}>
+        <svg className={`w-5 h-5 ${getIconClass(isInvoiceActive)}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+          <line x1="16" y1="13" x2="8" y2="13" />
+          <line x1="16" y1="17" x2="8" y2="17" />
+          <polyline points="10 9 9 9 8 9" />
+        </svg>
+      </Tooltip>
+
+      {/* 5. Versandlabel */}
+      <Tooltip title={labelTooltipTitle} subtitle={labelTooltipSubtitle}>
+        <svg className={`w-5 h-5 ${getIconClass(isLabelActive)}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" />
+          <path d="M7 7h.01" />
+        </svg>
+      </Tooltip>
+    </div>
+  )
+}
+
 export function OrdersTable({ 
   orders, 
   hermesDefaultParcelClass = 'XS',
@@ -271,6 +392,7 @@ export function OrdersTable({
     fromDate: '',
     toDate: '',
     invoiceFilter: 'all',
+    dateType: 'purchase',
   })
 
   // Draft Filters (The state while typing/selecting)
@@ -281,10 +403,29 @@ export function OrdersTable({
   const [draftFromDate, setDraftFromDate] = useState('')
   const [draftToDate, setDraftToDate] = useState('')
   const [draftInvoiceFilter, setDraftInvoiceFilter] = useState('all')
+  const [draftDateType, setDraftDateType] = useState('purchase')
 
   // Pagination
   const [pageSize, setPageSize] = useState(25)
   const [currentPage, setCurrentPage] = useState(1)
+
+  // Sorting
+  const [sortField, setSortField] = useState<string | null>(null)
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | null>(null)
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      if (sortDirection === 'asc') {
+        setSortDirection('desc')
+      } else if (sortDirection === 'desc') {
+        setSortField(null)
+        setSortDirection(null)
+      }
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
 
   const handleApplyFilters = () => {
     setActiveFilters({
@@ -295,6 +436,7 @@ export function OrdersTable({
       fromDate: draftFromDate,
       toDate: draftToDate,
       invoiceFilter: draftInvoiceFilter,
+      dateType: draftDateType,
     })
     setCurrentPage(1)
   }
@@ -307,6 +449,7 @@ export function OrdersTable({
     setDraftFromDate('')
     setDraftToDate('')
     setDraftInvoiceFilter('all')
+    setDraftDateType('purchase')
     setActiveFilters({
       search: '',
       marketplace: 'all',
@@ -315,7 +458,10 @@ export function OrdersTable({
       fromDate: '',
       toDate: '',
       invoiceFilter: 'all',
+      dateType: 'purchase',
     })
+    setSortField(null)
+    setSortDirection(null)
     setCurrentPage(1)
   }
 
@@ -363,18 +509,29 @@ export function OrdersTable({
     }
     // Filter by Date Range
     if (activeFilters.fromDate || activeFilters.toDate) {
-      const orderDate = order.marketplacePurchaseDate ? new Date(order.marketplacePurchaseDate) : null
-      if (!orderDate) return false
+      let targetDate: Date | null = null
+      if (activeFilters.dateType === 'invoice') {
+        const rawDate = order.invoice?.issuedAt || order.invoice?.createdAt
+        targetDate = rawDate ? new Date(rawDate) : null
+      } else if (activeFilters.dateType === 'shipping') {
+        const rawDate = order.status === 'shipped' ? order.updatedAt : null
+        targetDate = rawDate ? new Date(rawDate) : null
+      } else {
+        const rawDate = order.marketplacePurchaseDate || order.createdAt
+        targetDate = rawDate ? new Date(rawDate) : null
+      }
+
+      if (!targetDate) return false
       
       if (activeFilters.fromDate) {
         const start = new Date(activeFilters.fromDate)
         start.setHours(0, 0, 0, 0)
-        if (orderDate < start) return false
+        if (targetDate < start) return false
       }
       if (activeFilters.toDate) {
         const end = new Date(activeFilters.toDate)
         end.setHours(23, 59, 59, 999)
-        if (orderDate > end) return false
+        if (targetDate > end) return false
       }
     }
     // Filter by Country
@@ -405,6 +562,99 @@ export function OrdersTable({
     return true
   })
 
+  // Sort orders if sorting is active
+  const sortedOrders = [...filteredOrders].sort((a, b) => {
+    if (!sortField || !sortDirection) return 0
+
+    let valA: any = null
+    let valB: any = null
+
+    switch (sortField) {
+      case 'bestelldatum': {
+        const dateA = a.marketplacePurchaseDate ? new Date(a.marketplacePurchaseDate).getTime() : new Date(a.createdAt).getTime()
+        const dateB = b.marketplacePurchaseDate ? new Date(b.marketplacePurchaseDate).getTime() : new Date(b.createdAt).getTime()
+        valA = dateA
+        valB = dateB
+        break
+      }
+      case 'marketplace':
+        valA = formatMarketplaceName(a.marketplace, a.shippingCountry).toLowerCase()
+        valB = formatMarketplaceName(b.marketplace, b.shippingCountry).toLowerCase()
+        break
+      case 'status':
+        valA = (a.status === 'later_shipment' ? 'Later Shipment' : (a.status || '')).toLowerCase()
+        valB = (b.status === 'later_shipment' ? 'Later Shipment' : (b.status || '')).toLowerCase()
+        break
+      case 'orderNumber': {
+        // @ts-ignore
+        const numA = String(a.rawPayload?.orderNumber || a.marketplaceOrderId)
+        // @ts-ignore
+        const numB = String(b.rawPayload?.orderNumber || b.marketplaceOrderId)
+        valA = numA
+        valB = numB
+        break
+      }
+      case 'kunde': {
+        // @ts-ignore
+        valA = String(a.buyerName || a.buyer?.name || '').toLowerCase()
+        // @ts-ignore
+        valB = String(b.buyerName || b.buyer?.name || '').toLowerCase()
+        break
+      }
+      case 'land': {
+        const getCountryCode = (raw?: string | null) => {
+          if (!raw) return ''
+          const clean = raw.toUpperCase()
+          const iso3to2: Record<string, string> = {
+            DEU: 'DE', AUT: 'AT', CHE: 'CH', FRA: 'FR', NLD: 'NL',
+            BEL: 'BE', POL: 'PL', CZE: 'CZ', SVK: 'SK', LUX: 'LU',
+            ITA: 'IT', ESP: 'ES', GBR: 'GB', USA: 'US', CHN: 'CN',
+          }
+          return clean.length === 3 ? (iso3to2[clean] ?? clean.slice(0, 2)) : clean
+        }
+        valA = getCountryCode(a.shippingCountry)
+        valB = getCountryCode(b.shippingCountry)
+        break
+      }
+      case 'versanddatum': {
+        const dateA = a.status === 'shipped' ? new Date(a.updatedAt).getTime() : null
+        const dateB = b.status === 'shipped' ? new Date(b.updatedAt).getTime() : null
+        valA = dateA
+        valB = dateB
+        break
+      }
+      case 'rechnungsdatum': {
+        const dateA = a.invoice ? new Date(a.invoice.issuedAt || a.invoice.createdAt).getTime() : null
+        const dateB = b.invoice ? new Date(b.invoice.issuedAt || b.invoice.createdAt).getTime() : null
+        valA = dateA
+        valB = dateB
+        break
+      }
+      case 'umsatz':
+        valA = Number(a.totalAmount) || 0
+        valB = Number(b.totalAmount) || 0
+        break
+      default:
+        return 0
+    }
+
+    const isEmpty = (val: any) => val === null || val === undefined || val === ''
+    const isEmptyA = isEmpty(valA)
+    const isEmptyB = isEmpty(valB)
+
+    if (isEmptyA && isEmptyB) return 0
+    if (isEmptyA) return 1
+    if (isEmptyB) return -1
+
+    if (typeof valA === 'number' && typeof valB === 'number') {
+      return sortDirection === 'asc' ? valA - valB : valB - valA
+    }
+
+    return sortDirection === 'asc'
+      ? String(valA).localeCompare(String(valB), 'de', { numeric: true, sensitivity: 'base' })
+      : String(valB).localeCompare(String(valA), 'de', { numeric: true, sensitivity: 'base' })
+  })
+
   // Get unique countries for filter
   const uniqueCountries = Array.from(new Set(orders.map(o => {
     const raw = (o.shippingCountry || '').toUpperCase()
@@ -417,8 +667,8 @@ export function OrdersTable({
   }))).filter(Boolean).sort()
 
   // Pagination Logic
-  const totalPages = Math.ceil(filteredOrders.length / pageSize)
-  const paginatedOrders = filteredOrders.slice(
+  const totalPages = Math.ceil(sortedOrders.length / pageSize)
+  const paginatedOrders = sortedOrders.slice(
     (currentPage - 1) * pageSize,
     currentPage * pageSize
   )
@@ -835,6 +1085,40 @@ export function OrdersTable({
   const selectedWithoutInvoice = Array.from(selectedIds)
     .filter(id => !orders.find(o => o.id === id)?.invoiceId).length
 
+  const renderSortableHeader = (label: string, field: string, align: 'left' | 'right' = 'left') => {
+    const isSorted = sortField === field
+    return (
+      <th
+        scope="col"
+        onClick={() => handleSort(field)}
+        className={`px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 hover:text-gray-700 select-none transition-colors group ${
+          align === 'right' ? 'text-right' : 'text-left'
+        }`}
+      >
+        <div className={`flex items-center gap-1.5 ${align === 'right' ? 'justify-end' : ''}`}>
+          <span>{label}</span>
+          <span className="inline-flex items-center">
+            {isSorted ? (
+              sortDirection === 'asc' ? (
+                <svg className="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 15l7-7 7 7" />
+                </svg>
+              ) : (
+                <svg className="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
+                </svg>
+              )
+            ) : (
+              <svg className="w-3.5 h-3.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
+              </svg>
+            )}
+          </span>
+        </div>
+      </th>
+    )
+  }
+
   return (
     <div className="relative">
       <div>
@@ -1074,6 +1358,16 @@ export function OrdersTable({
             <option value="without_invoice">Ohne Rechnung</option>
           </select>
 
+          <select
+            value={draftDateType}
+            onChange={(e) => setDraftDateType(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[150px] text-gray-900 font-medium text-sm"
+          >
+            <option value="purchase">Bestelldatum</option>
+            <option value="invoice">Rechnungsdatum</option>
+            <option value="shipping">Versanddatum</option>
+          </select>
+
           <div className="flex items-center gap-2">
             <input
               type="date"
@@ -1118,7 +1412,7 @@ export function OrdersTable({
             {orders.length === 0 ? 'Noch keine Bestellungen importiert.' : 'Keine Bestellungen entsprechen den Filtern.'}
           </div>
         ) : (
-          <table className="min-w-[1400px] w-full divide-y divide-gray-200">
+          <table className="min-w-[1500px] w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1129,15 +1423,16 @@ export function OrdersTable({
                     onChange={toggleAll}
                   />
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bestelldatum</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Marktplatz</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bestellnummer</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kunde</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Land</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rechnungsdatum</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Versanddatum</th>
-                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Umsatz</th>
+                {renderSortableHeader('Bestelldatum', 'bestelldatum')}
+                {renderSortableHeader('Marktplatz', 'marketplace')}
+                {renderSortableHeader('Status', 'status')}
+                {renderSortableHeader('Bestellnummer', 'orderNumber')}
+                {renderSortableHeader('Kunde', 'kunde')}
+                {renderSortableHeader('Land', 'land')}
+                {renderSortableHeader('Versanddatum', 'versanddatum')}
+                {renderSortableHeader('Rechnungsdatum', 'rechnungsdatum')}
+                {renderSortableHeader('Umsatz', 'umsatz', 'right')}
+                <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Verlauf</th>
                 <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50 shadow-[-4px_0_4px_-2px_rgba(0,0,0,0.05)]">Aktion</th>
               </tr>
             </thead>
@@ -1218,9 +1513,6 @@ export function OrdersTable({
                         })()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500" suppressHydrationWarning>
-                        {formattedRechnungsDate}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500" suppressHydrationWarning>
                         <div>{formattedVersandDate}</div>
                         {order.trackingNumber && (
                           <div className="mt-1">
@@ -1240,8 +1532,14 @@ export function OrdersTable({
                           </div>
                         )}
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500" suppressHydrationWarning>
+                        {formattedRechnungsDate}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">
                         {formattedTotal}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {renderOrderProgress(order)}
                       </td>
                       <td className={`px-6 py-4 whitespace-nowrap text-right text-sm font-medium sticky right-0 transition-colors shadow-[-4px_0_4px_-2px_rgba(0,0,0,0.05)] ${
                         isSelected 
@@ -1265,7 +1563,7 @@ export function OrdersTable({
                     
                     {isExpanded && (
                       <tr className="bg-gray-50 border-t border-b border-gray-100">
-                        <td colSpan={11} className="px-6 py-6">
+                        <td colSpan={12} className="px-6 py-6">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                             {/* Addresses & Info */}
                             <div>

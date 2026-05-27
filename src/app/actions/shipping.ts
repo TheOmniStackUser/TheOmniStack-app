@@ -58,6 +58,12 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
       const adapter = getAdapterForIntegration(integration)
       if (adapter) {
         adaptersMap.set(integration.type, adapter)
+        if (integration.type === 'mirakl_custom') {
+          const customName = (integration.metadata as any)?.customName
+          if (customName) {
+            adaptersMap.set(customName.toLowerCase(), adapter)
+          }
+        }
       }
     }
 
@@ -342,6 +348,12 @@ export async function generateDhlLabelsAction(
       const adapter = getAdapterForIntegration(integration)
       if (adapter) {
         adaptersMap.set(integration.type, adapter)
+        if (integration.type === 'mirakl_custom') {
+          const customName = (integration.metadata as any)?.customName
+          if (customName) {
+            adaptersMap.set(customName.toLowerCase(), adapter)
+          }
+        }
       }
     }
 

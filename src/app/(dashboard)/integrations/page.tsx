@@ -62,6 +62,32 @@ export default async function IntegrationsPage(props: {
       }
     })
 
+  const activeMarketplacesList = integrations
+    .filter((i) => i.isActive && i.type !== 'dhl' && i.type !== 'hermes')
+    .map((i) => {
+      const key = i.type === 'mirakl_custom'
+        ? ((i.metadata as any)?.customName || '').toLowerCase()
+        : i.type
+
+      let label: string = i.type
+      if (i.type === 'otto') label = 'Otto.de'
+      else if (i.type === 'amazon') label = 'Amazon EU'
+      else if (i.type === 'shopify') label = 'Shopify'
+      else if (i.type === 'aboutyou') label = 'About You'
+      else if (i.type === 'kaufland') label = 'Kaufland'
+      else if (i.type === 'ebay') label = 'eBay'
+      else if (i.type === 'mirakl_decathlon') label = 'Decathlon (Mirakl)'
+      else if (i.type === 'mirakl_custom') {
+        label = (i.metadata as any)?.customName || 'Anderer Mirakl Marktplatz'
+      }
+
+      return {
+        key,
+        label,
+        type: i.type,
+      }
+    })
+
   const ottoIntegration = integrations.find((i: any) => i.type === 'otto')
   const customMiraklIntegrations = integrations.filter((i: any) => i.type === 'mirakl_custom')
 
@@ -439,6 +465,7 @@ export default async function IntegrationsPage(props: {
               <div className="p-6 bg-gray-50">
                 <DhlIntegrationForm
                   initialConfig={(integrations.find((i: any) => i.type === 'dhl')?.metadata as DhlConfig) ?? undefined}
+                  activeMarketplaces={activeMarketplacesList}
                 />
               </div>
             </CollapsibleSection>
@@ -467,6 +494,7 @@ export default async function IntegrationsPage(props: {
                 <HermesIntegrationForm 
                   initialClientId={integrations.find((i: any) => i.type === 'hermes')?.clientId || ''}
                   initialConfig={(integrations.find((i: any) => i.type === 'hermes')?.metadata as any) ?? undefined}
+                  activeMarketplaces={activeMarketplacesList}
                 />
               </div>
             </CollapsibleSection>

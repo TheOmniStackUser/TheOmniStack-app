@@ -21,7 +21,11 @@ export default async function OrdersPage() {
       orderBy: [desc(orders.marketplacePurchaseDate)],
       with: {
         items: true,
-        invoice: true
+        invoice: {
+          with: {
+            logs: true
+          }
+        }
       }
     }),
     db.query.marketplaceIntegrations.findFirst({

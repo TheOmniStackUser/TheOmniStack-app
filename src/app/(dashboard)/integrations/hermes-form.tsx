@@ -11,10 +11,12 @@ export type HermesConfig = {
 
 export function HermesIntegrationForm({ 
   initialClientId,
-  initialConfig 
+  initialConfig,
+  activeMarketplaces = []
 }: { 
   initialClientId: string,
-  initialConfig?: HermesConfig
+  initialConfig?: HermesConfig,
+  activeMarketplaces?: { key: string; label: string; type: string }[]
 }) {
   const [activeTab, setActiveTab] = useState<'connection' | 'returns' | 'settings'>('connection')
   const [state, action, pending] = useActionState(saveHermesIntegrationAction, undefined)
@@ -22,16 +24,26 @@ export function HermesIntegrationForm({
   const [testStatus, setTestStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle')
   const [testMessage, setTestMessage] = useState('')
 
-  const DEFAULT_PLATFORM_RETURNS: HermesConfig['platformReturns'] = {
-    otto: 'none',
-    amazon: 'none',
-    mirakl_decathlon: 'none',
-    shopify: 'none',
-    aboutyou: 'none',
+  const getInitialPlatformReturns = () => {
+    const defaults: Record<string, 'none' | 'enclosed' | 'virtual'> = {}
+    for (const mp of activeMarketplaces) {
+      defaults[mp.key] = 'none'
+    }
+    // Hardcoded defaults
+    defaults.otto = 'none'
+    defaults.amazon = 'none'
+    defaults.mirakl_decathlon = 'none'
+    defaults.shopify = 'none'
+    defaults.aboutyou = 'none'
+
+    if (initialConfig?.platformReturns) {
+      return { ...defaults, ...initialConfig.platformReturns }
+    }
+    return defaults
   }
 
   const [platformReturns, setPlatformReturns] = useState<HermesConfig['platformReturns']>(
-    initialConfig?.platformReturns ?? DEFAULT_PLATFORM_RETURNS
+    getInitialPlatformReturns()
   )
   const [defaultParcelClass, setDefaultParcelClass] = useState<string>(
     initialConfig?.defaultParcelClass ?? 'XS'
@@ -197,13 +209,13 @@ export function HermesIntegrationForm({
             <p>Wähle aus, wie Retouren für den jeweiligen Marktplatz gehandhabt werden sollen.</p>
           </div>
 
-          {([
-            { key: 'otto',             label: 'Otto',              icon: '🟥' },
-            { key: 'amazon',           label: 'Amazon',            icon: '🟧' },
-            { key: 'mirakl_decathlon', label: 'Decathlon (Mirakl)', icon: '🟦' },
-            { key: 'shopify',          label: 'Shopify',           icon: '🟩' },
-            { key: 'aboutyou',         label: 'About You',         icon: '⬜' },
-          ] as const).map(({ key, label, icon }) => {
+          {activeMarketplaces.map(({ key, label, type }) => {
+            const icon = type === 'otto' ? '🟥' :
+                         type === 'amazon' ? '🟧' :
+                         type === 'shopify' ? '🟩' :
+                         type === 'aboutyou' ? '⬜' :
+                         type === 'kaufland' ? '🟥' :
+                         type === 'ebay' ? '🟨' : '🟦'
             const value = platformReturns[key] ?? 'none'
             return (
               <div key={key} className="bg-white rounded-xl border border-gray-200 p-4">

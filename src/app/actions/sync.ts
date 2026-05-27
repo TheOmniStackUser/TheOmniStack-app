@@ -40,9 +40,10 @@ export async function triggerSyncAction() {
         companyId: auth.activeCompanyId,
         marketplace: integration.type as any,
         triggeredByUserId: auth.userId,
+        integrationId: integration.id,
       },
       {
-        jobId: `sync-${integration.type}-${auth.activeCompanyId}-${Date.now()}` // Prevent exact duplicates
+        jobId: `sync-${integration.type}-${integration.id}-${auth.activeCompanyId}-${Date.now()}` // Prevent exact duplicates
       }
     )
   }
