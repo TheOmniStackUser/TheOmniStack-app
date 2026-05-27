@@ -60,6 +60,23 @@ export async function updateOrderStatusAction(orderId: string, status: any) {
   try {
     const auth = await requireAuth()
 
+    if (status === 'invoiced') {
+      const [currentOrder] = await db
+        .select({ status: orders.status })
+        .from(orders)
+        .where(
+          and(
+            eq(orders.id, orderId),
+            eq(orders.companyId, auth.activeCompanyId)
+          )
+        )
+        .limit(1)
+
+      if (currentOrder && currentOrder.status === 'shipped') {
+        return { error: 'Der Status "versendet" darf nicht mit "invoiced" überschrieben werden.' }
+      }
+    }
+
     await db
       .update(orders)
       .set({ 

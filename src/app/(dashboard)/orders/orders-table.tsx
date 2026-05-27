@@ -92,6 +92,68 @@ const formatMarketplaceName = (mp: string | null, shippingCountry?: string | nul
   return resolvedName
 }
 
+const formatDate = (dateInput: Date | string | null | undefined, includeTime = false) => {
+  if (!dateInput) return '—'
+  try {
+    const formatter = new Intl.DateTimeFormat('de-DE', {
+      timeZone: 'Europe/Berlin',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      ...(includeTime ? {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      } : {})
+    })
+    const parts = formatter.formatToParts(new Date(dateInput))
+    const day = parts.find(p => p.type === 'day')?.value
+    const month = parts.find(p => p.type === 'month')?.value
+    const year = parts.find(p => p.type === 'year')?.value
+    if (includeTime) {
+      const hour = parts.find(p => p.type === 'hour')?.value
+      const minute = parts.find(p => p.type === 'minute')?.value
+      return `${day}.${month}.${year} ${hour}:${minute}`
+    }
+    return `${day}.${month}.${year}`
+  } catch (e) {
+    return '—'
+  }
+}
+
+const getTrackingUrl = (trackingNumber: string): string => {
+  const clean = trackingNumber.trim().replace(/\s+/g, '')
+  const upper = clean.toUpperCase()
+
+  // 1. UPS (typically starts with 1Z and has 18 characters)
+  if (/^1Z[A-Z0-9]{16}$/.test(upper)) {
+    return `https://www.ups.com/track?loc=de_DE&requester=ST&trackNums=${clean}/trackdetails`
+  }
+
+  // 2. Hermes (starts with H, starts with HERMES-, or is exactly 14 digits)
+  if (
+    upper.startsWith('HERMES-') ||
+    /^H\d{19}$/.test(upper) ||
+    /^\d{14}$/.test(upper)
+  ) {
+    return `https://www.myhermes.de/empfangen/sendungsverfolgung/details/${clean}`
+  }
+
+  // 3. DPD (typically 11, 14, or 15 digits)
+  if (/^\d{11}$/.test(upper) || /^\d{15}$/.test(upper)) {
+    return `https://tracking.dpd.de/status/de_DE/parcel/${clean}`
+  }
+
+  // 4. GLS (typically 11 or 12 digits, or 9 alphanumeric characters)
+  if (/^[A-Z0-9]{9}$/.test(upper) || /^\d{11}$/.test(upper)) {
+    return `https://www.gls-pakete.de/sendungsverfolgung?match=${clean}`
+  }
+
+  // 5. DHL / Deutsche Post (default/fallback since it's the most common)
+  return `https://www.dhl.de/de/privatkunden/pakete-empfangen/verfolgen.html?piececode=${clean}`
+}
+
+
 const getMarketplaceBadgeStyle = (mp: string) => {
   switch (mp) {
     case 'otto':
@@ -1056,7 +1118,7 @@ export function OrdersTable({
             {orders.length === 0 ? 'Noch keine Bestellungen importiert.' : 'Keine Bestellungen entsprechen den Filtern.'}
           </div>
         ) : (
-          <table className="min-w-[1200px] w-full divide-y divide-gray-200">
+          <table className="min-w-[1400px] w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1067,12 +1129,14 @@ export function OrdersTable({
                     onChange={toggleAll}
                   />
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Datum</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bestelldatum</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Marktplatz</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bestellnummer</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kunde</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Land</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rechnungsdatum</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Versanddatum</th>
                 <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Umsatz</th>
                 <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50 shadow-[-4px_0_4px_-2px_rgba(0,0,0,0.05)]">Aktion</th>
               </tr>
@@ -1080,30 +1144,16 @@ export function OrdersTable({
             <tbody className="bg-white divide-y divide-gray-200">
               {paginatedOrders.map((order) => {
                 const formattedTotal = new Intl.NumberFormat('de-DE', { style: 'currency', currency: order.currency }).format(order.totalAmount ? Number(order.totalAmount) : 0)
-                const rawDate = order.marketplacePurchaseDate || order.invoice?.issuedAt || order.createdAt
-                const formattedDate = (() => {
-                  if (!rawDate) return 'Unbekannt'
-                  try {
-                    const formatter = new Intl.DateTimeFormat('de-DE', {
-                      timeZone: 'Europe/Berlin',
-                      year: 'numeric',
-                      month: '2-digit',
-                      day: '2-digit',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      hour12: false
-                    })
-                    const parts = formatter.formatToParts(new Date(rawDate))
-                    const day = parts.find(p => p.type === 'day')?.value
-                    const month = parts.find(p => p.type === 'month')?.value
-                    const year = parts.find(p => p.type === 'year')?.value
-                    const hour = parts.find(p => p.type === 'hour')?.value
-                    const minute = parts.find(p => p.type === 'minute')?.value
-                    return `${day}.${month}.${year} ${hour}:${minute}`
-                  } catch (e) {
-                    return 'Unbekannt'
-                  }
-                })()
+                
+                const rawBestellDate = order.marketplacePurchaseDate || order.createdAt
+                const formattedBestellDate = formatDate(rawBestellDate, true)
+
+                const rawRechnungsDate = order.invoice?.issuedAt || order.invoice?.createdAt
+                const formattedRechnungsDate = order.invoice ? formatDate(rawRechnungsDate, false) : '—'
+
+                const rawVersandDate = order.status === 'shipped' ? order.updatedAt : null
+                const formattedVersandDate = formatDate(rawVersandDate, false)
+
                 const isSelected = selectedIds.has(order.id)
                 const isExpanded = expandedIds.has(order.id)
                 
@@ -1125,7 +1175,7 @@ export function OrdersTable({
                         />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500" suppressHydrationWarning>
-                        {formattedDate}
+                        {formattedBestellDate}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize" 
@@ -1167,6 +1217,29 @@ export function OrdersTable({
                           ) : <span className="text-gray-300 text-xs">—</span>
                         })()}
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500" suppressHydrationWarning>
+                        {formattedRechnungsDate}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500" suppressHydrationWarning>
+                        <div>{formattedVersandDate}</div>
+                        {order.trackingNumber && (
+                          <div className="mt-1">
+                            <a
+                              href={getTrackingUrl(order.trackingNumber)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100 hover:bg-blue-100 transition-colors text-xs font-semibold font-mono"
+                              onClick={(e) => e.stopPropagation()}
+                              title="Sendungsverfolgung öffnen"
+                            >
+                              {order.trackingNumber}
+                              <svg className="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                              </svg>
+                            </a>
+                          </div>
+                        )}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">
                         {formattedTotal}
                       </td>
@@ -1192,7 +1265,7 @@ export function OrdersTable({
                     
                     {isExpanded && (
                       <tr className="bg-gray-50 border-t border-b border-gray-100">
-                        <td colSpan={8} className="px-6 py-6">
+                        <td colSpan={11} className="px-6 py-6">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                             {/* Addresses & Info */}
                             <div>
@@ -1268,7 +1341,19 @@ export function OrdersTable({
                                 </div>
                                 {order.trackingNumber && (
                                   <div>
-                                    <span className="font-medium">Sendungsnummer:</span> <span className="text-gray-500">{order.trackingNumber}</span>
+                                    <span className="font-medium">Sendungsnummer:</span>{' '}
+                                    <a
+                                      href={getTrackingUrl(order.trackingNumber)}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1 font-mono font-medium"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      {order.trackingNumber}
+                                      <svg className="w-3.5 h-3.5 text-blue-500 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                      </svg>
+                                    </a>
                                   </div>
                                 )}
                                 {order.labelUrl && (
@@ -1293,7 +1378,19 @@ export function OrdersTable({
                                 )}
                                 {order.returnTrackingNumber && (
                                   <div>
-                                    <span className="font-medium">Retouren-Nr:</span> <span className="text-gray-500">{order.returnTrackingNumber}</span>
+                                    <span className="font-medium">Retouren-Nr:</span>{' '}
+                                    <a
+                                      href={getTrackingUrl(order.returnTrackingNumber)}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1 font-mono font-medium"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      {order.returnTrackingNumber}
+                                      <svg className="w-3.5 h-3.5 text-blue-500 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                      </svg>
+                                    </a>
                                   </div>
                                 )}
                                 {order.returnLabelUrl && (
