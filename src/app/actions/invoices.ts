@@ -593,7 +593,7 @@ ${data.ccEmail ? `CC: ${data.ccEmail}\n` : ''}Betreff: ${data.subject}`
   }
 }
 
-export async function saveEmailTemplateAction(content: string) {
+export async function saveEmailTemplateAction(content: string, templateName: string = 'email_invoice_default') {
   const auth = await requireAuth()
   const companyId = auth.activeCompanyId
 
@@ -604,7 +604,7 @@ export async function saveEmailTemplateAction(content: string) {
       .where(
         and(
           eq(invoiceTextTemplates.companyId, companyId),
-          eq(invoiceTextTemplates.name, 'email_invoice_default')
+          eq(invoiceTextTemplates.name, templateName)
         )
       )
       .limit(1)
@@ -619,7 +619,7 @@ export async function saveEmailTemplateAction(content: string) {
         .insert(invoiceTextTemplates)
         .values({
           companyId,
-          name: 'email_invoice_default',
+          name: templateName,
           content
         })
     }

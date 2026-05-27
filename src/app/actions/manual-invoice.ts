@@ -222,7 +222,7 @@ export async function createManualInvoiceAction(data: {
     })
   }
 
-  const redirectTarget = data.documentType === 'quote' ? '/quotes' : '/invoices'
+  const redirectTarget = data.documentType === 'quote' ? '/quotes' : (data.documentType === 'delivery_note' ? '/delivery-notes' : '/invoices')
   if (data.status !== 'draft') {
     redirect(redirectTarget)
   }
@@ -438,8 +438,9 @@ export async function convertQuoteAction(quoteId: string, targetType: 'invoice' 
 
     revalidatePath('/quotes')
     revalidatePath('/invoices')
+    revalidatePath('/delivery-notes')
 
-    const redirectTarget = targetType === 'invoice' ? '/invoices' : '/invoices'
+    const redirectTarget = targetType === 'invoice' ? '/invoices' : '/delivery-notes'
     redirect(redirectTarget)
   } catch (error: any) {
     if (error.message === 'NEXT_REDIRECT' || error.digest?.includes('NEXT_REDIRECT')) {
@@ -491,7 +492,7 @@ export async function deleteQuoteAction(quoteId: string) {
 }
 
 
-export async function getDraftsAction() {
+export async function getDraftsAction(documentType: 'invoice' | 'quote' | 'delivery_note' = 'invoice') {
   const auth = await requireAuth()
   const companyId = auth.activeCompanyId
 
@@ -499,7 +500,7 @@ export async function getDraftsAction() {
     where: and(
       eq(invoices.companyId, companyId),
       eq(invoices.status, 'draft'),
-      eq(invoices.documentType, 'invoice')
+      eq(invoices.documentType, documentType)
     ),
     orderBy: desc(invoices.createdAt),
   })
@@ -599,6 +600,8 @@ export async function deleteDraftAction(draftId: string) {
   })
 
   revalidatePath('/invoices')
+  revalidatePath('/delivery-notes')
+  revalidatePath('/quotes')
 }
 
 export async function previewInvoiceAction(data: {
@@ -866,6 +869,8 @@ export async function editManualInvoiceAction(data: {
     await regenerateInvoicePdf(invoice.id, companyId)
 
     revalidatePath('/invoices')
+    revalidatePath('/delivery-notes')
+    revalidatePath('/quotes')
     return { success: true }
   } catch (error: any) {
     console.error('[EditManualInvoice] Error:', error)

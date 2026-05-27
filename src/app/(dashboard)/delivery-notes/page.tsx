@@ -5,9 +5,8 @@ import { orders } from '@/db/schema/orders'
 import { eq, desc, and, ne } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import Link from 'next/link'
-import { InvoiceList } from './invoice-list'
-import { GenerateMissingButton } from './generate-missing-button'
-import { DraftsDropdown } from './drafts-dropdown'
+import { DeliveryNoteList } from './delivery-note-list'
+import { DraftsDropdown } from '../invoices/drafts-dropdown'
 import { getDraftsAction } from '@/app/actions/manual-invoice'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { companies } from '@/db/schema/companies'
@@ -16,11 +15,11 @@ import { users } from '@/db/schema/auth'
 
 const originalInvoice = alias(invoices, 'original_invoice')
 
-export default async function InvoicesPage() {
+export default async function DeliveryNotesPage() {
   const auth = await requireAuth()
-  const drafts = await getDraftsAction()
+  const drafts = await getDraftsAction('delivery_note')
 
-  const [allInvoices, integrations, company, emailTemplate, currentUser] = await Promise.all([
+  const [allDeliveryNotes, integrations, company, emailTemplate, currentUser] = await Promise.all([
     db
       .select({
         id: invoices.id,
@@ -44,7 +43,7 @@ export default async function InvoicesPage() {
       .leftJoin(originalInvoice, eq(invoices.cancelsInvoiceId, originalInvoice.id))
       .where(and(
         eq(invoices.companyId, auth.activeCompanyId),
-        eq(invoices.documentType, 'invoice'),
+        eq(invoices.documentType, 'delivery_note'),
         ne(invoices.status, 'draft')
       ))
       .orderBy(desc(invoices.createdAt)),
@@ -70,7 +69,7 @@ export default async function InvoicesPage() {
       .from(invoiceTextTemplates)
       .where(and(
         eq(invoiceTextTemplates.companyId, auth.activeCompanyId),
-        eq(invoiceTextTemplates.name, 'email_invoice_default')
+        eq(invoiceTextTemplates.name, 'email_delivery_note_default')
       ))
       .limit(1)
       .then(rows => rows[0]?.content || null),
@@ -100,26 +99,25 @@ export default async function InvoicesPage() {
     <div className="p-8">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Rechnungen</h1>
-          <p className="text-slate-500">Übersicht aller generierten Rechnungen und Gutschriften.</p>
+          <h1 className="text-2xl font-bold text-slate-900">Lieferscheine</h1>
+          <p className="text-slate-500">Übersicht aller generierten Lieferscheine.</p>
         </div>
         <div className="flex gap-3">
           <Link 
-            href="/invoices/new"
+            href="/delivery-notes/new"
             className="inline-flex items-center gap-2 bg-white border border-slate-200 px-4 py-2 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm"
           >
-            <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
             </svg>
-            Neue Rechnung
+            Neuer Lieferschein
           </Link>
-          <DraftsDropdown initialDrafts={drafts} />
-          <GenerateMissingButton />
+          <DraftsDropdown initialDrafts={drafts} documentType="delivery_note" />
         </div>
       </div>
 
-      <InvoiceList 
-        initialInvoices={allInvoices} 
+      <DeliveryNoteList 
+        initialDeliveryNotes={allDeliveryNotes} 
         hasKauflandIntegration={hasKauflandIntegration}
         hasEbayIntegration={hasEbayIntegration}
         hasOttoIntegration={hasOttoIntegration}

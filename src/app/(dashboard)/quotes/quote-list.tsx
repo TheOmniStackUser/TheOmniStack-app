@@ -729,7 +729,49 @@ export function QuoteList({
                           Versenden
                         </button>
                       </div>
+
+                      {/* Convert Actions Row */}
+                      <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap gap-2 font-sans">
+                        <span className="w-full text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Aus diesem Angebot generieren</span>
+                        {/* → Rechnung erstellen */}
+                        <Link
+                          href={`/invoices/new?clone=${details.invoice.id}`}
+                          className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-700 transition-all shadow-sm"
+                          title="Neue Rechnung auf Basis dieses Angebots erstellen"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          → Rechnung erstellen
+                        </Link>
+
+                        {/* → Lieferschein erstellen */}
+                        <button
+                          onClick={() => handleConvert(details.invoice.id, 'delivery_note')}
+                          disabled={convertingId === details.invoice.id}
+                          title="Neuen Lieferschein auf Basis dieses Angebots erstellen"
+                          className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl text-xs font-bold text-blue-700 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {convertingId === details.invoice.id ? (
+                            <>
+                              <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                              </svg>
+                              Wird erstellt...
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                              </svg>
+                              → Lieferschein erstellen
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
+
 
                     {/* Scrollable sections */}
                     <div className="flex-1 overflow-y-auto p-6 space-y-8 ScrollContainer">

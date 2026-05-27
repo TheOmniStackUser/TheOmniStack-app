@@ -10,6 +10,7 @@ export function SidebarNav({ role }: { role: string }) {
     { href: '/dashboard', label: 'Dashboard' },
     { href: '/orders', label: 'Bestellungen' },
     { href: '/invoices', label: 'Rechnungen' },
+    { href: '/delivery-notes', label: 'Lieferscheine' },
     { href: '/quotes', label: 'Angebote' },
   ]
 

@@ -132,7 +132,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
   const [showVatModal, setShowVatModal] = useState(false)
 
   const loadDraftsList = async () => {
-    const data = await getDraftsAction()
+    const data = await getDraftsAction(documentType)
     setDrafts(data)
   }
 
@@ -438,10 +438,10 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
           return
         }
 
-        const label = documentType === 'quote' ? 'Angebot' : (settings.isCreditNote ? 'Gutschrift' : 'Rechnung')
+        const label = documentType === 'quote' ? 'Angebot' : (documentType === 'delivery_note' ? 'Lieferschein' : (settings.isCreditNote ? 'Gutschrift' : 'Rechnung'))
         setNotification({ message: `${label} wurde erfolgreich aktualisiert!`, type: 'success' })
         setTimeout(() => {
-          location.href = documentType === 'quote' ? '/quotes' : '/invoices'
+          location.href = documentType === 'quote' ? '/quotes' : (documentType === 'delivery_note' ? '/delivery-notes' : '/invoices')
         }, 1500)
         return
       }
@@ -602,12 +602,18 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
     {documentType !== 'quote' && (
       <div className="max-w-5xl mx-auto mb-10">
         <h1 className="text-3xl font-bold text-slate-900">
-          {settings.isCreditNote ? 'Gutschrift erstellen' : 'Neue Rechnung schreiben'}
+          {documentType === 'delivery_note'
+            ? 'Neuen Lieferschein erstellen'
+            : (settings.isCreditNote ? 'Gutschrift erstellen' : 'Neue Rechnung schreiben')
+          }
         </h1>
         <p className="text-slate-500 mt-2">
-          {settings.isCreditNote 
-            ? 'Erstelle eine manuelle Gutschrift. Diese wird für die Buchhaltung sowie das Rechnungsausgangsbuch berücksichtigt.'
-            : 'Erstelle eine manuelle Rechnung. Diese wird automatisch als Bestellung im System erfasst und für die Buchhaltung sowie das Rechnungsausgangsbuch berücksichtigt.'
+          {documentType === 'delivery_note'
+            ? 'Erstelle einen manuellen Lieferschein. Dieser wird automatisch als Bestellung im System erfasst.'
+            : (settings.isCreditNote 
+                ? 'Erstelle eine manuelle Gutschrift. Diese wird für die Buchhaltung sowie das Rechnungsausgangsbuch berücksichtigt.'
+                : 'Erstelle eine manuelle Rechnung. Diese wird automatisch als Bestellung im System erfasst und für die Buchhaltung sowie das Rechnungsausgangsbuch berücksichtigt.'
+              )
           }
         </p>
       </div>
@@ -624,17 +630,21 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
             <h1 className="text-xl font-bold text-slate-900">
               {documentType === 'quote'
                 ? (editId ? 'Angebot bearbeiten' : 'Manuelle Angebotserstellung')
-                : editId 
-                  ? (settings.isCreditNote ? 'Gutschrift bearbeiten' : 'Rechnung bearbeiten') 
-                  : 'Manuelle Erstellung'
+                : documentType === 'delivery_note'
+                  ? (editId ? 'Lieferschein bearbeiten' : 'Manuelle Lieferscheinerstellung')
+                  : editId 
+                    ? (settings.isCreditNote ? 'Gutschrift bearbeiten' : 'Rechnung bearbeiten') 
+                    : 'Manuelle Erstellung'
               }
             </h1>
             <p className="text-sm text-slate-500">
               {documentType === 'quote'
                 ? 'Erstellen Sie Angebote manuell'
-                : settings.isCreditNote 
-                  ? 'Erstellen Sie Gutschriften manuell' 
-                  : 'Erstellen Sie Rechnungen oder Gutschriften manuell'
+                : documentType === 'delivery_note'
+                  ? 'Erstellen Sie Lieferscheine manuell'
+                  : settings.isCreditNote 
+                    ? 'Erstellen Sie Gutschriften manuell' 
+                    : 'Erstellen Sie Rechnungen oder Gutschriften manuell'
               }
             </p>
           </div>
@@ -677,7 +687,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
       {/* Settings Info */}
       <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-8">
         <div className="flex flex-wrap items-center gap-8 border-b border-slate-100 pb-6">
-          {documentType !== 'quote' && (
+          {documentType !== 'quote' && documentType !== 'delivery_note' && (
             <div className="space-y-2">
               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Dokumenttyp</span>
               <div className="flex gap-2">
@@ -1132,10 +1142,10 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
             </div>
           </div>
         </div>
-        <textarea className="w-full h-32 px-4 py-3 border-2 border-slate-100 rounded-xl focus:border-blue-400 outline-none font-bold text-slate-800 placeholder:text-slate-300 leading-relaxed" value={customText} onChange={e => setCustomText(e.target.value)} placeholder={documentType === 'quote' ? 'Gerne erstellen wir Ihnen folgendes Angebot...' : 'Vielen Dank für Ihren Auftrag! Bitte begleichen Sie den offenen Betrag...'} />
+        <textarea className="w-full h-32 px-4 py-3 border-2 border-slate-100 rounded-xl focus:border-blue-400 outline-none font-bold text-slate-800 placeholder:text-slate-300 leading-relaxed" value={customText} onChange={e => setCustomText(e.target.value)} placeholder={documentType === 'quote' ? 'Gerne erstellen wir Ihnen folgendes Angebot...' : (documentType === 'delivery_note' ? 'Vielen Dank für Ihre Bestellung! Nachfolgend erhalten Sie die Übersicht über Ihre Lieferung...' : 'Vielen Dank für Ihren Auftrag! Bitte begleichen Sie den offenen Betrag...')} />
       </div>
 
-      {documentType !== 'quote' && (
+      {documentType !== 'quote' && documentType !== 'delivery_note' && (
         <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-6">
           <div className="flex items-center gap-3"><h2 className="text-xl font-bold text-slate-900">Formatauswahl</h2><span className="px-2 py-0.5 bg-blue-600 text-white text-[10px] font-bold rounded-full uppercase">E-Rechnung</span></div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t border-slate-100">
@@ -1162,8 +1172,8 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
         {!editId && (
           <button type="button" onClick={(e) => handleSubmit(e, 'draft')} disabled={isSavingDraft || isSubmitting} className="px-8 py-3 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-all flex items-center gap-2 disabled:opacity-50">{isSavingDraft ? 'Wird gespeichert...' : documentType === 'quote' ? 'Als Entwurf speichern' : 'Als Entwurf speichern'}</button>
         )}
-        <button type="submit" disabled={isSubmitting || isSavingDraft} className={`px-10 py-3 ${documentType === 'quote' ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-200' : settings.isCreditNote ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-200' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'} text-white font-bold rounded-xl transition-all shadow-lg disabled:opacity-50 flex items-center gap-2`}>
-          {isSubmitting ? 'Wird gespeichert...' : editId ? 'Änderungen speichern' : documentType === 'quote' ? 'Angebot erstellen' : settings.isCreditNote ? 'Gutschrift erstellen' : 'Rechnung finalisieren'}
+        <button type="submit" disabled={isSubmitting || isSavingDraft} className={`px-10 py-3 ${documentType === 'quote' ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-200' : (documentType === 'delivery_note' ? 'bg-teal-600 hover:bg-teal-700 shadow-teal-200' : settings.isCreditNote ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-200' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200')} text-white font-bold rounded-xl transition-all shadow-lg disabled:opacity-50 flex items-center gap-2`}>
+          {isSubmitting ? 'Wird gespeichert...' : editId ? 'Änderungen speichern' : documentType === 'quote' ? 'Angebot erstellen' : (documentType === 'delivery_note' ? 'Lieferschein erstellen' : settings.isCreditNote ? 'Gutschrift erstellen' : 'Rechnung finalisieren')}
         </button>
       </div>
     </form>

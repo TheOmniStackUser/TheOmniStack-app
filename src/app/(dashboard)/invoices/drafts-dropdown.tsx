@@ -4,7 +4,13 @@ import { useState, useEffect } from 'react'
 import { getDraftsAction, deleteDraftAction } from '@/app/actions/manual-invoice'
 import Link from 'next/link'
 
-export function DraftsDropdown({ initialDrafts = [] }: { initialDrafts?: any[] }) {
+export function DraftsDropdown({ 
+  initialDrafts = [], 
+  documentType = 'invoice' 
+}: { 
+  initialDrafts?: any[]
+  documentType?: 'invoice' | 'quote' | 'delivery_note'
+}) {
   const [drafts, setDrafts] = useState<any[]>(initialDrafts)
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -12,7 +18,7 @@ export function DraftsDropdown({ initialDrafts = [] }: { initialDrafts?: any[] }
   const loadDrafts = async () => {
     setIsLoading(true)
     try {
-      const data = await getDraftsAction()
+      const data = await getDraftsAction(documentType)
       setDrafts(data)
     } catch (error) {
       console.error('Failed to load drafts', error)
@@ -63,35 +69,40 @@ export function DraftsDropdown({ initialDrafts = [] }: { initialDrafts?: any[] }
             ) : drafts.length === 0 ? (
               <div className="p-8 text-center text-slate-400 italic">Keine Entwürfe gefunden</div>
             ) : (
-              drafts.map(d => (
-                <Link
-                  key={d.id}
-                  href={`/invoices/new?draftId=${d.id}`}
-                  className="block p-4 hover:bg-blue-50 border-b border-slate-100 last:border-0 transition-colors group"
-                >
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1 min-w-0">
-                      <div className="font-bold text-slate-900 group-hover:text-blue-600 truncate">{d.draftName || 'Unbenannter Entwurf'}</div>
-                      <div className="text-xs text-slate-500 mt-1 truncate">
-                        {d.recipientName} • {new Date(d.createdAt).toLocaleDateString()}
+              drafts.map(d => {
+                const targetUrl = documentType === 'delivery_note' 
+                  ? `/delivery-notes/new?draftId=${d.id}` 
+                  : `/invoices/new?draftId=${d.id}`
+                return (
+                  <Link
+                    key={d.id}
+                    href={targetUrl}
+                    className="block p-4 hover:bg-blue-50 border-b border-slate-100 last:border-0 transition-colors group"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold text-slate-900 group-hover:text-blue-600 truncate">{d.draftName || 'Unbenannter Entwurf'}</div>
+                        <div className="text-xs text-slate-500 mt-1 truncate">
+                          {d.recipientName} • {new Date(d.createdAt).toLocaleDateString()}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 ml-4">
+                        <div className="text-xs font-bold text-slate-400">
+                          {parseFloat(d.totalAmount).toLocaleString('de-DE', { style: 'currency', currency: d.currency || 'EUR' })}
+                        </div>
+                        <button
+                          onClick={(e) => handleDelete(e, d.id)}
+                          className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 ml-4">
-                      <div className="text-xs font-bold text-slate-400">
-                        {parseFloat(d.totalAmount).toLocaleString('de-DE', { style: 'currency', currency: d.currency || 'EUR' })}
-                      </div>
-                      <button
-                        onClick={(e) => handleDelete(e, d.id)}
-                        className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                </Link>
-              ))
+                  </Link>
+                )
+              })
             )}
           </div>
         </div>
