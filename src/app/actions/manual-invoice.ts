@@ -3,7 +3,7 @@
 import { db } from '@/db/client'
 import { orders, orderItems } from '@/db/schema/orders'
 import { requireAuth } from '@/lib/session'
-import { eq, and, desc, ne } from 'drizzle-orm'
+import { eq, and, desc, ne, isNull } from 'drizzle-orm'
 import { createInvoiceForOrder } from '@/lib/invoice-service'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
@@ -282,9 +282,26 @@ export async function getQuoteDetailsAction(quoteId: string) {
   if (!quote) throw new Error('Angebot nicht gefunden')
 
   // Fetch the linked order to get manual metadata from rawPayload
-  const linkedOrder = await db.query.orders.findFirst({
+  let linkedOrder = await db.query.orders.findFirst({
     where: eq(orders.invoiceId, quoteId)
   })
+
+  if (!linkedOrder) {
+    const potentialOrder = await db.query.orders.findFirst({
+      where: and(
+        isNull(orders.invoiceId),
+        eq(orders.marketplace, 'manual'),
+        eq(orders.buyerName, quote.recipientName || ''),
+        eq(orders.totalAmount, quote.totalAmount || '0.00')
+      )
+    })
+    if (potentialOrder) {
+      await db.update(orders)
+        .set({ invoiceId: quoteId })
+        .where(eq(orders.id, potentialOrder.id))
+      linkedOrder = potentialOrder
+    }
+  }
 
   const metadata = (linkedOrder?.rawPayload as any)?.manualMetadata || {}
 
@@ -332,10 +349,29 @@ export async function convertQuoteAction(quoteId: string, targetType: 'invoice' 
     if (!quote) throw new Error('Angebot nicht gefunden')
 
     // 2. Fetch the linked order (for data source)
-    const linkedOrder = await db.query.orders.findFirst({
+    let linkedOrder = await db.query.orders.findFirst({
       where: eq(orders.invoiceId, quoteId),
       with: { items: true }
     })
+
+    if (!linkedOrder) {
+      const potentialOrder = await db.query.orders.findFirst({
+        where: and(
+          isNull(orders.invoiceId),
+          eq(orders.marketplace, 'manual'),
+          eq(orders.buyerName, quote.recipientName || ''),
+          eq(orders.totalAmount, quote.totalAmount || '0.00')
+        ),
+        with: { items: true }
+      })
+      if (potentialOrder) {
+        await db.update(orders)
+          .set({ invoiceId: quoteId })
+          .where(eq(orders.id, potentialOrder.id))
+        linkedOrder = potentialOrder
+      }
+    }
+
     if (!linkedOrder) throw new Error('Verknüpfte Bestellung nicht gefunden')
 
     const metadata = (linkedOrder?.rawPayload as any)?.manualMetadata || {}
