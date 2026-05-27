@@ -499,8 +499,16 @@ export function OrdersTable({
   }
   const filteredOrders = orders.filter(order => {
     // Filter by Marketplace
-    if (activeFilters.marketplace !== 'all' && order.marketplace !== activeFilters.marketplace) {
-      return false
+    if (activeFilters.marketplace !== 'all') {
+      const orderMp = (order.marketplace || 'manual').toLowerCase()
+      const targetMp = activeFilters.marketplace.toLowerCase()
+      if (targetMp === 'manual') {
+        if (orderMp !== 'manual' && orderMp !== '') {
+          return false
+        }
+      } else if (orderMp !== targetMp) {
+        return false
+      }
     }
     // Filter by Status
     if (activeFilters.status !== 'all' && order.status !== activeFilters.status) {
@@ -1315,6 +1323,7 @@ export function OrdersTable({
             className="px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[150px] text-gray-900 font-medium text-sm"
           >
             <option value="all">Alle Marktplätze</option>
+            <option value="manual">Manuell</option>
             {hasOttoIntegration && <option value="otto">Otto</option>}
             {hasDecathlonIntegration && <option value="mirakl_decathlon">Decathlon</option>}
             {hasAmazonIntegration && <option value="amazon">Amazon</option>}
