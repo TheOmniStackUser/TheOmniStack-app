@@ -527,8 +527,14 @@ export function InvoiceList({
     }
 
     // Filter by Marketplace
-    if (activeFilters.marketplace !== 'all' && invoice.marketplace !== activeFilters.marketplace) {
-      return false
+    if (activeFilters.marketplace !== 'all') {
+      const targetMp = activeFilters.marketplace.toLowerCase()
+      const invoiceMp = (invoice.marketplace || 'manual').toLowerCase()
+      if (targetMp === 'manual') {
+        if (invoiceMp !== 'manual' && invoiceMp !== '') return false
+      } else if (invoiceMp !== targetMp) {
+        return false
+      }
     }
 
     // Filter by Date Range
@@ -638,6 +644,7 @@ export function InvoiceList({
             className="px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px] text-sm text-slate-900 font-medium"
           >
             <option value="all">Alle Marktplätze</option>
+            <option value="manual">Manuell</option>
             {hasOttoIntegration && <option value="otto">Otto</option>}
             {hasAboutYouIntegration && <option value="aboutyou">About You</option>}
             {hasDecathlonIntegration && <option value="mirakl_decathlon">Decathlon</option>}
