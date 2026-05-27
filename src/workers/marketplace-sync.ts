@@ -22,6 +22,8 @@ import { AboutYouAdapter } from '@/adapters/marketplace/aboutyou'
 import { ShopifyAdapter } from '@/adapters/marketplace/shopify'
 import { KauflandAdapter } from '@/adapters/marketplace/kaufland'
 import { EbayAdapter } from '@/adapters/marketplace/ebay'
+import { WooCommerceAdapter } from '@/adapters/marketplace/woocommerce'
+import { ShopwareAdapter } from '@/adapters/marketplace/shopware'
 import type { NormalizedOrder, MarketplaceAdapter } from '@/adapters/marketplace/base'
 import { createInvoiceForOrder, formatDocumentNumber, getDefaultSettings } from '@/lib/invoice-service'
 import { get2LetterCountryCode } from '@/lib/countries'
@@ -206,6 +208,16 @@ export function createMarketplaceSyncWorker() {
               fromDate: job.data.fromDate,
               toDate: job.data.toDate
             })
+          } else if (marketplace === 'woocommerce') {
+            rawOrders = await adapter.fetchUnshippedOrders(companyId, {
+              fromDate: job.data.fromDate,
+              toDate: job.data.toDate
+            })
+          } else if (marketplace === 'shopware') {
+            rawOrders = await adapter.fetchUnshippedOrders(companyId, {
+              fromDate: job.data.fromDate,
+              toDate: job.data.toDate
+            })
           } else {
             throw new Error(`Adapter for ${marketplace} is not fully implemented yet`)
           }
@@ -315,6 +327,22 @@ export function getAdapterForIntegration(
       clientId: integration.clientId,
       clientSecret: integration.clientSecret,
       environment: (integration.environment as 'sandbox' | 'production') || 'production'
+    })
+  }
+  if (integration.type === 'woocommerce') {
+    if (!integration.environment || !integration.clientId || !integration.clientSecret) return null
+    return new WooCommerceAdapter({
+      shopUrl: integration.environment,
+      consumerKey: integration.clientId,
+      consumerSecret: integration.clientSecret,
+    })
+  }
+  if (integration.type === 'shopware') {
+    if (!integration.environment || !integration.clientId || !integration.clientSecret) return null
+    return new ShopwareAdapter({
+      shopUrl: integration.environment,
+      clientId: integration.clientId,
+      clientSecret: integration.clientSecret,
     })
   }
   return null

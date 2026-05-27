@@ -35,6 +35,8 @@ export const marketplaceEnum = pgEnum('marketplace', [
   'aboutyou',
   'kaufland',
   'ebay',
+  'woocommerce',
+  'shopware',
 ])
 
 // ─── Orders ───────────────────────────────────────────────────────────────────

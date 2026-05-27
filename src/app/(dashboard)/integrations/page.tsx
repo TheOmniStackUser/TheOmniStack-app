@@ -12,6 +12,8 @@ import { ShopifyIntegrationForm } from './shopify-form'
 import { AboutYouIntegrationForm } from './aboutyou-form'
 import { KauflandIntegrationForm } from './kaufland-form'
 import { EbayIntegrationForm } from './ebay-form'
+import { WooCommerceIntegrationForm } from './woocommerce-form'
+import { ShopwareIntegrationForm } from './shopware-form'
 import { SyncSettingsForm } from './sync-settings-form'
 import type { DhlConfig } from './dhl-form'
 import { CollapsibleSection } from '@/components/collapsible-section'
@@ -52,6 +54,8 @@ export default async function IntegrationsPage(props: {
       else if (i.type === 'aboutyou') label = 'About You'
       else if (i.type === 'kaufland') label = 'Kaufland'
       else if (i.type === 'ebay') label = 'eBay'
+      else if (i.type === 'woocommerce') label = 'WooCommerce'
+      else if (i.type === 'shopware') label = 'Shopware 6'
       else if (i.type === 'mirakl_decathlon') label = 'Decathlon (Mirakl)'
       else if (i.type === 'mirakl_custom') {
         label = (i.metadata as any)?.customName || 'Anderer Mirakl Marktplatz'
@@ -76,6 +80,8 @@ export default async function IntegrationsPage(props: {
       else if (i.type === 'aboutyou') label = 'About You'
       else if (i.type === 'kaufland') label = 'Kaufland'
       else if (i.type === 'ebay') label = 'eBay'
+      else if (i.type === 'woocommerce') label = 'WooCommerce'
+      else if (i.type === 'shopware') label = 'Shopware 6'
       else if (i.type === 'mirakl_decathlon') label = 'Decathlon (Mirakl)'
       else if (i.type === 'mirakl_custom') {
         label = (i.metadata as any)?.customName || 'Anderer Mirakl Marktplatz'
@@ -429,6 +435,62 @@ export default async function IntegrationsPage(props: {
                   initialClientSecret="" 
                   initialEnvironment=""
                   initialApiKey=""
+                />
+              </div>
+            </CollapsibleSection>
+
+            {/* WooCommerce Card */}
+            <CollapsibleSection
+              title="WooCommerce"
+              subtitle="REST API v3 Anbindung für Bestellimport & Versandbestätigung"
+              icon={
+                <div className="w-10 h-10 bg-purple-50 border border-purple-200 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform duration-200 hover:scale-105">
+                  <span className="text-[#96588a] font-black text-[8px] tracking-tighter">WooCommerce</span>
+                </div>
+              }
+              badge={integrations.find((i: any) => i.type === 'woocommerce')?.clientId ? (
+                <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  Verbunden
+                </span>
+              ) : (
+                <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
+                  Nicht verbunden
+                </span>
+              )}
+            >
+              <div className="p-6 bg-gray-50">
+                <WooCommerceIntegrationForm
+                  initialEnvironment={integrations.find((i: any) => i.type === 'woocommerce')?.environment || ''}
+                  initialClientId={integrations.find((i: any) => i.type === 'woocommerce')?.clientId || ''}
+                />
+              </div>
+            </CollapsibleSection>
+
+            {/* Shopware 6 Card */}
+            <CollapsibleSection
+              title="Shopware 6"
+              subtitle="Admin API Anbindung für Bestellimport & Versandbestätigung"
+              icon={
+                <div className="w-10 h-10 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform duration-200 hover:scale-105">
+                  <span className="text-[#189EFF] font-black text-[8px] tracking-tighter">Shopware</span>
+                </div>
+              }
+              badge={integrations.find((i: any) => i.type === 'shopware')?.clientId ? (
+                <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  Verbunden
+                </span>
+              ) : (
+                <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
+                  Nicht verbunden
+                </span>
+              )}
+            >
+              <div className="p-6 bg-gray-50">
+                <ShopwareIntegrationForm
+                  initialEnvironment={integrations.find((i: any) => i.type === 'shopware')?.environment || ''}
+                  initialClientId={integrations.find((i: any) => i.type === 'shopware')?.clientId || ''}
                 />
               </div>
             </CollapsibleSection>

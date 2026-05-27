@@ -598,6 +598,167 @@ export async function saveEbayIntegrationAction(
   return { success: true, message: 'eBay Zugangsdaten wurden erfolgreich gespeichert!' }
 }
 
+// ─── WooCommerce ───────────────────────────────────────────────────────────────
+const WooCommerceIntegrationSchema = z.object({
+  environment: z.string().url({ message: 'Bitte gib eine gültige Shop URL an (inkl. https://).' }).trim(),
+  clientId: z.string().min(1, { message: 'Consumer Key ist erforderlich.' }).trim(),
+  clientSecret: z.string().min(1, { message: 'Consumer Secret ist erforderlich.' }).trim(),
+})
+
+export async function saveWooCommerceIntegrationAction(
+  _state: IntegrationFormState,
+  formData: FormData
+): Promise<IntegrationFormState> {
+  const auth = await requireAuth()
+
+  const validated = WooCommerceIntegrationSchema.safeParse({
+    environment: formData.get('environment'),
+    clientId: formData.get('clientId'),
+    clientSecret: formData.get('clientSecret'),
+  })
+
+  if (!validated.success) {
+    return { errors: validated.error.flatten().fieldErrors }
+  }
+
+  const { environment, clientId, clientSecret } = validated.data
+  const shopUrl = environment.replace(/\/$/, '')
+
+  // Test connection: fetch a single order from WooCommerce REST API
+  try {
+    const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
+    const testRes = await fetch(`${shopUrl}/wp-json/wc/v3/orders?per_page=1`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Basic ${credentials}`,
+        'Accept': 'application/json',
+      },
+    })
+
+    if (!testRes.ok) {
+      const errText = await testRes.text()
+      return {
+        success: false,
+        message: `Verbindung zu WooCommerce fehlgeschlagen (${testRes.status}). Bitte Consumer Key und Secret prüfen. Antwort: ${errText.slice(0, 200)}`,
+      }
+    }
+  } catch (e: any) {
+    return { success: false, message: `Verbindungstest fehlgeschlagen: ${e.message}` }
+  }
+
+  const [existing] = await db
+    .select({ id: marketplaceIntegrations.id })
+    .from(marketplaceIntegrations)
+    .where(
+      and(
+        eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
+        eq(marketplaceIntegrations.type, 'woocommerce')
+      )
+    )
+    .limit(1)
+
+  if (existing) {
+    await db
+      .update(marketplaceIntegrations)
+      .set({ environment, clientId, clientSecret, updatedAt: new Date() })
+      .where(eq(marketplaceIntegrations.id, existing.id))
+  } else {
+    await db
+      .insert(marketplaceIntegrations)
+      .values({
+        companyId: auth.activeCompanyId,
+        type: 'woocommerce',
+        environment,
+        clientId,
+        clientSecret,
+      })
+  }
+
+  revalidatePath('/integrations')
+  return { success: true, message: 'WooCommerce Verbindung erfolgreich getestet und gespeichert!' }
+}
+
+// ─── Shopware 6 ────────────────────────────────────────────────────────────────
+const ShopwareIntegrationSchema = z.object({
+  environment: z.string().url({ message: 'Bitte gib eine gültige Shop URL an (inkl. https://).' }).trim(),
+  clientId: z.string().min(1, { message: 'Access Key ID ist erforderlich.' }).trim(),
+  clientSecret: z.string().min(1, { message: 'Secret Access Key ist erforderlich.' }).trim(),
+})
+
+export async function saveShopwareIntegrationAction(
+  _state: IntegrationFormState,
+  formData: FormData
+): Promise<IntegrationFormState> {
+  const auth = await requireAuth()
+
+  const validated = ShopwareIntegrationSchema.safeParse({
+    environment: formData.get('environment'),
+    clientId: formData.get('clientId'),
+    clientSecret: formData.get('clientSecret'),
+  })
+
+  if (!validated.success) {
+    return { errors: validated.error.flatten().fieldErrors }
+  }
+
+  const { environment, clientId, clientSecret } = validated.data
+  const shopUrl = environment.replace(/\/$/, '')
+
+  // Test connection: obtain OAuth2 token from Shopware
+  try {
+    const tokenRes = await fetch(`${shopUrl}/api/oauth/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        grant_type: 'client_credentials',
+        client_id: clientId,
+        client_secret: clientSecret,
+      }),
+    })
+
+    if (!tokenRes.ok) {
+      const errText = await tokenRes.text()
+      return {
+        success: false,
+        message: `Shopware Authentifizierung fehlgeschlagen (${tokenRes.status}). Bitte Access Key ID und Secret prüfen. Antwort: ${errText.slice(0, 200)}`,
+      }
+    }
+  } catch (e: any) {
+    return { success: false, message: `Verbindungstest fehlgeschlagen: ${e.message}` }
+  }
+
+  const [existing] = await db
+    .select({ id: marketplaceIntegrations.id })
+    .from(marketplaceIntegrations)
+    .where(
+      and(
+        eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
+        eq(marketplaceIntegrations.type, 'shopware')
+      )
+    )
+    .limit(1)
+
+  if (existing) {
+    await db
+      .update(marketplaceIntegrations)
+      .set({ environment, clientId, clientSecret, updatedAt: new Date() })
+      .where(eq(marketplaceIntegrations.id, existing.id))
+  } else {
+    await db
+      .insert(marketplaceIntegrations)
+      .values({
+        companyId: auth.activeCompanyId,
+        type: 'shopware',
+        environment,
+        clientId,
+        clientSecret,
+      })
+  }
+
+  revalidatePath('/integrations')
+  return { success: true, message: 'Shopware 6 Verbindung erfolgreich getestet und gespeichert!' }
+}
+
 const SyncSettingsSchema = z.object({
   fetchOrdersDaily: z.boolean(),
   fetchOrdersTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'Ungültiges Uhrzeitformat (HH:MM).' }),
