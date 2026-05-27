@@ -794,38 +794,58 @@ export function OrdersTable({
     }
   }
 
-  const getBillingAddress = (order: Order) => {
+  const getBillingAddress = (order: OrderWithItems) => {
+    // 1. If we have a linked invoice, use its recipient details as the billing address
+    if (order.invoice) {
+      return {
+        street: order.invoice.recipientStreet || '',
+        zip: order.invoice.recipientZip || '',
+        city: order.invoice.recipientCity || '',
+        country: order.invoice.recipientCountry || ''
+      }
+    }
+
     const raw = order.rawPayload as any
-    if (!raw) return null
+    if (raw) {
+      // 2. Otto Structure
+      if (raw.invoiceAddress) {
+        return {
+          street: `${raw.invoiceAddress.street || ''} ${raw.invoiceAddress.houseNumber || ''}`.trim(),
+          zip: raw.invoiceAddress.zipCode || '',
+          city: raw.invoiceAddress.city || '',
+          country: raw.invoiceAddress.countryCode || ''
+        }
+      }
 
-    // 1. Otto Structure
-    if (raw.invoiceAddress) {
-      return {
-        street: `${raw.invoiceAddress.street || ''} ${raw.invoiceAddress.houseNumber || ''}`.trim(),
-        zip: raw.invoiceAddress.zipCode || '',
-        city: raw.invoiceAddress.city || '',
-        country: raw.invoiceAddress.countryCode || ''
+      // 3. Mirakl Structure
+      if (raw.customer?.billing_address) {
+        const addr = raw.customer.billing_address
+        return {
+          street: `${addr.street_1 || ''} ${addr.street_2 || ''}`.trim(),
+          zip: addr.zip_code || '',
+          city: addr.city || '',
+          country: addr.country_iso_code || addr.country || ''
+        }
+      }
+
+      // 4. About You Structure
+      if (raw.billing_street) {
+        return {
+          street: raw.billing_street || '',
+          zip: raw.billing_zip_code || '',
+          city: raw.billing_city || '',
+          country: raw.billing_country_code || ''
+        }
       }
     }
 
-    // 2. Mirakl Structure
-    if (raw.customer?.billing_address) {
-      const addr = raw.customer.billing_address
+    // 5. Fallback for manual orders (use shipping address if no invoice is linked yet)
+    if (order.marketplace === 'manual' && order.shippingStreet) {
       return {
-        street: `${addr.street_1 || ''} ${addr.street_2 || ''}`.trim(),
-        zip: addr.zip_code || '',
-        city: addr.city || '',
-        country: addr.country_iso_code || addr.country || ''
-      }
-    }
-
-    // 3. About You Structure
-    if (raw.billing_street) {
-      return {
-        street: raw.billing_street || '',
-        zip: raw.billing_zip_code || '',
-        city: raw.billing_city || '',
-        country: raw.billing_country_code || ''
+        street: order.shippingStreet,
+        zip: order.shippingZip || '',
+        city: order.shippingCity || '',
+        country: order.shippingCountry || ''
       }
     }
 
