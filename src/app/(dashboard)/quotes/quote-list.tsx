@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
 import { getInvoiceDownloadUrl, getInvoiceDetailsAction, sendInvoiceEmailAction, addInvoiceLogAction } from '@/app/actions/invoices'
-import { convertQuoteAction, deleteQuoteAction, saveQuoteEmailTemplateAction } from '@/app/actions/manual-invoice'
+import { convertQuoteAction, convertQuoteToOrderAction, deleteQuoteAction, saveQuoteEmailTemplateAction } from '@/app/actions/manual-invoice'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -119,6 +119,7 @@ export function QuoteList({
   const [quotes, setQuotes] = useState<Quote[]>(initialQuotes)
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [convertingId, setConvertingId] = useState<string | null>(null)
+  const [orderingId, setOrderingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
@@ -162,6 +163,21 @@ export function QuoteList({
       showToast('PDF konnte nicht geladen werden.', 'error')
     }
     setLoadingId(null)
+  }
+
+  const handleConvertToOrder = async (id: string) => {
+    setOrderingId(id)
+    try {
+      const result = await convertQuoteToOrderAction(id) as any
+      if (result?.error) {
+        showToast(`Fehler: ${result.error}`, 'error')
+        setOrderingId(null)
+      }
+    } catch (error: any) {
+      if (error?.digest?.includes('NEXT_REDIRECT')) return
+      showToast('Fehler beim Erstellen der Bestellung.', 'error')
+      setOrderingId(null)
+    }
   }
 
   const handleConvert = async (id: string, targetType: 'invoice' | 'delivery_note') => {
@@ -504,6 +520,26 @@ export function QuoteList({
                         → Lieferschein
                       </button>
 
+                      {/* Convert to Order */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleConvertToOrder(quote.id); }}
+                        disabled={orderingId === quote.id}
+                        title="Als Bestellung erstellen"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-200 transition-all disabled:opacity-50"
+                      >
+                        {orderingId === quote.id ? (
+                          <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
+                        ) : (
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                          </svg>
+                        )}
+                        → Bestellung
+                      </button>
+
                       {/* Delete */}
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDelete(quote.id); }}
@@ -744,6 +780,31 @@ export function QuoteList({
                           </svg>
                           → Rechnung erstellen
                         </Link>
+
+                        {/* → Bestellung erstellen */}
+                        <button
+                          onClick={() => handleConvertToOrder(details.invoice.id)}
+                          disabled={orderingId === details.invoice.id}
+                          title="Neue Bestellung auf Basis dieses Angebots erstellen"
+                          className="inline-flex items-center gap-1.5 px-3 py-2 bg-violet-50 hover:bg-violet-100 border border-violet-200 rounded-xl text-xs font-bold text-violet-700 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {orderingId === details.invoice.id ? (
+                            <>
+                              <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                              </svg>
+                              Wird erstellt...
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                              </svg>
+                              → Bestellung erstellen
+                            </>
+                          )}
+                        </button>
 
                         {/* → Lieferschein erstellen */}
                         <button
