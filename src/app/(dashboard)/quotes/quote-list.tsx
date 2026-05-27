@@ -30,19 +30,36 @@ const formatCountry = (code?: string | null) => {
   return map[code.toUpperCase()] || code.toUpperCase()
 }
 
-const formatMarketplaceName = (mp: string | null) => {
+const formatMarketplaceName = (mp: string | null, shippingCountry?: string | null) => {
   if (!mp || mp.toLowerCase() === 'manual') return 'Manuell'
-  if (mp === 'mirakl_decathlon') return 'Decathlon'
-  if (mp === 'mirakl_decathlon_eu') return 'MIRAKL Hauptaccount'
-  if (mp === 'mirakl_mediamarkt') return 'MediaMarkt'
-  if (mp === 'otto') return 'Otto'
-  if (mp === 'shopify') return 'Shopify'
-  if (mp === 'aboutyou') return 'About You'
-  if (mp === 'amazon') return 'Amazon'
-  if (mp === 'kaufland') return 'Kaufland'
-  if (mp === 'ebay') return 'eBay'
-  return mp.charAt(0).toUpperCase() + mp.slice(1)
+  const lower = mp.toLowerCase()
+  if (lower === 'mirakl_decathlon') return 'Decathlon'
+  if (lower === 'mirakl_decathlon_eu') return 'MIRAKL Hauptaccount'
+  if (lower === 'mirakl_mediamarkt') return 'MediaMarkt'
+  if (lower === 'otto') return 'Otto'
+  if (lower === 'shopify') return 'Shopify'
+  if (lower === 'aboutyou') return 'About You'
+  if (lower === 'amazon') return 'Amazon'
+  if (lower === 'kaufland') return 'Kaufland'
+  if (lower === 'ebay') return 'eBay'
+
+  let resolvedName = mp
+  if (lower === 'mirakl_custom') {
+    resolvedName = 'Decathlon'
+  } else if (lower.includes('decathlon')) {
+    resolvedName = 'Decathlon'
+  } else {
+    resolvedName = mp.charAt(0).toUpperCase() + mp.slice(1)
+  }
+
+  if (resolvedName.toLowerCase().startsWith('decathlon') && shippingCountry) {
+    const countryCode = formatCountry(shippingCountry)
+    return `Decathlon ${countryCode}`
+  }
+
+  return resolvedName
 }
+
 
 const getInitials = (name?: string | null) => {
   if (!name) return 'U'
@@ -354,13 +371,27 @@ export function QuoteList({
 
       {/* Search */}
       <div className="mb-5">
-        <input
-          type="text"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Angebot suchen…"
-          className="w-full max-w-xs px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 bg-white text-slate-800 placeholder-slate-400 font-medium"
-        />
+        <div className="relative w-full max-w-xs">
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Angebot suchen…"
+            className="w-full pr-10 pl-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 bg-white text-slate-800 placeholder-slate-400 font-medium"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+              title="Suche leeren"
+                >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Table */}
@@ -654,7 +685,7 @@ export function QuoteList({
                           </h2>
                         </div>
                         <span className="px-2.5 py-1 text-xs font-bold rounded-lg border bg-white shadow-sm flex items-center gap-1.5 font-sans" style={getMarketplaceBadgeStyle(details.linkedOrder?.marketplace || 'manual')}>
-                          {formatMarketplaceName(details.linkedOrder?.marketplace || 'manual')}
+                          {formatMarketplaceName(details.linkedOrder?.marketplace || 'manual', details.linkedOrder?.shippingCountry)}
                         </span>
                       </div>
                       

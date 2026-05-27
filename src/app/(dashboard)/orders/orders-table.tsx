@@ -62,19 +62,34 @@ const getDefaultDhlProductCode = (country: string | null | undefined, config: Dh
   return 'V06PAK' // Default international if nothing is configured
 }
 
-const formatMarketplaceName = (mp: string) => {
-  if (!mp) return 'N/A'
-  if (mp === 'mirakl_decathlon') return 'Decathlon'
-  if (mp === 'mirakl_decathlon_eu') return 'MIRAKL Hauptaccount'
-  if (mp === 'mirakl_mediamarkt') return 'MediaMarkt'
-  if (mp === 'otto') return 'Otto'
-  if (mp === 'shopify') return 'Shopify'
-  if (mp === 'aboutyou') return 'About You'
-  if (mp === 'amazon') return 'Amazon'
-  if (mp === 'kaufland') return 'Kaufland'
-  if (mp === 'ebay') return 'eBay'
-  // Capitalize first letter for others
-  return mp.charAt(0).toUpperCase() + mp.slice(1)
+const formatMarketplaceName = (mp: string | null, shippingCountry?: string | null) => {
+  if (!mp || mp.toLowerCase() === 'manual') return 'Manuell'
+  const lower = mp.toLowerCase()
+  if (lower === 'mirakl_decathlon') return 'Decathlon'
+  if (lower === 'mirakl_decathlon_eu') return 'MIRAKL Hauptaccount'
+  if (lower === 'mirakl_mediamarkt') return 'MediaMarkt'
+  if (lower === 'otto') return 'Otto'
+  if (lower === 'shopify') return 'Shopify'
+  if (lower === 'aboutyou') return 'About You'
+  if (lower === 'amazon') return 'Amazon'
+  if (lower === 'kaufland') return 'Kaufland'
+  if (lower === 'ebay') return 'eBay'
+
+  let resolvedName = mp
+  if (lower === 'mirakl_custom') {
+    resolvedName = 'Decathlon'
+  } else if (lower.includes('decathlon')) {
+    resolvedName = 'Decathlon'
+  } else {
+    resolvedName = mp.charAt(0).toUpperCase() + mp.slice(1)
+  }
+
+  if (resolvedName.toLowerCase().startsWith('decathlon') && shippingCountry) {
+    const countryCode = formatCountry(shippingCountry)
+    return `Decathlon ${countryCode}`
+  }
+
+  return resolvedName
 }
 
 const getMarketplaceBadgeStyle = (mp: string) => {
@@ -239,6 +254,15 @@ export function OrdersTable({
       toDate: '',
       invoiceFilter: 'all',
     })
+    setCurrentPage(1)
+  }
+
+  const handleClearSearch = () => {
+    setDraftSearch('')
+    setActiveFilters(prev => ({
+      ...prev,
+      search: ''
+    }))
     setCurrentPage(1)
   }
 
@@ -907,8 +931,20 @@ export function OrdersTable({
                 onChange={(e) => setDraftSearch(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleApplyFilters()}
                 placeholder="Nach Bestellnummer oder Kunde suchen..."
-                className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 font-medium placeholder-gray-500 bg-gray-50/30 transition-all"
+                className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 font-medium placeholder-gray-500 bg-gray-50/30 transition-all"
               />
+              {draftSearch && (
+                <button
+                  type="button"
+                  onClick={handleClearSearch}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+                  title="Suche leeren"
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
             </div>
           </div>
           
@@ -949,6 +985,7 @@ export function OrdersTable({
           >
             <option value="all">Alle Status</option>
             <option value="pending">Pending</option>
+            <option value="invoiced">Invoiced</option>
             <option value="later_shipment">Later Shipment</option>
             <option value="shipped">Versendet</option>
             <option value="cancelled">Storniert</option>
@@ -1093,12 +1130,13 @@ export function OrdersTable({
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize" 
                           style={getMarketplaceBadgeStyle(order.marketplace)}>
-                          {formatMarketplaceName(order.marketplace)}
+                          {formatMarketplaceName(order.marketplace, order.shippingCountry)}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
                           order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                          order.status === 'invoiced' ? 'bg-blue-100 text-blue-800' :
                           order.status === 'later_shipment' ? 'bg-purple-100 text-purple-800' :
                           order.status === 'shipped' ? 'bg-green-100 text-green-800' :
                           'bg-gray-100 text-gray-800'

@@ -48,19 +48,34 @@ const formatCountry = (code?: string | null) => {
   return map[code.toUpperCase()] || code.toUpperCase()
 }
 
-const formatMarketplaceName = (mp: string | null) => {
+const formatMarketplaceName = (mp: string | null, shippingCountry?: string | null) => {
   if (!mp || mp.toLowerCase() === 'manual') return 'Manuell'
-  if (mp === 'mirakl_decathlon') return 'Decathlon'
-  if (mp === 'mirakl_decathlon_eu') return 'MIRAKL Hauptaccount'
-  if (mp === 'mirakl_mediamarkt') return 'MediaMarkt'
-  if (mp === 'otto') return 'Otto'
-  if (mp === 'shopify') return 'Shopify'
-  if (mp === 'aboutyou') return 'About You'
-  if (mp === 'amazon') return 'Amazon'
-  if (mp === 'kaufland') return 'Kaufland'
-  if (mp === 'ebay') return 'eBay'
-  // Capitalize first letter for others
-  return mp.charAt(0).toUpperCase() + mp.slice(1)
+  const lower = mp.toLowerCase()
+  if (lower === 'mirakl_decathlon') return 'Decathlon'
+  if (lower === 'mirakl_decathlon_eu') return 'MIRAKL Hauptaccount'
+  if (lower === 'mirakl_mediamarkt') return 'MediaMarkt'
+  if (lower === 'otto') return 'Otto'
+  if (lower === 'shopify') return 'Shopify'
+  if (lower === 'aboutyou') return 'About You'
+  if (lower === 'amazon') return 'Amazon'
+  if (lower === 'kaufland') return 'Kaufland'
+  if (lower === 'ebay') return 'eBay'
+
+  let resolvedName = mp
+  if (lower === 'mirakl_custom') {
+    resolvedName = 'Decathlon'
+  } else if (lower.includes('decathlon')) {
+    resolvedName = 'Decathlon'
+  } else {
+    resolvedName = mp.charAt(0).toUpperCase() + mp.slice(1)
+  }
+
+  if (resolvedName.toLowerCase().startsWith('decathlon') && shippingCountry) {
+    const countryCode = formatCountry(shippingCountry)
+    return `Decathlon ${countryCode}`
+  }
+
+  return resolvedName
 }
 
 const getInitials = (name?: string | null) => {
@@ -755,7 +770,7 @@ export function InvoiceList({
                 <td className="px-6 py-4">
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize" 
                     style={getMarketplaceBadgeStyle(invoice.marketplace)}>
-                    {formatMarketplaceName(invoice.marketplace)}
+                    {formatMarketplaceName(invoice.marketplace, invoice.recipientCountry)}
                   </span>
                 </td>
                 <td className="px-6 py-4 text-slate-600">
@@ -1162,8 +1177,8 @@ export function InvoiceList({
                           </h2>
                         </div>
                         <span className="px-2.5 py-1 text-xs font-bold rounded-lg border bg-white shadow-sm flex items-center gap-1.5" style={getMarketplaceBadgeStyle(details.linkedOrder?.marketplace || 'manual')}>
-                          {formatMarketplaceName(details.linkedOrder?.marketplace || 'manual')}
-                        </span>
+                           {formatMarketplaceName(details.linkedOrder?.marketplace || 'manual', details.linkedOrder?.shippingCountry)}
+                         </span>
                       </div>
                       
                       {/* Subheading */}
