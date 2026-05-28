@@ -370,6 +370,74 @@ export function InvoiceList({
   const [pageSize, setPageSize] = useState(25)
   const [currentPage, setCurrentPage] = useState(1)
 
+  // Sorting
+  const [sortField, setSortField] = useState<string | null>(null)
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | null>(null)
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      if (sortDirection === 'asc') {
+        setSortDirection('desc')
+      } else if (sortDirection === 'desc') {
+        setSortField(null)
+        setSortDirection(null)
+      }
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
+
+  const getInvoiceTypeLabel = (invoice: Invoice) => {
+    if (invoice.cancelsInvoiceId && invoice.invoiceNumber === invoice.originalInvoiceNumber) {
+      return 'Storno'
+    }
+    if (invoice.isCreditNote) {
+      return 'Gutschrift'
+    }
+    if (invoice.documentType === 'quote') {
+      return 'Angebot'
+    }
+    if (invoice.documentType === 'delivery_note') {
+      return 'Lieferschein'
+    }
+    return 'Rechnung'
+  }
+
+  const renderSortableHeader = (label: string, field: string, align: 'left' | 'right' = 'left') => {
+    const isSorted = sortField === field
+    return (
+      <th
+        scope="col"
+        onClick={() => handleSort(field)}
+        className={`px-6 py-4 font-semibold text-slate-700 cursor-pointer hover:bg-slate-100 hover:text-slate-900 select-none transition-colors group ${
+          align === 'right' ? 'text-right' : 'text-left'
+        }`}
+      >
+        <div className={`flex items-center gap-1.5 ${align === 'right' ? 'justify-end' : ''}`}>
+          <span>{label}</span>
+          <span className="inline-flex items-center">
+            {isSorted ? (
+              sortDirection === 'asc' ? (
+                <svg className="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 15l7-7 7 7" />
+                </svg>
+              ) : (
+                <svg className="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
+                </svg>
+              )
+            ) : (
+              <svg className="w-3.5 h-3.5 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
+              </svg>
+            )}
+          </span>
+        </div>
+      </th>
+    )
+  }
+
   const handleApplyFilters = () => {
     setActiveFilters({
       search: draftSearch,
@@ -394,6 +462,8 @@ export function InvoiceList({
       fromDate: '',
       toDate: '',
     })
+    setSortField(null)
+    setSortDirection(null)
     setCurrentPage(1)
   }
 
@@ -560,9 +630,66 @@ export function InvoiceList({
     )
   })
 
+  // Sort invoices if sorting is active
+  const sortedInvoices = [...filteredInvoices].sort((a, b) => {
+    if (!sortField || !sortDirection) return 0
+
+    let valA: any = null
+    let valB: any = null
+
+    switch (sortField) {
+      case 'createdAt':
+        valA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+        valB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+        break
+      case 'invoiceNumber':
+        valA = a.invoiceNumber || ''
+        valB = b.invoiceNumber || ''
+        break
+      case 'type':
+        valA = getInvoiceTypeLabel(a)
+        valB = getInvoiceTypeLabel(b)
+        break
+      case 'marketplace':
+        valA = formatMarketplaceName(a.marketplace, a.recipientCountry)
+        valB = formatMarketplaceName(b.marketplace, b.recipientCountry)
+        break
+      case 'recipientName':
+        valA = a.recipientName || ''
+        valB = b.recipientName || ''
+        break
+      case 'recipientCountry':
+        valA = formatCountry(a.recipientCountry)
+        valB = formatCountry(b.recipientCountry)
+        break
+      case 'totalAmount':
+        valA = Number(a.totalAmount) || 0
+        valB = Number(b.totalAmount) || 0
+        break
+      default:
+        return 0
+    }
+
+    const isEmpty = (val: any) => val === null || val === undefined || val === ''
+    const isEmptyA = isEmpty(valA)
+    const isEmptyB = isEmpty(valB)
+
+    if (isEmptyA && isEmptyB) return 0
+    if (isEmptyA) return 1
+    if (isEmptyB) return -1
+
+    if (typeof valA === 'number' && typeof valB === 'number') {
+      return sortDirection === 'asc' ? valA - valB : valB - valA
+    }
+
+    return sortDirection === 'asc'
+      ? String(valA).localeCompare(String(valB), 'de', { numeric: true, sensitivity: 'base' })
+      : String(valB).localeCompare(String(valA), 'de', { numeric: true, sensitivity: 'base' })
+  })
+
   // Pagination Logic
-  const totalPages = Math.ceil(filteredInvoices.length / pageSize)
-  const paginatedInvoices = filteredInvoices.slice(
+  const totalPages = Math.ceil(sortedInvoices.length / pageSize)
+  const paginatedInvoices = sortedInvoices.slice(
     (currentPage - 1) * pageSize,
     currentPage * pageSize
   )
@@ -723,13 +850,13 @@ export function InvoiceList({
         <table className="w-full text-left border-collapse text-sm min-w-[1200px]">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
-              <th className="px-6 py-4 font-semibold text-slate-700">Datum</th>
-              <th className="px-6 py-4 font-semibold text-slate-700">Belegnummer</th>
-              <th className="px-6 py-4 font-semibold text-slate-700">Typ</th>
-              <th className="px-6 py-4 font-semibold text-slate-700">Marktplatz</th>
-              <th className="px-6 py-4 font-semibold text-slate-700">Kunde</th>
-              <th className="px-6 py-4 font-semibold text-slate-700">Land</th>
-              <th className="px-6 py-4 font-semibold text-slate-700 text-right">Betrag</th>
+              {renderSortableHeader('Datum', 'createdAt')}
+              {renderSortableHeader('Belegnummer', 'invoiceNumber')}
+              {renderSortableHeader('Typ', 'type')}
+              {renderSortableHeader('Marktplatz', 'marketplace')}
+              {renderSortableHeader('Kunde', 'recipientName')}
+              {renderSortableHeader('Land', 'recipientCountry')}
+              {renderSortableHeader('Betrag', 'totalAmount', 'right')}
               <th className="px-6 py-4 font-semibold text-slate-700 text-left">Aktion</th>
             </tr>
           </thead>

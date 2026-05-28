@@ -257,3 +257,152 @@ export async function generateOrDownloadInvoicesBulkAction(orderIds: string[]) {
   }
 }
 
+export async function markOrderAsShippedManuallyAction(
+  orderId: string,
+  trackingNumber?: string,
+  carrier?: string,
+  confirmOnMarketplace = true
+) {
+  try {
+    const auth = await requireAuth()
+
+    // 1. Fetch order
+    const [order] = await db
+      .select()
+      .from(orders)
+      .where(
+        and(
+          eq(orders.id, orderId),
+          eq(orders.companyId, auth.activeCompanyId)
+        )
+      )
+      .limit(1)
+
+    if (!order) {
+      return { error: 'Bestellung nicht gefunden.' }
+    }
+
+    // 2. Update local order status
+    await db
+      .update(orders)
+      .set({
+        status: 'shipped',
+        trackingNumber: trackingNumber || null,
+        updatedAt: new Date()
+      })
+      .where(
+        and(
+          eq(orders.id, orderId),
+          eq(orders.companyId, auth.activeCompanyId)
+        )
+      )
+
+    // 3. Auto-generate / Auto-upload invoice if enabled
+    try {
+      const { marketplaceIntegrations } = await import('@/db/schema/integrations')
+      const activeIntegrations = await db
+        .select()
+        .from(marketplaceIntegrations)
+        .where(
+          and(
+            eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
+            eq(marketplaceIntegrations.isActive, true)
+          )
+        )
+
+      const integration = activeIntegrations.find(i => 
+        i.type === order.marketplace ||
+        (i.type === 'mirakl_custom' && 
+         ((i.metadata as any)?.customName || '').toLowerCase() === order.marketplace.toLowerCase())
+      )
+
+      const autoInvoiceEnabledAt = (integration?.metadata as any)?.autoInvoiceEnabledAt
+      const thresholdDate = autoInvoiceEnabledAt
+        ? new Date(autoInvoiceEnabledAt)
+        : new Date('2026-05-26T12:00:00Z')
+      const isOrderNew = order.createdAt >= thresholdDate
+
+      if (integration?.autoInvoice && isOrderNew && !order.invoiceId) {
+        console.log(`[Manual-Shipment-Action] Auto-generating invoice for order ${order.marketplaceOrderId} during manual shipment...`)
+        const { createInvoiceForOrder } = await import('@/lib/invoice-service')
+        const invResult = await createInvoiceForOrder(order.id, auth.activeCompanyId)
+        
+        // Upload if enabled
+        if (invResult && 'pdfBuffer' in invResult && integration.uploadInvoice) {
+          const { getAdapterForIntegration } = await import('@/workers/marketplace-sync')
+          const adapter = getAdapterForIntegration(integration)
+          if (adapter?.uploadInvoice) {
+            console.log(`[Manual-Shipment-Action] Auto-uploading invoice for order ${order.marketplaceOrderId}...`)
+            await adapter.uploadInvoice(
+              order.marketplaceOrderId,
+              invResult.pdfBuffer,
+              `${invResult.invoiceNumber}.pdf`
+            )
+          }
+        }
+      }
+    } catch (invError) {
+      console.error(`[Manual-Shipment-Action] Failed to auto-generate/upload invoice for order ${order.marketplaceOrderId}:`, invError)
+    }
+
+    // 4. Confirm shipment on marketplace if selected
+    let warning: string | undefined = undefined
+    if (confirmOnMarketplace && order.marketplaceOrderId) {
+      try {
+        const { marketplaceIntegrations } = await import('@/db/schema/integrations')
+        const activeIntegrations = await db
+          .select()
+          .from(marketplaceIntegrations)
+          .where(
+            and(
+              eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
+              eq(marketplaceIntegrations.isActive, true)
+            )
+          )
+
+        const { getAdapterForIntegration } = await import('@/workers/marketplace-sync')
+        const integration = activeIntegrations.find(i => 
+          i.type === order.marketplace ||
+          (i.type === 'mirakl_custom' && 
+           ((i.metadata as any)?.customName || '').toLowerCase() === order.marketplace.toLowerCase())
+        )
+
+        if (integration) {
+          const adapter = getAdapterForIntegration(integration)
+          if (adapter && typeof adapter.confirmShipment === 'function') {
+            console.log(`[Manual-Shipment-Action] Triggering confirmation for ${order.marketplaceOrderId} on ${order.marketplace}`)
+            
+            const isOtto = order.marketplace === 'otto'
+            const ottoReturnAddressCarrierId = isOtto ? (integration.metadata as any)?.returnAddressCarrierId : undefined
+
+            await adapter.confirmShipment(
+              order.marketplaceOrderId,
+              trackingNumber || '',
+              carrier || 'Other',
+              undefined, // returnTrackingNumber
+              order.rawPayload,
+              isOtto ? ottoReturnAddressCarrierId : undefined
+            )
+          }
+        }
+      } catch (confirmErr: any) {
+        const msg = confirmErr?.message ?? String(confirmErr)
+        console.error(`[Manual-Shipment-Action] Marketplace confirmation failed:`, msg)
+        warning = `Bestellung wurde lokal auf "versendet" gestellt, aber die Übertragung an den Marktplatz ist fehlgeschlagen: ${msg}`
+      }
+    }
+
+    revalidatePath('/orders')
+    revalidatePath('/dashboard')
+
+    return { 
+      success: true, 
+      warning,
+      message: warning || 'Bestellung wurde erfolgreich als versendet markiert.' 
+    }
+  } catch (error) {
+    console.error('Error marking order as shipped manually:', error)
+    return { error: 'Fehler beim Markieren der Bestellung als versendet.' }
+  }
+}
+
