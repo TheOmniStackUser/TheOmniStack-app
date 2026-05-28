@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, Fragment, ReactNode } from 'react'
+import { useState, Fragment, ReactNode, useEffect } from 'react'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
 import { generateHermesLabelsAction, generateDhlLabelsAction } from '@/app/actions/shipping'
@@ -346,6 +346,65 @@ export function OrdersTable({
   const [customCarrier, setCustomCarrier] = useState('')
   const [manualConfirmMarketplace, setManualConfirmMarketplace] = useState(true)
   const [isManualShipping, setIsManualShipping] = useState(false)
+
+  // Dropdown actions states & helpers
+  const [openMenuOrderId, setOpenMenuOrderId] = useState<string | null>(null)
+
+  useEffect(() => {
+    const handleClose = () => setOpenMenuOrderId(null)
+    window.addEventListener('click', handleClose)
+    return () => window.removeEventListener('click', handleClose)
+  }, [])
+
+  const toggleMenu = (orderId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setOpenMenuOrderId(prev => prev === orderId ? null : orderId)
+  }
+
+  const handleSingleOrderHermes = (order: OrderWithItems) => {
+    setHermesSelections({ [order.id]: hermesDefaultParcelClass })
+    setSelectedIds(new Set([order.id]))
+    setShowHermesModal(true)
+  }
+
+  const handleSingleOrderDhl = (order: OrderWithItems) => {
+    const productCode = getDefaultDhlProductCode(order.shippingCountry, dhlConfig)
+    let weight = 1
+    if (order.totalWeight && Number(order.totalWeight) > 0) {
+      weight = Number(order.totalWeight)
+    } else if (dhlConfig) {
+      if (productCode === 'V62WP') {
+        weight = dhlConfig.defaultWeightWarenpost ?? 0.2
+      } else if (productCode === 'V66WPI') {
+        weight = dhlConfig.defaultWeightWarenpostInternational ?? 0.2
+      } else if (productCode === 'V86PARCEL') {
+        weight = dhlConfig.defaultWeightKleinpaket ?? 0.5
+      } else if (productCode === 'V87PARCEL') {
+        weight = dhlConfig.defaultWeightKleinpaketInternational ?? 0.5
+      } else {
+        weight = dhlConfig.defaultWeight ?? 1
+      }
+    }
+    setDhlSelections({ [order.id]: { productCode, weight } })
+    setSelectedIds(new Set([order.id]))
+    setShowDhlModal(true)
+  }
+
+  const handleSingleOrderInvoice = async (orderId: string) => {
+    setIsGeneratingInvoices(true)
+    try {
+      const result = await generateOrDownloadInvoicesBulkAction([orderId])
+      if (result.error) {
+        showToast(result.error, 'error')
+      } else {
+        showToast(result.message, 'success')
+      }
+    } catch (e) {
+      showToast('Fehler beim Erstellen der Rechnung.', 'error')
+    } finally {
+      setIsGeneratingInvoices(false)
+    }
+  }
 
   const handleManualShipSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -1621,19 +1680,181 @@ export function OrdersTable({
                         isSelected 
                           ? 'bg-blue-50 group-hover:bg-blue-100/50' 
                           : 'bg-white group-hover:bg-gray-50'
-                      }`}>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleDelete(order.id)
-                          }}
-                          className="text-red-400 hover:text-red-600 transition-colors p-1 rounded-md hover:bg-red-50"
-                          title="Bestellung löschen"
-                        >
-                          <svg className="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
+                      }`} onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-2 relative">
+                          {/* Menu Toggle Button */}
+                          <button
+                            onClick={(e) => toggleMenu(order.id, e)}
+                            className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1.5 rounded-lg transition-colors"
+                            title="Aktionen"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <circle cx="12" cy="12" r="1.5" strokeWidth="2" />
+                              <circle cx="6" cy="12" r="1.5" strokeWidth="2" />
+                              <circle cx="18" cy="12" r="1.5" strokeWidth="2" />
+                            </svg>
+                          </button>
+
+                          {/* Delete Button */}
+                          <button
+                            onClick={() => handleDelete(order.id)}
+                            className="text-red-400 hover:text-red-600 transition-colors p-1.5 rounded-lg hover:bg-red-50"
+                            title="Bestellung löschen"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+
+                          {/* Dropdown Menu */}
+                          {openMenuOrderId === order.id && (
+                            <div className="absolute right-0 top-full mt-1.5 w-60 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden flex flex-col py-1 animate-in fade-in slide-in-from-top-2 duration-150">
+                              {/* 1. Lieferschein öffnen */}
+                              <button
+                                type="button"
+                                onClick={() => window.open(`/api/orders/${order.id}/delivery-note`, '_blank')}
+                                className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                              >
+                                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                                Lieferschein öffnen
+                              </button>
+
+                              {/* 2. Rechnung öffnen */}
+                              {order.invoiceId ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenInvoice(order.invoiceId!)}
+                                  disabled={loadingInvoiceId === order.invoiceId}
+                                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-blue-700 hover:bg-blue-50/50 transition-colors disabled:opacity-50"
+                                >
+                                  <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                  {loadingInvoiceId === order.invoiceId ? 'Rechnung lädt...' : 'Rechnung öffnen'}
+                                </button>
+                              ) : (
+                                <span className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-400 bg-slate-50/30 cursor-not-allowed select-none">
+                                  <svg className="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                  Rechnung öffnen
+                                </span>
+                              )}
+
+                              {/* 3. Rechnung generieren / abrufen */}
+                              {!order.invoiceId ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleSingleOrderInvoice(order.id)}
+                                  disabled={isGeneratingInvoices}
+                                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+                                >
+                                  <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                  Rechnung generieren/abrufen
+                                </button>
+                              ) : (
+                                <span className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-400 bg-slate-50/30 cursor-not-allowed select-none">
+                                  <svg className="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                  Rechnung bereits vorhanden
+                                </span>
+                              )}
+
+                              <div className="border-t border-slate-100 my-1"></div>
+
+                              {/* 4. DHL-Label erstellen */}
+                              {order.status !== 'shipped' && dhlConfig ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleSingleOrderDhl(order)}
+                                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                                >
+                                  <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                                  DHL-Label erstellen
+                                </button>
+                              ) : (
+                                <span className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-400 bg-slate-50/30 cursor-not-allowed select-none" title={!dhlConfig ? "DHL nicht konfiguriert" : "Bestellung bereits versendet"}>
+                                  <svg className="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                                  DHL-Label erstellen
+                                </span>
+                              )}
+
+                              {/* 5. Hermes-Label erstellen */}
+                              {order.status !== 'shipped' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleSingleOrderHermes(order)}
+                                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                                >
+                                  <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                                  Hermes-Label erstellen
+                                </button>
+                              ) : (
+                                <span className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-400 bg-slate-50/30 cursor-not-allowed select-none">
+                                  <svg className="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                                  Hermes-Label erstellen
+                                </span>
+                              )}
+
+                              {/* 6. Manuell versenden */}
+                              {order.status !== 'shipped' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setShowManualShipModal(order)
+                                    setManualTrackingNumber(order.trackingNumber || '')
+                                  }}
+                                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-emerald-700 hover:bg-emerald-50/50 transition-colors"
+                                >
+                                  <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
+                                  Manuell versenden
+                                </button>
+                              ) : (
+                                <span className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-400 bg-slate-50/30 cursor-not-allowed select-none">
+                                  <svg className="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
+                                  Manuell versenden
+                                </span>
+                              )}
+
+                              <div className="border-t border-slate-100 my-1"></div>
+
+                              {/* 7. Status updates: Versand auf später / Zurück zu Pending */}
+                              {order.status === 'pending' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleStatusUpdate(order.id, 'later_shipment')}
+                                  disabled={isUpdatingStatus === order.id}
+                                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-purple-700 hover:bg-purple-50 transition-colors disabled:opacity-50"
+                                >
+                                  <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                  Versand auf später
+                                </button>
+                              ) : order.status === 'later_shipment' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleStatusUpdate(order.id, 'pending')}
+                                  disabled={isUpdatingStatus === order.id}
+                                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-yellow-700 hover:bg-yellow-50 transition-colors disabled:opacity-50"
+                                >
+                                  <svg className="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                  Zurück zu Pending
+                                </button>
+                              ) : (
+                                <span className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-400 bg-slate-50/30 cursor-not-allowed select-none">
+                                  <svg className="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                  Versand auf später
+                                </span>
+                              )}
+
+                              <div className="border-t border-slate-100 my-1"></div>
+
+                              {/* 8. Bestellung löschen */}
+                              <button
+                                type="button"
+                                onClick={() => handleDelete(order.id)}
+                                className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 transition-colors"
+                              >
+                                <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                Bestellung löschen
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </td>
                     </tr>
                     
