@@ -1677,6 +1677,8 @@ export function OrdersTable({
                         {renderOrderProgress(order)}
                       </td>
                       <td className={`px-6 py-4 whitespace-nowrap text-right text-sm font-medium sticky right-0 transition-colors shadow-[-4px_0_4px_-2px_rgba(0,0,0,0.05)] ${
+                        openMenuOrderId === order.id ? 'z-50 shadow-2xl' : 'z-10'
+                      } ${
                         isSelected 
                           ? 'bg-blue-50 group-hover:bg-blue-100/50' 
                           : 'bg-white group-hover:bg-gray-50'
@@ -1708,12 +1710,12 @@ export function OrdersTable({
 
                           {/* Dropdown Menu */}
                           {openMenuOrderId === order.id && (
-                            <div className="absolute right-0 top-full mt-1.5 w-60 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden flex flex-col py-1 animate-in fade-in slide-in-from-top-2 duration-150">
+                            <div className="absolute right-0 top-full mt-1.5 w-72 bg-white border border-slate-200 rounded-xl shadow-2xl z-[100] flex flex-col py-1 animate-in fade-in slide-in-from-top-2 duration-150">
                               {/* 1. Lieferschein öffnen */}
                               <button
                                 type="button"
                                 onClick={() => window.open(`/api/orders/${order.id}/delivery-note`, '_blank')}
-                                className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                                className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors whitespace-nowrap"
                               >
                                 <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
                                 Lieferschein öffnen
@@ -1725,13 +1727,13 @@ export function OrdersTable({
                                   type="button"
                                   onClick={() => handleOpenInvoice(order.invoiceId!)}
                                   disabled={loadingInvoiceId === order.invoiceId}
-                                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-blue-700 hover:bg-blue-50/50 transition-colors disabled:opacity-50"
+                                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-blue-700 hover:bg-blue-50/50 transition-colors disabled:opacity-50 whitespace-nowrap"
                                 >
                                   <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                                   {loadingInvoiceId === order.invoiceId ? 'Rechnung lädt...' : 'Rechnung öffnen'}
                                 </button>
                               ) : (
-                                <span className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-400 bg-slate-50/30 cursor-not-allowed select-none">
+                                <span className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-400 bg-slate-50/30 cursor-not-allowed select-none whitespace-nowrap">
                                   <svg className="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                                   Rechnung öffnen
                                 </span>
@@ -1743,13 +1745,13 @@ export function OrdersTable({
                                   type="button"
                                   onClick={() => handleSingleOrderInvoice(order.id)}
                                   disabled={isGeneratingInvoices}
-                                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+                                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50 whitespace-nowrap"
                                 >
                                   <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                   Rechnung generieren/abrufen
                                 </button>
                               ) : (
-                                <span className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-400 bg-slate-50/30 cursor-not-allowed select-none">
+                                <span className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-400 bg-slate-50/30 cursor-not-allowed select-none whitespace-nowrap">
                                   <svg className="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                   Rechnung bereits vorhanden
                                 </span>
@@ -1762,13 +1764,13 @@ export function OrdersTable({
                                 <button
                                   type="button"
                                   onClick={() => handleSingleOrderDhl(order)}
-                                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors whitespace-nowrap"
                                 >
                                   <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
                                   DHL-Label erstellen
                                 </button>
                               ) : (
-                                <span className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-400 bg-slate-50/30 cursor-not-allowed select-none" title={!dhlConfig ? "DHL nicht konfiguriert" : "Bestellung bereits versendet"}>
+                                <span className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-400 bg-slate-50/30 cursor-not-allowed select-none whitespace-nowrap" title={!dhlConfig ? "DHL nicht konfiguriert" : "Bestellung bereits versendet"}>
                                   <svg className="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
                                   DHL-Label erstellen
                                 </span>
@@ -1779,13 +1781,13 @@ export function OrdersTable({
                                 <button
                                   type="button"
                                   onClick={() => handleSingleOrderHermes(order)}
-                                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors whitespace-nowrap"
                                 >
                                   <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
                                   Hermes-Label erstellen
                                 </button>
                               ) : (
-                                <span className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-400 bg-slate-50/30 cursor-not-allowed select-none">
+                                <span className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-400 bg-slate-50/30 cursor-not-allowed select-none whitespace-nowrap">
                                   <svg className="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
                                   Hermes-Label erstellen
                                 </span>
@@ -1799,13 +1801,13 @@ export function OrdersTable({
                                     setShowManualShipModal(order)
                                     setManualTrackingNumber(order.trackingNumber || '')
                                   }}
-                                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-emerald-700 hover:bg-emerald-50/50 transition-colors"
+                                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-emerald-700 hover:bg-emerald-50/50 transition-colors whitespace-nowrap"
                                 >
                                   <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
                                   Manuell versenden
                                 </button>
                               ) : (
-                                <span className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-400 bg-slate-50/30 cursor-not-allowed select-none">
+                                <span className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-400 bg-slate-50/30 cursor-not-allowed select-none whitespace-nowrap">
                                   <svg className="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
                                   Manuell versenden
                                 </span>
@@ -1819,7 +1821,7 @@ export function OrdersTable({
                                   type="button"
                                   onClick={() => handleStatusUpdate(order.id, 'later_shipment')}
                                   disabled={isUpdatingStatus === order.id}
-                                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-purple-700 hover:bg-purple-50 transition-colors disabled:opacity-50"
+                                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-purple-700 hover:bg-purple-50 transition-colors disabled:opacity-50 whitespace-nowrap"
                                 >
                                   <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                   Versand auf später
@@ -1829,13 +1831,13 @@ export function OrdersTable({
                                   type="button"
                                   onClick={() => handleStatusUpdate(order.id, 'pending')}
                                   disabled={isUpdatingStatus === order.id}
-                                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-yellow-700 hover:bg-yellow-50 transition-colors disabled:opacity-50"
+                                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-yellow-700 hover:bg-yellow-50 transition-colors disabled:opacity-50 whitespace-nowrap"
                                 >
                                   <svg className="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                                   Zurück zu Pending
                                 </button>
                               ) : (
-                                <span className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-400 bg-slate-50/30 cursor-not-allowed select-none">
+                                <span className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-400 bg-slate-50/30 cursor-not-allowed select-none whitespace-nowrap">
                                   <svg className="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                   Versand auf später
                                 </span>
@@ -1847,7 +1849,7 @@ export function OrdersTable({
                               <button
                                 type="button"
                                 onClick={() => handleDelete(order.id)}
-                                className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 transition-colors"
+                                className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 transition-colors whitespace-nowrap"
                               >
                                 <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                 Bestellung löschen
