@@ -383,6 +383,39 @@ export async function markOrderAsShippedManuallyAction(
               order.rawPayload,
               isOtto ? ottoReturnAddressCarrierId : undefined
             )
+
+            // Auto-download invoice after shipping confirmation if enabled
+            const downloadInvoice = !!(integration.metadata as any)?.downloadInvoice
+            if (downloadInvoice) {
+              console.log(`[Manual-Shipment-Action] Scheduled invoice download for order ${order.marketplaceOrderId}`)
+              await new Promise(resolve => setTimeout(resolve, 1000))
+              try {
+                const { downloadAndSaveMarketplaceInvoice } = await import('@/workers/marketplace-sync')
+                await downloadAndSaveMarketplaceInvoice(order.id, auth.activeCompanyId, adapter)
+              } catch (err) {
+                console.error(`[Manual-Shipment-Action] Immediate invoice download failed:`, err)
+              }
+
+              try {
+                const { marketplaceSyncQueue } = await import('@/workers/marketplace-sync')
+                await marketplaceSyncQueue.add(
+                  `sync-${order.marketplace}-invoices-${order.id}`,
+                  {
+                    companyId: auth.activeCompanyId,
+                    marketplace: order.marketplace as any,
+                    triggeredByUserId: auth.userId,
+                  },
+                  {
+                    delay: 240000, // 4 minutes delay
+                    removeOnComplete: true,
+                    removeOnFail: true,
+                  }
+                )
+                console.log(`[Manual-Shipment-Action] Enqueued delayed marketplace sync job for invoice recovery of order ${order.marketplaceOrderId}`)
+              } catch (queueErr) {
+                console.error(`[Manual-Shipment-Action] Failed to enqueue delayed sync job:`, queueErr)
+              }
+            }
           }
         }
       } catch (confirmErr: any) {
