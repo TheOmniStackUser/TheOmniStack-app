@@ -861,79 +861,86 @@ export function InvoiceList({
             </tr>
           </thead>
           <tbody>
-            {paginatedInvoices.map((invoice) => (
-              <tr 
-                key={invoice.id} 
-                onClick={() => handleSelectInvoice(invoice.id)} 
-                className="border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer"
-              >
-                <td className="px-6 py-4 text-slate-600">
-                  {format(new Date(invoice.createdAt), 'dd.MM.yyyy HH:mm', { locale: de })}
-                </td>
-                <td className="px-6 py-4 font-medium text-slate-900">
-                  <div className="flex flex-col">
-                    <span>{invoice.invoiceNumber}</span>
-                    {invoice.cancelsInvoiceId && invoice.originalInvoiceNumber && (
-                      <span className={`text-[10px] font-bold mt-0.5 ${
-                        invoice.invoiceNumber === invoice.originalInvoiceNumber ? 'text-rose-600' : 'text-amber-600'
-                      }`}>
-                        {invoice.invoiceNumber === invoice.originalInvoiceNumber ? 'Storno' : 'Gutschrift'} zu {invoice.originalInvoiceNumber} vom {format(new Date(invoice.originalInvoiceCreatedAt!), 'dd.MM.yyyy')}
-                      </span>
-                    )}
-                    {invoice.status === 'cancelled' && (
-                      <span className="text-[10px] text-red-600 font-bold mt-0.5">
-                        Storniert (Stornobeleg: gleiche Nr.)
-                      </span>
-                    )}
-                    <span className="text-[10px] text-blue-600 font-bold uppercase tracking-tighter mt-0.5">E-Rechnung (ZUGFeRD)</span>
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                  {(() => {
-                    if (invoice.cancelsInvoiceId && invoice.invoiceNumber === invoice.originalInvoiceNumber) {
+            {paginatedInvoices.map((invoice) => {
+              const formatCustomerName = (name: string) => {
+                if (name.length <= 20) return name;
+                return name.match(/.{1,20}(\s|$)/g)?.join('\n') || name;
+              };
+              return (
+                <tr 
+                  key={invoice.id} 
+                  onClick={() => handleSelectInvoice(invoice.id)} 
+                  className="border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  <td className="px-6 py-4 text-slate-600">
+                    {format(new Date(invoice.createdAt), 'dd.MM.yyyy HH:mm', { locale: de })}
+                  </td>
+                  <td className="px-6 py-4 font-medium text-slate-900">
+                    <div className="flex flex-col">
+                      <span>{invoice.invoiceNumber}</span>
+                      {invoice.cancelsInvoiceId && invoice.originalInvoiceNumber && (
+                        <span className={`text-[10px] font-bold mt-0.5 ${
+                          invoice.invoiceNumber === invoice.originalInvoiceNumber ? 'text-rose-600' : 'text-amber-600'
+                        }`}>
+                          {invoice.invoiceNumber === invoice.originalInvoiceNumber ? 'Storno' : 'Gutschrift'} zu {invoice.originalInvoiceNumber} vom {format(new Date(invoice.originalInvoiceCreatedAt!), 'dd.MM.yyyy')}
+                        </span>
+                      )}
+                      {invoice.status === 'cancelled' && (
+                        <span className="text-[10px] text-red-600 font-bold mt-0.5">
+                          Storniert (Stornobeleg: gleiche Nr.)
+                        </span>
+                      )}
+                      <span className="text-[10px] text-blue-600 font-bold uppercase tracking-tighter mt-0.5">E-Rechnung (ZUGFeRD)</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    {(() => {
+                      if (invoice.cancelsInvoiceId && invoice.invoiceNumber === invoice.originalInvoiceNumber) {
+                        return (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-rose-50 text-rose-700 border border-rose-100">
+                            Storno
+                          </span>
+                        )
+                      }
+                      if (invoice.isCreditNote) {
+                        return (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-amber-50 text-amber-700 border border-amber-100">
+                            Gutschrift
+                          </span>
+                        )
+                      }
+                      if (invoice.documentType === 'quote') {
+                        return (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                            Angebot
+                          </span>
+                        )
+                      }
+                      if (invoice.documentType === 'delivery_note') {
+                        return (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-slate-50 text-slate-700 border border-slate-200">
+                            Lieferschein
+                          </span>
+                        )
+                      }
                       return (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-rose-50 text-rose-700 border border-rose-100">
-                          Storno
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                          Rechnung
                         </span>
                       )
-                    }
-                    if (invoice.isCreditNote) {
-                      return (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-amber-50 text-amber-700 border border-amber-100">
-                          Gutschrift
-                        </span>
-                      )
-                    }
-                    if (invoice.documentType === 'quote') {
-                      return (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-blue-50 text-blue-700 border border-blue-100">
-                          Angebot
-                        </span>
-                      )
-                    }
-                    if (invoice.documentType === 'delivery_note') {
-                      return (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-slate-50 text-slate-700 border border-slate-200">
-                          Lieferschein
-                        </span>
-                      )
-                    }
-                    return (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                        Rechnung
-                      </span>
-                    )
-                  })()}
-                </td>
-                <td className="px-6 py-4">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize" 
-                    style={getMarketplaceBadgeStyle(invoice.marketplace)}>
-                    {formatMarketplaceName(invoice.marketplace, invoice.recipientCountry)}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-slate-600">
-                  {invoice.recipientName || '–'}
-                </td>
+                    })()}
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize" 
+                      style={getMarketplaceBadgeStyle(invoice.marketplace)}>
+                      {formatMarketplaceName(invoice.marketplace, invoice.recipientCountry)}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-slate-600">
+                    <div style={{ whiteSpace: 'pre-line' }}>
+                      {formatCustomerName(invoice.recipientName || '–')}
+                    </div>
+                  </td>
                 <td className="px-6 py-4">
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200 tracking-wide font-mono">
                     {formatCountry(invoice.recipientCountry)}
@@ -1009,7 +1016,7 @@ export function InvoiceList({
                   </div>
                 </td>
               </tr>
-            ))}
+            })}
             {filteredInvoices.length === 0 && (
               <tr>
                 <td colSpan={8} className="px-6 py-12 text-center text-slate-500">
@@ -1838,7 +1845,7 @@ export function InvoiceList({
                   <div className="col-span-3 flex gap-2">
                     <input 
                       type="text" 
-                      className="flex-1 px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                      className="flex-1 px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-800"
                       value={recipientEmail}
                       onChange={(e) => setRecipientEmail(e.target.value)}
                       placeholder="empfaenger@email.de"
@@ -1855,7 +1862,7 @@ export function InvoiceList({
                   <div className="col-span-3 flex gap-2">
                     <input 
                       type="text" 
-                      className="flex-1 px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                      className="flex-1 px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-800"
                       value={ccEmail}
                       onChange={(e) => setCcEmail(e.target.value)}
                       placeholder="weitere-empfaenger@email.de"
@@ -1872,7 +1879,7 @@ export function InvoiceList({
                   <div className="col-span-3">
                     <input 
                       type="text" 
-                      className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-800"
                       value={subject}
                       onChange={(e) => setSubject(e.target.value)}
                     />
@@ -1895,7 +1902,7 @@ export function InvoiceList({
                   <div className="col-span-3">
                     <textarea 
                       rows={6}
-                      className="w-full p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 leading-relaxed font-medium font-sans"
+                      className="w-full p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 leading-relaxed font-medium font-sans text-slate-800"
                       value={messageText}
                       onChange={(e) => setMessageText(e.target.value)}
                     />

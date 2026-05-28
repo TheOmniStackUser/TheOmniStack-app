@@ -691,27 +691,34 @@ export function DeliveryNoteList({
             </tr>
           </thead>
           <tbody>
-            {paginatedDeliveryNotes.map((dn) => (
-              <tr 
-                key={dn.id} 
-                onClick={() => handleSelectDeliveryNote(dn.id)} 
-                className="border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer"
-              >
-                <td className="px-6 py-4 text-slate-600">
-                  {format(new Date(dn.createdAt), 'dd.MM.yyyy HH:mm', { locale: de })}
-                </td>
-                <td className="px-6 py-4 font-medium text-slate-900">
-                  {dn.invoiceNumber}
-                </td>
-                <td className="px-6 py-4">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize" 
-                    style={getMarketplaceBadgeStyle(dn.marketplace)}>
-                    {formatMarketplaceName(dn.marketplace, dn.recipientCountry)}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-slate-600">
-                  {dn.recipientName || '–'}
-                </td>
+            {paginatedDeliveryNotes.map((dn) => {
+              const formatCustomerName = (name: string) => {
+                if (name.length <= 20) return name;
+                return name.match(/.{1,20}(\s|$)/g)?.join('\n') || name;
+              };
+              return (
+                <tr 
+                  key={dn.id} 
+                  onClick={() => handleSelectDeliveryNote(dn.id)} 
+                  className="border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  <td className="px-6 py-4 text-slate-600">
+                    {format(new Date(dn.createdAt), 'dd.MM.yyyy HH:mm', { locale: de })}
+                  </td>
+                  <td className="px-6 py-4 font-medium text-slate-900">
+                    {dn.invoiceNumber}
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize" 
+                      style={getMarketplaceBadgeStyle(dn.marketplace)}>
+                      {formatMarketplaceName(dn.marketplace, dn.recipientCountry)}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-slate-600">
+                    <div style={{ whiteSpace: 'pre-line' }}>
+                      {formatCustomerName(dn.recipientName || '–')}
+                    </div>
+                  </td>
                 <td className="px-6 py-4">
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200 tracking-wide font-mono">
                     {formatCountry(dn.recipientCountry)}
@@ -769,7 +776,7 @@ export function DeliveryNoteList({
                   </div>
                 </td>
               </tr>
-            ))}
+            })}
             {filteredDeliveryNotes.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-6 py-12 text-center text-slate-500">

@@ -1566,7 +1566,6 @@ export function OrdersTable({
                 {renderSortableHeader('Land', 'land')}
                 {renderSortableHeader('Umsatz', 'umsatz', 'right')}
                 {renderSortableHeader('Versanddatum', 'versanddatum')}
-                {renderSortableHeader('Rechnungsdatum', 'rechnungsdatum')}
                 <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Verlauf</th>
                 <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50 shadow-[-4px_0_4px_-2px_rgba(0,0,0,0.05)]">Aktion</th>
               </tr>
@@ -1589,6 +1588,11 @@ export function OrdersTable({
                 
                 // @ts-ignore - JSON field
                 const orderNumber = order.rawPayload?.orderNumber || order.marketplaceOrderId
+
+                const formatCustomerName = (name: string) => {
+                  if (name.length <= 20) return name;
+                  return name.match(/.{1,20}(\s|$)/g)?.join('\n') || name;
+                };
 
                 return (
                   <Fragment key={order.id}>
@@ -1627,9 +1631,11 @@ export function OrdersTable({
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {orderNumber}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {/* @ts-ignore */}
-                        {order.buyerName || order.buyer?.name || 'Unbekannt'}
+                      <td className="px-6 py-4 text-sm text-gray-500">
+                        <div style={{ whiteSpace: 'pre-line' }}>
+                          {/* @ts-ignore */}
+                          {formatCustomerName(order.buyerName || order.buyer?.name || 'Unbekannt')}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {(() => {
@@ -1669,9 +1675,6 @@ export function OrdersTable({
                             </a>
                           </div>
                         )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500" suppressHydrationWarning>
-                        {formattedRechnungsDate}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {renderOrderProgress(order)}
@@ -1862,7 +1865,7 @@ export function OrdersTable({
                     
                     {isExpanded && (
                       <tr className="bg-gray-50 border-t border-b border-gray-100">
-                        <td colSpan={12} className="px-6 py-6">
+                        <td colSpan={11} className="px-6 py-6">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                             {/* Addresses & Info */}
                             <div>
@@ -1870,6 +1873,9 @@ export function OrdersTable({
                               <div className="space-y-4 text-sm text-gray-700">
                                 <div>
                                   <span className="font-medium">System Auftrags-ID:</span> <span className="text-gray-500">{order.marketplaceOrderId}</span>
+                                </div>
+                                <div>
+                                  <span className="font-medium">Rechnungsdatum:</span> <span className="text-gray-500">{formattedRechnungsDate}</span>
                                 </div>
                                 <div>
                                   <span className="font-medium">MwSt. (Gesamt):</span> <span className="text-gray-500">{new Intl.NumberFormat('de-DE', { style: 'currency', currency: order.currency }).format(order.taxAmount ? Number(order.taxAmount) : 0)}</span>

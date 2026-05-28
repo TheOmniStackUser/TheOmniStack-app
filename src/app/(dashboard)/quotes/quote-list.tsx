@@ -432,23 +432,30 @@ export function QuoteList({
                 </td>
               </tr>
             ) : (
-              filtered.map((quote) => (
-                <tr 
-                  key={quote.id} 
-                  onClick={() => handleSelectQuote(quote.id)}
-                  className="hover:bg-slate-50/60 transition-colors group cursor-pointer"
-                >
-                  <td className="px-5 py-4">
-                    <span className="font-mono text-xs font-semibold text-slate-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg">
-                      {quote.invoiceNumber}
-                    </span>
-                  </td>
-                  <td className="px-5 py-4">
-                    <div className="font-medium text-slate-800">{quote.recipientName || '–'}</div>
-                    {quote.draftName && (
-                      <div className="text-xs text-slate-400 mt-0.5">{quote.draftName}</div>
-                    )}
-                  </td>
+              filtered.map((quote) => {
+                const formatCustomerName = (name: string) => {
+                  if (name.length <= 20) return name;
+                  return name.match(/.{1,20}(\s|$)/g)?.join('\n') || name;
+                };
+                return (
+                  <tr 
+                    key={quote.id} 
+                    onClick={() => handleSelectQuote(quote.id)}
+                    className="hover:bg-slate-50/60 transition-colors group cursor-pointer"
+                  >
+                    <td className="px-5 py-4">
+                      <span className="font-mono text-xs font-semibold text-slate-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg">
+                        {quote.invoiceNumber}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="font-medium text-slate-800" style={{ whiteSpace: 'pre-line' }}>
+                        {formatCustomerName(quote.recipientName || '–')}
+                      </div>
+                      {quote.draftName && (
+                        <div className="text-xs text-slate-400 mt-0.5">{quote.draftName}</div>
+                      )}
+                    </td>
                   <td className="px-5 py-4">
                     <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
                       {formatCountry(quote.recipientCountry)}
@@ -551,10 +558,10 @@ export function QuoteList({
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
                       </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+                  </div>
+                </td>
+              </tr>
+            })}
             )}
           </tbody>
         </table>
@@ -1069,7 +1076,7 @@ export function QuoteList({
                   <div className="col-span-3 flex gap-2">
                     <input 
                       type="text" 
-                      className="flex-1 px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium"
+                      className="flex-1 px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium text-slate-800"
                       value={recipientEmail}
                       onChange={(e) => setRecipientEmail(e.target.value)}
                       placeholder="empfaenger@email.de"
@@ -1083,7 +1090,7 @@ export function QuoteList({
                   <div className="col-span-3 flex gap-2">
                     <input 
                       type="text" 
-                      className="flex-1 px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium"
+                      className="flex-1 px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium text-slate-800"
                       value={ccEmail}
                       onChange={(e) => setCcEmail(e.target.value)}
                       placeholder="weitere-empfaenger@email.de"
@@ -1097,7 +1104,7 @@ export function QuoteList({
                   <div className="col-span-3">
                     <input 
                       type="text" 
-                      className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium text-slate-800"
                       value={subject}
                       onChange={(e) => setSubject(e.target.value)}
                     />
@@ -1120,7 +1127,7 @@ export function QuoteList({
                   <div className="col-span-3">
                     <textarea 
                       rows={6}
-                      className="w-full p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 leading-relaxed font-medium font-sans text-xs"
+                      className="w-full p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 leading-relaxed font-medium font-sans text-xs text-slate-800"
                       value={messageText}
                       onChange={(e) => setMessageText(e.target.value)}
                     />
