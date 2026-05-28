@@ -2,7 +2,7 @@ import { requireAuth } from '@/lib/session'
 import { db } from '@/db/client'
 import { invoices } from '@/db/schema/invoices'
 import { orders } from '@/db/schema/orders'
-import { eq, desc, and, ne } from 'drizzle-orm'
+import { eq, desc, and, ne, isNotNull } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import Link from 'next/link'
 import { DeliveryNoteList } from './delivery-note-list'
@@ -19,7 +19,7 @@ export default async function DeliveryNotesPage() {
   const auth = await requireAuth()
   const drafts = await getDraftsAction('delivery_note')
 
-  const [allDeliveryNotes, integrations, company, emailTemplate, currentUser] = await Promise.all([
+  const [allDeliveryNotesFromInvoices, orderDeliveryNotesRaw, integrations, company, emailTemplate, currentUser] = await Promise.all([
     db
       .select({
         id: invoices.id,
@@ -47,6 +47,24 @@ export default async function DeliveryNotesPage() {
         ne(invoices.status, 'draft')
       ))
       .orderBy(desc(invoices.createdAt)),
+    db
+      .select({
+        id: orders.id,
+        deliveryNoteNumber: orders.deliveryNoteNumber,
+        shippingName: orders.shippingName,
+        buyerName: orders.buyerName,
+        shippingCountry: orders.shippingCountry,
+        totalAmount: orders.totalAmount,
+        currency: orders.currency,
+        createdAt: orders.createdAt,
+        marketplace: orders.marketplace,
+      })
+      .from(orders)
+      .where(and(
+        eq(orders.companyId, auth.activeCompanyId),
+        isNotNull(orders.deliveryNoteNumber)
+      ))
+      .orderBy(desc(orders.createdAt)),
     db.query.marketplaceIntegrations.findMany({
       where: and(
         eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
@@ -82,6 +100,29 @@ export default async function DeliveryNotesPage() {
       .limit(1)
       .then(rows => rows[0] || null)
   ])
+
+  const orderDeliveryNotes = orderDeliveryNotesRaw.map(o => ({
+    id: o.id,
+    invoiceNumber: o.deliveryNoteNumber!,
+    status: 'issued',
+    recipientName: o.shippingName || o.buyerName || 'Kunde',
+    recipientCountry: o.shippingCountry,
+    totalAmount: o.totalAmount || '0.00',
+    currency: o.currency || 'EUR',
+    createdAt: o.createdAt,
+    pdfStorageKey: `${auth.activeCompanyId}/delivery-notes/${o.id}.pdf`,
+    marketplace: o.marketplace,
+    cancelsInvoiceId: null,
+    isCreditNote: false,
+    documentType: 'delivery_note',
+    originalInvoiceNumber: null,
+    originalInvoiceCreatedAt: null,
+  }))
+
+  const allDeliveryNotes = [
+    ...allDeliveryNotesFromInvoices,
+    ...orderDeliveryNotes
+  ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
   const customMiraklIntegrations = integrations.filter(i => i.type === 'mirakl_custom')
 

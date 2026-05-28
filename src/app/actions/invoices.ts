@@ -26,12 +26,34 @@ export async function getInvoiceDownloadUrl(invoiceId: string) {
     )
     .limit(1)
 
-  if (!invoice || !invoice.pdfStorageKey) {
-    throw new Error('Rechnung nicht gefunden oder PDF wurde noch nicht generiert.')
+  if (invoice) {
+    if (!invoice.pdfStorageKey) {
+      throw new Error('Rechnung nicht gefunden oder PDF wurde noch nicht generiert.')
+    }
+    const url = await getDocumentUrl(invoice.pdfStorageKey)
+    return url
   }
 
-  const url = await getDocumentUrl(invoice.pdfStorageKey)
-  return url
+  // Fallback: Check orders for a delivery note
+  const [order] = await db
+    .select()
+    .from(orders)
+    .where(
+      and(
+        eq(orders.id, invoiceId),
+        eq(orders.companyId, auth.activeCompanyId)
+      )
+    )
+    .limit(1)
+
+  if (order && order.deliveryNoteNumber) {
+    const { buildDeliveryNoteKey } = await import('@/lib/storage')
+    const key = buildDeliveryNoteKey(auth.activeCompanyId, order.id)
+    const url = await getDocumentUrl(key)
+    return url
+  }
+
+  throw new Error('Rechnung nicht gefunden oder PDF wurde noch nicht generiert.')
 }
 
 export async function getInvoiceXmlAction(invoiceId: string) {
@@ -207,11 +229,71 @@ export async function regenerateInvoicePdfAction(invoiceId: string) {
   const companyId = auth.activeCompanyId
 
   try {
-    await regenerateInvoicePdf(invoiceId, companyId)
-    return { success: true }
+    const [invoice] = await db
+      .select({ id: invoices.id })
+      .from(invoices)
+      .where(and(eq(invoices.id, invoiceId), eq(invoices.companyId, companyId)))
+      .limit(1)
+
+    if (invoice) {
+      await regenerateInvoicePdf(invoiceId, companyId)
+      return { success: true }
+    }
+
+    // Fallback: Check orders for a delivery note to regenerate
+    const [order] = await db
+      .select()
+      .from(orders)
+      .where(
+        and(
+          eq(orders.id, invoiceId),
+          eq(orders.companyId, companyId)
+        )
+      )
+      .limit(1)
+
+    if (order && order.deliveryNoteNumber) {
+      const [company] = await db
+        .select()
+        .from(companies)
+        .where(eq(companies.id, companyId))
+        .limit(1)
+
+      const { orderItems } = await import('@/db/schema/orders')
+      const items = await db
+        .select()
+        .from(orderItems)
+        .where(eq(orderItems.orderId, order.id))
+
+      const orderWithItems = {
+        ...order,
+        items: items.map(i => ({
+          ...i,
+          quantity: parseInt(i.quantity)
+        }))
+      }
+
+      const { renderToBuffer } = await import('@react-pdf/renderer')
+      const { DeliveryNoteDocument } = await import('@/components/pdf/delivery-note')
+      const React = await import('react')
+      const { uploadDocument, buildDeliveryNoteKey } = await import('@/lib/storage')
+
+      const pdfBuffer = await renderToBuffer(
+        React.createElement(DeliveryNoteDocument, {
+          order: orderWithItems,
+          company: company
+        }) as any
+      )
+
+      const cacheKey = buildDeliveryNoteKey(companyId, order.id)
+      await uploadDocument(cacheKey, pdfBuffer)
+      return { success: true }
+    }
+
+    throw new Error('Dokument nicht gefunden')
   } catch (err) {
-    console.error('[Action] Failed to regenerate invoice:', err)
-    throw new Error('Fehler beim Aktualisieren der Rechnung.')
+    console.error('[Action] Failed to regenerate document:', err)
+    throw new Error('Fehler beim Aktualisieren des Belegs.')
   }
 }
 
@@ -237,16 +319,76 @@ export async function getInvoiceDetailsAction(invoiceId: string) {
     }
   })
 
-  if (!invoice) throw new Error('Rechnung nicht gefunden')
+  if (invoice) {
+    const linkedOrder = await db.query.orders.findFirst({
+      where: eq(orders.invoiceId, invoiceId)
+    })
 
-  const linkedOrder = await db.query.orders.findFirst({
-    where: eq(orders.invoiceId, invoiceId)
+    return {
+      invoice,
+      linkedOrder: linkedOrder || null
+    }
+  }
+
+  // Fallback: Check orders
+  const order = await db.query.orders.findFirst({
+    where: and(eq(orders.id, invoiceId), eq(orders.companyId, companyId)),
+    with: {
+      items: true
+    }
   })
 
-  return {
-    invoice,
-    linkedOrder: linkedOrder || null
+  if (order && order.deliveryNoteNumber) {
+    const { buildDeliveryNoteKey } = await import('@/lib/storage')
+    const storageKey = buildDeliveryNoteKey(companyId, order.id)
+
+    const mockInvoice = {
+      id: order.id,
+      companyId: order.companyId,
+      documentType: 'delivery_note',
+      invoiceNumber: order.deliveryNoteNumber,
+      draftName: null,
+      status: 'issued',
+      recipientName: order.shippingName || order.buyerName || 'Kunde',
+      recipientStreet: order.shippingStreet || '',
+      recipientZip: order.shippingZip || '',
+      recipientCity: order.shippingCity || '',
+      recipientCountry: order.shippingCountry || 'DE',
+      recipientEmail: order.buyerEmail || null,
+      currency: order.currency || 'EUR',
+      subtotalAmount: order.subtotalAmount || '0.00',
+      taxAmount: order.taxAmount || '0.00',
+      totalAmount: order.totalAmount || '0.00',
+      taxRate: '0.1900',
+      issuedAt: order.createdAt,
+      dueAt: order.createdAt,
+      pdfStorageKey: storageKey,
+      pdfGeneratedAt: order.createdAt,
+      isCreditNote: false,
+      cancelsInvoiceId: null,
+      createdAt: order.createdAt,
+      items: order.items.map((item, index) => ({
+        id: item.id,
+        invoiceId: order.id,
+        companyId: order.companyId,
+        position: (index + 1).toString(),
+        sku: item.sku || '',
+        description: item.title,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        taxRate: item.taxRate,
+        lineTotal: (parseFloat(item.unitPrice) * parseFloat(item.quantity)).toFixed(2)
+      })),
+      logs: []
+    }
+
+    return {
+      invoice: mockInvoice as any,
+      linkedOrder: order
+    }
   }
+
+  throw new Error('Rechnung nicht gefunden')
 }
 
 export async function addInvoiceLogAction(invoiceId: string, action: string, note: string) {
