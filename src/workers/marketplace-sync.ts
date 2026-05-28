@@ -38,6 +38,7 @@ export type MarketplaceSyncJobData = {
   fromDate?: string
   toDate?: string
   integrationId?: string | null
+  isInvoiceSync?: boolean
 }
 
 // ─── Lazy Redis Connection & Queue Initialization ─────────────────────────────
@@ -133,36 +134,72 @@ export function createMarketplaceSyncWorker() {
         return { success: true, message: `Dispatched daily sync for ${toSync.length} marketplaces.` }
       }
 
-      await auditLog({
-        companyId,
-        userId: triggeredByUserId ?? null,
-        action: 'sync_start',
-        entityType: 'marketplace_sync',
-        entityId: marketplace || 'unknown',
-        nextState: { marketplace, startedAt: new Date().toISOString() },
-      })
+      const isInvoiceSync = job.name.includes('-invoices-') || (job.data as any).isInvoiceSync === true
+
+      if (!isInvoiceSync) {
+        await auditLog({
+          companyId,
+          userId: triggeredByUserId ?? null,
+          action: 'sync_start',
+          entityType: 'marketplace_sync',
+          entityId: marketplace || 'unknown',
+          nextState: { marketplace, startedAt: new Date().toISOString() },
+        })
+      }
 
       try {
         // Fetch credentials from the database
-        const [integration] = await db
-          .select()
-          .from(marketplaceIntegrations)
-          .where(
-            and(
-              eq(marketplaceIntegrations.companyId, companyId),
-              job.data.integrationId 
-                ? eq(marketplaceIntegrations.id, job.data.integrationId)
-                : eq(marketplaceIntegrations.type, marketplace as any),
-              eq(marketplaceIntegrations.isActive, true)
+        let integration = null
+        if (job.data.integrationId) {
+          const [found] = await db
+            .select()
+            .from(marketplaceIntegrations)
+            .where(
+              and(
+                eq(marketplaceIntegrations.companyId, companyId),
+                eq(marketplaceIntegrations.id, job.data.integrationId),
+                eq(marketplaceIntegrations.isActive, true)
+              )
             )
-          )
-          .limit(1)
+            .limit(1)
+          integration = found
+        } else {
+          // Try exact match first
+          const [found] = await db
+            .select()
+            .from(marketplaceIntegrations)
+            .where(
+              and(
+                eq(marketplaceIntegrations.companyId, companyId),
+                eq(marketplaceIntegrations.type, marketplace as any),
+                eq(marketplaceIntegrations.isActive, true)
+              )
+            )
+            .limit(1)
+          integration = found
+
+          // If not found, try custom Mirakl integrations matching customName
+          if (!integration && marketplace) {
+            const customIntegrations = await db
+              .select()
+              .from(marketplaceIntegrations)
+              .where(
+                and(
+                  eq(marketplaceIntegrations.companyId, companyId),
+                  eq(marketplaceIntegrations.type, 'mirakl_custom'),
+                  eq(marketplaceIntegrations.isActive, true)
+                )
+              )
+            integration = customIntegrations.find(i => 
+              ((i.metadata as any)?.customName || '').toLowerCase() === marketplace.toLowerCase()
+            ) || null
+          }
+        }
 
         if (!integration) {
           throw new Error(`No active integration found for ${marketplace}`)
         }
 
-        const isInvoiceSync = job.name.includes('-invoices-')
         let rawOrders: NormalizedOrder[] = []
         const adapter = getAdapterForIntegration(integration)
 
@@ -231,26 +268,30 @@ export function createMarketplaceSyncWorker() {
         // Recovery: download invoices for shipped orders that are missing invoices
         await syncShippedOrdersInvoices(companyId, marketplace as any, integration.id)
 
-        await auditLog({
-          companyId,
-          userId: triggeredByUserId,
-          action: 'sync_complete',
-          entityType: 'marketplace_sync',
-          entityId: marketplace,
-          nextState: { marketplace, completedAt: new Date().toISOString(), ordersImported: rawOrders.length },
-        })
+        if (!isInvoiceSync) {
+          await auditLog({
+            companyId,
+            userId: triggeredByUserId,
+            action: 'sync_complete',
+            entityType: 'marketplace_sync',
+            entityId: marketplace,
+            nextState: { marketplace, completedAt: new Date().toISOString(), ordersImported: rawOrders.length },
+          })
+        }
       } catch (error) {
-        await auditLog({
-          companyId,
-          userId: triggeredByUserId,
-          action: 'sync_error',
-          entityType: 'marketplace_sync',
-          entityId: marketplace,
-          nextState: {
-            marketplace,
-            error: error instanceof Error ? error.message : String(error),
-          },
-        })
+        if (!isInvoiceSync) {
+          await auditLog({
+            companyId,
+            userId: triggeredByUserId,
+            action: 'sync_error',
+            entityType: 'marketplace_sync',
+            entityId: marketplace,
+            nextState: {
+              marketplace,
+              error: error instanceof Error ? error.message : String(error),
+            },
+          })
+        }
         throw error // Re-throw so BullMQ marks the job as failed and retries
       }
     },
