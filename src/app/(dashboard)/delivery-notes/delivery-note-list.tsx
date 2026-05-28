@@ -188,6 +188,58 @@ export function DeliveryNoteList({
   const [commentText, setCommentText] = useState('')
   const [isSubmittingComment, setIsSubmittingComment] = useState(false)
 
+  // Sorting
+  const [sortField, setSortField] = useState<string | null>(null)
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | null>(null)
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      if (sortDirection === 'asc') {
+        setSortDirection('desc')
+      } else if (sortDirection === 'desc') {
+        setSortField(null)
+        setSortDirection(null)
+      }
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
+
+  const renderSortableHeader = (label: string, field: string, align: 'left' | 'right' = 'left') => {
+    const isSorted = sortField === field
+    return (
+      <th
+        scope="col"
+        onClick={() => handleSort(field)}
+        className={`px-6 py-4 font-semibold text-slate-700 cursor-pointer hover:bg-slate-100 hover:text-slate-900 select-none transition-colors group ${
+          align === 'right' ? 'text-right' : 'text-left'
+        }`}
+      >
+        <div className={`flex items-center gap-1.5 ${align === 'right' ? 'justify-end' : ''}`}>
+          <span>{label}</span>
+          <span className="inline-flex items-center">
+            {isSorted ? (
+              sortDirection === 'asc' ? (
+                <svg className="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 15l7-7 7 7" />
+                </svg>
+              ) : (
+                <svg className="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
+                </svg>
+              )
+            ) : (
+              <svg className="w-3.5 h-3.5 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
+              </svg>
+            )}
+          </span>
+        </div>
+      </th>
+    )
+  }
+
   // Loading States
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
@@ -232,6 +284,8 @@ export function DeliveryNoteList({
     setDraftMarketplace('all')
     setDraftFromDate('')
     setDraftToDate('')
+    setSortField(null)
+    setSortDirection(null)
     setActiveFilters({
       search: '',
       country: 'all',
@@ -420,9 +474,58 @@ export function DeliveryNoteList({
     )
   })
 
+  // Sort delivery notes if sorting is active
+  const sortedDeliveryNotes = [...filteredDeliveryNotes].sort((a, b) => {
+    if (!sortField || !sortDirection) return 0
+
+    let valA: any = null
+    let valB: any = null
+
+    switch (sortField) {
+      case 'createdAt':
+        valA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+        valB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+        break
+      case 'invoiceNumber':
+        valA = a.invoiceNumber || ''
+        valB = b.invoiceNumber || ''
+        break
+      case 'marketplace':
+        valA = formatMarketplaceName(a.marketplace, a.recipientCountry)
+        valB = formatMarketplaceName(b.marketplace, b.recipientCountry)
+        break
+      case 'recipientName':
+        valA = a.recipientName || ''
+        valB = b.recipientName || ''
+        break
+      case 'recipientCountry':
+        valA = formatCountry(a.recipientCountry)
+        valB = formatCountry(b.recipientCountry)
+        break
+      default:
+        return 0
+    }
+
+    const isEmpty = (val: any) => val === null || val === undefined || val === ''
+    const isEmptyA = isEmpty(valA)
+    const isEmptyB = isEmpty(valB)
+
+    if (isEmptyA && isEmptyB) return 0
+    if (isEmptyA) return 1
+    if (isEmptyB) return -1
+
+    if (typeof valA === 'number' && typeof valB === 'number') {
+      return sortDirection === 'asc' ? valA - valB : valB - valA
+    }
+
+    return sortDirection === 'asc'
+      ? String(valA).localeCompare(String(valB), 'de', { numeric: true, sensitivity: 'base' })
+      : String(valB).localeCompare(String(valA), 'de', { numeric: true, sensitivity: 'base' })
+  })
+
   // Pagination Logic
-  const totalPages = Math.ceil(filteredDeliveryNotes.length / pageSize)
-  const paginatedDeliveryNotes = filteredDeliveryNotes.slice(
+  const totalPages = Math.ceil(sortedDeliveryNotes.length / pageSize)
+  const paginatedDeliveryNotes = sortedDeliveryNotes.slice(
     (currentPage - 1) * pageSize,
     currentPage * pageSize
   )
@@ -574,12 +677,12 @@ export function DeliveryNoteList({
         <table className="w-full text-left border-collapse text-sm min-w-[1000px]">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
-              <th className="px-6 py-4 font-semibold text-slate-700">Datum</th>
-              <th className="px-6 py-4 font-semibold text-slate-700">Lieferscheinnummer</th>
-              <th className="px-6 py-4 font-semibold text-slate-700">Marktplatz</th>
-              <th className="px-6 py-4 font-semibold text-slate-700">Kunde</th>
-              <th className="px-6 py-4 font-semibold text-slate-700">Land</th>
-              <th className="px-6 py-4 font-semibold text-slate-700 text-left">Aktion</th>
+              {renderSortableHeader('Datum', 'createdAt')}
+              {renderSortableHeader('Lieferscheinnummer', 'invoiceNumber')}
+              {renderSortableHeader('Marktplatz', 'marketplace')}
+              {renderSortableHeader('Kunde', 'recipientName')}
+              {renderSortableHeader('Land', 'recipientCountry')}
+              <th scope="col" className="px-6 py-4 font-semibold text-slate-700 text-left">Aktion</th>
             </tr>
           </thead>
           <tbody>
@@ -1095,16 +1198,16 @@ export function DeliveryNoteList({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1.5">Empfänger E-Mail</label>
-                  <input type="email" required value={sendMailTo} onChange={(e) => setSendMailTo(e.target.value)} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500 outline-none" />
+                  <input type="email" required value={sendMailTo} onChange={(e) => setSendMailTo(e.target.value)} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" />
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1.5">Kopie an (CC)</label>
-                  <input type="email" value={sendMailCc} onChange={(e) => setSendMailCc(e.target.value)} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500 outline-none" />
+                  <input type="email" value={sendMailCc} onChange={(e) => setSendMailCc(e.target.value)} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" />
                 </div>
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1.5">Betreff</label>
-                <input type="text" required value={sendMailSubject} onChange={(e) => setSendMailSubject(e.target.value)} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500 outline-none" />
+                <input type="text" required value={sendMailSubject} onChange={(e) => setSendMailSubject(e.target.value)} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" />
               </div>
               <div>
                 <div className="flex justify-between items-center mb-1.5">
@@ -1115,14 +1218,14 @@ export function DeliveryNoteList({
                 </div>
                 {isEditingTemplate ? (
                   <div className="space-y-2">
-                    <textarea value={templateText} onChange={(e) => setTemplateText(e.target.value)} className="w-full h-48 px-4 py-3 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500 outline-none font-mono" />
+                    <textarea value={templateText} onChange={(e) => setTemplateText(e.target.value)} className="w-full h-48 px-4 py-3 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none font-mono" />
                     <div className="text-[9px] text-slate-400 leading-normal">Platzhalter: <code className="font-bold text-slate-650 bg-slate-100 px-1 py-0.5 rounded">{`{kunde}`}</code>, <code className="font-bold text-slate-650 bg-slate-100 px-1 py-0.5 rounded">{`{belegnummer}`}</code>, <code className="font-bold text-slate-650 bg-slate-100 px-1 py-0.5 rounded">{`{datum}`}</code>, <code className="font-bold text-slate-650 bg-slate-100 px-1 py-0.5 rounded">{`{firma}`}</code></div>
                     <button type="button" disabled={isSavingTemplate} onClick={handleSaveTemplateText} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 disabled:opacity-50 transition-colors">
                       {isSavingTemplate ? 'Wird gespeichert...' : 'Vorlage für Lieferscheine speichern'}
                     </button>
                   </div>
                 ) : (
-                  <textarea required value={sendMailBody} onChange={(e) => setSendMailBody(e.target.value)} className="w-full h-48 px-4 py-3 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500 outline-none" />
+                  <textarea required value={sendMailBody} onChange={(e) => setSendMailBody(e.target.value)} className="w-full h-48 px-4 py-3 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" />
                 )}
               </div>
               <div className="p-4 bg-slate-50 border border-slate-150 rounded-2xl flex items-center gap-3">
