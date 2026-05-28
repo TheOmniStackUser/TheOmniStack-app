@@ -375,7 +375,7 @@ export async function markOrderAsShippedManuallyAction(
             const isOtto = order.marketplace === 'otto'
             const ottoReturnAddressCarrierId = isOtto ? (integration.metadata as any)?.returnAddressCarrierId : undefined
 
-            await adapter.confirmShipment(
+            await (adapter as any).confirmShipment(
               order.marketplaceOrderId,
               trackingNumber || '',
               carrier || 'Other',
