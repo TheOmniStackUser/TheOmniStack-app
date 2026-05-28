@@ -173,6 +173,7 @@ export function DeliveryNoteList({
 
   // Mail Modal State
   const [showSendModal, setShowSendModal] = useState(false)
+  const [sendMailSender, setSendMailSender] = useState('')
   const [sendMailTo, setSendMailTo] = useState('')
   const [sendMailCc, setSendMailCc] = useState('')
   const [sendMailSubject, setSendMailSubject] = useState('')
@@ -368,6 +369,10 @@ export function DeliveryNoteList({
 
   const handleSendMailOpen = () => {
     if (!details) return
+    const defaultSender = (company?.smtpSettings?.enabled && company.smtpSettings.fromEmail)
+      ? company.smtpSettings.fromEmail
+      : 'noreply@theomnistack.de'
+    setSendMailSender(defaultSender)
     setSendMailTo(details.invoice.recipientEmail || '')
     setSendMailCc(company?.email || '')
     setSendMailSubject(`Lieferschein ${details.invoice.invoiceNumber}`)
@@ -398,7 +403,7 @@ export function DeliveryNoteList({
         ccEmail: sendMailCc || undefined,
         subject: sendMailSubject,
         messageText: sendMailBody.replace(/\n/g, '<br/>'),
-        senderEmail: company?.email || '',
+        senderEmail: sendMailSender || company?.email || '',
         sendAsAttachment: true
       })
       if (res.error) {
@@ -1189,12 +1194,37 @@ export function DeliveryNoteList({
                 <h3 className="text-xl font-bold text-slate-900">Beleg per E-Mail versenden</h3>
                 <p className="text-xs text-slate-500 font-medium">Senden Sie diesen Lieferschein direkt an den Empfänger.</p>
               </div>
-              <button onClick={() => setShowSendModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+              <button onClick={() => setShowSendModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-600 hover:text-slate-900 font-bold">
                 ✕
               </button>
             </div>
             
             <form onSubmit={handleSendMailSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1.5">Absender E-Mail</label>
+                <div className="flex items-center gap-2">
+                  <select 
+                    className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl bg-white text-xs font-medium text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none"
+                    value={sendMailSender}
+                    onChange={(e) => setSendMailSender(e.target.value)}
+                  >
+                    <option value="noreply@theomnistack.de">noreply@theomnistack.de (System-Standard)</option>
+                    {company?.smtpSettings?.enabled && company.smtpSettings.fromEmail && (
+                      <option value={company.smtpSettings.fromEmail}>
+                        {company.smtpSettings.fromEmail} (Eigener Mailserver)
+                      </option>
+                    )}
+                  </select>
+                  <Link 
+                    href="/settings#smtp-settings"
+                    target="_blank"
+                    className="text-blue-600 hover:text-blue-700 hover:underline shrink-0 text-xs font-bold"
+                  >
+                    SMTP einrichten
+                  </Link>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1.5">Empfänger E-Mail</label>
