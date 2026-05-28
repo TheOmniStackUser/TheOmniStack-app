@@ -1127,7 +1127,7 @@ export function DeliveryNoteList({
                             placeholder="Interne Notiz hinzufügen..." 
                             value={commentText}
                             onChange={(e) => setCommentText(e.target.value)}
-                            className="flex-1 px-4 py-2 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                            className="flex-1 px-4 py-2 border border-slate-200 bg-white rounded-xl text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                           />
                           <button 
                             type="submit" 
