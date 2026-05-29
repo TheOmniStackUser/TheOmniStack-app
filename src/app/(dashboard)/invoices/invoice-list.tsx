@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
@@ -166,7 +166,13 @@ export function InvoiceList({
   currentUserName?: string
 }) {
   const router = useRouter()
-  const [activeFilterTab, setActiveFilterTab] = useState<'all' | 'drafts' | 'open' | 'overdue' | 'paid' | 'cancelled'>('all')
+  const searchParams = useSearchParams()
+  const initialStatus = searchParams ? searchParams.get('status') : null
+  const [activeFilterTab, setActiveFilterTab] = useState<'all' | 'drafts' | 'open' | 'overdue' | 'paid' | 'cancelled'>(
+    (initialStatus && ['all', 'drafts', 'open', 'overdue', 'paid', 'cancelled'].includes(initialStatus))
+      ? (initialStatus as any)
+      : 'all'
+  )
   const [showSearch, setShowSearch] = useState(false)
 
   // Row context menu state
