@@ -168,10 +168,49 @@ export async function generateMissingInvoicesAction() {
           continue
         }
         
-        const { downloadAndSaveMarketplaceInvoice, getAdapterForIntegration } = await import('@/workers/marketplace-sync')
-        const adapter = getAdapterForIntegration(integration)
+        // Initialize adapter
+        let adapter: any = null
+        if (order.marketplace === 'otto') {
+          if (integration.clientId && integration.clientSecret) {
+            const { OttoAdapter } = await import('@/adapters/marketplace/otto')
+            adapter = new OttoAdapter({
+              clientId: integration.clientId,
+              clientSecret: integration.clientSecret,
+              environment: (integration.environment as 'sandbox' | 'production') || 'production',
+              installationId: (integration.metadata as any)?.installationId,
+              appId: (integration.metadata as any)?.appId
+            })
+          }
+        } else if (order.marketplace === 'aboutyou') {
+          if (integration.apiKey) {
+            const { AboutYouAdapter } = await import('@/adapters/marketplace/aboutyou')
+            adapter = new AboutYouAdapter({
+              apiKey: integration.apiKey,
+              environment: (integration.environment as 'sandbox' | 'production') || 'production'
+            })
+          }
+        } else if (
+          (order.marketplace && order.marketplace.startsWith('mirakl_')) ||
+          integration.type === 'mirakl_custom'
+        ) {
+          if (integration.clientId) {
+            const { MiraklAdapter } = await import('@/adapters/marketplace/mirakl')
+            const customName = integration.type === 'mirakl_custom'
+              ? ((integration.metadata as any)?.customName || 'mirakl_custom')
+              : integration.type
+            adapter = new MiraklAdapter({
+              instance: customName.toLowerCase(),
+              baseUrl: integration.environment!,
+              clientId: integration.clientId,
+              clientSecret: integration.clientSecret || '',
+              apiKey: integration.apiKey || undefined,
+              shopId: (integration.metadata as any)?.shopId || undefined
+            })
+          }
+        }
 
         if (adapter) {
+          const { downloadAndSaveMarketplaceInvoice } = await import('@/workers/marketplace-sync')
           await downloadAndSaveMarketplaceInvoice(order.id, companyId, adapter)
 
           // Check if invoice was successfully downloaded and linked
