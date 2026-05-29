@@ -718,10 +718,12 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
               <option value="CHF">CHF (Schweizer Franken)</option>
             </select>
           </div>
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Fälligkeit (Tage)</label>
-            <input type="number" className="w-24 px-4 py-2.5 border-2 border-slate-200 rounded-xl font-bold text-slate-900 outline-none focus:border-blue-500" value={settings.dueDateDays} onChange={e => setSettings({ ...settings, dueDateDays: parseInt(e.target.value) })} />
-          </div>
+          {documentType !== 'quote' && (
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Fälligkeit (Tage)</label>
+              <input type="number" className="w-24 px-4 py-2.5 border-2 border-slate-200 rounded-xl font-bold text-slate-900 outline-none focus:border-blue-500" value={settings.dueDateDays} onChange={e => setSettings({ ...settings, dueDateDays: parseInt(e.target.value) })} />
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">

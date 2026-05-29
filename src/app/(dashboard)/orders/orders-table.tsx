@@ -4,7 +4,7 @@ import { useState, Fragment, ReactNode, useEffect } from 'react'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
 import { generateHermesLabelsAction, generateDhlLabelsAction } from '@/app/actions/shipping'
-import { archiveOrderAction, archiveOrdersBulkAction, updateOrderStatusAction, updateOrderAddressAction, generateOrDownloadInvoicesBulkAction, markOrderAsShippedManuallyAction } from '@/app/actions/orders'
+import { archiveOrderAction, archiveOrdersBulkAction, updateOrderStatusAction, updateOrderAddressAction, updateOrderBillingAddressAction, generateOrDownloadInvoicesBulkAction, markOrderAsShippedManuallyAction } from '@/app/actions/orders'
 import { getInvoiceDownloadUrl } from '@/app/actions/invoices'
 import type { Order, OrderItem } from '@/db/schema/orders'
 import type { Invoice, InvoiceLog } from '@/db/schema/invoices'
@@ -460,6 +460,48 @@ export function OrdersTable({
   const [editCity, setEditCity] = useState('')
   const [editCountry, setEditCountry] = useState('')
   const [isUpdatingAddress, setIsUpdatingAddress] = useState(false)
+
+  // Billing Address editing states
+  const [editingBillingAddressId, setEditingBillingAddressId] = useState<string | null>(null)
+  const [editBillingName, setEditBillingName] = useState('')
+  const [editBillingStreet, setEditBillingStreet] = useState('')
+  const [editBillingZip, setEditBillingZip] = useState('')
+  const [editBillingCity, setEditBillingCity] = useState('')
+  const [editBillingCountry, setEditBillingCountry] = useState('')
+  const [isUpdatingBillingAddress, setIsUpdatingBillingAddress] = useState(false)
+
+  const startEditingBillingAddress = (order: OrderWithItems) => {
+    const addr = getBillingAddress(order)
+    setEditingBillingAddressId(order.id)
+    setEditBillingName(order.buyerName || order.shippingName || '')
+    setEditBillingStreet(addr?.street || '')
+    setEditBillingZip(addr?.zip || '')
+    setEditBillingCity(addr?.city || '')
+    setEditBillingCountry(addr?.country || 'DE')
+  }
+
+  const handleSaveBillingAddress = async (orderId: string) => {
+    setIsUpdatingBillingAddress(true)
+    try {
+      const result = await updateOrderBillingAddressAction(orderId, {
+        buyerName: editBillingName,
+        street: editBillingStreet,
+        zip: editBillingZip,
+        city: editBillingCity,
+        country: editBillingCountry,
+      })
+      if (result.error) {
+        showToast(result.error, 'error')
+      } else {
+        showToast(result.message, 'success')
+        setEditingBillingAddressId(null)
+      }
+    } catch (e) {
+      showToast('Fehler beim Aktualisieren der Rechnungsadresse.', 'error')
+    } finally {
+      setIsUpdatingBillingAddress(false)
+    }
+  }
   
   const showToast = (message: string | undefined | null, type: 'success' | 'error' | 'info' = 'info') => {
     if (!message) return
@@ -959,6 +1001,14 @@ export function OrdersTable({
 
     const raw = order.rawPayload as any
     if (raw) {
+      if (raw.manualBillingAddress) {
+        return {
+          street: raw.manualBillingAddress.street || '',
+          zip: raw.manualBillingAddress.zip || '',
+          city: raw.manualBillingAddress.city || '',
+          country: raw.manualBillingAddress.country || 'DE'
+        }
+      }
       // 2. Otto Structure
       if (raw.invoiceAddress) {
         return {
@@ -2168,21 +2218,106 @@ export function OrdersTable({
                                   </div>
                                 )}
                                 <div>
-                                  <span className="font-medium">Rechnungsadresse:</span>
-                                  <div className="mt-1 text-gray-600 bg-white p-3 rounded-md border border-gray-200">
-                                    {order.buyerName || order.buyerEmail}<br/>
-                                    {(() => {
-                                      const addr = getBillingAddress(order)
-                                      if (!addr) return <span>Keine Rechnungsadresse hinterlegt</span>
-                                      return (
-                                        <>
-                                          {addr.street}<br/>
-                                          {addr.zip} {addr.city}<br/>
-                                          {formatCountry(addr.country)}
-                                        </>
-                                      )
-                                    })()}
-                                  </div>
+                                  {editingBillingAddressId === order.id ? (
+                                    <div>
+                                      <span className="font-medium">Rechnungsadresse bearbeiten:</span>
+                                      <div className="mt-1 space-y-2 bg-white p-3 rounded-md border border-gray-200">
+                                        <div>
+                                          <label className="block text-[10px] uppercase font-bold text-gray-400">Name</label>
+                                          <input 
+                                            type="text" 
+                                            value={editBillingName} 
+                                            onChange={(e) => setEditBillingName(e.target.value)}
+                                            className="w-full text-sm p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-[10px] uppercase font-bold text-gray-400">Straße & Hausnummer</label>
+                                          <input 
+                                            type="text" 
+                                            value={editBillingStreet} 
+                                            onChange={(e) => setEditBillingStreet(e.target.value)}
+                                            className="w-full text-sm p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                          />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                          <div>
+                                            <label className="block text-[10px] uppercase font-bold text-gray-400">PLZ</label>
+                                            <input 
+                                              type="text" 
+                                              value={editBillingZip} 
+                                              onChange={(e) => setEditBillingZip(e.target.value)}
+                                              className="w-full text-sm p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-[10px] uppercase font-bold text-gray-400">Stadt</label>
+                                            <input 
+                                              type="text" 
+                                              value={editBillingCity} 
+                                              onChange={(e) => setEditBillingCity(e.target.value)}
+                                              className="w-full text-sm p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                            />
+                                          </div>
+                                        </div>
+                                        <div>
+                                          <label className="block text-[10px] uppercase font-bold text-gray-400">Land (ISO 2)</label>
+                                          <input 
+                                            type="text" 
+                                            value={editBillingCountry} 
+                                            onChange={(e) => setEditBillingCountry(e.target.value)}
+                                            maxLength={3}
+                                            className="w-full text-sm p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                          />
+                                        </div>
+                                        <div className="flex justify-end gap-2 pt-1">
+                                          <button 
+                                            onClick={() => setEditingBillingAddressId(null)}
+                                            disabled={isUpdatingBillingAddress}
+                                            className="text-xs px-2.5 py-1.5 border border-gray-300 hover:bg-gray-50 rounded-md transition-colors"
+                                          >
+                                            Abbrechen
+                                          </button>
+                                          <button 
+                                            onClick={() => handleSaveBillingAddress(order.id)}
+                                            disabled={isUpdatingBillingAddress}
+                                            className="text-xs px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors disabled:opacity-50"
+                                          >
+                                            {isUpdatingBillingAddress ? 'Speichert...' : 'Speichern'}
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div>
+                                      <div className="flex items-center justify-between">
+                                        <span className="font-medium">Rechnungsadresse:</span>
+                                        <button 
+                                          onClick={() => startEditingBillingAddress(order)}
+                                          className="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1 transition-colors"
+                                        >
+                                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                          </svg>
+                                          Bearbeiten
+                                        </button>
+                                      </div>
+                                      <div className="mt-1 text-gray-600 bg-white p-3 rounded-md border border-gray-200">
+                                        {order.buyerName || order.buyerEmail}<br/>
+                                        {(() => {
+                                          const addr = getBillingAddress(order)
+                                          if (!addr) return <span>Keine Rechnungsadresse hinterlegt</span>
+                                          return (
+                                            <>
+                                              {addr.street}<br/>
+                                              {addr.zip} {addr.city}<br/>
+                                              {formatCountry(addr.country)}
+                                            </>
+                                          )
+                                        })()}
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                                  {editingAddressId === order.id ? (
                                   <div>

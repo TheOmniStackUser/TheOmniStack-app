@@ -13,6 +13,7 @@ import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { companies } from '@/db/schema/companies'
 import { invoiceTextTemplates } from '@/db/schema/templates'
 import { users } from '@/db/schema/auth'
+import { dunningLogs } from '@/db/schema/dunning'
 
 const originalInvoice = alias(invoices, 'original_invoice')
 
@@ -20,7 +21,7 @@ export default async function InvoicesPage() {
   const auth = await requireAuth()
   const drafts = await getDraftsAction()
 
-  const [allInvoices, integrations, company, emailTemplate, currentUser] = await Promise.all([
+  const [allInvoices, companyDunningLogs, integrations, company, emailTemplate, currentUser] = await Promise.all([
     db
       .select({
         id: invoices.id,
@@ -51,6 +52,18 @@ export default async function InvoicesPage() {
         eq(invoices.documentType, 'invoice')
       ))
       .orderBy(desc(invoices.createdAt)),
+    db
+      .select({
+        invoiceId: dunningLogs.invoiceId,
+        stage: dunningLogs.stage,
+        sentAt: dunningLogs.sentAt,
+      })
+      .from(dunningLogs)
+      .where(and(
+        eq(dunningLogs.companyId, auth.activeCompanyId),
+        eq(dunningLogs.status, 'sent')
+      ))
+      .orderBy(desc(dunningLogs.sentAt)),
     db.query.marketplaceIntegrations.findMany({
       where: and(
         eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
@@ -99,6 +112,16 @@ export default async function InvoicesPage() {
   const hasAmazonIntegration = integrations.some(i => i.type === 'amazon' && i.refreshToken)
   const hasShopifyIntegration = integrations.some(i => i.type === 'shopify' && i.accessToken)
 
+  // Map dunning stage info
+  const invoicesWithDunning = allInvoices.map((inv) => {
+    const logs = companyDunningLogs.filter((log) => log.invoiceId === inv.id)
+    return {
+      ...inv,
+      lastDunningStage: logs[0]?.stage || null,
+      lastDunningSentAt: logs[0]?.sentAt || null,
+    }
+  })
+
   return (
     <div className="p-8">
       <div className="flex justify-between items-center mb-8">
@@ -122,7 +145,7 @@ export default async function InvoicesPage() {
       </div>
 
       <InvoiceList 
-        initialInvoices={allInvoices} 
+        initialInvoices={invoicesWithDunning} 
         hasKauflandIntegration={hasKauflandIntegration}
         hasEbayIntegration={hasEbayIntegration}
         hasOttoIntegration={hasOttoIntegration}

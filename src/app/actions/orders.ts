@@ -3,6 +3,7 @@
 import { requireAuth } from '@/lib/session'
 import { db } from '@/db/client'
 import { orders } from '@/db/schema/orders'
+import { invoices } from '@/db/schema/invoices'
 import { eq, and } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 
@@ -436,6 +437,89 @@ export async function markOrderAsShippedManuallyAction(
   } catch (error) {
     console.error('Error marking order as shipped manually:', error)
     return { error: 'Fehler beim Markieren der Bestellung als versendet.' }
+  }
+}
+
+export async function updateOrderBillingAddressAction(
+  orderId: string,
+  address: {
+    buyerName: string
+    street: string
+    zip: string
+    city: string
+    country: string
+  }
+) {
+  try {
+    const auth = await requireAuth()
+
+    const [order] = await db
+      .select()
+      .from(orders)
+      .where(
+        and(
+          eq(orders.id, orderId),
+          eq(orders.companyId, auth.activeCompanyId)
+        )
+      )
+      .limit(1)
+
+    if (!order) {
+      return { error: 'Bestellung nicht gefunden.' }
+    }
+
+    if (order.invoiceId) {
+      await db
+        .update(invoices)
+        .set({
+          recipientName: address.buyerName,
+          recipientStreet: address.street,
+          recipientZip: address.zip,
+          recipientCity: address.city,
+          recipientCountry: address.country,
+        })
+        .where(
+          and(
+            eq(invoices.id, order.invoiceId),
+            eq(invoices.companyId, auth.activeCompanyId)
+          )
+        )
+
+      const { regenerateInvoicePdf } = await import('@/lib/invoice-service')
+      await regenerateInvoicePdf(order.invoiceId, auth.activeCompanyId)
+    }
+
+    const currentRaw = (order.rawPayload as any) || {}
+    const updatedRaw = {
+      ...currentRaw,
+      manualBillingAddress: {
+        name: address.buyerName,
+        street: address.street,
+        zip: address.zip,
+        city: address.city,
+        country: address.country
+      }
+    }
+
+    await db
+      .update(orders)
+      .set({
+        buyerName: address.buyerName,
+        rawPayload: updatedRaw,
+        updatedAt: new Date()
+      })
+      .where(
+        and(
+          eq(orders.id, orderId),
+          eq(orders.companyId, auth.activeCompanyId)
+        )
+      )
+
+    revalidatePath('/orders')
+    return { success: true, message: 'Rechnungsadresse wurde erfolgreich aktualisiert.' }
+  } catch (error) {
+    console.error('Error updating billing address:', error)
+    return { error: 'Fehler beim Aktualisieren der Rechnungsadresse.' }
   }
 }
 

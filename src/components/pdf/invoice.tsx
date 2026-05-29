@@ -415,7 +415,7 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
             {paymentMethod && (
               <Text style={{ marginRight: 15 }}>{t.paymentMethod}: {paymentMethod}</Text>
             )}
-            {dueDate && !isCreditNote && (
+            {dueDate && !isCreditNote && documentType !== 'quote' && (
               <Text>{t.dueDate}: {format(dueDate, 'dd.MM.yyyy')}</Text>
             )}
           </View>

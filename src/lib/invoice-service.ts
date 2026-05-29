@@ -211,6 +211,44 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
   const { paymentMethod } = extractPaymentInfo(order)
   const metadata = (order.rawPayload as any)?.manualMetadata || {}
 
+  let billingName = order.buyerName || order.shippingName || 'Kunde'
+  let billingStreet = order.shippingStreet || ''
+  let billingZip = order.shippingZip || ''
+  let billingCity = order.shippingCity || ''
+  let billingCountry = order.shippingCountry || 'DE'
+
+  const raw = order.rawPayload as any
+  if (raw) {
+    if (raw.manualBillingAddress) {
+      billingName = raw.manualBillingAddress.name || billingName
+      billingStreet = raw.manualBillingAddress.street || ''
+      billingZip = raw.manualBillingAddress.zip || ''
+      billingCity = raw.manualBillingAddress.city || ''
+      billingCountry = raw.manualBillingAddress.country || 'DE'
+    } else if (raw.invoiceAddress) {
+      billingStreet = `${raw.invoiceAddress.street || ''} ${raw.invoiceAddress.houseNumber || ''}`.trim()
+      billingZip = raw.invoiceAddress.zipCode || ''
+      billingCity = raw.invoiceAddress.city || ''
+      billingCountry = raw.invoiceAddress.countryCode || 'DE'
+    } else if (raw.customer?.billing_address) {
+      const addr = raw.customer.billing_address
+      billingStreet = `${addr.street_1 || ''} ${addr.street_2 || ''}`.trim()
+      billingZip = addr.zip_code || ''
+      billingCity = addr.city || ''
+      billingCountry = addr.country_iso_code || addr.country || 'DE'
+    } else if (raw.billing_street) {
+      billingStreet = raw.billing_street || ''
+      billingZip = raw.billing_zip_code || ''
+      billingCity = raw.billing_city || ''
+      billingCountry = raw.billing_country_code || 'DE'
+    }
+  } else if (order.marketplace === 'manual' && order.shippingStreet) {
+    billingStreet = order.shippingStreet
+    billingZip = order.shippingZip || ''
+    billingCity = order.shippingCity || ''
+    billingCountry = order.shippingCountry || 'DE'
+  }
+
   let pdfBuffer;
   if (documentType === 'delivery_note') {
     const { DeliveryNoteDocument } = await import('@/components/pdf/delivery-note')
@@ -273,11 +311,11 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
           footerTextEn: documentType === 'quote' ? (company.offerFooterEn || undefined) : (company.invoiceFooterEn || undefined),
         },
         recipient: {
-          name: order.shippingName || order.buyerName || 'Kunde',
-          street: order.shippingStreet || '',
-          zip: order.shippingZip || '',
-          city: order.shippingCity || '',
-          country: order.shippingCountry || 'DE',
+          name: billingName,
+          street: billingStreet,
+          zip: billingZip,
+          city: billingCity,
+          country: billingCountry,
         },
         items: order.items.map((i: typeof orderItems.$inferSelect) => ({
           sku: i.sku,
@@ -360,11 +398,11 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
         status,
         draftName,
         documentType,
-        recipientName: order.shippingName || order.buyerName || 'Kunde',
-        recipientStreet: order.shippingStreet || '',
-        recipientZip: order.shippingZip || '',
-        recipientCity: order.shippingCity || '',
-        recipientCountry: order.shippingCountry || 'DE',
+        recipientName: billingName,
+        recipientStreet: billingStreet,
+        recipientZip: billingZip,
+        recipientCity: billingCity,
+        recipientCountry: billingCountry,
         recipientEmail: order.buyerEmail || null,
         currency: order.currency || 'EUR',
         subtotalAmount: calculatedSubtotal.toFixed(2),
@@ -577,4 +615,74 @@ export async function regenerateInvoicePdf(invoiceId: string, companyId: string)
     .where(eq(invoices.id, invoiceId))
 
   return { storageKey }
+}
+
+export async function addDunningFeeToInvoice(
+  invoiceId: string,
+  companyId: string,
+  feeAmount: string,
+  stageLabel: string
+) {
+  const fee = parseFloat(feeAmount)
+  if (isNaN(fee) || fee <= 0) return
+
+  await db.transaction(async (tx) => {
+    // 1. Fetch current invoice with items
+    const invoice = await tx.query.invoices.findFirst({
+      where: and(eq(invoices.id, invoiceId), eq(invoices.companyId, companyId)),
+      with: { items: true }
+    })
+    if (!invoice) throw new Error('Rechnung nicht gefunden')
+
+    // 2. Prevent duplicate fee additions for the same stage
+    const alreadyExists = invoice.items.some(
+      (item: any) => item.sku === 'MAHNGEBUEHR' && item.description.includes(stageLabel)
+    )
+    if (alreadyExists) {
+      console.log(`[DunningFee] Fee for ${stageLabel} already added to invoice ${invoice.invoiceNumber}.`)
+      return
+    }
+
+    // Find the next position for the item list
+    let maxPosition = 0
+    for (const item of invoice.items) {
+      const pos = parseInt(item.position)
+      if (!isNaN(pos) && pos > maxPosition) {
+        maxPosition = pos
+      }
+    }
+    const nextPosition = (maxPosition + 1).toString()
+
+    // 3. Insert invoice item for Mahngebühr (0% VAT damage compensation)
+    await tx.insert(invoiceItems).values({
+      invoiceId,
+      companyId,
+      position: nextPosition,
+      sku: 'MAHNGEBUEHR',
+      description: `Mahngebühr (${stageLabel})`,
+      quantity: '1',
+      unitPrice: fee.toFixed(2),
+      taxRate: '0.0000',
+      lineTotal: fee.toFixed(2)
+    })
+
+    // 4. Recalculate totals
+    const newSubtotal = parseFloat(invoice.subtotalAmount) + fee
+    const newTotal = parseFloat(invoice.totalAmount) + fee
+    const taxVal = parseFloat(invoice.taxAmount)
+    const newTaxRate = (newSubtotal > 0 ? taxVal / newSubtotal : 0).toFixed(4)
+
+    // 5. Update invoice totals in DB
+    await tx.update(invoices)
+      .set({
+        subtotalAmount: newSubtotal.toFixed(2),
+        totalAmount: newTotal.toFixed(2),
+        taxRate: newTaxRate,
+        updatedAt: new Date()
+      })
+      .where(eq(invoices.id, invoiceId))
+  })
+
+  // 6. Regenerate PDF
+  await regenerateInvoicePdf(invoiceId, companyId)
 }

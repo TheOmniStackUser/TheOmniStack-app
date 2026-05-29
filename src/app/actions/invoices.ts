@@ -862,6 +862,12 @@ export async function sendDunningNoticeAction(data: {
 }) {
   const auth = await requireAuth()
   const companyId = auth.activeCompanyId
+  const stageLabel = data.type === 'reminder' ? 'Zahlungserinnerung' : data.type === 'first' ? '1. Mahnung' : '2. Mahnung'
+
+  if (data.dunningFee && parseFloat(data.dunningFee) > 0) {
+    const { addDunningFeeToInvoice } = await import('@/lib/invoice-service')
+    await addDunningFeeToInvoice(data.invoiceId, companyId, data.dunningFee, stageLabel)
+  }
 
   const invoice = await db.query.invoices.findFirst({
     where: and(eq(invoices.id, data.invoiceId), eq(invoices.companyId, companyId))

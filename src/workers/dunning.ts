@@ -55,6 +55,7 @@ function resolveTemplate(
     dueDate: string
     amount: string
     companyName: string
+    dunningFee?: string
   }
 ) {
   return template
@@ -64,6 +65,7 @@ function resolveTemplate(
     .replace(/\{Fälligkeitsdatum\}/g, vars.dueDate)
     .replace(/\{Betrag\}/g, vars.amount)
     .replace(/\{Unternehmen\}/g, vars.companyName)
+    .replace(/\{Mahngebühr\}/g, vars.dunningFee || '0,00 €')
 }
 
 // ─── Core Processing Logic ────────────────────────────────────────────────────
@@ -182,24 +184,41 @@ async function processDunningForCompany(
         continue
       }
 
-      // 4e. Prepare email content
-      const invoiceDate = format(invoice.createdAt, 'dd.MM.yyyy', { locale: de })
+      // 4e. Prepare email content and apply fee if configured
+      const stageLabel =
+        stageToSend === 'reminder' ? 'Zahlungserinnerung' :
+        stageToSend === 'first' ? '1. Mahnung' : '2. Mahnung'
+
+      let currentInvoice = invoice
+      if (ruleToApply.feeAmount && parseFloat(ruleToApply.feeAmount) > 0) {
+        const { addDunningFeeToInvoice } = await import('@/lib/invoice-service')
+        await addDunningFeeToInvoice(invoice.id, companyId, ruleToApply.feeAmount, stageLabel)
+        const reloaded = await db.query.invoices.findFirst({
+          where: eq(invoices.id, invoice.id)
+        })
+        if (reloaded) {
+          currentInvoice = reloaded
+        }
+      }
+
+      const invoiceDate = format(currentInvoice.createdAt, 'dd.MM.yyyy', { locale: de })
       const dueDate = format(dueAt, 'dd.MM.yyyy', { locale: de })
-      const amount = formatAmount(invoice.totalAmount, invoice.currency)
+      const amount = formatAmount(currentInvoice.totalAmount, currentInvoice.currency)
       const feeAmount = ruleToApply.feeAmount ? formatAmount(ruleToApply.feeAmount) : undefined
 
       const vars = {
-        recipientName: invoice.recipientName,
-        invoiceNumber: invoice.invoiceNumber,
+        recipientName: currentInvoice.recipientName,
+        invoiceNumber: currentInvoice.invoiceNumber,
         invoiceDate,
         dueDate,
         amount,
         companyName: company.name,
+        dunningFee: feeAmount,
       }
 
       const subject = resolveTemplate(
         ruleToApply.subjectTemplate ||
-          `${stageToSend === 'reminder' ? 'Zahlungserinnerung' : stageToSend === 'first' ? '1. Mahnung' : '2. Mahnung'}: Rechnung ${invoice.invoiceNumber}`,
+          `${stageToSend === 'reminder' ? 'Zahlungserinnerung' : stageToSend === 'first' ? '1. Mahnung' : '2. Mahnung'}: Rechnung ${currentInvoice.invoiceNumber}`,
         vars
       )
 
@@ -210,8 +229,8 @@ async function processDunningForCompany(
       // Try to get PDF URL (non-fatal if unavailable)
       let pdfUrl: string | undefined
       try {
-        if (invoice.pdfStorageKey) {
-          pdfUrl = await getDocumentUrl(invoice.pdfStorageKey)
+        if (currentInvoice.pdfStorageKey) {
+          pdfUrl = await getDocumentUrl(currentInvoice.pdfStorageKey)
         }
       } catch {
         // PDF link is optional
@@ -221,8 +240,8 @@ async function processDunningForCompany(
       const html = await render(
         React.createElement(DunningEmail, {
           stage: stageToSend,
-          recipientName: invoice.recipientName,
-          invoiceNumber: invoice.invoiceNumber,
+          recipientName: currentInvoice.recipientName,
+          invoiceNumber: currentInvoice.invoiceNumber,
           invoiceDate,
           dueDate,
           amount,
@@ -262,7 +281,7 @@ async function processDunningForCompany(
         try {
           await transporter.sendMail({
             from,
-            to: invoice.recipientEmail,
+            to: currentInvoice.recipientEmail,
             replyTo: company.email || undefined,
             subject,
             html,
@@ -275,7 +294,7 @@ async function processDunningForCompany(
         // Use Resend
         const { data, error } = await resend.emails.send({
           from: 'TheOmniStack <noreply@theomnistack.de>',
-          to: [invoice.recipientEmail],
+          to: [currentInvoice.recipientEmail],
           replyTo: company.email || undefined,
           subject,
           html,
@@ -291,36 +310,36 @@ async function processDunningForCompany(
       // 4g. Write dunning log
       await db.insert(dunningLogs).values({
         companyId,
-        invoiceId: invoice.id,
+        invoiceId: currentInvoice.id,
         stage: stageToSend,
         status: emailSent ? 'sent' : 'failed',
-        recipientEmail: invoice.recipientEmail,
+        recipientEmail: currentInvoice.recipientEmail,
         subject,
         errorMessage: emailError,
         triggeredByUserId: triggeredByUserId || null,
       })
 
       // 4h. Write invoice log (visible in detail panel)
-      const stageLabel =
+      const stageLabelText =
         stageToSend === 'reminder' ? 'Zahlungserinnerung' :
         stageToSend === 'first' ? '1. Mahnung' : '2. Mahnung'
 
       await db.insert(invoiceLogs).values({
-        invoiceId: invoice.id,
+        invoiceId: currentInvoice.id,
         companyId,
         userId: triggeredByUserId || null,
         action: 'dunning',
         note: emailSent
-          ? `${stageLabel} automatisch per E-Mail gesendet an ${invoice.recipientEmail}.`
-          : `${stageLabel}: E-Mail-Versand fehlgeschlagen. Fehler: ${emailError}`,
+          ? `${stageLabelText} automatisch per E-Mail gesendet an ${currentInvoice.recipientEmail}.`
+          : `${stageLabelText}: E-Mail-Versand fehlgeschlagen. Fehler: ${emailError}`,
       })
 
       if (emailSent) {
         stats.sent++
-        console.log(`[Dunning] ✅ Sent ${stageToSend} for invoice ${invoice.invoiceNumber} to ${invoice.recipientEmail}`)
+        console.log(`[Dunning] ✅ Sent ${stageToSend} for invoice ${currentInvoice.invoiceNumber} to ${currentInvoice.recipientEmail}`)
       } else {
         stats.failed++
-        console.error(`[Dunning] ❌ Failed ${stageToSend} for invoice ${invoice.invoiceNumber}: ${emailError}`)
+        console.error(`[Dunning] ❌ Failed ${stageToSend} for invoice ${currentInvoice.invoiceNumber}: ${emailError}`)
       }
     } catch (err) {
       stats.failed++
