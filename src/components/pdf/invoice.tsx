@@ -412,7 +412,7 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
           )}
           
           <View style={{ flexDirection: 'row', marginTop: 5, fontSize: 9 }}>
-            {paymentMethod && (
+            {paymentMethod && !isCreditNote && (
               <Text style={{ marginRight: 15 }}>{t.paymentMethod}: {paymentMethod}</Text>
             )}
             {dueDate && !isCreditNote && documentType !== 'quote' && (

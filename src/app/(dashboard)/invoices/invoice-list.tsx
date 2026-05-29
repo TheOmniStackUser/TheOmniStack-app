@@ -287,7 +287,18 @@ export function InvoiceList({
   const resolveDunningText = (inv: Invoice, stage: 'reminder' | 'first' | 'second', feeEnabled: boolean, feeVal: string) => {
     const rule = dunningRulesList.find(r => r.stage === stage)
     const subjectTemplate = rule?.subjectTemplate || (stage === 'reminder' ? 'Zahlungserinnerung: Rechnung {Nummer}' : stage === 'first' ? '1. Mahnung: Rechnung {Nummer}' : '2. Mahnung: Rechnung {Nummer}')
-    const bodyTemplate = rule?.bodyTemplate || getDunningDefaults(inv, stage).body
+    
+    let bodyTemplate = rule?.bodyTemplate || getDunningDefaults(inv, stage).body
+    if (rule?.bodyTemplate) {
+      const hasGreeting = /sehr\s+geehrte/i.test(rule.bodyTemplate)
+      const hasClosing = /mit\s+freundlichen/i.test(rule.bodyTemplate)
+      if (!hasGreeting) {
+        bodyTemplate = `Sehr geehrte/r {Empfänger},\n\n` + bodyTemplate
+      }
+      if (!hasClosing) {
+        bodyTemplate = bodyTemplate + `\n\nMit freundlichen Grüßen`
+      }
+    }
 
     const num = inv.invoiceNumber
     const date = format(new Date(inv.createdAt), 'dd.MM.yyyy', { locale: de })
