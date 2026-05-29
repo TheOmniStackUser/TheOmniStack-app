@@ -893,6 +893,7 @@ export async function sendDunningNoticeAction(data: {
   let smtpConfig: any = undefined
   if (company?.smtpSettings?.enabled && company.smtpSettings.fromEmail && data.senderEmail === company.smtpSettings.fromEmail) {
     smtpConfig = company.smtpSettings
+  }
   // Send email
   const { sendInvoiceEmail } = await import('@/lib/email')
   const emailResult = await sendInvoiceEmail({
