@@ -16,7 +16,7 @@ import {
   sendInvoiceEmailAction,
   saveEmailTemplateAction
 } from '@/app/actions/invoices'
-import { getInvoiceLogsAction } from '@/app/actions/manual-invoice'
+import { getInvoiceLogsAction, deleteDraftAction } from '@/app/actions/manual-invoice'
 import { exportInvoiceJournalAction } from '@/app/actions/export'
 import { getInvoiceDunningLogsAction, addDunningExclusionAction } from '@/app/actions/dunning'
 
@@ -36,6 +36,9 @@ interface Invoice {
   documentType: string
   originalInvoiceNumber?: string | null
   originalInvoiceCreatedAt?: Date | null
+  dueAt?: Date | string | null
+  paidAt?: Date | string | null
+  draftName?: string | null
 }
 
 const formatCountry = (code?: string | null) => {
@@ -158,6 +161,21 @@ export function InvoiceList({
   currentUserName?: string
 }) {
   const router = useRouter()
+  const [activeFilterTab, setActiveFilterTab] = useState<'all' | 'drafts' | 'open' | 'overdue' | 'paid' | 'cancelled'>('all')
+  const [showSearch, setShowSearch] = useState(false)
+
+  const isOverdue = (invoice: Invoice) => {
+    if (invoice.status !== 'issued' || invoice.paidAt) return false
+    if (!invoice.dueAt) return false
+    return new Date() > new Date(invoice.dueAt)
+  }
+
+  const getOverdueDays = (dueAt?: Date | string | null) => {
+    if (!dueAt) return 0
+    const diffTime = new Date().getTime() - new Date(dueAt).getTime()
+    return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)))
+  }
+
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -601,7 +619,15 @@ export function InvoiceList({
     }
   }
 
-  const filteredInvoices = initialInvoices.filter(invoice => {
+  // Unfiltered counts for status tabs
+  const totalCount = initialInvoices.length
+  const draftsCount = initialInvoices.filter(i => i.status === 'draft').length
+  const openCount = initialInvoices.filter(i => i.status === 'issued' && !i.paidAt).length
+  const overdueCount = initialInvoices.filter(i => isOverdue(i)).length
+  const paidCount = initialInvoices.filter(i => i.status === 'issued' && i.paidAt).length
+  const cancelledCount = initialInvoices.filter(i => i.status === 'cancelled').length
+
+  const searchFilteredInvoices = initialInvoices.filter(invoice => {
     // Filter by Country
     if (activeFilters.country !== 'all') {
       const code = formatCountry(invoice.recipientCountry)
@@ -637,9 +663,29 @@ export function InvoiceList({
     if (activeFilters.search.trim() === '') return true
     const q = activeFilters.search.toLowerCase()
     return (
-      invoice.invoiceNumber.toLowerCase().includes(q) ||
+      (invoice.invoiceNumber || '').toLowerCase().includes(q) ||
+      (invoice.draftName || '').toLowerCase().includes(q) ||
       (invoice.recipientName || '').toLowerCase().includes(q)
     )
+  })
+
+  // Apply tab status filter on top of search/filter
+  const filteredInvoices = searchFilteredInvoices.filter(invoice => {
+    switch (activeFilterTab) {
+      case 'drafts':
+        return invoice.status === 'draft'
+      case 'open':
+        return invoice.status === 'issued' && !invoice.paidAt
+      case 'overdue':
+        return isOverdue(invoice)
+      case 'paid':
+        return invoice.status === 'issued' && !!invoice.paidAt
+      case 'cancelled':
+        return invoice.status === 'cancelled'
+      case 'all':
+      default:
+        return true
+    }
   })
 
   // Sort invoices if sorting is active
@@ -727,136 +773,194 @@ export function InvoiceList({
 
   return (
     <div className="space-y-6">
-      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-5">
-        {/* Row 1: Search */}
-        <div className="flex flex-col sm:flex-row gap-4 items-center">
-          <div className="flex-1 w-full">
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
-              <input
-                type="text"
-                placeholder="Rechnungsnummer oder Kunde suchen..."
-                className="block w-full pl-10 pr-10 py-2.5 border border-slate-200 rounded-lg leading-5 bg-slate-50/30 text-slate-900 font-medium placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-all"
-                value={draftSearch}
-                onChange={(e) => setDraftSearch(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleApplyFilters()}
-              />
-              {draftSearch && (
-                <button
-                  type="button"
-                  onClick={handleClearSearch}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
-                  title="Suche leeren"
-                >
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+      {/* Quick Filter Tabs */}
+      <div className="flex flex-wrap gap-2.5 mb-2">
+        {[
+          { id: 'all', label: 'Alle', count: totalCount },
+          { id: 'drafts', label: 'Entwürfe', count: draftsCount },
+          { id: 'open', label: 'Offen', count: openCount },
+          { id: 'overdue', label: 'Überfällig', count: overdueCount, isOverdue: overdueCount > 0 },
+          { id: 'paid', label: 'Bezahlt', count: paidCount },
+          { id: 'cancelled', label: 'Storniert', count: cancelledCount },
+        ].map((tab) => {
+          const isActive = activeFilterTab === tab.id
+          return (
+            <button
+              key={tab.id}
+              onClick={() => {
+                setActiveFilterTab(tab.id as any)
+                setCurrentPage(1)
+              }}
+              className={`flex flex-col items-start text-left px-5 py-3.5 rounded-xl border transition-all min-w-[115px] shadow-sm select-none ${
+                isActive
+                  ? 'bg-slate-50 border-slate-300 ring-1 ring-slate-300'
+                  : 'bg-white border-slate-200 hover:bg-slate-50/50 hover:border-slate-300'
+              }`}
+            >
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                {tab.label}
+              </span>
+              <span className={`text-xl font-black tracking-tight leading-none ${
+                isActive
+                  ? 'text-blue-600'
+                  : 'text-slate-900'
+              }`}>
+                {tab.count}
+              </span>
+            </button>
+          )
+        })}
+
+        {/* Search Toggle Tab */}
+        <button
+          onClick={() => setShowSearch(!showSearch)}
+          className={`flex flex-col items-start justify-center px-6 py-3.5 rounded-xl border transition-all min-w-[115px] shadow-sm select-none font-bold text-sm leading-none ${
+            showSearch
+              ? 'bg-slate-100 border-slate-300 ring-1 ring-slate-300 text-slate-900'
+              : 'bg-white border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-slate-500'
+          }`}
+        >
+          <div className="flex items-center gap-1.5 py-1">
+            <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <span className="text-sm font-black text-slate-700 tracking-wide uppercase">Suchen</span>
+          </div>
+        </button>
+      </div>
+
+      {showSearch && (
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-5">
+          {/* Row 1: Search */}
+          <div className="flex flex-col sm:flex-row gap-4 items-center">
+            <div className="flex-1 w-full">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
-                </button>
-              )}
+                </div>
+                <input
+                  type="text"
+                  placeholder="Rechnungsnummer oder Kunde suchen..."
+                  className="block w-full pl-10 pr-10 py-2.5 border border-slate-200 rounded-lg leading-5 bg-slate-50/30 text-slate-900 font-medium placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-all"
+                  value={draftSearch}
+                  onChange={(e) => setDraftSearch(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleApplyFilters()}
+                />
+                {draftSearch && (
+                  <button
+                    type="button"
+                    onClick={handleClearSearch}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                    title="Suche leeren"
+                  >
+                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="text-sm text-slate-500 font-medium px-2 bg-slate-50 py-2 rounded-lg border border-slate-100 min-w-[120px] text-center">
+              {filteredInvoices.length} {filteredInvoices.length === 1 ? 'Rechnung' : 'Rechnungen'}
             </div>
           </div>
-          <div className="text-sm text-slate-500 font-medium px-2 bg-slate-50 py-2 rounded-lg border border-slate-100 min-w-[120px] text-center">
-            {filteredInvoices.length} {filteredInvoices.length === 1 ? 'Rechnung' : 'Rechnungen'}
+
+          {/* Row 2: Filters & Actions */}
+          <div className="flex flex-wrap items-center gap-4 pt-4 border-t border-slate-100">
+            <select
+              value={draftCountry}
+              onChange={(e) => setDraftCountry(e.target.value)}
+              className="px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[140px] text-sm text-slate-900 font-medium"
+            >
+              <option value="all">Alle Länder</option>
+              {uniqueCountries.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+
+            <select
+              value={draftMarketplace}
+              onChange={(e) => setDraftMarketplace(e.target.value)}
+              className="px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px] text-sm text-slate-900 font-medium"
+            >
+              <option value="all">Alle Marktplätze</option>
+              <option value="manual">Manuell</option>
+              {hasOttoIntegration && <option value="otto">Otto</option>}
+              {hasAboutYouIntegration && <option value="aboutyou">About You</option>}
+              {hasDecathlonIntegration && <option value="mirakl_decathlon">Decathlon</option>}
+              {hasDecathlonEuIntegration && <option value="mirakl_decathlon_eu">Decathlon EU</option>}
+              {hasMediamarktIntegration && <option value="mirakl_mediamarkt">MediaMarkt</option>}
+              {hasAmazonIntegration && <option value="amazon">Amazon</option>}
+              {hasShopifyIntegration && <option value="shopify">Shopify</option>}
+              {hasKauflandIntegration && <option value="kaufland">Kaufland</option>}
+              {hasEbayIntegration && <option value="ebay">eBay</option>}
+              {customMiraklIntegrations.map((integration) => {
+                const name = (integration.metadata as any)?.customName || 'Unbenannter Mirakl Marktplatz'
+                return (
+                  <option key={integration.id} value={name.toLowerCase()}>
+                    {name}
+                  </option>
+                )
+              })}
+            </select>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={draftFromDate}
+                onChange={(e) => setDraftFromDate(e.target.value)}
+                className="px-2 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-slate-900 font-medium"
+                title="Von Datum"
+              />
+              <span className="text-slate-300 font-bold">-</span>
+              <input
+                type="date"
+                value={draftToDate}
+                onChange={(e) => setDraftToDate(e.target.value)}
+                className="px-2 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-slate-900 font-medium"
+                title="Bis Datum"
+              />
+            </div>
+
+            <div className="ml-auto flex gap-2">
+              <button
+                onClick={handleResetFilters}
+                className="px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-all"
+              >
+                Zurücksetzen
+              </button>
+              <button
+                onClick={handleExport}
+                disabled={isExporting}
+                className="px-4 py-2 bg-white border border-slate-200 text-slate-700 text-sm font-bold rounded-lg hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2 disabled:opacity-50"
+              >
+                {isExporting ? (
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                )}
+                Export
+              </button>
+              <button
+                onClick={handleApplyFilters}
+                className="px-6 py-2 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 transition-all shadow-md flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                Suche
+              </button>
+            </div>
           </div>
         </div>
-
-        {/* Row 2: Filters & Actions */}
-        <div className="flex flex-wrap items-center gap-4 pt-4 border-t border-slate-100">
-          <select
-            value={draftCountry}
-            onChange={(e) => setDraftCountry(e.target.value)}
-            className="px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[140px] text-sm text-slate-900 font-medium"
-          >
-            <option value="all">Alle Länder</option>
-            {uniqueCountries.map(c => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
-
-          <select
-            value={draftMarketplace}
-            onChange={(e) => setDraftMarketplace(e.target.value)}
-            className="px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px] text-sm text-slate-900 font-medium"
-          >
-            <option value="all">Alle Marktplätze</option>
-            <option value="manual">Manuell</option>
-            {hasOttoIntegration && <option value="otto">Otto</option>}
-            {hasAboutYouIntegration && <option value="aboutyou">About You</option>}
-            {hasDecathlonIntegration && <option value="mirakl_decathlon">Decathlon</option>}
-            {hasDecathlonEuIntegration && <option value="mirakl_decathlon_eu">Decathlon EU</option>}
-            {hasMediamarktIntegration && <option value="mirakl_mediamarkt">MediaMarkt</option>}
-            {hasAmazonIntegration && <option value="amazon">Amazon</option>}
-            {hasShopifyIntegration && <option value="shopify">Shopify</option>}
-            {hasKauflandIntegration && <option value="kaufland">Kaufland</option>}
-            {hasEbayIntegration && <option value="ebay">eBay</option>}
-            {customMiraklIntegrations.map((integration) => {
-              const name = (integration.metadata as any)?.customName || 'Unbenannter Mirakl Marktplatz'
-              return (
-                <option key={integration.id} value={name.toLowerCase()}>
-                  {name}
-                </option>
-              )
-            })}
-          </select>
-
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={draftFromDate}
-              onChange={(e) => setDraftFromDate(e.target.value)}
-              className="px-2 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-slate-900 font-medium"
-              title="Von Datum"
-            />
-            <span className="text-slate-300 font-bold">-</span>
-            <input
-              type="date"
-              value={draftToDate}
-              onChange={(e) => setDraftToDate(e.target.value)}
-              className="px-2 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-slate-900 font-medium"
-              title="Bis Datum"
-            />
-          </div>
-
-          <div className="ml-auto flex gap-2">
-            <button
-              onClick={handleResetFilters}
-              className="px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-all"
-            >
-              Zurücksetzen
-            </button>
-            <button
-              onClick={handleExport}
-              disabled={isExporting}
-              className="px-4 py-2 bg-white border border-slate-200 text-slate-700 text-sm font-bold rounded-lg hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2 disabled:opacity-50"
-            >
-              {isExporting ? (
-                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                </svg>
-              ) : (
-                <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              )}
-              Export
-            </button>
-            <button
-              onClick={handleApplyFilters}
-              className="px-6 py-2 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 transition-all shadow-md flex items-center gap-2"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              Suche
-            </button>
-          </div>
-        </div>
-      </div>
+      )}
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
         <table className="w-full text-left border-collapse text-sm min-w-[1200px]">
@@ -881,7 +985,13 @@ export function InvoiceList({
               return (
                 <tr 
                   key={invoice.id} 
-                  onClick={() => handleSelectInvoice(invoice.id)} 
+                  onClick={() => {
+                    if (invoice.status === 'draft') {
+                      router.push(`/invoices/new?draftId=${invoice.id}`)
+                    } else {
+                      handleSelectInvoice(invoice.id)
+                    }
+                  }} 
                   className="border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer"
                 >
                   <td className="px-6 py-4 text-slate-600">
@@ -889,7 +999,7 @@ export function InvoiceList({
                   </td>
                   <td className="px-6 py-4 font-medium text-slate-900">
                     <div className="flex flex-col">
-                      <span>{invoice.invoiceNumber}</span>
+                      <span>{invoice.status === 'draft' ? (invoice.draftName || 'Unbenannter Entwurf') : invoice.invoiceNumber}</span>
                       {invoice.cancelsInvoiceId && invoice.originalInvoiceNumber && (
                         <span className={`text-[10px] font-bold mt-0.5 ${
                           invoice.invoiceNumber === invoice.originalInvoiceNumber ? 'text-rose-600' : 'text-amber-600'
@@ -902,11 +1012,20 @@ export function InvoiceList({
                           Storniert (Stornobeleg: gleiche Nr.)
                         </span>
                       )}
-                      <span className="text-[10px] text-blue-600 font-bold uppercase tracking-tighter mt-0.5">E-Rechnung (ZUGFeRD)</span>
+                      {invoice.status !== 'draft' && (
+                        <span className="text-[10px] text-blue-600 font-bold uppercase tracking-tighter mt-0.5">E-Rechnung (ZUGFeRD)</span>
+                      )}
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     {(() => {
+                      if (invoice.status === 'draft') {
+                        return (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-amber-50 text-amber-700 border border-amber-100">
+                            Entwurf
+                          </span>
+                        )
+                      }
                       if (invoice.cancelsInvoiceId && invoice.invoiceNumber === invoice.originalInvoiceNumber) {
                         return (
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-rose-50 text-rose-700 border border-rose-100">
@@ -959,70 +1078,121 @@ export function InvoiceList({
                   </span>
                 </td>
                 <td className="px-6 py-4 text-right font-medium text-slate-900">
-                  {new Intl.NumberFormat('de-DE', { style: 'currency', currency: invoice.currency }).format(
-                    invoice.cancelsInvoiceId ? -Number(invoice.totalAmount) : Number(invoice.totalAmount)
-                  )}
+                  <div className="flex items-center justify-end gap-2.5">
+                    {isOverdue(invoice) && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-rose-50 text-rose-700 border border-rose-100 shrink-0">
+                        <svg className="w-3.5 h-3.5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        {getOverdueDays(invoice.dueAt)} Tage
+                      </span>
+                    )}
+                    <span className="shrink-0">
+                      {new Intl.NumberFormat('de-DE', { style: 'currency', currency: invoice.currency }).format(
+                        invoice.cancelsInvoiceId ? -Number(invoice.totalAmount) : Number(invoice.totalAmount)
+                      )}
+                    </span>
+                  </div>
                 </td>
-                 <td className="px-6 py-4 text-left">
+                 <td className={`px-6 py-4 text-left transition-all ${isOverdue(invoice) ? 'border-r-4 border-r-rose-600' : ''}`}>
                   <div className="flex justify-start gap-2 min-w-max whitespace-nowrap">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleDownload(invoice.id); }}
-                      disabled={loadingId === invoice.id || !invoice.pdfStorageKey}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-xs font-bold text-blue-700 hover:bg-blue-100 transition-all disabled:opacity-50"
-                      title="Gespeicherte PDF herunterladen"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
-                      </svg>
-                      {loadingId === invoice.id ? '...' : 'PDF'}
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleRegenerate(invoice.id); }}
-                      disabled={loadingId === invoice.id}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 border border-indigo-200 rounded-lg text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition-all disabled:opacity-50"
-                      title="PDF neu generieren (Design aktualisieren)"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                      Update
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleDownloadXml(invoice.id, invoice.invoiceNumber); }}
-                      disabled={loadingId === invoice.id}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 transition-all disabled:opacity-50"
-                      title="E-Rechnung (XML) herunterladen"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                      </svg>
-                      XML
-                    </button>
-                    {invoice.marketplace === 'manual' && (
+                    {invoice.status === 'draft' ? (
                       <>
-                        {invoice.status !== 'cancelled' && (
-                          <a
-                            href={`/invoices/new?edit=${invoice.id}`}
-                            onClick={(e) => e.stopPropagation()}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg text-xs font-bold text-amber-700 hover:bg-amber-100 transition-all"
-                            title="Rechnung bearbeiten (GoBD-konform mit Log)"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                            Bearbeiten
-                          </a>
-                        )}
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleShowHistory(invoice.id); }}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 transition-all"
-                          title="Änderungsverlauf anzeigen"
+                        <Link
+                          href={`/invoices/new?draftId=${invoice.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-xs font-bold text-blue-700 hover:bg-blue-100 transition-all"
+                          title="Entwurf bearbeiten"
                         >
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                           </svg>
-                          Verlauf
+                          Bearbeiten
+                        </Link>
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (confirm('Diesen Entwurf wirklich löschen?')) {
+                              try {
+                                await deleteDraftAction(invoice.id);
+                                showToast('Entwurf wurde gelöscht.', 'success');
+                                router.refresh();
+                              } catch (err) {
+                                showToast('Fehler beim Löschen des Entwurfs.', 'error');
+                              }
+                            }
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 border border-rose-200 rounded-lg text-xs font-bold text-rose-700 hover:bg-rose-100 transition-all"
+                          title="Entwurf löschen"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          Löschen
                         </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDownload(invoice.id); }}
+                          disabled={loadingId === invoice.id || !invoice.pdfStorageKey}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-xs font-bold text-blue-700 hover:bg-blue-100 transition-all disabled:opacity-50"
+                          title="Gespeicherte PDF herunterladen"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                          </svg>
+                          {loadingId === invoice.id ? '...' : 'PDF'}
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleRegenerate(invoice.id); }}
+                          disabled={loadingId === invoice.id}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 border border-indigo-200 rounded-lg text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition-all disabled:opacity-50"
+                          title="PDF neu generieren (Design aktualisieren)"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                          Update
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDownloadXml(invoice.id, invoice.invoiceNumber); }}
+                          disabled={loadingId === invoice.id}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 transition-all disabled:opacity-50"
+                          title="E-Rechnung (XML) herunterladen"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                          </svg>
+                          XML
+                        </button>
+                        {invoice.marketplace === 'manual' && (
+                          <>
+                            {invoice.status !== 'cancelled' && (
+                              <a
+                                href={`/invoices/new?edit=${invoice.id}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg text-xs font-bold text-amber-700 hover:bg-amber-100 transition-all"
+                                title="Rechnung bearbeiten (GoBD-konform mit Log)"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                                Bearbeiten
+                              </a>
+                            )}
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleShowHistory(invoice.id); }}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 transition-all"
+                              title="Änderungsverlauf anzeigen"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              Verlauf
+                            </button>
+                          </>
+                        )}
                       </>
                     )}
                   </div>
@@ -1350,8 +1520,13 @@ export function InvoiceList({
                           <span className="text-xs font-black uppercase text-blue-600 tracking-wider">
                             {details.invoice.cancelsInvoiceId ? 'Storno' : (details.invoice.documentType === 'quote' ? 'Angebot' : (details.invoice.documentType === 'delivery_note' ? 'Lieferschein' : 'Rechnung'))}
                           </span>
-                          <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                          <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center flex-wrap gap-2">
                             {details.invoice.invoiceNumber}
+                            {isOverdue(details.invoice) && (
+                              <span className="px-2 py-0.5 bg-red-600 text-white text-[11px] font-bold rounded-lg uppercase tracking-wide leading-none select-none">
+                                Überfällig {format(new Date(details.invoice.dueAt), 'd. MMM. yyyy', { locale: de })}
+                              </span>
+                            )}
                           </h2>
                         </div>
                         <span className="px-2.5 py-1 text-xs font-bold rounded-lg border bg-white shadow-sm flex items-center gap-1.5" style={getMarketplaceBadgeStyle(details.linkedOrder?.marketplace || 'manual')}>
@@ -1525,6 +1700,21 @@ export function InvoiceList({
 
                     {/* Scrollable sections */}
                     <div className="flex-1 overflow-y-auto p-6 space-y-8 ScrollContainer">
+                      {isOverdue(details.invoice) && (
+                        <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-start gap-3 shadow-sm select-none">
+                          <div className="p-2 bg-red-100/80 rounded-xl text-red-600 shrink-0">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-black text-red-950 leading-none">Mahnwesen</h4>
+                            <p className="text-xs font-bold text-red-700 mt-1.5 leading-snug">
+                              Überfällig seit {format(new Date(details.invoice.dueAt), 'dd. MMM. yyyy', { locale: de })} ({getOverdueDays(details.invoice.dueAt)} Tage)
+                            </p>
+                          </div>
+                        </div>
+                      )}
                       
                       {/* Section 1: Informationen */}
                       <div id="sec-info" className="space-y-4 pt-2">

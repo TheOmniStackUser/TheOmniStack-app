@@ -38,14 +38,16 @@ export default async function InvoicesPage() {
         documentType: invoices.documentType,
         originalInvoiceNumber: originalInvoice.invoiceNumber,
         originalInvoiceCreatedAt: originalInvoice.createdAt,
+        dueAt: invoices.dueAt,
+        paidAt: invoices.paidAt,
+        draftName: invoices.draftName,
       })
       .from(invoices)
       .leftJoin(orders, eq(invoices.id, orders.invoiceId))
       .leftJoin(originalInvoice, eq(invoices.cancelsInvoiceId, originalInvoice.id))
       .where(and(
         eq(invoices.companyId, auth.activeCompanyId),
-        eq(invoices.documentType, 'invoice'),
-        ne(invoices.status, 'draft')
+        eq(invoices.documentType, 'invoice')
       ))
       .orderBy(desc(invoices.createdAt)),
     db.query.marketplaceIntegrations.findMany({
