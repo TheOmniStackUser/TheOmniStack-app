@@ -721,13 +721,25 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
           {documentType !== 'quote' && (
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Fälligkeit (Tage)</label>
-              <input type="number" className="w-24 px-4 py-2.5 border-2 border-slate-200 rounded-xl font-bold text-slate-900 outline-none focus:border-blue-500" value={settings.dueDateDays} onChange={e => setSettings({ ...settings, dueDateDays: parseInt(e.target.value) })} />
+              <input 
+                type="number" 
+                min="0"
+                className="w-24 px-4 py-2.5 border-2 border-slate-200 rounded-xl font-bold text-slate-900 outline-none focus:border-blue-500" 
+                value={settings.dueDateDays} 
+                onChange={e => {
+                  const val = parseInt(e.target.value)
+                  setSettings({ ...settings, dueDateDays: isNaN(val) ? 0 : Math.max(0, val) })
+                }} 
+              />
             </div>
           )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="space-y-4"><h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Skonto & Rabatt</h3><div className="grid grid-cols-2 gap-4"><div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Skonto %</label><div className="relative"><input type="number" className="w-full pl-4 pr-8 py-2.5 border-2 border-slate-100 rounded-xl font-bold text-slate-900 focus:border-blue-400 outline-none" value={settings.skontoPercent} onChange={e => setSettings({ ...settings, skontoPercent: parseFloat(e.target.value) })} /><span className="absolute right-3 top-2.5 text-slate-400 font-bold">%</span></div></div><div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tage</label><input type="number" className="w-full px-4 py-2.5 border-2 border-slate-100 rounded-xl font-bold text-slate-900 focus:border-blue-400 outline-none" value={settings.skontoDays} onChange={e => setSettings({ ...settings, skontoDays: parseInt(e.target.value) })} /></div><div className="col-span-2"><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Rabatt auf Summe %</label><div className="relative"><input type="number" className="w-full pl-4 pr-8 py-2.5 border-2 border-slate-100 rounded-xl font-bold text-slate-900 focus:border-blue-400 outline-none" value={settings.discount} onChange={e => setSettings({ ...settings, discount: parseFloat(e.target.value) })} /><span className="absolute right-3 top-2.5 text-slate-400 font-bold">%</span></div></div></div></div>
+          <div className="space-y-4"><h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Skonto & Rabatt</h3><div className="grid grid-cols-2 gap-4"><div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Skonto %</label><div className="relative"><input type="number" min="0" className="w-full pl-4 pr-8 py-2.5 border-2 border-slate-100 rounded-xl font-bold text-slate-900 focus:border-blue-400 outline-none" value={settings.skontoPercent} onChange={e => setSettings({ ...settings, skontoPercent: parseFloat(e.target.value) })} /><span className="absolute right-3 top-2.5 text-slate-400 font-bold">%</span></div></div><div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tage</label><input type="number" min="0" className="w-full px-4 py-2.5 border-2 border-slate-100 rounded-xl font-bold text-slate-900 focus:border-blue-400 outline-none" value={settings.skontoDays} onChange={e => {
+            const val = parseInt(e.target.value)
+            setSettings({ ...settings, skontoDays: isNaN(val) ? 0 : Math.max(0, val) })
+          }} /></div><div className="col-span-2"><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Rabatt auf Summe %</label><div className="relative"><input type="number" min="0" className="w-full pl-4 pr-8 py-2.5 border-2 border-slate-100 rounded-xl font-bold text-slate-900 focus:border-blue-400 outline-none" value={settings.discount} onChange={e => setSettings({ ...settings, discount: parseFloat(e.target.value) })} /><span className="absolute right-3 top-2.5 text-slate-400 font-bold">%</span></div></div></div></div>
           <div className="space-y-4 col-span-2">
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Steuer-Optionen</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

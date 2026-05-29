@@ -61,10 +61,16 @@ export async function createManualInvoiceAction(data: {
 }) {
   try {
     const auth = await requireAuth()
-  const companyId = auth.activeCompanyId
+    const companyId = auth.activeCompanyId
 
+    if (data.dueDateDays !== undefined && data.dueDateDays < 0) {
+      throw new Error('Fälligkeit (Tage) darf nicht negativ sein.')
+    }
+    if (data.skontoDays !== undefined && data.skontoDays < 0) {
+      throw new Error('Skontotage darf nicht negativ sein.')
+    }
 
-  // 1. Create a manual order
+    // 1. Create a manual order
   const subtotal = data.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0)
   const tax = data.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice * (item.taxRate / 100)), 0)
   const total = subtotal + tax
@@ -900,6 +906,13 @@ export async function editManualInvoiceAction(data: {
   try {
     const auth = await requireAuth()
     const companyId = auth.activeCompanyId
+
+    if (data.dueDateDays !== undefined && data.dueDateDays < 0) {
+      throw new Error('Fälligkeit (Tage) darf nicht negativ sein.')
+    }
+    if (data.skontoDays !== undefined && data.skontoDays < 0) {
+      throw new Error('Skontotage darf nicht negativ sein.')
+    }
 
     // 1. Fetch existing invoice and check if manual
     const invoice = await db.query.invoices.findFirst({
