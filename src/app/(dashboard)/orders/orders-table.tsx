@@ -514,7 +514,13 @@ export function OrdersTable({
     toDate: '',
     invoiceFilter: 'all',
     dateType: 'purchase',
-    progress: [] as string[],
+    progress: {
+      ordered: 'all',
+      paid: 'all',
+      shipped: 'all',
+      invoice: 'all',
+      label: 'all'
+    } as Record<string, 'all' | 'yes' | 'no'>,
   })
 
   // Draft Filters (The state while typing/selecting)
@@ -526,7 +532,13 @@ export function OrdersTable({
   const [draftToDate, setDraftToDate] = useState('')
   const [draftInvoiceFilter, setDraftInvoiceFilter] = useState('all')
   const [draftDateType, setDraftDateType] = useState('purchase')
-  const [draftProgress, setDraftProgress] = useState<string[]>([])
+  const [draftProgress, setDraftProgress] = useState<Record<string, 'all' | 'yes' | 'no'>>({
+    ordered: 'all',
+    paid: 'all',
+    shipped: 'all',
+    invoice: 'all',
+    label: 'all'
+  })
   const [isProgressDropdownOpen, setIsProgressDropdownOpen] = useState(false)
 
   // Pagination
@@ -575,7 +587,13 @@ export function OrdersTable({
     setDraftToDate('')
     setDraftInvoiceFilter('all')
     setDraftDateType('purchase')
-    setDraftProgress([])
+    setDraftProgress({
+      ordered: 'all',
+      paid: 'all',
+      shipped: 'all',
+      invoice: 'all',
+      label: 'all'
+    })
     setActiveFilters({
       search: '',
       marketplace: 'all',
@@ -585,7 +603,13 @@ export function OrdersTable({
       toDate: '',
       invoiceFilter: 'all',
       dateType: 'purchase',
-      progress: [],
+      progress: {
+        ordered: 'all',
+        paid: 'all',
+        shipped: 'all',
+        invoice: 'all',
+        label: 'all'
+      },
     })
     setSortField(null)
     setSortDirection(null)
@@ -634,12 +658,12 @@ export function OrdersTable({
       return false
     }
     // Filter by Progress Status
-    if (activeFilters.progress && activeFilters.progress.length > 0) {
+    if (activeFilters.progress) {
       const states = getOrderProgressStates(order)
-      for (const pStatus of activeFilters.progress) {
-        if (!states[pStatus as keyof typeof states]) {
-          return false
-        }
+      for (const [key, value] of Object.entries(activeFilters.progress)) {
+        const orderHasState = states[key as keyof typeof states]
+        if (value === 'yes' && !orderHasState) return false
+        if (value === 'no' && orderHasState) return false
       }
     }
     // Filter by Invoice Status
@@ -1509,9 +1533,12 @@ export function OrdersTable({
               className="px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[150px] text-gray-900 font-medium text-sm flex items-center justify-between gap-2"
             >
               <span>
-                {draftProgress.length === 0
-                  ? 'Alle Verläufe'
-                  : `Verlauf (${draftProgress.length})`}
+                {(() => {
+                  const activeProgressCount = Object.values(draftProgress).filter(v => v !== 'all').length
+                  return activeProgressCount === 0
+                    ? 'Alle Verläufe'
+                    : `Verlauf (${activeProgressCount})`
+                })()}
               </span>
               <svg
                 className={`w-4 h-4 text-gray-500 transition-transform ${isProgressDropdownOpen ? 'rotate-180' : ''}`}
@@ -1524,7 +1551,10 @@ export function OrdersTable({
             </button>
 
             {isProgressDropdownOpen && (
-              <div className="absolute left-0 mt-1 w-64 bg-white border border-gray-200 rounded-md shadow-lg z-[150] py-2 max-h-60 overflow-y-auto">
+              <div className="absolute left-0 mt-1 w-[380px] bg-white border border-gray-200 rounded-md shadow-lg z-[150] py-3 px-4 space-y-3">
+                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+                  Verlaufsfilter einstellen
+                </div>
                 {[
                   { id: 'ordered', label: 'Bestellt' },
                   { id: 'paid', label: 'Bezahlt' },
@@ -1532,26 +1562,47 @@ export function OrdersTable({
                   { id: 'invoice', label: 'Rechnung erstellt' },
                   { id: 'label', label: 'Versandlabel erstellt' },
                 ].map((item) => {
-                  const isChecked = draftProgress.includes(item.id)
+                  const currentValue = draftProgress[item.id] || 'all'
                   return (
-                    <label
-                      key={item.id}
-                      className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm text-gray-700 select-none"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => {
-                          setDraftProgress((prev) =>
-                            isChecked
-                              ? prev.filter((id) => id !== item.id)
-                              : [...prev, item.id]
-                          )
-                        }}
-                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mr-3 cursor-pointer"
-                      />
-                      <span>{item.label}</span>
-                    </label>
+                    <div key={item.id} className="flex items-center justify-between gap-4">
+                      <span className="text-sm font-medium text-gray-700">{item.label}</span>
+                      
+                      <div className="flex items-center rounded-lg bg-gray-100 p-0.5 border border-gray-200/60 shadow-inner">
+                        <button
+                          type="button"
+                          onClick={() => setDraftProgress(prev => ({ ...prev, [item.id]: 'all' }))}
+                          className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                            currentValue === 'all'
+                              ? 'bg-white text-gray-700 shadow-sm'
+                              : 'text-gray-400 hover:text-gray-600'
+                          }`}
+                        >
+                          Egal
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDraftProgress(prev => ({ ...prev, [item.id]: 'yes' }))}
+                          className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                            currentValue === 'yes'
+                              ? 'bg-emerald-500 text-white shadow-sm'
+                              : 'text-gray-400 hover:text-gray-600'
+                          }`}
+                        >
+                          Ja
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDraftProgress(prev => ({ ...prev, [item.id]: 'no' }))}
+                          className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                            currentValue === 'no'
+                              ? 'bg-rose-500 text-white shadow-sm'
+                              : 'text-gray-400 hover:text-gray-600'
+                          }`}
+                        >
+                          Nein
+                        </button>
+                      </div>
+                    </div>
                   )
                 })}
               </div>
