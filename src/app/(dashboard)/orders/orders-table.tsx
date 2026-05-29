@@ -196,27 +196,39 @@ const Tooltip = ({ title, subtitle, children }: { title: string; subtitle: strin
   )
 }
 
-const renderOrderProgress = (order: OrderWithItems) => {
-  // 1. Ordered (Bestellt)
-  const orderedDate = order.marketplacePurchaseDate || order.createdAt
-  const orderedDateStr = orderedDate ? format(new Date(orderedDate), 'dd.MM.yyyy HH:mm', { locale: de }) : '—'
-  const isOrderedActive = true
-
-  // 2. Paid (Bezahlt)
+const getOrderProgressStates = (order: OrderWithItems) => {
   const isMarketplacePrepaid = ['otto', 'amazon', 'mirakl_decathlon', 'mirakl_decathlon_eu', 'mirakl_mediamarkt', 'aboutyou', 'kaufland', 'ebay'].includes(order.marketplace)
   const isShopifyPaid = order.marketplace === 'shopify' && ((order.rawPayload as any)?.financial_status === 'paid' || (order.rawPayload as any)?.financial_status === undefined)
   const paymentLog = order.invoice?.logs?.find((l: any) => l.action === 'payment')
   const isInvoicePaid = !!paymentLog
   const isPaidActive = isMarketplacePrepaid || isShopifyPaid || isInvoicePaid
 
+  return {
+    ordered: true,
+    paid: isPaidActive,
+    shipped: order.status === 'shipped',
+    invoice: !!order.invoiceId,
+    label: !!order.labelUrl,
+  }
+}
+
+const renderOrderProgress = (order: OrderWithItems) => {
+  const states = getOrderProgressStates(order)
+  
+  // 1. Ordered (Bestellt)
+  const orderedDate = order.marketplacePurchaseDate || order.createdAt
+  const orderedDateStr = orderedDate ? format(new Date(orderedDate), 'dd.MM.yyyy HH:mm', { locale: de }) : '—'
+
+  // 2. Paid (Bezahlt)
+  const paymentLog = order.invoice?.logs?.find((l: any) => l.action === 'payment')
   let paidTooltipTitle = "Zahlung ausstehend"
   let paidTooltipSubtitle = "Zahlung offen"
-  if (isPaidActive) {
+  if (states.paid) {
     paidTooltipTitle = "Zahlung erhalten"
     if (paymentLog) {
       const paymentDate = paymentLog.createdAt ? format(new Date(paymentLog.createdAt), 'dd.MM.yyyy HH:mm', { locale: de }) : ''
       paidTooltipSubtitle = `Zahlung erfasst am ${paymentDate}`
-    } else if (isMarketplacePrepaid) {
+    } else if (['otto', 'amazon', 'mirakl_decathlon', 'mirakl_decathlon_eu', 'mirakl_mediamarkt', 'aboutyou', 'kaufland', 'ebay'].includes(order.marketplace)) {
       paidTooltipSubtitle = `Zahlung über ${formatMarketplaceName(order.marketplace, order.shippingCountry)}`
     } else if (order.marketplace === 'shopify') {
       paidTooltipSubtitle = "Zahlung über Shopify abgewickelt"
@@ -226,24 +238,21 @@ const renderOrderProgress = (order: OrderWithItems) => {
   }
 
   // 3. Shipped (Versendet)
-  const isShippedActive = order.status === 'shipped'
-  const shippedDate = isShippedActive ? order.updatedAt : null
+  const shippedDate = states.shipped ? order.updatedAt : null
   const shippedDateStr = shippedDate ? format(new Date(shippedDate), 'dd.MM.yyyy', { locale: de }) : ''
-  const shippedTooltipTitle = isShippedActive ? "Versendet" : "Versand ausstehend"
-  const shippedTooltipSubtitle = isShippedActive ? `Versendet am ${shippedDateStr}` : "Noch nicht versendet"
+  const shippedTooltipTitle = states.shipped ? "Versendet" : "Versand ausstehend"
+  const shippedTooltipSubtitle = states.shipped ? `Versendet am ${shippedDateStr}` : "Noch nicht versendet"
 
   // 4. Invoice (Rechnung)
-  const isInvoiceActive = !!order.invoiceId
   const invoiceNumber = order.invoice?.invoiceNumber
   const invoiceDate = order.invoice?.issuedAt || order.invoice?.createdAt
   const invoiceDateStr = invoiceDate ? format(new Date(invoiceDate), 'dd.MM.yyyy', { locale: de }) : ''
-  const invoiceTooltipTitle = isInvoiceActive ? "Rechnung erstellt" : "Rechnung ausstehend"
-  const invoiceTooltipSubtitle = isInvoiceActive ? `Nr. ${invoiceNumber} vom ${invoiceDateStr}` : "Rechnung fehlt"
+  const invoiceTooltipTitle = states.invoice ? "Rechnung erstellt" : "Rechnung ausstehend"
+  const invoiceTooltipSubtitle = states.invoice ? `Nr. ${invoiceNumber} vom ${invoiceDateStr}` : "Rechnung fehlt"
 
   // 5. Shipping Label (Versandlabel)
-  const isLabelActive = !!order.labelUrl
-  const labelTooltipTitle = isLabelActive ? "Versandlabel erstellt" : "Kein Versandlabel"
-  const labelTooltipSubtitle = isLabelActive ? "Etikett generiert" : "Kein Label vorhanden"
+  const labelTooltipTitle = states.label ? "Versandlabel erstellt" : "Kein Versandlabel"
+  const labelTooltipSubtitle = states.label ? "Etikett generiert" : "Kein Label vorhanden"
 
   const getIconClass = (isActive: boolean) => isActive ? 'text-emerald-500 hover:text-emerald-600 transition-colors' : 'text-gray-300 hover:text-gray-400 transition-colors'
 
@@ -251,7 +260,7 @@ const renderOrderProgress = (order: OrderWithItems) => {
     <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
       {/* 1. Bestellt */}
       <Tooltip title="Bestellt" subtitle={`Bestellt am ${orderedDateStr}`}>
-        <svg className={`w-5 h-5 ${getIconClass(isOrderedActive)}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <svg className={`w-5 h-5 ${getIconClass(states.ordered)}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <circle cx="9" cy="21" r="1" />
           <circle cx="20" cy="21" r="1" />
           <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
@@ -260,7 +269,7 @@ const renderOrderProgress = (order: OrderWithItems) => {
 
       {/* 2. Bezahlt */}
       <Tooltip title={paidTooltipTitle} subtitle={paidTooltipSubtitle}>
-        <svg className={`w-5 h-5 ${getIconClass(isPaidActive)}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <svg className={`w-5 h-5 ${getIconClass(states.paid)}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <rect x="2" y="6" width="20" height="12" rx="2" />
           <circle cx="12" cy="12" r="2" />
           <path d="M6 12h.01M18 12h.01" />
@@ -269,7 +278,7 @@ const renderOrderProgress = (order: OrderWithItems) => {
 
       {/* 3. Versendet */}
       <Tooltip title={shippedTooltipTitle} subtitle={shippedTooltipSubtitle}>
-        <svg className={`w-5 h-5 ${getIconClass(isShippedActive)}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <svg className={`w-5 h-5 ${getIconClass(states.shipped)}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <rect x="2" y="7" width="13" height="10" rx="1" />
           <polygon points="15 8 19 8 22 11 22 17 15 17 15 8" />
           <circle cx="7" cy="17" r="2" />
@@ -279,7 +288,7 @@ const renderOrderProgress = (order: OrderWithItems) => {
 
       {/* 4. Rechnung */}
       <Tooltip title={invoiceTooltipTitle} subtitle={invoiceTooltipSubtitle}>
-        <svg className={`w-5 h-5 ${getIconClass(isInvoiceActive)}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <svg className={`w-5 h-5 ${getIconClass(states.invoice)}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
           <polyline points="14 2 14 8 20 8" />
           <line x1="16" y1="13" x2="8" y2="13" />
@@ -290,7 +299,7 @@ const renderOrderProgress = (order: OrderWithItems) => {
 
       {/* 5. Versandlabel */}
       <Tooltip title={labelTooltipTitle} subtitle={labelTooltipSubtitle}>
-        <svg className={`w-5 h-5 ${getIconClass(isLabelActive)}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <svg className={`w-5 h-5 ${getIconClass(states.label)}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" />
           <path d="M7 7h.01" />
         </svg>
@@ -351,7 +360,13 @@ export function OrdersTable({
   const [openMenuOrderId, setOpenMenuOrderId] = useState<string | null>(null)
 
   useEffect(() => {
-    const handleClose = () => setOpenMenuOrderId(null)
+    const handleClose = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('#progress-dropdown-container')) {
+        setIsProgressDropdownOpen(false)
+      }
+      setOpenMenuOrderId(null)
+    }
     window.addEventListener('click', handleClose)
     return () => window.removeEventListener('click', handleClose)
   }, [])
@@ -499,6 +514,7 @@ export function OrdersTable({
     toDate: '',
     invoiceFilter: 'all',
     dateType: 'purchase',
+    progress: [] as string[],
   })
 
   // Draft Filters (The state while typing/selecting)
@@ -510,6 +526,8 @@ export function OrdersTable({
   const [draftToDate, setDraftToDate] = useState('')
   const [draftInvoiceFilter, setDraftInvoiceFilter] = useState('all')
   const [draftDateType, setDraftDateType] = useState('purchase')
+  const [draftProgress, setDraftProgress] = useState<string[]>([])
+  const [isProgressDropdownOpen, setIsProgressDropdownOpen] = useState(false)
 
   // Pagination
   const [pageSize, setPageSize] = useState(25)
@@ -543,6 +561,7 @@ export function OrdersTable({
       toDate: draftToDate,
       invoiceFilter: draftInvoiceFilter,
       dateType: draftDateType,
+      progress: draftProgress,
     })
     setCurrentPage(1)
   }
@@ -556,6 +575,7 @@ export function OrdersTable({
     setDraftToDate('')
     setDraftInvoiceFilter('all')
     setDraftDateType('purchase')
+    setDraftProgress([])
     setActiveFilters({
       search: '',
       marketplace: 'all',
@@ -565,6 +585,7 @@ export function OrdersTable({
       toDate: '',
       invoiceFilter: 'all',
       dateType: 'purchase',
+      progress: [],
     })
     setSortField(null)
     setSortDirection(null)
@@ -611,6 +632,15 @@ export function OrdersTable({
     // Filter by Status
     if (activeFilters.status !== 'all' && order.status !== activeFilters.status) {
       return false
+    }
+    // Filter by Progress Status
+    if (activeFilters.progress && activeFilters.progress.length > 0) {
+      const states = getOrderProgressStates(order)
+      for (const pStatus of activeFilters.progress) {
+        if (!states[pStatus as keyof typeof states]) {
+          return false
+        }
+      }
     }
     // Filter by Invoice Status
     if (activeFilters.invoiceFilter !== 'all') {
@@ -1472,6 +1502,62 @@ export function OrdersTable({
             <option value="cancelled">Storniert</option>
           </select>
 
+          <div id="progress-dropdown-container" className="relative">
+            <button
+              type="button"
+              onClick={() => setIsProgressDropdownOpen(!isProgressDropdownOpen)}
+              className="px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[150px] text-gray-900 font-medium text-sm flex items-center justify-between gap-2"
+            >
+              <span>
+                {draftProgress.length === 0
+                  ? 'Alle Verläufe'
+                  : `Verlauf (${draftProgress.length})`}
+              </span>
+              <svg
+                className={`w-4 h-4 text-gray-500 transition-transform ${isProgressDropdownOpen ? 'rotate-180' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {isProgressDropdownOpen && (
+              <div className="absolute left-0 mt-1 w-64 bg-white border border-gray-200 rounded-md shadow-lg z-[150] py-2 max-h-60 overflow-y-auto">
+                {[
+                  { id: 'ordered', label: 'Bestellt' },
+                  { id: 'paid', label: 'Bezahlt' },
+                  { id: 'shipped', label: 'Versendet' },
+                  { id: 'invoice', label: 'Rechnung erstellt' },
+                  { id: 'label', label: 'Versandlabel erstellt' },
+                ].map((item) => {
+                  const isChecked = draftProgress.includes(item.id)
+                  return (
+                    <label
+                      key={item.id}
+                      className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm text-gray-700 select-none"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => {
+                          setDraftProgress((prev) =>
+                            isChecked
+                              ? prev.filter((id) => id !== item.id)
+                              : [...prev, item.id]
+                          )
+                        }}
+                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mr-3 cursor-pointer"
+                      />
+                      <span>{item.label}</span>
+                    </label>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
           <select
             value={draftCountry}
             onChange={(e) => setDraftCountry(e.target.value)}
@@ -1873,6 +1959,12 @@ export function OrdersTable({
                               <div className="space-y-4 text-sm text-gray-700">
                                 <div>
                                   <span className="font-medium">System Auftrags-ID:</span> <span className="text-gray-500">{order.marketplaceOrderId}</span>
+                                </div>
+                                <div>
+                                  <span className="font-medium">Bestelldatum:</span> <span className="text-gray-500">{formattedBestellDate}</span>
+                                </div>
+                                <div>
+                                  <span className="font-medium">Versanddatum:</span> <span className="text-gray-500">{formattedVersandDate}</span>
                                 </div>
                                 <div>
                                   <span className="font-medium">Rechnungsdatum:</span> <span className="text-gray-500">{formattedRechnungsDate}</span>
