@@ -766,7 +766,7 @@ export async function deleteDraftAction(draftId: string) {
   revalidatePath('/quotes')
 }
 
-export async function createManualInvoiceAction(data: {
+export async function previewInvoiceAction(data: {
   customer: {
     id?: string
     name: string
