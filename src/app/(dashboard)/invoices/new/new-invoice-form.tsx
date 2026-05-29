@@ -226,7 +226,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
         country: invoice.recipientCountry || 'DE',
         email: invoice.recipientEmail || '',
         vatId: '',
-        customerNumber: ''
+        customerNumber: (invoice as any).customerNumber || ''
       })
       setItems(clonedItems.map(i => ({
         sku: i.sku || '',
@@ -235,11 +235,24 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
         unitPrice: i.unitPrice,
         taxRate: i.taxRate
       })))
-      setSettings(prev => ({
-        ...prev,
-        ...invoice,
+      setSettings({
         isCreditNote: isCreditNoteParam === 'true',
-      }))
+        currency: invoice.currency || 'EUR',
+        dueDateDays: invoice.dueDateDays || 14,
+        discount: invoice.discountRate || 0,
+        skontoPercent: invoice.skontoRate || 0,
+        skontoDays: invoice.skontoDays || 7,
+        shippingCountry: invoice.shippingCountry || 'DE',
+        destinationCountry: invoice.destinationCountry || 'DE',
+        taxCountry: invoice.taxCountry || 'DE',
+        orderNumber: invoice.orderNumber || '',
+        orderDate: isCreditNoteParam === 'true' ? new Date().toISOString().split('T')[0] : (invoice.orderDate || ''),
+        buyerReference: invoice.buyerReference || '',
+        externalId: invoice.externalId || '',
+        taxOption: invoice.taxOption || 'standard',
+        isOss: invoice.ossEnabled || false,
+        createOrder: false,
+      })
       
       if (isCreditNoteParam === 'true') {
         const formattedDate = invoice.createdAt ? new Date(invoice.createdAt).toLocaleDateString('de-DE') : ''
@@ -998,7 +1011,17 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
             </div>
             <div><label className="block text-xs font-bold text-slate-600 uppercase mb-2">Steuerland</label><select className="w-full px-4 py-3 border border-slate-300 rounded-xl font-bold text-slate-900 outline-none bg-white" value={settings.taxCountry} onChange={e => setSettings({ ...settings, taxCountry: e.target.value })}>{EU_COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}</select></div>
             <div><label className="block text-xs font-bold text-slate-600 uppercase mb-2">Bestellnummer</label><input className="w-full px-4 py-3 border border-slate-300 rounded-xl font-bold text-slate-900 outline-none" value={settings.orderNumber} onChange={e => setSettings({ ...settings, orderNumber: e.target.value })} placeholder="P000123" /></div>
-            <div><label className="block text-xs font-bold text-slate-600 uppercase mb-2">Bestelldatum</label><input type="date" className={`w-full px-4 py-3 border border-slate-300 rounded-xl font-bold outline-none bg-white ${settings.orderDate ? 'text-slate-900' : 'text-slate-400'}`} value={settings.orderDate} onChange={e => setSettings({ ...settings, orderDate: e.target.value })} /></div>
+            <div>
+              <label className="block text-xs font-bold text-slate-600 uppercase mb-2">
+                {settings.isCreditNote ? 'Gutschriftsdatum' : 'Bestelldatum'}
+              </label>
+              <input 
+                type="date" 
+                className={`w-full px-4 py-3 border border-slate-300 rounded-xl font-bold outline-none bg-white ${settings.orderDate ? 'text-slate-900' : 'text-slate-400'}`} 
+                value={settings.orderDate} 
+                onChange={e => setSettings({ ...settings, orderDate: e.target.value })} 
+              />
+            </div>
             <div><label className="block text-xs font-bold text-slate-600 uppercase mb-2">Referenz des Käufers</label><input className="w-full px-4 py-3 border border-slate-300 rounded-xl font-bold text-slate-900 outline-none" value={settings.buyerReference} onChange={e => setSettings({ ...settings, buyerReference: e.target.value })} placeholder="Ref-456" /></div>
             <div><label className="block text-xs font-bold text-slate-600 uppercase mb-2">Externe ID</label><input className="w-full px-4 py-3 border border-slate-300 rounded-xl font-bold text-slate-900 outline-none" value={settings.externalId} onChange={e => setSettings({ ...settings, externalId: e.target.value })} placeholder="Ext-789" /></div>
           </div>

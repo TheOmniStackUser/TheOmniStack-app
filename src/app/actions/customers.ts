@@ -2,6 +2,7 @@
 
 import { db } from '@/db/client'
 import { customers } from '@/db/schema/customers'
+import { orders } from '@/db/schema/orders'
 import { requireAuth } from '@/lib/session'
 import { eq, ilike, or, and, desc, isNotNull, ne } from 'drizzle-orm'
 
@@ -198,49 +199,25 @@ export async function saveCustomerAction(data: any) {
     normalizedData.lastVatCheckAt = vatCheckStatus.lastChecked || new Date()
   }
 
-  if (normalizedData.customerNumber) {
-    const conditions = [
-      eq(customers.companyId, companyId),
-      eq(customers.customerNumber, normalizedData.customerNumber)
-    ]
-    if (id) conditions.push(ne(customers.id, id))
+  let existingCustomer = null
 
-    const [existingWithNumber] = await db
+  if (normalizedData.email) {
+    const [found] = await db
       .select()
       .from(customers)
-      .where(and(...conditions))
+      .where(
+        and(
+          eq(customers.companyId, companyId),
+          eq(customers.email, normalizedData.email)
+        )
+      )
       .limit(1)
-
-    if (existingWithNumber) {
-      // Collision! Another record already has this number.
-      // We "merge" by updating that existing record instead.
-      const [updated] = await db.update(customers)
-        .set({ ...normalizedData, updatedAt: new Date() })
-        .where(eq(customers.id, existingWithNumber.id))
-        .returning()
-      return { success: true, id: existingWithNumber.id, customerNumber: updated.customerNumber }
-    }
+    existingCustomer = found
   }
 
-  if (id) {
-    const [updated] = await db.update(customers)
-      .set({ ...normalizedData, updatedAt: new Date() })
-      .where(and(eq(customers.id, id), eq(customers.companyId, companyId)))
-      .returning()
-    
-    if (!updated) {
-      // If no row was updated (e.g. ID belongs to other company), try to insert as new
-      const customerNumber = normalizedData.customerNumber || await generateCustomerNumber(companyId)
-      const [newCust] = await db.insert(customers)
-        .values({ ...normalizedData, customerNumber, companyId })
-        .returning()
-      return { success: true, id: newCust.id, customerNumber: newCust.customerNumber }
-    }
-    
-    return { success: true, id, customerNumber: updated.customerNumber }
-  } else {
+  if (!existingCustomer) {
     // Check if customer with same name and address already exists
-    const [existingByAddress] = await db
+    const [found] = await db
       .select()
       .from(customers)
       .where(
@@ -253,19 +230,52 @@ export async function saveCustomerAction(data: any) {
         )
       )
       .limit(1)
-
-    if (existingByAddress) {
-      const [updated] = await db.update(customers)
-        .set({ ...normalizedData, updatedAt: new Date() })
-        .where(and(eq(customers.id, existingByAddress.id), eq(customers.companyId, companyId)))
-        .returning()
-      return { success: true, id: existingByAddress.id, customerNumber: updated.customerNumber }
-    }
-
-    const customerNumber = normalizedData.customerNumber || await generateCustomerNumber(companyId)
-    const [newCust] = await db.insert(customers)
-      .values({ ...normalizedData, customerNumber, companyId })
-      .returning()
-    return { success: true, id: newCust.id, customerNumber: newCust.customerNumber }
+    existingCustomer = found
   }
+
+  let fallbackCustomerNumber = null
+  if (!existingCustomer && normalizedData.email) {
+    const [foundOrder] = await db
+      .select({ customerNumber: orders.customerNumber })
+      .from(orders)
+      .where(
+        and(
+          eq(orders.companyId, companyId),
+          eq(orders.buyerEmail, normalizedData.email),
+          isNotNull(orders.customerNumber),
+          ne(orders.customerNumber, '')
+        )
+      )
+      .limit(1)
+    if (foundOrder?.customerNumber) {
+      fallbackCustomerNumber = foundOrder.customerNumber
+    }
+  }
+
+  const targetId = id || existingCustomer?.id
+  const finalCustomerNumber = normalizedData.customerNumber || existingCustomer?.customerNumber || fallbackCustomerNumber || await generateCustomerNumber(companyId)
+
+  if (targetId) {
+    const [updated] = await db.update(customers)
+      .set({ 
+        ...normalizedData, 
+        customerNumber: finalCustomerNumber,
+        updatedAt: new Date() 
+      })
+      .where(and(eq(customers.id, targetId), eq(customers.companyId, companyId)))
+      .returning()
+    
+    if (updated) {
+      return { success: true, id: targetId, customerNumber: updated.customerNumber }
+    }
+  }
+
+  const [newCust] = await db.insert(customers)
+    .values({ 
+      ...normalizedData, 
+      customerNumber: finalCustomerNumber, 
+      companyId 
+    })
+    .returning()
+  return { success: true, id: newCust.id, customerNumber: newCust.customerNumber }
 }

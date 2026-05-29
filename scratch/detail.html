@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}Ticket #{{ ticket.id }}{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+
+  <!-- Header -->
+  <div class="flex items-center gap-3 mb-6">
+    <a href="{{ url_for('dashboard') }}" class="text-gray-400 hover:text-gray-600 transition text-sm">← Dashboard</a>
+    <span class="text-gray-300">/</span>
+    <span class="text-sm text-gray-500">Ticket #{{ ticket.id }}</span>
+  </div>
+
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+
+    <!-- Titel + Badges -->
+    <div class="flex items-start justify-between gap-4 mb-5">
+      <h1 class="text-xl font-bold text-navy-900 leading-tight flex-1">{{ ticket.titel }}</h1>
+      <div class="flex gap-2 flex-shrink-0 flex-wrap justify-end">
+        <span class="inline-flex px-3 py-1 rounded-lg text-xs font-bold
+                     {% if ticket.kategorie == 'TheOmniStack' %}bg-cyan-50 text-cyan-700 border border-cyan-200
+                     {% else %}bg-purple-50 text-purple-700 border border-purple-200{% endif %}">
+          {{ ticket.kategorie }}
+        </span>
+        <span class="inline-flex px-3 py-1 rounded-lg text-xs font-bold
+                     {% if ticket.prioritaet == 'Hoch' %}bg-red-100 text-red-700
+                     {% elif ticket.prioritaet == 'Mittel' %}bg-amber-100 text-amber-700
+                     {% else %}bg-green-100 text-green-700{% endif %}">
+          {{ ticket.prioritaet }}
+        </span>
+        <span class="inline-flex px-3 py-1 rounded-lg text-xs font-bold
+                     {% if ticket.status == 'Offen' %}bg-blue-100 text-blue-700
+                     {% elif ticket.status == 'In Bearbeitung' %}bg-orange-100 text-orange-700
+                     {% else %}bg-emerald-100 text-emerald-700{% endif %}"
+              id="statusBadge">
+          {{ ticket.status }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Meta -->
+    <div class="flex flex-wrap gap-4 text-xs text-gray-400 mb-5 pb-5 border-b border-gray-100">
+      <span>📅 Erstellt: {{ ticket.erstellt_am }}</span>
+      <span>🔄 Geändert: {{ ticket.geaendert_am }}</span>
+      {% if user_role != 'haendler' and ticket.user_name %}
+      <span>👤 Erstellt von: <span class="font-semibold text-gray-600">{{ ticket.user_name }}</span> ({{ ticket.user_email }})</span>
+      {% endif %}
+    </div>
+
+    <!-- Beschreibung -->
+    <div class="mb-6">
+      <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Beschreibung</h2>
+      <div class="bg-gray-50 rounded-xl p-4 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{{ ticket.beschreibung }}</div>
+    </div>
+
+    <!-- Screenshot -->
+    {% if ticket.screenshot %}
+    <div class="mb-6">
+      <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Screenshot</h2>
+      <a href="{{ url_for('uploaded_file', filename=ticket.screenshot) }}" target="_blank">
+        <img src="{{ url_for('uploaded_file', filename=ticket.screenshot) }}"
+             alt="Screenshot"
+             class="rounded-xl border border-gray-200 max-h-64 object-contain hover:opacity-90 transition cursor-zoom-in" />
+      </a>
+      <p class="text-xs text-gray-400 mt-1">Klicken zum Vergrößern</p>
+    </div>
+    {% endif %}
+
+    <!-- Status-Buttons (nur für Support/Admin) -->
+    {% if user_role != 'haendler' %}
+    <div class="border-t border-gray-100 pt-5">
+      <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Status ändern</h2>
+      <div class="flex flex-wrap gap-2">
+        <button onclick="updateStatus('Offen')"
+                class="px-4 py-2 text-sm bg-blue-50 text-blue-700 rounded-xl hover:bg-blue-100 font-semibold transition
+                       {% if ticket.status == 'Offen' %}ring-2 ring-blue-300{% endif %}">
+          Offen
+        </button>
+        <button onclick="updateStatus('In Bearbeitung')"
+                class="px-4 py-2 text-sm bg-orange-50 text-orange-700 rounded-xl hover:bg-orange-100 font-semibold transition
+                       {% if ticket.status == 'In Bearbeitung' %}ring-2 ring-orange-300{% endif %}">
+          In Bearbeitung
+        </button>
+        <button onclick="updateStatus('Erledigt')"
+                class="px-4 py-2 text-sm bg-emerald-50 text-emerald-700 rounded-xl hover:bg-emerald-100 font-semibold transition
+                       {% if ticket.status == 'Erledigt' %}ring-2 ring-emerald-300{% endif %}">
+          Erledigt ✓
+        </button>
+        <button onclick="deleteAndRedirect()"
+                class="px-4 py-2 text-sm bg-red-50 text-red-600 rounded-xl hover:bg-red-100 font-semibold transition ml-auto">
+          Ticket löschen
+        </button>
+      </div>
+    </div>
+    {% else %}
+    <!-- Händler: nur löschen des eigenen Tickets -->
+    <div class="border-t border-gray-100 pt-5 flex justify-end">
+      <button onclick="deleteAndRedirect()"
+              class="px-4 py-2 text-sm bg-red-50 text-red-600 rounded-xl hover:bg-red-100 font-semibold transition">
+        Ticket löschen
+      </button>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+<script>
+async function updateStatus(status) {
+  const res = await fetch(`/api/ticket/{{ ticket.id }}/status`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status })
+  });
+  if (res.ok) {
+    document.getElementById('statusBadge').textContent = status;
+    document.getElementById('statusBadge').className =
+      'inline-flex px-3 py-1 rounded-lg text-xs font-bold ' +
+      (status === 'Offen' ? 'bg-blue-100 text-blue-700' :
+       status === 'In Bearbeitung' ? 'bg-orange-100 text-orange-700' :
+       'bg-emerald-100 text-emerald-700');
+    document.querySelectorAll('[onclick^="updateStatus"]').forEach(btn => {
+      btn.classList.remove('ring-2', 'ring-blue-300', 'ring-orange-300', 'ring-emerald-300');
+    });
+    const rings = { 'Offen': 'ring-blue-300', 'In Bearbeitung': 'ring-orange-300', 'Erledigt': 'ring-emerald-300' };
+    event.currentTarget.classList.add('ring-2', rings[status]);
+  }
+}
+
+async function deleteAndRedirect() {
+  if (!confirm('Ticket wirklich löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.')) return;
+  const res = await fetch(`/api/ticket/{{ ticket.id }}`, { method: 'DELETE' });
+  if (res.ok) window.location.href = '/';
+}
+</script>
+{% endblock %}

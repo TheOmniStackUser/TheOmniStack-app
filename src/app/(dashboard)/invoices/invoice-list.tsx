@@ -15,7 +15,8 @@ import {
   cancelInvoiceAction,
   sendInvoiceEmailAction,
   saveEmailTemplateAction,
-  recordPaymentAction
+  recordPaymentAction,
+  sendDunningNoticeAction
 } from '@/app/actions/invoices'
 import { getInvoiceLogsAction, deleteDraftAction } from '@/app/actions/manual-invoice'
 import { exportInvoiceJournalAction } from '@/app/actions/export'
@@ -40,6 +41,7 @@ interface Invoice {
   dueAt?: Date | string | null
   paidAt?: Date | string | null
   draftName?: string | null
+  marketplaceOrderId?: string | null
 }
 
 const formatCountry = (code?: string | null) => {
@@ -181,6 +183,18 @@ export function InvoiceList({
   const [paymentHasDunningFee, setPaymentHasDunningFee] = useState(false)
   const [isSavingPayment, setIsSavingPayment] = useState(false)
 
+  // Mahnwesen Modal States
+  const [showDunningModal, setShowDunningModal] = useState(false)
+  const [dunningInvoice, setDunningInvoice] = useState<Invoice | null>(null)
+  const [dunningType, setDunningType] = useState<'reminder' | 'first' | 'second'>('reminder')
+  const [dunningSubject, setDunningSubject] = useState('')
+  const [dunningBody, setDunningBody] = useState('')
+  const [dunningRecipient, setDunningRecipient] = useState('')
+  const [dunningSender, setDunningSender] = useState('noreply@theomnistack.de')
+  const [dunningFee, setDunningFee] = useState('')
+  const [dunningIncludeFee, setDunningIncludeFee] = useState(false)
+  const [isSendingDunning, setIsSendingDunning] = useState(false)
+
   const isOverdue = (invoice: Invoice) => {
     if (invoice.status !== 'issued' || invoice.paidAt) return false
     if (!invoice.dueAt) return false
@@ -232,6 +246,83 @@ export function InvoiceList({
     setActiveRowMenuId(null)
     await handleSelectInvoice(invoiceId)
     setShowSendModal(true)
+  }
+
+  // Build default dunning text for a given type and invoice
+  const getDunningDefaults = (inv: Invoice, type: 'reminder' | 'first' | 'second') => {
+    const num = inv.invoiceNumber
+    const date = format(new Date(inv.createdAt), 'dd.MM.yyyy', { locale: de })
+    const amount = new Intl.NumberFormat('de-DE', { style: 'currency', currency: inv.currency }).format(Number(inv.totalAmount))
+    const due = inv.dueAt ? format(new Date(inv.dueAt), 'dd.MM.yyyy', { locale: de }) : ''
+    const customer = inv.recipientName || 'Sehr geehrte Damen und Herren'
+
+    if (type === 'reminder') {
+      return {
+        subject: `Zahlungserinnerung: Rechnung ${num}`,
+        body: `Sehr geehrte/r ${customer},\n\nwir möchten Sie freundlich daran erinnern, dass die Zahlung für Rechnung Nr. ${num} vom ${date} in Höhe von ${amount} am ${due} fällig war.\n\nSollten Sie die Zahlung bereits veranlasst haben, betrachten Sie dieses Schreiben bitte als gegenstandslos.\n\nBitte überweisen Sie den offenen Betrag auf unser unten angegebenes Konto.\n\nMit freundlichen Grüßen`,
+      }
+    } else if (type === 'first') {
+      return {
+        subject: `1. Mahnung: Rechnung ${num}`,
+        body: `Sehr geehrte/r ${customer},\n\ntrotz unserer Zahlungserinnerung haben wir für Rechnung Nr. ${num} vom ${date} in Höhe von ${amount} noch keinen Zahlungseingang verzeichnen können.\n\nWir bitten Sie daher, den ausstehenden Betrag umgehend zu begleichen.\n\nSollte Ihre Zahlung unsere Mahnung gekreuzt haben, betrachten Sie dieses Schreiben bitte als gegenstandslos.\n\nMit freundlichen Grüßen`,
+      }
+    } else {
+      return {
+        subject: `2. Mahnung: Rechnung ${num}`,
+        body: `Sehr geehrte/r ${customer},\n\nleider mussten wir feststellen, dass unser erstes Mahnschreiben bezüglich Rechnung Nr. ${num} vom ${date} über ${amount} ohne Reaktion geblieben ist.\n\nWir fordern Sie hiermit letztmalig auf, den ausstehenden Betrag innerhalb von 7 Tagen zu begleichen.\n\nSollte bis zum Ablauf dieser Frist keine Zahlung eingehen, sehen wir uns gezwungen, weitere rechtliche Schritte einzuleiten.\n\nMit freundlichen Grüßen`,
+      }
+    }
+  }
+
+  // Open Mahnwesen modal from row or sidebar
+  const handleOpenDunningModal = (invoice: Invoice) => {
+    setDunningInvoice(invoice)
+    setDunningType('reminder')
+    const defaults = getDunningDefaults(invoice, 'reminder')
+    setDunningSubject(defaults.subject)
+    setDunningBody(defaults.body)
+    setDunningRecipient((invoice as any).recipientEmail || '')
+    setDunningSender(
+      company?.smtpSettings?.enabled && company.smtpSettings.fromEmail
+        ? company.smtpSettings.fromEmail
+        : 'noreply@theomnistack.de'
+    )
+    setDunningFee('')
+    setDunningIncludeFee(false)
+    setShowDunningModal(true)
+    setActiveRowMenuId(null)
+  }
+
+  // Send dunning notice
+  const handleSendDunning = async () => {
+    if (!dunningInvoice || !dunningRecipient) return
+    try {
+      setIsSendingDunning(true)
+      await sendDunningNoticeAction({
+        invoiceId: dunningInvoice.id,
+        type: dunningType,
+        subject: dunningSubject,
+        body: dunningBody,
+        recipientEmail: dunningRecipient,
+        senderEmail: dunningSender,
+        dunningFee: dunningIncludeFee && dunningFee ? dunningFee : undefined,
+      })
+      const stageLabel = dunningType === 'reminder' ? 'Zahlungserinnerung' : dunningType === 'first' ? '1. Mahnung' : '2. Mahnung'
+      showToast(`${stageLabel} erfolgreich versendet.`, 'success')
+      setShowDunningModal(false)
+      if (selectedInvoiceId === dunningInvoice.id) {
+        const [updatedDetails, updatedDunningLogs] = await Promise.all([
+          getInvoiceDetailsAction(selectedInvoiceId),
+          getInvoiceDunningLogsAction(selectedInvoiceId),
+        ])
+        setDetails(updatedDetails)
+        setDunningLogs(updatedDunningLogs)
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Fehler beim Versenden.', 'error')
+    } finally {
+      setIsSendingDunning(false)
+    }
   }
 
   // Save payments to backend
@@ -755,7 +846,8 @@ export function InvoiceList({
     return (
       (invoice.invoiceNumber || '').toLowerCase().includes(q) ||
       (invoice.draftName || '').toLowerCase().includes(q) ||
-      (invoice.recipientName || '').toLowerCase().includes(q)
+      (invoice.recipientName || '').toLowerCase().includes(q) ||
+      (invoice.marketplaceOrderId || '').toLowerCase().includes(q)
     )
   })
 
@@ -1231,14 +1323,11 @@ export function InvoiceList({
                             {(invoice.status === 'issued' && !invoice.paidAt) && (
                               <div className="border-b border-slate-100 py-1">
                                 <button
-                                  onClick={async () => {
-                                    setActiveRowMenuId(null);
-                                    await handleSelectInvoice(invoice.id);
-                                  }}
-                                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 text-red-700 bg-red-50/50 font-bold transition-all text-left"
+                                  onClick={() => handleOpenDunningModal(invoice)}
+                                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-red-50 text-red-700 font-bold transition-all text-left"
                                 >
                                   <svg className="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                                   </svg>
                                   <span>Mahnwesen</span>
                                 </button>
@@ -1880,6 +1969,19 @@ export function InvoiceList({
                           Versenden
                         </button>
 
+                        {/* Mahnwesen button – only for overdue/open invoices */}
+                        {details.invoice.status === 'issued' && !details.invoice.paidAt && details.invoice.status !== 'cancelled' && (
+                          <button
+                            onClick={() => handleOpenDunningModal(details.invoice)}
+                            className="inline-flex items-center gap-1.5 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                            </svg>
+                            Mahnwesen
+                          </button>
+                        )}
+
                         {/* Bezahlt */}
                         {(details.invoice.paidAt || details.invoice.logs?.some((l: any) => l.action === 'payment')) ? (
                           <div className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 border border-emerald-100 rounded-xl text-xs font-bold text-emerald-700 shadow-sm">
@@ -2197,23 +2299,25 @@ export function InvoiceList({
                               const isComment = log.action === 'comment'
                               const isPayment = log.action === 'payment'
                               const isEmail = log.action === 'email'
+                              const isDunning = isEmail && (log.note?.includes('Mahnung') || log.note?.includes('Zahlungserinnerung'))
                               
                               return (
                                 <div key={log.id} className="relative pl-6 border-l border-slate-100 last:pb-0">
                                   {/* Dot indicator */}
                                   <div className={`absolute -left-[5px] top-1 w-2.5 h-2.5 bg-white border-2 rounded-full shadow-sm ${
-                                    isPayment ? 'border-emerald-500' : isComment ? 'border-blue-500' : isEmail ? 'border-amber-500' : 'border-slate-400'
+                                    isPayment ? 'border-emerald-500' : isComment ? 'border-blue-500' : isDunning ? 'border-red-500' : isEmail ? 'border-amber-500' : 'border-slate-400'
                                   }`} />
                                   
                                   <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-2">
                                     <span>{format(new Date(log.createdAt), 'dd.MM.yyyy HH:mm', { locale: de })}</span>
                                     <span>•</span>
                                     <span className="text-slate-500">
-                                      {log.action === 'email' ? 'System' : (log.user?.name || 'Bearbeiter')}
+                                      {log.user?.name || 'Bearbeiter'}
                                     </span>
                                     {isPayment && <span className="text-emerald-600 font-bold uppercase text-[9px]">Zahlung</span>}
                                     {isComment && <span className="text-blue-600 font-bold uppercase text-[9px]">Kommentar</span>}
-                                    {isEmail && <span className="text-amber-600 font-bold uppercase text-[9px]">E-Mail</span>}
+                                    {isDunning && <span className="text-red-600 font-bold uppercase text-[9px]">Mahnung</span>}
+                                    {isEmail && !isDunning && <span className="text-amber-600 font-bold uppercase text-[9px]">E-Mail</span>}
                                   </div>
                                   
                                   <p className="text-xs font-semibold text-slate-700 mt-1 leading-relaxed">
@@ -2296,6 +2400,212 @@ export function InvoiceList({
                     </div>
                   </>
                 ) : null}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Mahnwesen Modal ─────────────────────────────────────────────── */}
+      {showDunningModal && dunningInvoice && (
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-[75] flex items-center justify-center p-4">
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[92vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-red-50 to-rose-50">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-red-100 rounded-xl">
+                  <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 uppercase tracking-tight">Mahnwesen</h3>
+                  <p className="text-xs text-slate-500 font-semibold mt-0.5">Rechnung {dunningInvoice.invoiceNumber} · {dunningInvoice.recipientName}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowDunningModal(false)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-all"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Type Selector */}
+            <div className="px-6 pt-5 pb-3 border-b border-slate-100 bg-white">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-3">Art der Nachricht</p>
+              <div className="flex gap-2">
+                {([
+                  { value: 'reminder', label: '📋 Zahlungserinnerung', desc: 'Freundliche Erinnerung' },
+                  { value: 'first', label: '⚠️ 1. Mahnung', desc: 'Erste Mahnung' },
+                  { value: 'second', label: '🔴 2. Mahnung', desc: 'Letzte Mahnung' },
+                ] as const).map(({ value, label, desc }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => {
+                      setDunningType(value)
+                      const defaults = getDunningDefaults(dunningInvoice, value)
+                      setDunningSubject(defaults.subject)
+                      setDunningBody(defaults.body)
+                    }}
+                    className={`flex-1 px-3 py-2.5 rounded-xl text-xs font-bold border transition-all text-left ${
+                      dunningType === value
+                        ? value === 'reminder' ? 'bg-blue-600 border-blue-600 text-white shadow-md' : value === 'first' ? 'bg-amber-500 border-amber-500 text-white shadow-md' : 'bg-red-600 border-red-600 text-white shadow-md'
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div>{label}</div>
+                    <div className={`text-[10px] mt-0.5 font-semibold ${dunningType === value ? 'text-white/80' : 'text-slate-400'}`}>{desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Form */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-5 text-xs font-semibold text-slate-800">
+
+              {/* Absender */}
+              <div className="grid grid-cols-4 gap-4 items-center">
+                <span className="text-slate-500 font-bold uppercase tracking-wider">Absender</span>
+                <div className="col-span-3">
+                  <select
+                    value={dunningSender}
+                    onChange={(e) => setDunningSender(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-red-400 font-medium"
+                  >
+                    <option value="noreply@theomnistack.de">noreply@theomnistack.de (System-Standard)</option>
+                    {company?.smtpSettings?.enabled && company.smtpSettings.fromEmail && (
+                      <option value={company.smtpSettings.fromEmail}>
+                        {company.smtpSettings.fromEmail} (Eigener Mailserver)
+                      </option>
+                    )}
+                  </select>
+                </div>
+              </div>
+
+              {/* Empfänger */}
+              <div className="grid grid-cols-4 gap-4 items-center">
+                <span className="text-slate-500 font-bold uppercase tracking-wider">Empfänger</span>
+                <div className="col-span-3">
+                  <input
+                    type="email"
+                    value={dunningRecipient}
+                    onChange={(e) => setDunningRecipient(e.target.value)}
+                    placeholder="empfaenger@email.de"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-400 font-medium text-slate-800"
+                  />
+                </div>
+              </div>
+
+              {/* Betreff */}
+              <div className="grid grid-cols-4 gap-4 items-center">
+                <span className="text-slate-500 font-bold uppercase tracking-wider">Betreff</span>
+                <div className="col-span-3">
+                  <input
+                    type="text"
+                    value={dunningSubject}
+                    onChange={(e) => setDunningSubject(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-400 font-medium text-slate-800"
+                  />
+                </div>
+              </div>
+
+              {/* Nachricht */}
+              <div className="grid grid-cols-4 gap-4 items-start">
+                <span className="text-slate-500 font-bold uppercase tracking-wider pt-2">Nachricht</span>
+                <div className="col-span-3">
+                  <textarea
+                    rows={9}
+                    value={dunningBody}
+                    onChange={(e) => setDunningBody(e.target.value)}
+                    className="w-full p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-400 leading-relaxed font-medium font-sans text-slate-800 resize-none"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1.5">Der Standardtext kann frei bearbeitet werden. Die Rechnung wird automatisch als PDF-Anhang beigefügt.</p>
+                </div>
+              </div>
+
+              {/* Mahngebühr – nur für Mahnungen */}
+              {dunningType !== 'reminder' && (
+                <div className="grid grid-cols-4 gap-4 items-start pt-1">
+                  <span className="text-slate-500 font-bold uppercase tracking-wider pt-2">Mahngebühr</span>
+                  <div className="col-span-3 space-y-2.5">
+                    <label className="flex items-center gap-2.5 text-xs text-slate-700 font-semibold select-none cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={dunningIncludeFee}
+                        onChange={(e) => setDunningIncludeFee(e.target.checked)}
+                        className="rounded border-slate-300 text-red-600 focus:ring-red-400 h-4 w-4"
+                      />
+                      <span>Mahngebühr erheben</span>
+                    </label>
+                    {dunningIncludeFee && (
+                      <div className="flex items-center gap-2">
+                        <div className="relative max-w-[160px]">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="0.00"
+                            value={dunningFee}
+                            onChange={(e) => setDunningFee(e.target.value)}
+                            className="w-full pl-3 pr-8 py-2 border border-slate-200 rounded-xl text-sm text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-red-400"
+                          />
+                          <span className="absolute inset-y-0 right-3 flex items-center text-slate-400 text-xs font-bold">€</span>
+                        </div>
+                        <span className="text-slate-400 text-[11px]">wird im E-Mail-Text erwähnt</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Anhang Info */}
+              <div className="grid grid-cols-4 gap-4 items-center pt-1">
+                <span className="text-slate-500 font-bold uppercase tracking-wider">Anhang</span>
+                <div className="col-span-3 flex items-center gap-2 text-slate-700 bg-slate-50 px-3 py-2 rounded-xl border border-slate-100 max-w-max">
+                  <svg className="w-4 h-4 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
+                  <span className="font-bold font-mono text-[11px]">Rechnung-{dunningInvoice.invoiceNumber}.pdf</span>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-between items-center gap-3 shrink-0">
+              <p className="text-[11px] text-slate-400 font-semibold">Der Versand wird im Aktivitätenprotokoll und Mahnwesen erfasst.</p>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowDunningModal(false)}
+                  className="px-5 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-black uppercase rounded-xl transition-all shadow-sm"
+                >
+                  Abbrechen
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSendDunning}
+                  disabled={isSendingDunning || !dunningRecipient}
+                  className={`px-5 py-2.5 text-white text-xs font-black uppercase rounded-xl transition-all shadow-md flex items-center gap-1.5 disabled:opacity-50 ${
+                    dunningType === 'reminder' ? 'bg-blue-600 hover:bg-blue-700' : dunningType === 'first' ? 'bg-amber-500 hover:bg-amber-600' : 'bg-red-600 hover:bg-red-700'
+                  }`}
+                >
+                  {isSendingDunning ? (
+                    <div className="animate-spin h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full" />
+                  ) : (
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    </svg>
+                  )}
+                  {isSendingDunning ? 'Wird versendet...' : dunningType === 'reminder' ? 'Erinnerung senden' : dunningType === 'first' ? '1. Mahnung senden' : '2. Mahnung senden'}
+                </button>
               </div>
             </div>
           </div>

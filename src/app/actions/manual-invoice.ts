@@ -63,16 +63,6 @@ export async function createManualInvoiceAction(data: {
     const auth = await requireAuth()
   const companyId = auth.activeCompanyId
 
-  // 0. Save/Update customer record
-  await saveCustomerAction({
-    name: data.customer.name,
-    email: data.customer.email,
-    street: data.customer.street,
-    zip: data.customer.zip,
-    city: data.customer.city,
-    country: data.customer.country,
-    vatId: data.customer.vatId
-  })
 
   // 1. Create a manual order
   const subtotal = data.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0)
@@ -163,13 +153,13 @@ export async function createManualInvoiceAction(data: {
         marketplaceOrderId: orderNumber,
         marketplacePurchaseDate: data.orderDate || new Date(),
         status: data.status === 'draft' ? 'draft' : 'invoiced',
-        buyerName: data.customer.name,
-        buyerEmail: data.customer.email,
-        shippingName: data.customer.name,
-        shippingStreet: data.customer.street,
-        shippingZip: data.customer.zip,
-        shippingCity: data.customer.city,
-        shippingCountry: data.customer.country,
+        buyerName: data.customer.name || null,
+        buyerEmail: data.customer.email || null,
+        shippingName: data.customer.name || null,
+        shippingStreet: data.customer.street || null,
+        shippingZip: data.customer.zip || null,
+        shippingCity: data.customer.city || null,
+        shippingCountry: data.customer.country || null,
         currency: data.currency,
         subtotalAmount: subtotal.toFixed(2),
         taxAmount: tax.toFixed(2),
@@ -441,11 +431,11 @@ export async function convertQuoteAction(quoteId: string, targetType: 'invoice' 
         marketplacePurchaseDate: new Date(),
         status: 'invoiced',
         buyerName: quote.recipientName || '',
-        buyerEmail: quote.recipientEmail || undefined,
+        buyerEmail: quote.recipientEmail || null,
         shippingName: quote.recipientName || '',
         shippingStreet: quote.recipientStreet || '',
         shippingZip: quote.recipientZip || '',
-        shippingCity: quote.recipientCity || '',
+        shippingCity: quote.recipientCity || null,
         shippingCountry: quote.recipientCountry || 'DE',
         currency: quote.currency || 'EUR',
         subtotalAmount: subtotal.toFixed(2),
@@ -562,11 +552,11 @@ export async function convertQuoteToOrderAction(quoteId: string) {
         marketplacePurchaseDate: new Date(),
         status: 'pending',
         buyerName: quote.recipientName || '',
-        buyerEmail: quote.recipientEmail || undefined,
+        buyerEmail: quote.recipientEmail || null,
         shippingName: quote.recipientName || '',
         shippingStreet: quote.recipientStreet || '',
         shippingZip: quote.recipientZip || '',
-        shippingCity: quote.recipientCity || '',
+        shippingCity: quote.recipientCity || null,
         shippingCountry: quote.recipientCountry || 'DE',
         currency: quote.currency || 'EUR',
         subtotalAmount: subtotal.toFixed(2),
@@ -871,6 +861,7 @@ export async function editManualInvoiceAction(data: {
   invoiceId: string
   internalNote: string
   customer: {
+    id?: string
     name: string
     street: string
     zip: string
@@ -944,6 +935,22 @@ export async function editManualInvoiceAction(data: {
         note: data.internalNote,
         action: 'edited'
       })
+
+      // Save/Update customer record
+      if (data.customer.name?.trim()) {
+        await saveCustomerAction({
+          id: data.customer.id,
+          name: data.customer.name,
+          email: data.customer.email,
+          street: data.customer.street,
+          zip: data.customer.zip,
+          city: data.customer.city,
+          country: data.customer.country,
+          vatId: data.customer.vatId,
+          customerNumber: data.customer.customerNumber,
+          vatCheckStatus: data.vatCheckStatus
+        })
+      }
 
       // b) Update Invoice Record
       await tx.update(invoices).set({

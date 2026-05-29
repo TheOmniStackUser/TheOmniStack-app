@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}Neues Ticket{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+  <div class="flex items-center gap-3 mb-6">
+    <a href="{{ url_for('dashboard') }}" class="text-gray-400 hover:text-gray-600 transition text-sm">← Dashboard</a>
+    <span class="text-gray-300">/</span>
+    <h1 class="text-xl font-bold text-navy-900">Neues Ticket</h1>
+  </div>
+
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+    <form method="POST" action="{{ url_for('neu') }}" enctype="multipart/form-data">
+
+      <!-- Kategorie -->
+      <div class="mb-5">
+        <label class="block text-sm font-semibold text-gray-700 mb-2">
+          Kategorie <span class="text-red-400">*</span>
+        </label>
+        <div class="grid grid-cols-2 gap-3">
+          {% for k, icon, desc in [
+            ('TheOmniStack', '⚙️', 'Fehler oder Ideen zur Plattform'),
+            ('Ticket System', '🎫', 'Probleme mit dem Ticket-System')
+          ] %}
+          <label class="cursor-pointer">
+            <input type="radio" name="kategorie" value="{{ k }}" class="sr-only"
+                   {% if (kategorie or 'TheOmniStack') == k %}checked{% endif %} />
+            <div class="kat-option border-2 rounded-xl p-3 text-center transition
+                        {% if (kategorie or 'TheOmniStack') == k %}border-cyan-400 bg-cyan-50 text-cyan-700{% else %}border-gray-100 hover:border-gray-200{% endif %}">
+              <div class="text-xl mb-1">{{ icon }}</div>
+              <div class="text-xs font-bold">{{ k }}</div>
+              <div class="text-xs text-gray-400">{{ desc }}</div>
+            </div>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Titel -->
+      <div class="mb-5">
+        <label class="block text-sm font-semibold text-gray-700 mb-2" for="titel">
+          Titel <span class="text-red-400">*</span>
+        </label>
+        <input type="text" id="titel" name="titel" value="{{ titel or '' }}"
+               class="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400 transition"
+               placeholder="Kurze, prägnante Beschreibung des Problems"
+               required autofocus />
+      </div>
+
+      <!-- Beschreibung -->
+      <div class="mb-5">
+        <label class="block text-sm font-semibold text-gray-700 mb-2" for="beschreibung">
+          Beschreibung <span class="text-red-400">*</span>
+        </label>
+        <textarea id="beschreibung" name="beschreibung" rows="5"
+                  class="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400 transition resize-y"
+                  placeholder="Detaillierte Beschreibung:&#10;- Was ist passiert?&#10;- Wie kann man es reproduzieren?&#10;- Was ist das erwartete Verhalten?"
+                  required>{{ beschreibung or '' }}</textarea>
+      </div>
+
+      <!-- Priorität -->
+      <div class="mb-5">
+        <label class="block text-sm font-semibold text-gray-700 mb-2">
+          Priorität <span class="text-red-400">*</span>
+        </label>
+        <div class="grid grid-cols-3 gap-3">
+          {% for p, icon, desc, colors in [
+            ('Niedrig',  '🟢', 'Keine Eile',          'border-green-200 bg-green-50 text-green-700'),
+            ('Mittel',   '🟡', 'Zeitnah bearbeiten',  'border-amber-200 bg-amber-50 text-amber-700'),
+            ('Hoch',     '🔴', 'Sofort handeln',      'border-red-200 bg-red-50 text-red-700')
+          ] %}
+          <label class="cursor-pointer">
+            <input type="radio" name="prioritaet" value="{{ p }}" class="sr-only"
+                   {% if (prioritaet or 'Mittel') == p %}checked{% endif %} />
+            <div class="priority-option border-2 rounded-xl p-3 text-center transition
+                        {% if (prioritaet or 'Mittel') == p %}{{ colors }} border-current{% else %}border-gray-100 hover:border-gray-200{% endif %}">
+              <div class="text-xl mb-1">{{ icon }}</div>
+              <div class="text-xs font-bold">{{ p }}</div>
+              <div class="text-xs text-gray-400">{{ desc }}</div>
+            </div>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Screenshot Upload -->
+      <div class="mb-6">
+        <label class="block text-sm font-semibold text-gray-700 mb-2" for="screenshot">
+          Screenshot
+          <span class="text-xs font-normal text-gray-400 ml-1">optional · PNG, JPG, GIF bis 5 MB</span>
+        </label>
+        <div class="relative border-2 border-dashed border-gray-200 rounded-xl p-6 text-center hover:border-cyan-400 transition" id="dropZone">
+          <input type="file" id="screenshot" name="screenshot" accept=".png,.jpg,.jpeg,.gif,.webp"
+                 class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                 onchange="previewFile(this)" />
+          <div id="uploadPlaceholder">
+            <div class="text-3xl mb-2">📎</div>
+            <p class="text-sm text-gray-500">Datei hierher ziehen oder <span class="text-cyan-500 font-semibold">auswählen</span></p>
+          </div>
+          <div id="uploadPreview" class="hidden">
+            <img id="previewImg" src="" alt="Preview" class="max-h-40 mx-auto rounded-lg mb-2" />
+            <p id="previewName" class="text-xs text-gray-500"></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Buttons -->
+      <div class="flex gap-3">
+        <button type="submit" class="flex-1 bg-navy-900 text-white font-bold py-3 px-6 rounded-xl hover:bg-navy-700 transition text-sm">
+          Ticket erstellen →
+        </button>
+        <a href="{{ url_for('dashboard') }}" class="px-6 py-3 border border-gray-200 text-gray-500 font-semibold rounded-xl hover:bg-gray-50 transition text-sm text-center">
+          Abbrechen
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+// Kategorie-Radio
+document.querySelectorAll('input[name="kategorie"]').forEach(radio => {
+  radio.addEventListener('change', () => {
+    document.querySelectorAll('.kat-option').forEach(el => {
+      el.className = 'kat-option border-2 rounded-xl p-3 text-center transition border-gray-100 hover:border-gray-200';
+    });
+    radio.nextElementSibling.className = 'kat-option border-2 rounded-xl p-3 text-center transition border-cyan-400 bg-cyan-50 text-cyan-700';
+  });
+});
+
+// Prioritäts-Radio
+document.querySelectorAll('input[name="prioritaet"]').forEach(radio => {
+  radio.addEventListener('change', () => {
+    document.querySelectorAll('.priority-option').forEach(el => {
+      el.className = 'priority-option border-2 rounded-xl p-3 text-center transition border-gray-100 hover:border-gray-200';
+    });
+    const colors = {
+      'Niedrig': 'border-green-200 bg-green-50 text-green-700 border-current',
+      'Mittel':  'border-amber-200 bg-amber-50 text-amber-700 border-current',
+      'Hoch':    'border-red-200 bg-red-50 text-red-700 border-current'
+    };
+    radio.nextElementSibling.className = `priority-option border-2 rounded-xl p-3 text-center transition ${colors[radio.value]}`;
+  });
+});
+
+// Screenshot-Vorschau
+function previewFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('uploadPlaceholder').classList.add('hidden');
+    document.getElementById('uploadPreview').classList.remove('hidden');
+    document.getElementById('previewImg').src = e.target.result;
+    document.getElementById('previewName').textContent = file.name + ' (' + (file.size / 1024).toFixed(0) + ' KB)';
+  };
+  reader.readAsDataURL(file);
+}
+</script>
+{% endblock %}

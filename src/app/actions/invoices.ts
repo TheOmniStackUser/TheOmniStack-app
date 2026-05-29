@@ -622,8 +622,12 @@ export async function getInvoiceDetailsForCloneAction(invoiceId: string) {
       shippingCountry: metadata.shippingCountry || invoice.recipientCountry || 'DE',
       destinationCountry: metadata.destinationCountry || invoice.recipientCountry || 'DE',
       taxCountry: metadata.taxCountry || 'DE',
-      orderNumber: metadata.orderNumber || '',
-      orderDate: metadata.orderDate ? new Date(metadata.orderDate).toISOString().split('T')[0] : '',
+      orderNumber: metadata.orderNumber || linkedOrder?.marketplaceOrderId || '',
+      orderDate: metadata.orderDate 
+        ? new Date(metadata.orderDate).toISOString().split('T')[0] 
+        : (linkedOrder?.marketplacePurchaseDate 
+          ? new Date(linkedOrder.marketplacePurchaseDate).toISOString().split('T')[0] 
+          : ''),
       buyerReference: metadata.buyerReference || '',
       externalId: metadata.externalId || '',
       skontoRate: metadata.skontoRate || 0,
@@ -631,6 +635,7 @@ export async function getInvoiceDetailsForCloneAction(invoiceId: string) {
       discountRate: metadata.discountRate || 0,
       ossEnabled: metadata.ossEnabled || false,
       dueDateDays: metadata.dueDateDays || 14,
+      customerNumber: linkedOrder?.customerNumber || '',
     },
     items: invoice.items.map(i => ({
       sku: i.sku || '',
@@ -846,4 +851,97 @@ ${data.provider ? `Zahlungsdienstleister: ${data.provider}\n` : ''}${data.refere
   return { success: true }
 }
 
+export async function sendDunningNoticeAction(data: {
+  invoiceId: string
+  type: 'reminder' | 'first' | 'second'
+  subject: string
+  body: string
+  recipientEmail: string
+  senderEmail: string
+  dunningFee?: string
+}) {
+  const auth = await requireAuth()
+  const companyId = auth.activeCompanyId
 
+  const invoice = await db.query.invoices.findFirst({
+    where: and(eq(invoices.id, data.invoiceId), eq(invoices.companyId, companyId))
+  })
+  if (!invoice) throw new Error('Rechnung nicht gefunden')
+
+  const [company] = await db
+    .select({ email: companies.email, name: companies.name, smtpSettings: companies.smtpSettings })
+    .from(companies)
+    .where(eq(companies.id, companyId))
+    .limit(1)
+
+  // Download PDF attachment
+  let pdfBuffer: Buffer | undefined
+  let pdfFilename: string | undefined
+  if (invoice.pdfStorageKey) {
+    const { downloadDocument } = await import('@/lib/storage')
+    pdfBuffer = await downloadDocument(invoice.pdfStorageKey)
+    pdfFilename = `Rechnung-${invoice.invoiceNumber}.pdf`
+  }
+
+  // Determine SMTP config
+  let smtpConfig: any = undefined
+  if (company?.smtpSettings?.enabled && company.smtpSettings.fromEmail && data.senderEmail === company.smtpSettings.fromEmail) {
+    smtpConfig = company.smtpSettings
+  }
+
+  const stageLabel = data.type === 'reminder' ? 'Zahlungserinnerung' : data.type === 'first' ? '1. Mahnung' : '2. Mahnung'
+
+  // Send email
+  const { sendInvoiceEmail } = await import('@/lib/email')
+  const emailResult = await sendInvoiceEmail({
+    toEmail: data.recipientEmail,
+    replyTo: company?.email || '',
+    subject: data.subject,
+    html: data.body.replace(/\n/g, '<br>'),
+    pdfBuffer,
+    pdfFilename,
+    smtpConfig
+  })
+
+  if (!emailResult.success) {
+    // Log failure in dunningLogs
+    const { dunningLogs } = await import('@/db/schema/dunning')
+    await db.insert(dunningLogs).values({
+      companyId,
+      invoiceId: data.invoiceId,
+      stage: data.type,
+      status: 'failed',
+      recipientEmail: data.recipientEmail,
+      subject: data.subject,
+      errorMessage: String((emailResult.error as any)?.message || 'Unbekannter Fehler'),
+      triggeredByUserId: auth.userId,
+    })
+    throw new Error((emailResult.error as any)?.message || 'Fehler beim E-Mail-Dienst')
+  }
+
+  // Log success in dunningLogs
+  const { dunningLogs } = await import('@/db/schema/dunning')
+  await db.insert(dunningLogs).values({
+    companyId,
+    invoiceId: data.invoiceId,
+    stage: data.type,
+    status: 'sent',
+    recipientEmail: data.recipientEmail,
+    subject: data.subject,
+    triggeredByUserId: auth.userId,
+  })
+
+  // Log in invoiceLogs for the activity trail
+  const feeNote = data.dunningFee ? `\nMahngebühr: ${data.dunningFee} €` : ''
+  const logNote = `${stageLabel} manuell versendet.\nAbsender: ${data.senderEmail}\nEmpfänger: ${data.recipientEmail}\nBetreff: ${data.subject}${feeNote}`
+
+  await db.insert(invoiceLogs).values({
+    invoiceId: data.invoiceId,
+    companyId,
+    userId: auth.userId,
+    action: 'email',
+    note: logNote,
+  })
+
+  return { success: true }
+}

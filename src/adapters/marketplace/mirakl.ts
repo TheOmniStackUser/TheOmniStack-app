@@ -135,7 +135,8 @@ export class MiraklAdapter implements MarketplaceAdapter {
 
       // Filter orders by channel code if this instance is restricted to a specific country
       const match = this.marketplace.match(/\s([a-z]{2})$/i)
-      if (match) {
+      const isDecathlon = this.config.baseUrl.includes('decathlon')
+      if (match && isDecathlon) {
         const expectedChannel = match[1].toUpperCase()
         rawOrders = rawOrders.filter((raw: any) => {
           const channelCode = raw.channel?.code?.toUpperCase()

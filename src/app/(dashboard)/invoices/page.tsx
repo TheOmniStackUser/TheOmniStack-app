@@ -33,6 +33,7 @@ export default async function InvoicesPage() {
         createdAt: invoices.createdAt,
         pdfStorageKey: invoices.pdfStorageKey,
         marketplace: orders.marketplace,
+        marketplaceOrderId: orders.marketplaceOrderId,
         cancelsInvoiceId: invoices.cancelsInvoiceId,
         isCreditNote: invoices.isCreditNote,
         documentType: invoices.documentType,

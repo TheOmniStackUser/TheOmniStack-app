@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- Stats -->
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+  {% for label, val, color in [
+    ('Gesamt', stats.gesamt, 'text-gray-700'),
+    ('Offen', stats.offen, 'text-blue-600'),
+    ('In Bearbeitung', stats.in_bearbeitung, 'text-orange-500'),
+    ('Erledigt', stats.erledigt, 'text-emerald-600')
+  ] %}
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{{ label }}</p>
+    <p class="text-3xl font-extrabold {{ color }}">{{ val or 0 }}</p>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Filter -->
+<div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-4">
+  <form method="GET" action="{{ url_for('dashboard') }}" class="flex flex-wrap gap-3 items-end">
+    <div class="flex-1 min-w-[200px]">
+      <label class="block text-xs font-semibold text-gray-500 mb-1">SUCHE</label>
+      <input type="text" name="suche" value="{{ suche }}"
+             placeholder="Titel oder Beschreibung ..."
+             class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400 transition" />
+    </div>
+    <div>
+      <label class="block text-xs font-semibold text-gray-500 mb-1">STATUS</label>
+      <select name="status" class="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400 bg-white">
+        <option value="alle" {% if status_filter=='alle' %}selected{% endif %}>Alle</option>
+        {% for s in ['Offen','In Bearbeitung','Erledigt'] %}
+        <option value="{{ s }}" {% if status_filter==s %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs font-semibold text-gray-500 mb-1">PRIORITÄT</label>
+      <select name="prioritaet" class="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400 bg-white">
+        <option value="alle" {% if prioritaet_filter=='alle' %}selected{% endif %}>Alle</option>
+        {% for p in ['Hoch','Mittel','Niedrig'] %}
+        <option value="{{ p }}" {% if prioritaet_filter==p %}selected{% endif %}>{{ p }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs font-semibold text-gray-500 mb-1">KATEGORIE</label>
+      <select name="kategorie" class="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400 bg-white">
+        <option value="alle" {% if kategorie_filter=='alle' %}selected{% endif %}>Alle</option>
+        {% for k in kategorien %}
+        <option value="{{ k }}" {% if kategorie_filter==k %}selected{% endif %}>{{ k }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="px-5 py-2 bg-navy-900 text-white text-sm font-bold rounded-xl hover:bg-navy-700 transition">
+      Suchen
+    </button>
+    {% if suche or status_filter != 'alle' or prioritaet_filter != 'alle' or kategorie_filter != 'alle' %}
+    <a href="{{ url_for('dashboard') }}" class="px-4 py-2 text-sm text-gray-400 hover:text-gray-600 rounded-xl border border-gray-200 hover:bg-gray-50 transition">
+      Zurücksetzen
+    </a>
+    {% endif %}
+  </form>
+</div>
+
+{% if tickets %}
+<div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+
+  <!-- Desktop-Tabelle -->
+  <div class="hidden md:block overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 border-b border-gray-100">
+        <tr>
+          <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-8">#</th>
+          <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Titel</th>
+          <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-28">Kategorie</th>
+          {% if user_role != 'haendler' %}
+          <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-36">Händler</th>
+          {% endif %}
+          <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-24">Priorität</th>
+          <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-32">Status</th>
+          <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-28">Erstellt</th>
+          <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Aktionen</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        {% for t in tickets %}
+        <tr class="hover:bg-gray-50 transition" id="row-{{ t.id }}">
+          <td class="px-4 py-3 text-gray-400 font-mono text-xs">#{{ t.id }}</td>
+          <td class="px-4 py-3">
+            <a href="{{ url_for('detail', ticket_id=t.id) }}" class="font-semibold text-navy-900 hover:text-cyan-600 transition flex items-center gap-2">
+              {{ t.titel }}
+              {% if t.screenshot %}<span class="text-gray-300 ml-1">🖼</span>{% endif %}
+              {% if t.id in neue_antworten %}
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full border border-emerald-200 whitespace-nowrap">
+                &#128172; Neue Antwort
+              </span>
+              {% endif %}
+            </a>
+            <p class="text-xs text-gray-400 mt-0.5">{{ t.beschreibung[:60] }}{% if t.beschreibung|length > 60 %}…{% endif %}</p>
+          </td>
+          <td class="px-4 py-3">
+            <span class="inline-flex px-2 py-1 rounded-md text-xs font-semibold
+                         {% if t.kategorie == 'TheOmniStack' %}bg-cyan-50 text-cyan-700 border border-cyan-200
+                         {% else %}bg-purple-50 text-purple-700 border border-purple-200{% endif %}">
+              {{ t.kategorie }}
+            </span>
+          </td>
+          {% if user_role != 'haendler' %}
+          <td class="px-4 py-3 text-xs text-gray-500">{{ t.user_name or '–' }}</td>
+          {% endif %}
+          <td class="px-4 py-3">
+            <span class="inline-flex px-2 py-1 rounded-md text-xs font-semibold
+                         {% if t.prioritaet == 'Hoch' %}bg-red-100 text-red-700
+                         {% elif t.prioritaet == 'Mittel' %}bg-amber-100 text-amber-700
+                         {% else %}bg-green-100 text-green-700{% endif %}">
+              {{ t.prioritaet }}
+            </span>
+          </td>
+          <td class="px-4 py-3">
+            <span class="inline-flex px-2 py-1 rounded-md text-xs font-semibold
+                         {% if t.status == 'Offen' %}bg-blue-100 text-blue-700
+                         {% elif t.status == 'In Bearbeitung' %}bg-orange-100 text-orange-700
+                         {% else %}bg-emerald-100 text-emerald-700{% endif %}"
+                  id="status-{{ t.id }}">
+              {{ t.status }}
+            </span>
+          </td>
+          <td class="px-4 py-3 text-xs text-gray-400">{{ t.erstellt_am }}</td>
+          <td class="px-4 py-3">
+            <div class="flex items-center gap-1 flex-wrap">
+              {% if user_role != 'haendler' %}
+                {% if t.status != 'Offen' %}
+                <button onclick="updateStatus({{ t.id }}, 'Offen')"
+                        class="px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition font-medium">Offen</button>
+                {% endif %}
+                {% if t.status != 'In Bearbeitung' %}
+                <button onclick="updateStatus({{ t.id }}, 'In Bearbeitung')"
+                        class="px-2 py-1 text-xs bg-orange-50 text-orange-600 rounded-md hover:bg-orange-100 transition font-medium">Aktiv</button>
+                {% endif %}
+                {% if t.status != 'Erledigt' %}
+                <button onclick="updateStatus({{ t.id }}, 'Erledigt')"
+                        class="px-2 py-1 text-xs bg-emerald-50 text-emerald-600 rounded-md hover:bg-emerald-100 transition font-medium">Erledigt</button>
+                {% endif %}
+              {% endif %}
+              <button onclick="deleteTicket({{ t.id }}, '{{ t.titel|replace("'", "\\'") }}')"
+                      class="px-2 py-1 text-xs bg-red-50 text-red-500 rounded-md hover:bg-red-100 transition font-medium ml-1">✕</button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Mobile-Karten -->
+  <div class="md:hidden divide-y divide-gray-100">
+    {% for t in tickets %}
+    <div class="p-4" id="card-{{ t.id }}">
+      <div class="flex items-start justify-between gap-3 mb-2">
+        <div class="flex-1">
+          <a href="{{ url_for('detail', ticket_id=t.id) }}" class="font-semibold text-navy-900 text-sm flex items-center gap-2 flex-wrap">
+            {{ t.titel }}
+            {% if t.id in neue_antworten %}
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full border border-emerald-200">
+              💬 Neue Antwort
+            </span>
+            {% endif %}
+          </a>
+          <p class="text-xs text-gray-400 mt-0.5">{{ t.erstellt_am }} · #{{ t.id }}</p>
+        </div>
+        <div class="flex gap-1 flex-col items-end flex-shrink-0">
+          <span class="inline-flex px-2 py-1 rounded-md text-xs font-semibold
+                       {% if t.prioritaet == 'Hoch' %}bg-red-100 text-red-700
+                       {% elif t.prioritaet == 'Mittel' %}bg-amber-100 text-amber-700
+                       {% else %}bg-green-100 text-green-700{% endif %}">{{ t.prioritaet }}</span>
+          <span class="inline-flex px-2 py-1 rounded-md text-xs font-semibold
+                       {% if t.kategorie == 'TheOmniStack' %}bg-cyan-50 text-cyan-700
+                       {% else %}bg-purple-50 text-purple-700{% endif %}">{{ t.kategorie }}</span>
+        </div>
+      </div>
+      {% if user_role != 'haendler' and t.user_name %}
+      <p class="text-xs text-gray-400 mb-2">👤 {{ t.user_name }}</p>
+      {% endif %}
+      <p class="text-xs text-gray-500 mb-3">{{ t.beschreibung[:100] }}{% if t.beschreibung|length > 100 %}…{% endif %}</p>
+      <div class="flex gap-2 flex-wrap">
+        {% if user_role != 'haendler' %}
+          {% if t.status != 'Offen' %}
+          <button onclick="updateStatus({{ t.id }}, 'Offen')" class="px-3 py-1.5 text-xs bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 font-medium">Offen</button>
+          {% endif %}
+          {% if t.status != 'In Bearbeitung' %}
+          <button onclick="updateStatus({{ t.id }}, 'In Bearbeitung')" class="px-3 py-1.5 text-xs bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100 font-medium">Aktiv</button>
+          {% endif %}
+          {% if t.status != 'Erledigt' %}
+          <button onclick="updateStatus({{ t.id }}, 'Erledigt')" class="px-3 py-1.5 text-xs bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 font-medium">Erledigt</button>
+          {% endif %}
+        {% endif %}
+        <button onclick="deleteTicket({{ t.id }}, '{{ t.titel|replace("'", "\\'") }}')" class="px-3 py-1.5 text-xs bg-red-50 text-red-500 rounded-lg hover:bg-red-100 font-medium">Löschen</button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<p class="text-xs text-gray-400 mt-3 text-right">{{ tickets|length }} Ticket{% if tickets|length != 1 %}s{% endif %} gefunden</p>
+
+{% else %}
+<div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-16 text-center">
+  <div class="text-5xl mb-4">📋</div>
+  <h3 class="text-lg font-semibold text-gray-700 mb-2">Keine Tickets gefunden</h3>
+  <p class="text-gray-400 text-sm mb-6">
+    {% if suche or status_filter != 'alle' or prioritaet_filter != 'alle' or kategorie_filter != 'alle' %}
+      Keine Tickets entsprechen deinen Filterkriterien.
+    {% else %}
+      Noch keine Tickets vorhanden. Erstelle das erste!
+    {% endif %}
+  </p>
+  <a href="{{ url_for('neu') }}" class="inline-flex items-center gap-2 px-5 py-2.5 bg-navy-900 text-white text-sm font-semibold rounded-xl hover:bg-navy-700 transition">
+    + Erstes Ticket erstellen
+  </a>
+</div>
+{% endif %}
+
+<script>
+async function updateStatus(id, status) {
+  try {
+    const res = await fetch(`/api/ticket/${id}/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status })
+    });
+    if (!res.ok) throw new Error('Fehler');
+    const badge = document.getElementById(`status-${id}`);
+    if (badge) {
+      badge.textContent = status;
+      badge.className = 'inline-flex px-2 py-1 rounded-md text-xs font-semibold ' +
+        (status === 'Offen' ? 'bg-blue-100 text-blue-700' :
+         status === 'In Bearbeitung' ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700');
+    }
+    showToast(`Status auf „${status}" geändert`, 'success');
+    setTimeout(() => location.reload(), 600);
+  } catch(e) { showToast('Fehler beim Aktualisieren', 'error'); }
+}
+
+async function deleteTicket(id, titel) {
+  const confirmed = await confirmCustom(
+    'Ticket löschen',
+    `Ticket „${titel}“ wirklich löschen?\nDieser Vorgang kann nicht rückgängig gemacht werden.`,
+    { type: 'danger', confirmText: 'Löschen', cancelText: 'Abbrechen' }
+  );
+  if (!confirmed) return;
+  try {
+    const res = await fetch(`/api/ticket/${id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Fehler');
+    const row  = document.getElementById(`row-${id}`);
+    const card = document.getElementById(`card-${id}`);
+    if (row)  { row.style.opacity  = '0'; setTimeout(() => row.remove(),  300); }
+    if (card) { card.style.opacity = '0'; setTimeout(() => card.remove(), 300); }
+    showToast(`Ticket „${titel}" gelöscht`, 'success');
+  } catch(e) { showToast('Fehler beim Löschen', 'error'); }
+}
+
+function showToast(msg, type) {
+  const div = document.createElement('div');
+  div.className = `fixed top-16 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-sm font-medium ${type === 'success' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`;
+  div.style.animation = 'slideIn .3s ease';
+  div.innerHTML = `<span>${type === 'success' ? '✓' : '✕'}</span> ${msg}`;
+  document.body.appendChild(div);
+  setTimeout(() => div.remove(), 3000);
+}
+</script>
+{% endblock %}
