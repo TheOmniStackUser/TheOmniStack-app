@@ -157,7 +157,7 @@ export async function generateMissingInvoicesAction() {
       const integration = activeIntegrations.find(i => 
         i.type === order.marketplace ||
         (i.type === 'mirakl_custom' && 
-         ((i.metadata as any)?.customName || '').toLowerCase() === order.marketplace.toLowerCase())
+         ((i.metadata as any)?.customName || '').toLowerCase() === (order.marketplace || '').toLowerCase())
       )
       const downloadInvoice = !!(integration?.metadata as any)?.downloadInvoice
 
