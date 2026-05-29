@@ -325,7 +325,7 @@ export function DunningSettings() {
                               max={365}
                               value={rule.daysAfterDue}
                               onChange={(e) => updateRule(rule.stage as DunningStage, { daysAfterDue: parseInt(e.target.value) || 0 })}
-                              className="w-24 px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                             <span className="text-sm text-gray-500">Tage</span>
                           </div>
@@ -345,7 +345,7 @@ export function DunningSettings() {
                               placeholder="0.00"
                               value={rule.feeAmount ?? ''}
                               onChange={(e) => updateRule(rule.stage as DunningStage, { feeAmount: e.target.value || null })}
-                              className="w-28 px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="w-28 px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                             <span className="text-sm text-gray-500">EUR</span>
                           </div>
@@ -359,7 +359,7 @@ export function DunningSettings() {
                             type="text"
                             value={rule.subjectTemplate}
                             onChange={(e) => updateRule(rule.stage as DunningStage, { subjectTemplate: e.target.value })}
-                            className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                             placeholder={`${meta.label}: Rechnung {Nummer}`}
                           />
                         </div>
@@ -371,7 +371,7 @@ export function DunningSettings() {
                             rows={7}
                             value={rule.bodyTemplate}
                             onChange={(e) => updateRule(rule.stage as DunningStage, { bodyTemplate: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y font-mono"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y font-mono"
                             placeholder="E-Mail-Text eingeben..."
                           />
                           <p className="text-xs text-gray-400 mt-1">Anrede und Grußformel werden automatisch ergänzt. Hier nur den Haupttext eingeben.</p>
@@ -421,14 +421,14 @@ export function DunningSettings() {
               placeholder="kunde@beispiel.de"
               value={newExclusionEmail}
               onChange={(e) => setNewExclusionEmail(e.target.value)}
-              className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
             <input
               type="text"
               placeholder="Grund (optional)"
               value={newExclusionReason}
               onChange={(e) => setNewExclusionReason(e.target.value)}
-              className="w-44 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-44 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
             <button
               onClick={handleAddExclusion}
