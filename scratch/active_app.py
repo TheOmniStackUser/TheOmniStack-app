@@ -237,9 +237,19 @@ def email_ticket_neues_support(support_emails: list[str], haendler_name: str,
     for email in support_emails:
         send_email(email, f'[Neues Ticket #{ticket_id}] {titel} – {prioritaet}', html)
 
-def email_ticket_geschlossen(haendler_email: str, haendler_name: str, ticket_id: int, titel: str):
+def email_ticket_geschlossen(haendler_email: str, haendler_name: str, ticket_id: int, titel: str, abschluss_text: str = None):
     """E-Mail an Händler wenn Ticket geschlossen wird."""
     ticket_url = f"{TICKET_BASE_URL}/ticket/{ticket_id}"
+    
+    abschluss_html = ""
+    if abschluss_text:
+        abschluss_html = f"""
+        <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;padding:16px;margin:20px 0">
+          <p style="margin:0;color:#065f46;font-size:13px;font-weight:600">KOMMENTAR VOM SUPPORT</p>
+          <p style="margin:8px 0 0;color:#047857;font-size:15px;white-space:pre-wrap">{abschluss_text}</p>
+        </div>
+        """
+
     html = f"""
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f9fafb;padding:24px;border-radius:12px">
       <div style="text-align:center;margin-bottom:24px">
@@ -253,6 +263,7 @@ def email_ticket_geschlossen(haendler_email: str, haendler_name: str, ticket_id:
           Ihr Support-Ticket wurde von unserem Team als <strong>erledigt</strong> markiert.
           Wir hoffen, dass Ihr Anliegen zufriedenstellend gelöst wurde.
         </p>
+        {abschluss_html}
         <div style="background:#f3f4f6;border-radius:8px;padding:16px;margin:20px 0">
           <p style="margin:0;color:#6b7280;font-size:13px">TICKET-NR.</p>
           <p style="margin:4px 0 0;color:#111827;font-size:18px;font-weight:700">#{ticket_id}</p>
@@ -904,8 +915,12 @@ def update_status(ticket_id):
 
     data   = request.get_json()
     status = data.get('status')
+    nachricht = data.get('nachricht')  # Optionaler Schließungskommentar
     if status not in ['Offen', 'In Bearbeitung', 'Erledigt']:
         return jsonify({'error': 'Ungültiger Status'}), 400
+
+    absender_id = session.get('user_id')
+    jetzt_str = jetzt()
 
     with get_db() as conn:
         ticket = conn.execute('''
@@ -918,7 +933,15 @@ def update_status(ticket_id):
             return jsonify({'error': 'Ticket nicht gefunden'}), 404
 
         conn.execute('UPDATE tickets SET status=?, geaendert_am=? WHERE id=?',
-                     (status, jetzt(), ticket_id))
+                     (status, jetzt_str, ticket_id))
+
+        # Wenn Status auf Erledigt gesetzt wird und ein Kommentar vorhanden ist, diesen als Nachricht einpflegen
+        if status == 'Erledigt' and nachricht and nachricht.strip():
+            conn.execute('''
+                INSERT INTO nachrichten (ticket_id, absender_id, typ, nachricht, erstellt_am, gelesen)
+                VALUES (?, ?, 'info_anfrage', ?, ?, 1)
+            ''', (ticket_id, absender_id, nachricht.strip(), jetzt_str))
+
         conn.commit()
 
     # E-Mail an Händler wenn Ticket geschlossen wird
@@ -928,6 +951,7 @@ def update_status(ticket_id):
             haendler_name=ticket['user_name'] or 'Händler',
             ticket_id=ticket_id,
             titel=ticket['titel'],
+            abschluss_text=nachricht.strip() if (nachricht and nachricht.strip()) else None
         )
 
     return jsonify({'success': True, 'status': status})
