@@ -426,6 +426,12 @@ export async function markInvoiceAsPaidAction(invoiceId: string) {
 
   if (!invoice) throw new Error('Rechnung nicht gefunden')
 
+  // Mark the invoice as paid (enables efficient dunning worker filtering)
+  await db
+    .update(invoices)
+    .set({ paidAt: new Date() })
+    .where(and(eq(invoices.id, invoiceId), eq(invoices.companyId, companyId)))
+
   await db.insert(invoiceLogs).values({
     invoiceId,
     companyId,

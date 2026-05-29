@@ -142,7 +142,6 @@ export function QuoteList({
   const [ccEmail, setCcEmail] = useState('')
   const [subject, setSubject] = useState('')
   const [messageText, setMessageText] = useState('')
-  const [digitalSign, setDigitalSign] = useState(false)
   const [sendAsAttachment, setSendAsAttachment] = useState(true)
   const [emailTemplate, setEmailTemplate] = useState(initialEmailTemplate || DEFAULT_QUOTE_TEMPLATE)
   const [isSavingTemplate, setIsSavingTemplate] = useState(false)
@@ -246,7 +245,6 @@ export function QuoteList({
       setCcEmail('')
       setSubject(`Angebot-${invNumber}`)
       setMessageText(resolvedText)
-      setDigitalSign(false)
       setSendAsAttachment(true)
     } catch (error) {
       console.error(error)
@@ -1138,16 +1136,6 @@ export function QuoteList({
                 {/* Options Checkboxes */}
                 <div className="grid grid-cols-4 gap-4">
                   <div className="col-start-2 col-span-3 space-y-2 text-slate-700">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 w-4 h-4" 
-                        checked={digitalSign}
-                        onChange={(e) => setDigitalSign(e.target.checked)}
-                      />
-                      <span>Dokument digital signieren</span>
-                    </label>
-
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input 
                         type="checkbox" 

@@ -2,6 +2,7 @@ import { returnsReportQueue } from './returns-report'
 import { db } from '@/db/client'
 import { companies } from '@/db/schema'
 import { marketplaceSyncQueue } from './marketplace-sync'
+import { dunningQueue } from './dunning'
 import { eq } from 'drizzle-orm'
 
 /**
@@ -103,3 +104,37 @@ export async function setupScheduledSyncs() {
   }
 }
 
+/**
+ * Sets up the daily dunning (Mahnwesen) check for all companies.
+ * Runs every morning at 08:00 Europe/Berlin.
+ */
+export async function setupDunningSchedule() {
+  console.log('⏰ Setting up daily dunning check...')
+
+  // Clean up old repeatable dunning jobs first
+  try {
+    const repeatableJobs = await dunningQueue.getRepeatableJobs()
+    for (const job of repeatableJobs) {
+      if (job.key?.includes('dunning-daily')) {
+        await dunningQueue.removeRepeatableByKey(job.key)
+        console.log(`   - Cleared old repeatable dunning job: ${job.key}`)
+      }
+    }
+  } catch (err) {
+    console.error('[Scheduler] Failed to clear old dunning jobs:', err)
+  }
+
+  await dunningQueue.add(
+    'daily-dunning-check',
+    {}, // no companyId = runs for all companies
+    {
+      jobId: 'dunning-daily',
+      repeat: {
+        pattern: '0 8 * * *', // 08:00 every day
+        tz: 'Europe/Berlin',
+      },
+      removeOnComplete: true,
+    }
+  )
+  console.log('   - Scheduled daily dunning check at 08:00 (Europe/Berlin)')
+}

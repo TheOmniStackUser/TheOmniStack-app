@@ -10,6 +10,7 @@ import { MarketplaceAutomation } from './marketplace-automation'
 import { TwoFactorSettings } from './two-factor-settings'
 import { ApiSettings } from './api-settings'
 import { SmtpSettings } from './smtp-settings'
+import { DunningSettings } from './dunning-settings'
 import { vatSettings } from '@/db/schema/vat-settings'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { users } from '@/db/schema/auth'
@@ -93,6 +94,8 @@ export default async function SettingsPage(props: {
       <ApiSettings />
 
       <SmtpSettings company={company} />
+
+      <DunningSettings />
 
       <VatSettings initialSettings={initialVatSettings} />
 

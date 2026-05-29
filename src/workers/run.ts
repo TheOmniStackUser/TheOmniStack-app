@@ -1,6 +1,7 @@
 import { createMarketplaceSyncWorker } from './marketplace-sync'
 import { createReturnsReportWorker } from './returns-report'
-import { setupScheduledReports, setupScheduledSyncs } from './scheduler'
+import { createDunningWorker } from './dunning'
+import { setupScheduledReports, setupScheduledSyncs, setupDunningSchedule } from './scheduler'
 
 console.log('🚀 Starting OmniStack Worker Engine...')
 
@@ -10,10 +11,12 @@ console.log(`📡 Database: ${dbUrl.split('@')[1] || 'Local/Fallback'}`)
 // Initialize Workers
 const marketplaceWorker = createMarketplaceSyncWorker()
 const returnsWorker = createReturnsReportWorker()
+const dunningWorker = createDunningWorker()
 
 // Setup CRON jobs
 setupScheduledReports().catch(console.error)
 setupScheduledSyncs().catch(console.error)
+setupDunningSchedule().catch(console.error)
 
 marketplaceWorker.on('completed', (job) => {
   console.log(`✅ [Marketplace] Job ${job.id} completed.`)
@@ -31,11 +34,20 @@ returnsWorker.on('failed', (job, err) => {
   console.log(`❌ [Returns] Job ${job?.id} failed:`, err.message)
 })
 
+dunningWorker.on('completed', (job, result) => {
+  console.log(`✅ [Dunning] Job ${job.id} completed. Sent: ${result?.sent ?? 0}, Skipped: ${result?.skipped ?? 0}, Failed: ${result?.failed ?? 0}`)
+})
+
+dunningWorker.on('failed', (job, err) => {
+  console.log(`❌ [Dunning] Job ${job?.id} failed:`, err.message)
+})
+
 process.on('SIGINT', async () => {
   console.log('Shutting down workers...')
   await Promise.all([
     marketplaceWorker.close(),
-    returnsWorker.close()
+    returnsWorker.close(),
+    dunningWorker.close(),
   ])
   process.exit(0)
 })

@@ -58,6 +58,9 @@ export const invoices = pgTable('invoices', {
   // S3 / MinIO reference — immutable PDF stored with Object Lock
   pdfStorageKey: text('pdf_storage_key'),
   pdfGeneratedAt: timestamp('pdf_generated_at', { withTimezone: true }),
+  // Payment tracking — set when user clicks "Als bezahlt markieren"
+  // Used by the dunning worker to skip already-paid invoices efficiently.
+  paidAt: timestamp('paid_at', { withTimezone: true }),
   // Cancellation chain
   isCreditNote: boolean('is_credit_note').notNull().default(false),
   cancelsInvoiceId: uuid('cancels_invoice_id'), // self-reference
