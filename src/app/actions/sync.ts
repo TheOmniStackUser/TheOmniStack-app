@@ -244,6 +244,12 @@ export async function triggerManualSyncAction(data: { marketplace: string, fromD
       // Also sync shipped orders invoices for this integration
       const { syncShippedOrdersInvoices } = await import('@/workers/marketplace-sync')
       await syncShippedOrdersInvoices(auth.activeCompanyId, integration.type, integration.id)
+
+      // Also sync returns/refunds for Mirakl integrations
+      if (integration.type.startsWith('mirakl_') || integration.type === 'mirakl_custom') {
+        const { syncMiraklReturns } = await import('@/workers/marketplace-sync')
+        await syncMiraklReturns(auth.activeCompanyId, integration, adapter)
+      }
     } catch (error) {
       console.error(`Error manually syncing ${integration.type}:`, error)
       // Continue to next integration even if one fails

@@ -33,19 +33,19 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
       return 0
     })
 
-  const handleToggle = async (id: string, field: 'autoInvoice' | 'uploadInvoice' | 'downloadInvoice', currentVal: boolean) => {
+  const handleToggle = async (id: string, field: 'autoInvoice' | 'uploadInvoice' | 'downloadInvoice' | 'autoCreditNote', currentVal: boolean) => {
     const newVal = !currentVal
 
     // Optimistically update local state immediately
     setLocalIntegrations(prev => prev.map(int => {
       if (int.id === id) {
-        if (field === 'downloadInvoice') {
+        if (field === 'downloadInvoice' || field === 'autoCreditNote') {
           const currentMetadata = (int.metadata as Record<string, unknown>) || {}
           return {
             ...int,
             metadata: {
               ...currentMetadata,
-              downloadInvoice: newVal
+              [field]: newVal
             }
           }
         } else {
@@ -71,20 +71,21 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
       id,
       field === 'autoInvoice' ? newVal : integration.autoInvoice,
       field === 'uploadInvoice' ? newVal : integration.uploadInvoice,
-      field === 'downloadInvoice' ? newVal : !!(integration.metadata as Record<string, unknown>)?.downloadInvoice
+      field === 'downloadInvoice' ? newVal : !!(integration.metadata as Record<string, unknown>)?.downloadInvoice,
+      field === 'autoCreditNote' ? newVal : !!(integration.metadata as Record<string, unknown>)?.autoCreditNote
     )
 
     if (!result.success) {
       // Revert optimistic state on failure
       setLocalIntegrations(prev => prev.map(int => {
         if (int.id === id) {
-          if (field === 'downloadInvoice') {
+          if (field === 'downloadInvoice' || field === 'autoCreditNote') {
             const currentMetadata = (int.metadata as Record<string, unknown>) || {}
             return {
               ...int,
               metadata: {
                 ...currentMetadata,
-                downloadInvoice: currentVal
+                [field]: currentVal
               }
             }
           } else {
@@ -235,6 +236,21 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
                         <CloudUpload size={14} />
                         {loadingId === `${int.id}-uploadInvoice` ? '...' : 'Auto-Upload'}
                       </button>
+
+                      {isMirakl && (
+                        <button
+                          onClick={() => handleToggle(int.id, 'autoCreditNote', !!(int.metadata as any)?.autoCreditNote)}
+                          disabled={loadingId === `${int.id}-autoCreditNote`}
+                          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                            (int.metadata as any)?.autoCreditNote
+                              ? 'bg-green-600 border-green-600 text-white shadow-md shadow-green-200' 
+                              : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
+                          }`}
+                        >
+                          <RefreshCw size={14} />
+                          {loadingId === `${int.id}-autoCreditNote` ? '...' : 'Auto-Gutschrift'}
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

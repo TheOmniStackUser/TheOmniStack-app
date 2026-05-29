@@ -135,8 +135,8 @@ export class MiraklAdapter implements MarketplaceAdapter {
 
       // Filter orders by channel code if this instance is restricted to a specific country
       const match = this.marketplace.match(/\s([a-z]{2})$/i)
-      const isDecathlon = this.config.baseUrl.includes('decathlon')
-      if (match && isDecathlon) {
+      const isCountryRestricted = this.config.baseUrl.includes('decathlon') || this.marketplace.toLowerCase().includes('secret sales')
+      if (match && isCountryRestricted) {
         const expectedChannel = match[1].toUpperCase()
         rawOrders = rawOrders.filter((raw: any) => {
           const channelCode = raw.channel?.code?.toUpperCase()
@@ -233,7 +233,7 @@ export class MiraklAdapter implements MarketplaceAdapter {
    * Upload an invoice document to Mirakl.
    * Uses PA11 endpoint: POST /api/orders/{order_id}/documents
    */
-  async uploadInvoice(orderId: string, pdfBuffer: Buffer, fileName: string): Promise<boolean> {
+  async uploadInvoice(orderId: string, pdfBuffer: Buffer, fileName: string, isCreditNote = false): Promise<boolean> {
     try {
       const token = await this.getAccessToken()
       const headers: Record<string, string> = {}
@@ -250,8 +250,8 @@ export class MiraklAdapter implements MarketplaceAdapter {
       const blob = new Blob([new Uint8Array(pdfBuffer)], { type: 'application/pdf' })
       formData.append('files', blob, fileName)
       
-      // Document type 'INVOICE'
-      formData.append('document_type_code', 'INVOICE')
+      // Document type 'INVOICE' or 'CREDIT_NOTE'
+      formData.append('document_type_code', isCreditNote ? 'CREDIT_NOTE' : 'INVOICE')
 
       let url = `${this.config.baseUrl}/api/orders/${orderId}/documents`
       if (this.config.shopId) {
@@ -610,6 +610,72 @@ export class MiraklAdapter implements MarketplaceAdapter {
     } catch (error) {
       console.error(`[MiraklAdapter:${this.marketplace}] Error downloading invoice for order ${marketplaceOrderId}:`, error)
       return null
+    }
+  }
+
+  /**
+   * Fetch customer returns that have been refunded.
+   * Uses OR51 / returns listing endpoint: GET /api/returns
+   */
+  async fetchRefundedReturns(): Promise<any[]> {
+    try {
+      const token = await this.getAccessToken()
+      const headers: Record<string, string> = {
+        'Accept': 'application/json'
+      }
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      } else {
+        const apiKey = this.config.clientSecret === '' || !this.config.clientSecret 
+          ? this.config.clientId 
+          : this.config.apiKey
+        
+        if (apiKey) {
+          headers['Authorization'] = apiKey
+          headers['X-Mirakl-Api-Key'] = apiKey
+        }
+      }
+
+      const baseUrl = this.config.baseUrl.replace(/\/$/, '')
+      let url = ''
+      if (baseUrl.includes('miraklconnect.com')) {
+        if (baseUrl.endsWith('/v1')) {
+          url = `${baseUrl}/returns?return_state=REFUNDED&max=100`
+        } else {
+          url = `${baseUrl}/api/v1/returns?return_state=REFUNDED&max=100`
+        }
+      } else {
+        if (baseUrl.endsWith('/api')) {
+          url = `${baseUrl}/returns?return_state=REFUNDED&max=100`
+        } else {
+          url = `${baseUrl}/api/returns?return_state=REFUNDED&max=100`
+        }
+      }
+
+      if (this.config.shopId) {
+        url += `&shop_id=${this.config.shopId}`
+      }
+
+      console.log(`[MiraklAdapter:${this.marketplace}] Fetching refunded returns via GET ${url}...`)
+      const response = await fetch(url, {
+        method: 'GET',
+        headers
+      })
+
+      if (!response.ok) {
+        const errText = await response.text()
+        console.error(`[MiraklAdapter:${this.marketplace}] Fetch returns failed (${response.status}): ${errText}`)
+        throw new Error(`Mirakl API returns failed with status ${response.status}`)
+      }
+
+      const data = await response.json()
+      const returns = data.returns || []
+      console.log(`[MiraklAdapter:${this.marketplace}] Fetched ${returns.length} returns.`)
+      return returns
+    } catch (error) {
+      console.error(`[MiraklAdapter:${this.marketplace}] Error fetching returns:`, error)
+      throw error
     }
   }
 }

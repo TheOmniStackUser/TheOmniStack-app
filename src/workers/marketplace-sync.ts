@@ -13,7 +13,8 @@ import { vatSettings } from '@/db/schema/vat-settings'
 import { auditLog } from '@/lib/audit'
 import { eq, and, desc, isNull, inArray, gte } from 'drizzle-orm'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
-import { invoices, invoiceItems } from '@/db/schema/invoices'
+import { invoices, invoiceItems, invoiceLogs } from '@/db/schema/invoices'
+import { returnsLog, returnedItems } from '@/db/schema/returns'
 import { buildInvoiceKey, buildDeliveryNoteKey, documentExists, uploadDocument } from '@/lib/storage'
 import { OttoAdapter } from '@/adapters/marketplace/otto'
 import { MiraklAdapter } from '@/adapters/marketplace/mirakl'
@@ -267,6 +268,11 @@ export function createMarketplaceSyncWorker() {
 
         // Recovery: download invoices for shipped orders that are missing invoices
         await syncShippedOrdersInvoices(companyId, marketplace as any, integration.id)
+
+        // Also sync returns for Mirakl integrations
+        if (integration.type.startsWith('mirakl_') || integration.type === 'mirakl_custom') {
+          await syncMiraklReturns(companyId, integration, adapter as MiraklAdapter)
+        }
 
         if (!isInvoiceSync) {
           await auditLog({
@@ -752,6 +758,371 @@ export async function downloadAndSaveMarketplaceInvoice(
     console.log(`[Worker] Saved downloaded invoice ${invoiceNumber} for order ${order.marketplaceOrderId}`)
   } catch (err) {
     console.error(`[Worker] Error downloading and saving invoice for order ${order.marketplaceOrderId}:`, err)
+  }
+}
+
+/**
+ * Sync refunded returns from Mirakl and create credit notes.
+ */
+export async function syncMiraklReturns(
+  companyId: string,
+  integration: any,
+  adapter: MiraklAdapter
+) {
+  const autoCreditNote = !!(integration.metadata as any)?.autoCreditNote
+  if (!autoCreditNote) {
+    console.log(`[MiraklReturnSync] Auto credit note is disabled for integration ${integration.id}.`)
+    return
+  }
+
+  console.log(`[MiraklReturnSync] Fetching refunded returns for integration ${integration.id} (${integration.type})...`)
+
+  try {
+    const refundedReturns = await adapter.fetchRefundedReturns()
+    if (!refundedReturns || refundedReturns.length === 0) {
+      console.log(`[MiraklReturnSync] No returns found for integration ${integration.id}.`)
+      return
+    }
+
+    const orderMarketplaceName = integration.type === 'mirakl_custom'
+      ? ((integration.metadata as any)?.customName || 'mirakl_custom').toLowerCase()
+      : integration.type
+
+    // Fetch all local return logs to check for existing records
+    const existingLogs = await db
+      .select({ metadata: returnsLog.metadata })
+      .from(returnsLog)
+      .where(eq(returnsLog.companyId, companyId))
+
+    const processedReturnIds = new Set<string>()
+    for (const log of existingLogs) {
+      if (log.metadata && typeof log.metadata === 'object') {
+        const returnId = (log.metadata as any).return_id
+        if (returnId) processedReturnIds.add(returnId)
+      }
+    }
+
+    for (const ret of refundedReturns) {
+      const returnId = ret.return_id
+      if (!returnId) continue
+
+      if (processedReturnIds.has(returnId)) {
+        console.log(`[MiraklReturnSync] Return ${returnId} has already been processed, skipping.`)
+        continue
+      }
+
+      console.log(`[MiraklReturnSync] Processing new return ${returnId} for order ${ret.order_id}...`)
+
+      // Find the order
+      const order = await db.query.orders.findFirst({
+        where: and(
+          eq(orders.companyId, companyId),
+          eq(orders.marketplaceOrderId, ret.order_id),
+          eq(orders.marketplace, orderMarketplaceName)
+        ),
+        with: { items: true }
+      })
+
+      if (!order) {
+        console.warn(`[MiraklReturnSync] Matching order ${ret.order_id} not found in DB for company ${companyId}.`)
+        continue
+      }
+
+      if (!order.invoiceId) {
+        console.warn(`[MiraklReturnSync] Order ${ret.order_id} has no linked invoice yet. Cannot generate credit note.`)
+        continue
+      }
+
+      // Fetch the original invoice
+      const originalInvoice = await db.query.invoices.findFirst({
+        where: and(eq(invoices.id, order.invoiceId), eq(invoices.companyId, companyId))
+      })
+
+      if (!originalInvoice) {
+        console.warn(`[MiraklReturnSync] Original invoice for order ${ret.order_id} not found in DB.`)
+        continue
+      }
+
+      if (originalInvoice.status === 'cancelled') {
+        console.warn(`[MiraklReturnSync] Original invoice ${originalInvoice.invoiceNumber} is already cancelled. Skipping.`)
+        continue
+      }
+
+      // Get return items
+      const returnItemsList = ret.return_items || ret.return_lines || []
+      if (returnItemsList.length === 0) {
+        console.warn(`[MiraklReturnSync] Return ${returnId} has no items. Skipping.`)
+        continue
+      }
+
+      // Map returned items to order items and construct credit note line items
+      const creditNoteItems: { sku: string; title: string; quantity: number; unitPrice: number; taxRate: number; description: string }[] = []
+      let totalAmount = 0
+      let subtotalAmount = 0
+      let taxAmount = 0
+
+      for (const retItem of returnItemsList) {
+        const productSku = retItem.product_sku || retItem.sku
+        if (!productSku) continue
+
+        // Find match in order items
+        const matchedItem = order.items.find(
+          item => item.sku?.toLowerCase() === productSku.toLowerCase()
+        )
+
+        if (!matchedItem) {
+          console.warn(`[MiraklReturnSync] Returned item ${productSku} not found in order ${order.marketplaceOrderId} items.`)
+          continue
+        }
+
+        const qty = retItem.quantity || 1
+        const netUnitPrice = parseFloat(matchedItem.unitPrice)
+        const taxRate = parseFloat(matchedItem.taxRate)
+
+        const lineNet = netUnitPrice * qty
+        const lineTax = lineNet * taxRate
+        const lineGross = lineNet + lineTax
+
+        subtotalAmount += lineNet
+        taxAmount += lineTax
+        totalAmount += lineGross
+
+        creditNoteItems.push({
+          sku: matchedItem.sku || 'UNKNOWN',
+          title: matchedItem.title,
+          quantity: qty,
+          unitPrice: netUnitPrice,
+          taxRate: taxRate,
+          description: matchedItem.title || 'Produkt'
+        })
+      }
+
+      if (creditNoteItems.length === 0) {
+        console.warn(`[MiraklReturnSync] No matching return items found in order. Skipping.`)
+        continue
+      }
+
+      // Generate document number (creditNote sequence)
+      const [company] = await db.select().from(companies).where(eq(companies.id, companyId)).limit(1)
+      if (!company) {
+        console.error(`[MiraklReturnSync] Company not found.`)
+        continue
+      }
+
+      const dbSettings = company.documentNumberSettings as any
+      const config = dbSettings?.creditNote || getDefaultSettings('creditNote', company)
+
+      let creditNoteNumber = ''
+      if (config && config.auto) {
+        const nextNum = parseInt(config.next, 10) || 1
+        const padding = config.padding || 5
+        creditNoteNumber = formatDocumentNumber(
+          config.format,
+          nextNum,
+          padding,
+          order.customerNumber || '',
+          '',
+          new Date()
+        )
+      } else {
+        creditNoteNumber = `GS-${Date.now()}`
+      }
+
+      // Render PDF Buffer
+      const { renderToBuffer } = await import('@react-pdf/renderer')
+      const { InvoiceDocument } = await import('@/components/pdf/invoice')
+      const React = await import('react')
+
+      console.log(`[MiraklReturnSync] Rendering credit note PDF for ${creditNoteNumber}...`)
+
+      const pdfBuffer = await renderToBuffer(
+        React.createElement(InvoiceDocument, {
+          invoiceNumber: creditNoteNumber,
+          date: new Date(),
+          dueDate: new Date(),
+          orderNumber: order.marketplaceOrderId,
+          orderDate: order.marketplacePurchaseDate || undefined,
+          customerNumber: order.customerNumber || '–',
+          company: {
+            name: company.legalName || company.name,
+            street: company.street || undefined,
+            zip: company.zip || undefined,
+            city: company.city || undefined,
+            country: company.country,
+            email: company.email || undefined,
+            phone: company.phone || undefined,
+            website: company.website || undefined,
+            vatId: company.vatId || undefined,
+            taxId: company.taxId || undefined,
+            bankName: company.bankName || undefined,
+            bankIban: company.iban || undefined,
+            bankBic: company.bic || undefined,
+            logoUrl: company.logoUrl || undefined,
+            paymentRecipient: company.paymentRecipient || undefined,
+            management: company.management || undefined,
+            registrationCourt: company.registrationCourt || undefined,
+            internationalLanguage: company.internationalLanguage || undefined,
+            footerText: company.invoiceFooter || undefined,
+            footerTextEn: company.invoiceFooterEn || undefined,
+          },
+          recipient: {
+            name: originalInvoice.recipientName,
+            street: originalInvoice.recipientStreet || '',
+            zip: originalInvoice.recipientZip || '',
+            city: originalInvoice.recipientCity || '',
+            country: originalInvoice.recipientCountry || 'DE',
+          },
+          items: creditNoteItems.map(i => ({
+            sku: i.sku,
+            title: i.title,
+            quantity: i.quantity,
+            unitPrice: i.unitPrice,
+            taxRate: i.taxRate,
+          })),
+          currency: order.currency,
+          paymentMethod: 'Marketplace',
+          isCreditNote: true,
+          documentType: 'invoice',
+          cancelsInvoiceNumber: originalInvoice.invoiceNumber,
+          cancelsInvoiceDate: originalInvoice.createdAt || undefined,
+        }) as any
+      )
+
+      // Upload PDF to S3/Storage
+      const storageKey = buildInvoiceKey(companyId, creditNoteNumber)
+      await uploadDocument(storageKey, pdfBuffer)
+
+      // Save database records
+      await db.transaction(async (tx) => {
+        // Increment creditNote number sequence
+        const [dbCompany] = await tx
+          .select()
+          .from(companies)
+          .where(eq(companies.id, companyId))
+          .for('update')
+
+        if (dbCompany) {
+          const currentSettings = dbCompany.documentNumberSettings as any || {}
+          const config = currentSettings.creditNote || getDefaultSettings('creditNote', dbCompany)
+          if (config && config.auto) {
+            const nextNum = parseInt(config.next, 10) || 1
+            const updatedSettings = {
+              ...currentSettings,
+              creditNote: {
+                ...config,
+                next: (nextNum + 1).toString()
+              }
+            }
+            await tx.update(companies)
+              .set({ documentNumberSettings: updatedSettings, updatedAt: new Date() })
+              .where(eq(companies.id, companyId))
+          }
+        }
+
+        // Insert Credit Note Invoice
+        const [newCreditNoteInvoice] = await tx
+          .insert(invoices)
+          .values({
+            companyId,
+            invoiceNumber: creditNoteNumber,
+            status: 'issued',
+            documentType: 'invoice',
+            recipientName: originalInvoice.recipientName,
+            recipientStreet: originalInvoice.recipientStreet,
+            recipientZip: originalInvoice.recipientZip,
+            recipientCity: originalInvoice.recipientCity,
+            recipientCountry: originalInvoice.recipientCountry,
+            recipientEmail: originalInvoice.recipientEmail,
+            currency: order.currency || 'EUR',
+            subtotalAmount: subtotalAmount.toFixed(2),
+            taxAmount: taxAmount.toFixed(2),
+            totalAmount: totalAmount.toFixed(2),
+            taxRate: (taxAmount / subtotalAmount || 0).toFixed(4),
+            isCreditNote: true,
+            cancelsInvoiceId: originalInvoice.id,
+            dueAt: new Date(),
+            pdfStorageKey: storageKey,
+            pdfGeneratedAt: new Date(),
+            issuedAt: new Date()
+          })
+          .returning({ id: invoices.id })
+
+        // Insert Credit Note Items
+        await tx.insert(invoiceItems).values(
+          creditNoteItems.map((item, index) => ({
+            invoiceId: newCreditNoteInvoice.id,
+            companyId,
+            position: (index + 1).toString(),
+            sku: item.sku,
+            description: item.description,
+            quantity: item.quantity.toString(),
+            unitPrice: item.unitPrice.toFixed(2),
+            taxRate: item.taxRate.toString(),
+            lineTotal: (item.unitPrice * item.quantity).toFixed(2),
+          }))
+        )
+
+        // Insert return log record
+        const [logEntry] = await tx.insert(returnsLog).values({
+          companyId,
+          orderId: order.id,
+          orderNumber: order.marketplaceOrderId,
+          customerName: order.buyerName,
+          shippingAddress: `${order.shippingStreet || ''}, ${order.shippingZip || ''} ${order.shippingCity || ''}`,
+          status: 'erfolgt',
+          marketplace: order.marketplace,
+          metadata: { return_id: returnId, mirakl_payload: ret, creditNoteId: newCreditNoteInvoice.id },
+          notes: `Automatisch erstellte Gutschrift ${creditNoteNumber} für Mirakl Retoure.`
+        }).returning({ id: returnsLog.id })
+
+        // Insert returned items
+        await tx.insert(returnedItems).values(
+          creditNoteItems.map(item => ({
+            returnLogId: logEntry.id,
+            skuOrProductName: item.sku || item.description,
+            quantity: item.quantity,
+            condition: 'new',
+            notes: 'Importiert von Mirakl Retoure'
+          }))
+        )
+
+        // Insert Invoice Logs
+        await tx.insert(invoiceLogs).values([
+          {
+            invoiceId: originalInvoice.id,
+            companyId,
+            action: 'edited',
+            note: `Gutschrift ${creditNoteNumber} für diese Rechnung wurde automatisch erzeugt.`
+          },
+          {
+            invoiceId: newCreditNoteInvoice.id,
+            companyId,
+            action: 'edited',
+            note: `Gutschrift für Mirakl Retoure ${returnId} erzeugt.`
+          }
+        ])
+      })
+
+      console.log(`[MiraklReturnSync] Credit note ${creditNoteNumber} saved successfully.`)
+
+      // Upload Credit Note back to Mirakl if auto-upload is active
+      if (integration.uploadInvoice && adapter.uploadInvoice) {
+        try {
+          console.log(`[MiraklReturnSync] Uploading credit note ${creditNoteNumber} to Mirakl...`)
+          await adapter.uploadInvoice(
+            order.marketplaceOrderId,
+            pdfBuffer,
+            `${creditNoteNumber}.pdf`,
+            true // isCreditNote = true
+          )
+        } catch (uploadErr) {
+          console.error(`[MiraklReturnSync] Failed to upload credit note to Mirakl:`, uploadErr)
+        }
+      }
+    }
+  } catch (err) {
+    console.error(`[MiraklReturnSync] Error syncing returns:`, err)
+    throw err
   }
 }
 

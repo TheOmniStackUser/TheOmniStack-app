@@ -251,7 +251,8 @@ export async function saveMarketplaceAutomationAction(
   integrationId: string, 
   autoInvoice: boolean, 
   uploadInvoice: boolean,
-  downloadInvoice?: boolean
+  downloadInvoice?: boolean,
+  autoCreditNote?: boolean
 ) {
   const auth = await requireAuth()
   const { marketplaceIntegrations } = await import('@/db/schema/integrations')
@@ -290,7 +291,8 @@ export async function saveMarketplaceAutomationAction(
     const updatedMetadata = {
       ...currentMetadata,
       autoInvoiceEnabledAt,
-      ...(downloadInvoice !== undefined ? { downloadInvoice } : {})
+      ...(downloadInvoice !== undefined ? { downloadInvoice } : {}),
+      ...(autoCreditNote !== undefined ? { autoCreditNote } : {})
     }
 
     await db.update(marketplaceIntegrations)
