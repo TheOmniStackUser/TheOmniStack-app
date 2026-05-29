@@ -281,7 +281,7 @@ async function processDunningForCompany(
         try {
           await transporter.sendMail({
             from,
-            to: currentInvoice.recipientEmail,
+            to: currentInvoice.recipientEmail!,
             replyTo: company.email || undefined,
             subject,
             html,
@@ -294,7 +294,7 @@ async function processDunningForCompany(
         // Use Resend
         const { data, error } = await resend.emails.send({
           from: 'TheOmniStack <noreply@theomnistack.de>',
-          to: [currentInvoice.recipientEmail],
+          to: [currentInvoice.recipientEmail!],
           replyTo: company.email || undefined,
           subject,
           html,
@@ -313,7 +313,7 @@ async function processDunningForCompany(
         invoiceId: currentInvoice.id,
         stage: stageToSend,
         status: emailSent ? 'sent' : 'failed',
-        recipientEmail: currentInvoice.recipientEmail,
+        recipientEmail: currentInvoice.recipientEmail!,
         subject,
         errorMessage: emailError,
         triggeredByUserId: triggeredByUserId || null,
@@ -330,13 +330,13 @@ async function processDunningForCompany(
         userId: triggeredByUserId || null,
         action: 'dunning',
         note: emailSent
-          ? `${stageLabelText} automatisch per E-Mail gesendet an ${currentInvoice.recipientEmail}.`
+          ? `${stageLabelText} automatisch per E-Mail gesendet an ${currentInvoice.recipientEmail!}.`
           : `${stageLabelText}: E-Mail-Versand fehlgeschlagen. Fehler: ${emailError}`,
       })
 
       if (emailSent) {
         stats.sent++
-        console.log(`[Dunning] ✅ Sent ${stageToSend} for invoice ${currentInvoice.invoiceNumber} to ${currentInvoice.recipientEmail}`)
+        console.log(`[Dunning] ✅ Sent ${stageToSend} for invoice ${currentInvoice.invoiceNumber} to ${currentInvoice.recipientEmail!}`)
       } else {
         stats.failed++
         console.error(`[Dunning] ❌ Failed ${stageToSend} for invoice ${currentInvoice.invoiceNumber}: ${emailError}`)
