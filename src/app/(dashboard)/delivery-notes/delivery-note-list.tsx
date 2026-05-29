@@ -776,7 +776,8 @@ export function DeliveryNoteList({
                   </div>
                 </td>
               </tr>
-            })}
+            )
+          })}
             {filteredDeliveryNotes.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-6 py-12 text-center text-slate-500">

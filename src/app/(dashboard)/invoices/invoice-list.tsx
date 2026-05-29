@@ -1016,7 +1016,8 @@ export function InvoiceList({
                   </div>
                 </td>
               </tr>
-            })}
+            )
+          })}
             {filteredInvoices.length === 0 && (
               <tr>
                 <td colSpan={8} className="px-6 py-12 text-center text-slate-500">

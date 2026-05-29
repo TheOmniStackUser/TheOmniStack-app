@@ -561,8 +561,9 @@ export function QuoteList({
                   </div>
                 </td>
               </tr>
-            })}
-            )}
+            )
+          })
+        )}
           </tbody>
         </table>
       </div>
