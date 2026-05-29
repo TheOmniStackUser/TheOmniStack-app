@@ -893,10 +893,6 @@ export async function sendDunningNoticeAction(data: {
   let smtpConfig: any = undefined
   if (company?.smtpSettings?.enabled && company.smtpSettings.fromEmail && data.senderEmail === company.smtpSettings.fromEmail) {
     smtpConfig = company.smtpSettings
-  }
-
-  const stageLabel = data.type === 'reminder' ? 'Zahlungserinnerung' : data.type === 'first' ? '1. Mahnung' : '2. Mahnung'
-
   // Send email
   const { sendInvoiceEmail } = await import('@/lib/email')
   const emailResult = await sendInvoiceEmail({

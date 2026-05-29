@@ -20,7 +20,7 @@ import {
 } from '@/app/actions/invoices'
 import { getInvoiceLogsAction, deleteDraftAction } from '@/app/actions/manual-invoice'
 import { exportInvoiceJournalAction } from '@/app/actions/export'
-import { getInvoiceDunningLogsAction, addDunningExclusionAction } from '@/app/actions/dunning'
+import { getInvoiceDunningLogsAction, addDunningExclusionAction, getDunningRulesAction, saveDunningRulesAction } from '@/app/actions/dunning'
 
 interface Invoice {
   id: string
@@ -42,6 +42,8 @@ interface Invoice {
   paidAt?: Date | string | null
   draftName?: string | null
   marketplaceOrderId?: string | null
+  lastDunningStage?: string | null
+  lastDunningSentAt?: Date | string | null
 }
 
 const formatCountry = (code?: string | null) => {
@@ -194,6 +196,14 @@ export function InvoiceList({
   const [dunningFee, setDunningFee] = useState('')
   const [dunningIncludeFee, setDunningIncludeFee] = useState(false)
   const [isSendingDunning, setIsSendingDunning] = useState(false)
+  const [dunningRulesList, setDunningRulesList] = useState<any[]>([])
+  const [isSavingDunningTemplate, setIsSavingDunningTemplate] = useState(false)
+
+  useEffect(() => {
+    getDunningRulesAction().then((rules) => {
+      setDunningRulesList(rules)
+    }).catch(console.error)
+  }, [])
 
   const isOverdue = (invoice: Invoice) => {
     if (invoice.status !== 'issued' || invoice.paidAt) return false
@@ -274,23 +284,123 @@ export function InvoiceList({
     }
   }
 
+  const resolveDunningText = (inv: Invoice, stage: 'reminder' | 'first' | 'second', feeEnabled: boolean, feeVal: string) => {
+    const rule = dunningRulesList.find(r => r.stage === stage)
+    const subjectTemplate = rule?.subjectTemplate || (stage === 'reminder' ? 'Zahlungserinnerung: Rechnung {Nummer}' : stage === 'first' ? '1. Mahnung: Rechnung {Nummer}' : '2. Mahnung: Rechnung {Nummer}')
+    const bodyTemplate = rule?.bodyTemplate || getDunningDefaults(inv, stage).body
+
+    const num = inv.invoiceNumber
+    const date = format(new Date(inv.createdAt), 'dd.MM.yyyy', { locale: de })
+    const amount = new Intl.NumberFormat('de-DE', { style: 'currency', currency: inv.currency }).format(Number(inv.totalAmount))
+    const due = inv.dueAt ? format(new Date(inv.dueAt), 'dd.MM.yyyy', { locale: de }) : ''
+    const customer = inv.recipientName || 'Sehr geehrte Damen und Herren'
+    const companyName = 'Unser Unternehmen'
+    const feeStr = feeEnabled && feeVal ? `${parseFloat(feeVal).toFixed(2).replace('.', ',')} €` : '0,00 €'
+
+    const vars = {
+      'Empfänger': customer,
+      'Nummer': num,
+      'Datum': date,
+      'Fälligkeitsdatum': due,
+      'Betrag': amount,
+      'Unternehmen': companyName,
+      'Mahngebühr': feeStr
+    }
+
+    let resolvedSubject = subjectTemplate
+    let resolvedBody = bodyTemplate
+
+    Object.entries(vars).forEach(([key, val]) => {
+      resolvedSubject = resolvedSubject.split(`{${key}}`).join(val)
+      resolvedBody = resolvedBody.split(`{${key}}`).join(val)
+    })
+
+    return { subject: resolvedSubject, body: resolvedBody }
+  }
+
   // Open Mahnwesen modal from row or sidebar
   const handleOpenDunningModal = (invoice: Invoice) => {
     setDunningInvoice(invoice)
     setDunningType('reminder')
-    const defaults = getDunningDefaults(invoice, 'reminder')
-    setDunningSubject(defaults.subject)
-    setDunningBody(defaults.body)
+    
+    const rule = dunningRulesList.find(r => r.stage === 'reminder')
+    const hasFee = !!(rule?.feeAmount && parseFloat(rule.feeAmount) > 0)
+    const fee = rule?.feeAmount || ''
+    setDunningIncludeFee(hasFee)
+    setDunningFee(fee)
+
+    const resolved = resolveDunningText(invoice, 'reminder', hasFee, fee)
+    setDunningSubject(resolved.subject)
+    setDunningBody(resolved.body)
     setDunningRecipient((invoice as any).recipientEmail || '')
     setDunningSender(
       company?.smtpSettings?.enabled && company.smtpSettings.fromEmail
         ? company.smtpSettings.fromEmail
         : 'noreply@theomnistack.de'
     )
-    setDunningFee('')
-    setDunningIncludeFee(false)
     setShowDunningModal(true)
     setActiveRowMenuId(null)
+  }
+
+  const handleSaveDunningTemplate = async () => {
+    if (!dunningInvoice) return
+    try {
+      setIsSavingDunningTemplate(true)
+      
+      const inv = dunningInvoice
+      const invNumber = inv.invoiceNumber || ''
+      const invDate = format(new Date(inv.createdAt), 'dd.MM.yyyy', { locale: de })
+      const due = inv.dueAt ? format(new Date(inv.dueAt), 'dd.MM.yyyy', { locale: de }) : ''
+      const recipientVal = inv.recipientName || 'Sehr geehrte Damen und Herren'
+      const amount = new Intl.NumberFormat('de-DE', { style: 'currency', currency: inv.currency }).format(Number(inv.totalAmount))
+      const companyName = 'Unser Unternehmen'
+      const feeStr = dunningIncludeFee && dunningFee ? `${parseFloat(dunningFee).toFixed(2).replace('.', ',')} €` : '0,00 €'
+      
+      let bodyTemplateText = dunningBody
+      let subjectTemplateText = dunningSubject
+
+      const vars = [
+        { placeholder: '{Empfänger}', value: recipientVal },
+        { placeholder: '{Nummer}', value: invNumber },
+        { placeholder: '{Datum}', value: invDate },
+        { placeholder: '{Fälligkeitsdatum}', value: due },
+        { placeholder: '{Betrag}', value: amount },
+        { placeholder: '{Unternehmen}', value: companyName },
+        { placeholder: '{Mahngebühr}', value: feeStr },
+      ]
+
+      vars.forEach(({ placeholder, value }) => {
+        if (value) {
+          bodyTemplateText = bodyTemplateText.split(value).join(placeholder)
+          subjectTemplateText = subjectTemplateText.split(value).join(placeholder)
+        }
+      })
+
+      // Load existing rules, edit matching stage, and save
+      const currentRules = await getDunningRulesAction()
+      const updatedRules = currentRules.map((rule) => {
+        if (rule.stage === dunningType) {
+          return {
+            ...rule,
+            subjectTemplate: subjectTemplateText,
+            bodyTemplate: bodyTemplateText,
+          }
+        }
+        return rule
+      })
+
+      const result = await saveDunningRulesAction(updatedRules as any)
+      if ((result as any).error) {
+        throw new Error((result as any).error)
+      }
+
+      setDunningRulesList(updatedRules)
+      showToast('Standardtext wurde erfolgreich als Vorlage gespeichert.', 'success')
+    } catch (error: any) {
+      showToast(error.message || 'Fehler beim Speichern der Vorlage.', 'error')
+    } finally {
+      setIsSavingDunningTemplate(false)
+    }
   }
 
   // Send dunning notice
@@ -310,6 +420,10 @@ export function InvoiceList({
       const stageLabel = dunningType === 'reminder' ? 'Zahlungserinnerung' : dunningType === 'first' ? '1. Mahnung' : '2. Mahnung'
       showToast(`${stageLabel} erfolgreich versendet.`, 'success')
       setShowDunningModal(false)
+      
+      // Refresh list and router to show updated totals and badges
+      router.refresh()
+
       if (selectedInvoiceId === dunningInvoice.id) {
         const [updatedDetails, updatedDunningLogs] = await Promise.all([
           getInvoiceDetailsAction(selectedInvoiceId),
@@ -1197,6 +1311,20 @@ export function InvoiceList({
                       )}
                       {invoice.status !== 'draft' && (
                         <span className="text-[10px] text-blue-600 font-bold uppercase tracking-tighter mt-0.5">E-Rechnung (ZUGFeRD)</span>
+                      )}
+                      {invoice.lastDunningStage && (
+                        <span className={`text-[9px] font-black uppercase tracking-tight mt-1 flex items-center gap-1 max-w-max px-1.5 py-0.5 rounded border ${
+                          invoice.lastDunningStage === 'reminder'
+                            ? 'bg-blue-50 border-blue-200 text-blue-700'
+                            : invoice.lastDunningStage === 'first'
+                            ? 'bg-amber-50 border-amber-200 text-amber-700'
+                            : 'bg-red-50 border-red-200 text-red-700'
+                        }`}>
+                          {invoice.lastDunningStage === 'reminder' ? '📋 Erinnerung' : invoice.lastDunningStage === 'first' ? '⚠️ 1. Mahnung' : '🔴 2. Mahnung'}
+                          <span className="opacity-70 font-semibold font-sans normal-case">
+                            ({format(new Date(invoice.lastDunningSentAt!), 'dd.MM.yyyy')})
+                          </span>
+                        </span>
                       )}
                     </div>
                   </td>
@@ -2385,9 +2513,15 @@ export function InvoiceList({
                     type="button"
                     onClick={() => {
                       setDunningType(value)
-                      const defaults = getDunningDefaults(dunningInvoice, value)
-                      setDunningSubject(defaults.subject)
-                      setDunningBody(defaults.body)
+                      const rule = dunningRulesList.find(r => r.stage === value)
+                      const hasFee = !!(rule?.feeAmount && parseFloat(rule.feeAmount) > 0)
+                      const fee = rule?.feeAmount || ''
+                      setDunningIncludeFee(hasFee)
+                      setDunningFee(fee)
+                      
+                      const resolved = resolveDunningText(dunningInvoice, value, hasFee, fee)
+                      setDunningSubject(resolved.subject)
+                      setDunningBody(resolved.body)
                     }}
                     className={`flex-1 px-3 py-2.5 rounded-xl text-xs font-bold border transition-all text-left ${
                       dunningType === value
@@ -2453,7 +2587,17 @@ export function InvoiceList({
 
               {/* Nachricht */}
               <div className="grid grid-cols-4 gap-4 items-start">
-                <span className="text-slate-500 font-bold uppercase tracking-wider pt-2">Nachricht</span>
+                <div className="flex flex-col gap-1">
+                  <span className="text-slate-500 font-bold uppercase tracking-wider pt-2">Nachricht</span>
+                  <button
+                    type="button"
+                    onClick={handleSaveDunningTemplate}
+                    disabled={isSavingDunningTemplate || !dunningInvoice}
+                    className="text-red-600 hover:text-red-700 hover:underline text-left mt-1 text-[10px] font-bold disabled:opacity-50"
+                  >
+                    {isSavingDunningTemplate ? 'Speichert...' : 'Standardtext ändern'}
+                  </button>
+                </div>
                 <div className="col-span-3">
                   <textarea
                     rows={9}
@@ -2461,7 +2605,7 @@ export function InvoiceList({
                     onChange={(e) => setDunningBody(e.target.value)}
                     className="w-full p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-400 leading-relaxed font-medium font-sans text-slate-800 resize-none"
                   />
-                  <p className="text-[10px] text-slate-400 mt-1.5">Der Standardtext kann frei bearbeitet werden. Die Rechnung wird automatisch als PDF-Anhang beigefügt.</p>
+                  <p className="text-[10px] text-slate-400 mt-1.5 font-semibold">Der Standardtext kann frei bearbeitet werden. Die Rechnung wird automatisch als PDF-Anhang beigefügt.</p>
                 </div>
               </div>
 
@@ -2474,7 +2618,13 @@ export function InvoiceList({
                       <input
                         type="checkbox"
                         checked={dunningIncludeFee}
-                        onChange={(e) => setDunningIncludeFee(e.target.checked)}
+                        onChange={(e) => {
+                          const checked = e.target.checked
+                          setDunningIncludeFee(checked)
+                          const resolved = resolveDunningText(dunningInvoice, dunningType, checked, dunningFee)
+                          setDunningSubject(resolved.subject)
+                          setDunningBody(resolved.body)
+                        }}
                         className="rounded border-slate-300 text-red-600 focus:ring-red-400 h-4 w-4"
                       />
                       <span>Mahngebühr erheben</span>
@@ -2488,7 +2638,13 @@ export function InvoiceList({
                             min="0"
                             placeholder="0.00"
                             value={dunningFee}
-                            onChange={(e) => setDunningFee(e.target.value)}
+                            onChange={(e) => {
+                              const val = e.target.value
+                              setDunningFee(val)
+                              const resolved = resolveDunningText(dunningInvoice, dunningType, dunningIncludeFee, val)
+                              setDunningSubject(resolved.subject)
+                              setDunningBody(resolved.body)
+                            }}
                             className="w-full pl-3 pr-8 py-2 border border-slate-200 rounded-xl text-sm text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-red-400"
                           />
                           <span className="absolute inset-y-0 right-3 flex items-center text-slate-400 text-xs font-bold">€</span>
