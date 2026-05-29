@@ -1228,7 +1228,7 @@ export function InvoiceList({
                             </div>
 
                             {/* Section 3: Mahnwesen */}
-                            {(invoice.status === 'issued' && !invoice.paidAt && invoice.status !== 'cancelled') && (
+                            {(invoice.status === 'issued' && !invoice.paidAt) && (
                               <div className="border-b border-slate-100 py-1">
                                 <button
                                   onClick={async () => {
