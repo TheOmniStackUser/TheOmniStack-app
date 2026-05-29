@@ -28,8 +28,8 @@ export default async function DashboardLayout({
   const hdrs = await headers()
   const pathname = (hdrs.get('x-pathname') || '').split('?')[0]
   
-  // Mandatory 2FA Check - Redirect to setup if not enabled (Bypass for Shopify Reviewer)
-  const isTestAccount = user?.email === 'shopify-test@theomnistack.de'
+  // Mandatory 2FA Check - Redirect to setup if not enabled (Bypass for Shopify/Apple Reviewers)
+  const isTestAccount = user?.email === 'shopify-test@theomnistack.de' || user?.email === 'apple-test@theomnistack.de'
   if (user && !user.twoFactorEnabled && !isTestAccount && !pathname.startsWith('/settings') && !pathname.startsWith('/setup-2fa')) {
     redirect('/setup-2fa')
   }

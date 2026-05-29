@@ -11,10 +11,6 @@ export const dynamic = 'force-dynamic'
 export default async function ReturnsPage() {
   const auth = await requireAuth()
 
-  // Strict Access Control: Only Owner and Support / Beta support can see returns for now
-  if (auth.role !== 'owner' && auth.role !== 'omnistack_support' && auth.role !== 'omnistack_beta') {
-    redirect('/dashboard')
-  }
 
   // Fetch returns log with items and active integrations
   const [logs, integrations] = await Promise.all([

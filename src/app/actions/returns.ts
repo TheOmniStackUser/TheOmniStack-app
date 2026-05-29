@@ -6,12 +6,8 @@ import { eq, and, inArray } from 'drizzle-orm'
 import { requireAuth } from '@/lib/session'
 import { revalidatePath } from 'next/cache'
 
-// Strict session check helper
 async function checkAuth() {
   const session = await requireAuth()
-  if (session.role !== 'owner' && session.role !== 'omnistack_support' && session.role !== 'omnistack_beta') {
-    throw new Error('Keine Berechtigung')
-  }
   return session
 }
 
