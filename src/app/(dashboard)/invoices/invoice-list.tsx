@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { format } from 'date-fns'
@@ -14,7 +14,8 @@ import {
   markInvoiceAsPaidAction,
   cancelInvoiceAction,
   sendInvoiceEmailAction,
-  saveEmailTemplateAction
+  saveEmailTemplateAction,
+  recordPaymentAction
 } from '@/app/actions/invoices'
 import { getInvoiceLogsAction, deleteDraftAction } from '@/app/actions/manual-invoice'
 import { exportInvoiceJournalAction } from '@/app/actions/export'
@@ -164,6 +165,22 @@ export function InvoiceList({
   const [activeFilterTab, setActiveFilterTab] = useState<'all' | 'drafts' | 'open' | 'overdue' | 'paid' | 'cancelled'>('all')
   const [showSearch, setShowSearch] = useState(false)
 
+  // Row context menu state
+  const [activeRowMenuId, setActiveRowMenuId] = useState<string | null>(null)
+
+  // Payments Modal States
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null)
+  const [paymentDate, setPaymentDate] = useState(format(new Date(), 'yyyy-MM-dd'))
+  const [paymentMethod, setPaymentMethod] = useState('Überweisung')
+  const [paymentProvider, setPaymentProvider] = useState('')
+  const [paymentReference, setPaymentReference] = useState('')
+  const [paymentNote, setPaymentNote] = useState('')
+  const [paymentAmount, setPaymentAmount] = useState('')
+  const [paymentIsSettled, setPaymentIsSettled] = useState(false)
+  const [paymentHasDunningFee, setPaymentHasDunningFee] = useState(false)
+  const [isSavingPayment, setIsSavingPayment] = useState(false)
+
   const isOverdue = (invoice: Invoice) => {
     if (invoice.status !== 'issued' || invoice.paidAt) return false
     if (!invoice.dueAt) return false
@@ -174,6 +191,79 @@ export function InvoiceList({
     if (!dueAt) return 0
     const diffTime = new Date().getTime() - new Date(dueAt).getTime()
     return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)))
+  }
+
+  // Row menu toggle
+  const toggleRowMenu = (invoiceId: string) => {
+    setActiveRowMenuId(prev => prev === invoiceId ? null : invoiceId)
+  }
+
+  // Handle click outside to close dropdowns
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('.row-menu-btn') && !target.closest('.row-menu-dropdown')) {
+        setActiveRowMenuId(null)
+      }
+    }
+    document.addEventListener('click', handleOutsideClick)
+    return () => {
+      document.removeEventListener('click', handleOutsideClick)
+    }
+  }, [])
+
+  // Open Payment modal
+  const handleOpenPaymentModal = (invoice: Invoice) => {
+    setPaymentInvoice(invoice)
+    setPaymentDate(format(new Date(), 'yyyy-MM-dd'))
+    setPaymentMethod('Überweisung')
+    setPaymentProvider('')
+    setPaymentReference('')
+    setPaymentNote('')
+    setPaymentAmount(invoice.totalAmount)
+    setPaymentIsSettled(true)
+    setPaymentHasDunningFee(false)
+    setShowPaymentModal(true)
+    setActiveRowMenuId(null)
+  }
+
+  // Open Send modal from row action
+  const handleOpenSendModalFromRow = async (invoiceId: string) => {
+    setActiveRowMenuId(null)
+    await handleSelectInvoice(invoiceId)
+    setShowSendModal(true)
+  }
+
+  // Save payments to backend
+  const handleSavePayment = async () => {
+    if (!paymentInvoice) return
+    try {
+      setIsSavingPayment(true)
+      const result = await recordPaymentAction(paymentInvoice.id, {
+        date: paymentDate,
+        method: paymentMethod,
+        provider: paymentProvider,
+        reference: paymentReference,
+        note: paymentNote,
+        amount: paymentAmount,
+        isSettled: paymentIsSettled
+      })
+      if (result.success) {
+        showToast('Zahlungseingang wurde erfolgreich erfasst.', 'success')
+        setShowPaymentModal(false)
+        if (selectedInvoiceId === paymentInvoice.id) {
+          const updated = await getInvoiceDetailsAction(selectedInvoiceId)
+          setDetails(updated)
+        }
+        router.refresh()
+      } else {
+        throw new Error('Fehler beim Speichern der Zahlung.')
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Fehler beim Erfassen des Zahlungseingangs.', 'error')
+    } finally {
+      setIsSavingPayment(false)
+    }
   }
 
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
@@ -997,24 +1087,213 @@ export function InvoiceList({
                   <td className="px-6 py-4 text-slate-600">
                     {format(new Date(invoice.createdAt), 'dd.MM.yyyy HH:mm', { locale: de })}
                   </td>
-                  <td className="px-6 py-4 font-medium text-slate-900">
-                    <div className="flex flex-col">
-                      <span>{invoice.status === 'draft' ? (invoice.draftName || 'Unbenannter Entwurf') : invoice.invoiceNumber}</span>
-                      {invoice.cancelsInvoiceId && invoice.originalInvoiceNumber && (
-                        <span className={`text-[10px] font-bold mt-0.5 ${
-                          invoice.invoiceNumber === invoice.originalInvoiceNumber ? 'text-rose-600' : 'text-amber-600'
-                        }`}>
-                          {invoice.invoiceNumber === invoice.originalInvoiceNumber ? 'Storno' : 'Gutschrift'} zu {invoice.originalInvoiceNumber} vom {format(new Date(invoice.originalInvoiceCreatedAt!), 'dd.MM.yyyy')}
-                        </span>
-                      )}
-                      {invoice.status === 'cancelled' && (
-                        <span className="text-[10px] text-red-600 font-bold mt-0.5">
-                          Storniert (Stornobeleg: gleiche Nr.)
-                        </span>
-                      )}
-                      {invoice.status !== 'draft' && (
-                        <span className="text-[10px] text-blue-600 font-bold uppercase tracking-tighter mt-0.5">E-Rechnung (ZUGFeRD)</span>
-                      )}
+                  <td className="px-6 py-4 font-medium text-slate-900 relative">
+                    <div className="flex items-center gap-3">
+                      {/* Three dots button */}
+                      <div className="relative shrink-0">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleRowMenu(invoice.id);
+                          }}
+                          className="row-menu-btn p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors border border-slate-200 shadow-sm bg-white"
+                          title="Mehr Aktionen"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 5v.01M12 12v.01M12 19v.01" />
+                          </svg>
+                        </button>
+
+                        {/* Dropdown Menu container */}
+                        {activeRowMenuId === invoice.id && (
+                          <div 
+                            className="row-menu-dropdown absolute left-0 mt-1.5 w-64 bg-white rounded-xl shadow-2xl border border-slate-200 z-[100] py-1.5 overflow-hidden text-xs text-slate-700 font-medium"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {/* Top Quick Row: Edit, Print, Download, History */}
+                            <div className="flex items-center justify-around border-b border-slate-100 pb-2 px-1 gap-1">
+                              {/* Edit */}
+                              <Link
+                                href={invoice.status === 'draft' ? `/invoices/new?draftId=${invoice.id}` : `/invoices/new?edit=${invoice.id}`}
+                                className="p-2 hover:bg-slate-50 text-slate-500 hover:text-blue-600 rounded-lg transition-colors flex items-center justify-center flex-1"
+                                title="Bearbeiten"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                              </Link>
+                              {/* Print */}
+                              <button
+                                onClick={() => { handleDownload(invoice.id); setActiveRowMenuId(null); }}
+                                className="p-2 hover:bg-slate-50 text-slate-500 hover:text-blue-600 rounded-lg transition-colors flex items-center justify-center flex-1"
+                                title="Drucken"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                </svg>
+                              </button>
+                              {/* Download */}
+                              <button
+                                onClick={() => { handleDownload(invoice.id); setActiveRowMenuId(null); }}
+                                className="p-2 hover:bg-slate-50 text-slate-500 hover:text-blue-600 rounded-lg transition-colors flex items-center justify-center flex-1"
+                                title="Herunterladen"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                </svg>
+                              </button>
+                              {/* History */}
+                              <button
+                                onClick={() => { handleShowHistory(invoice.id); setActiveRowMenuId(null); }}
+                                className="p-2 hover:bg-slate-50 text-slate-500 hover:text-blue-600 rounded-lg transition-colors flex items-center justify-center flex-1"
+                                title="Verlauf anzeigen"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                              </button>
+                            </div>
+
+                            {/* Section 1: ZUGFeRD / XML */}
+                            {invoice.status !== 'draft' && (
+                              <div className="border-b border-slate-100 py-1">
+                                <button
+                                  onClick={() => { handleDownloadXml(invoice.id, invoice.invoiceNumber); setActiveRowMenuId(null); }}
+                                  className="w-full flex items-center justify-between px-3 py-2 hover:bg-slate-50 text-slate-700 font-bold transition-all text-left"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    </svg>
+                                    <span>ZUGFeRD/ XRechnung</span>
+                                  </div>
+                                  <svg className="w-3.5 h-3.5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                                  </svg>
+                                </button>
+                              </div>
+                            )}
+
+                            {/* Section 2: Actions */}
+                            <div className="border-b border-slate-100 py-1 flex flex-col">
+                              {/* Versenden */}
+                              {invoice.status !== 'draft' && (
+                                <button
+                                  onClick={() => handleOpenSendModalFromRow(invoice.id)}
+                                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 text-slate-700 transition-all text-left"
+                                >
+                                  <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                  </svg>
+                                  <span>Versenden</span>
+                                </button>
+                              )}
+                              
+                              {/* Zahlungen */}
+                              {invoice.status !== 'draft' && !invoice.paidAt && invoice.status !== 'cancelled' && (
+                                <button
+                                  onClick={() => handleOpenPaymentModal(invoice)}
+                                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 text-slate-700 transition-all text-left"
+                                >
+                                  <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                                  </svg>
+                                  <span>Zahlungen</span>
+                                </button>
+                              )}
+
+                              {/* SEPA */}
+                              <button
+                                onClick={() => { alert('SEPA-Lastschriftdatei erstellen (Funktion folgt)'); setActiveRowMenuId(null); }}
+                                className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 text-slate-400 transition-all text-left cursor-not-allowed"
+                                title="SEPA"
+                              >
+                                <svg className="w-3.5 h-3.5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                <span>SEPA</span>
+                              </button>
+
+                              {/* Aufgabe erstellen */}
+                              <button
+                                onClick={() => { alert('Aufgabe für diesen Beleg erstellen (Funktion folgt)'); setActiveRowMenuId(null); }}
+                                className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 text-slate-400 transition-all text-left cursor-not-allowed"
+                                title="Aufgabe erstellen"
+                              >
+                                <svg className="w-3.5 h-3.5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 00-2 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                                </svg>
+                                <span>Aufgabe erstellen</span>
+                              </button>
+                            </div>
+
+                            {/* Section 3: Mahnwesen */}
+                            {(invoice.status === 'issued' && !invoice.paidAt && invoice.status !== 'cancelled') && (
+                              <div className="border-b border-slate-100 py-1">
+                                <button
+                                  onClick={async () => {
+                                    setActiveRowMenuId(null);
+                                    await handleSelectInvoice(invoice.id);
+                                  }}
+                                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 text-red-700 bg-red-50/50 font-bold transition-all text-left"
+                                >
+                                  <svg className="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                  <span>Mahnwesen</span>
+                                </button>
+                              </div>
+                            )}
+
+                            {/* Section 4: Cancel / Credit Note */}
+                            {invoice.status !== 'draft' && (
+                              <div className="py-1 flex flex-col">
+                                {invoice.status !== 'cancelled' && !invoice.isCreditNote && (
+                                  <button
+                                    onClick={() => { handleCreateStorno(invoice.id); setActiveRowMenuId(null); }}
+                                    className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 text-rose-600 transition-all text-left"
+                                  >
+                                    <svg className="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <span>Storno erstellen</span>
+                                  </button>
+                                )}
+                                <Link
+                                  href={`/invoices/new?clone=${invoice.id}&isCreditNote=true`}
+                                  onClick={() => setActiveRowMenuId(null)}
+                                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 text-slate-700 transition-all text-left"
+                                >
+                                  <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                  </svg>
+                                  <span>Gutschrift erstellen</span>
+                                </Link>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Invoice Details */}
+                      <div className="flex flex-col">
+                        <span>{invoice.status === 'draft' ? (invoice.draftName || 'Unbenannter Entwurf') : invoice.invoiceNumber}</span>
+                        {invoice.cancelsInvoiceId && invoice.originalInvoiceNumber && (
+                          <span className={`text-[10px] font-bold mt-0.5 ${
+                            invoice.invoiceNumber === invoice.originalInvoiceNumber ? 'text-rose-600' : 'text-amber-600'
+                          }`}>
+                            {invoice.invoiceNumber === invoice.originalInvoiceNumber ? 'Storno' : 'Gutschrift'} zu {invoice.originalInvoiceNumber} vom {format(new Date(invoice.originalInvoiceCreatedAt!), 'dd.MM.yyyy')}
+                          </span>
+                        )}
+                        {invoice.status === 'cancelled' && (
+                          <span className="text-[10px] text-red-600 font-bold mt-0.5">
+                            Storniert (Stornobeleg: gleiche Nr.)
+                          </span>
+                        )}
+                        {invoice.status !== 'draft' && (
+                          <span className="text-[10px] text-blue-600 font-bold uppercase tracking-tighter mt-0.5">E-Rechnung (ZUGFeRD)</span>
+                        )}
+                      </div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
@@ -1602,7 +1881,7 @@ export function InvoiceList({
                         </button>
 
                         {/* Bezahlt */}
-                        {details.invoice.logs?.some((l: any) => l.action === 'payment') ? (
+                        {(details.invoice.paidAt || details.invoice.logs?.some((l: any) => l.action === 'payment')) ? (
                           <div className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 border border-emerald-100 rounded-xl text-xs font-bold text-emerald-700 shadow-sm">
                             <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -1611,7 +1890,7 @@ export function InvoiceList({
                           </div>
                         ) : (
                           <button
-                            onClick={handleMarkAsPaid}
+                            onClick={() => handleOpenPaymentModal(details.invoice)}
                             className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
                           >
                             Zahlung erfassen
@@ -2257,6 +2536,263 @@ export function InvoiceList({
                     </svg>
                     Versenden
                   </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payments Modal Dialog */}
+      {showPaymentModal && paymentInvoice && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden border border-slate-200 flex flex-col max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center shrink-0">
+              <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Zahlungen</h3>
+              <button 
+                onClick={() => setShowPaymentModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 hover:bg-slate-100 rounded-lg transition-all"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-6 flex flex-col md:flex-row gap-6">
+              {/* Left Panel: Form */}
+              <div className="flex-1 space-y-4">
+                {/* Autocomplete payments info banner */}
+                <div className="p-4 bg-blue-50/50 border border-blue-100 rounded-xl flex flex-col gap-1.5 select-none">
+                  <h4 className="text-xs font-black text-blue-900 uppercase tracking-wider">Automatischer Zahlungsabgleich</h4>
+                  <p className="text-[11px] font-semibold text-blue-700 leading-relaxed">
+                    Der automatische Bankkontenabgleich teilt Ihnen mit, welche Transaktionen bereits erledigt sind und welche Vorgänge Ihre Aufmerksamkeit benötigen.{' '}
+                    <span className="text-blue-600 hover:text-blue-800 underline cursor-pointer">Bankkonto verknüpfen</span>
+                  </p>
+                </div>
+
+                {/* Form fields */}
+                <div className="space-y-3.5">
+                  {/* Datum */}
+                  <div className="grid grid-cols-3 gap-4 items-center">
+                    <label className="text-xs font-black text-slate-500 uppercase tracking-wider">Datum</label>
+                    <div className="col-span-2">
+                      <input
+                        type="date"
+                        value={paymentDate}
+                        onChange={(e) => setPaymentDate(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/30"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Zahlung per */}
+                  <div className="grid grid-cols-3 gap-4 items-center">
+                    <label className="text-xs font-black text-slate-500 uppercase tracking-wider">Zahlung per</label>
+                    <div className="col-span-2 flex items-center gap-2">
+                      <select
+                        value={paymentMethod}
+                        onChange={(e) => setPaymentMethod(e.target.value)}
+                        className="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-sm text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                      >
+                        <option value="Überweisung">Überweisung</option>
+                        <option value="PayPal">PayPal</option>
+                        <option value="Kreditkarte">Kreditkarte</option>
+                        <option value="Lastschrift">Lastschrift</option>
+                        <option value="Bar">Bar</option>
+                        <option value="Amazon Pay">Amazon Pay</option>
+                        <option value="eBay Managed Payments">eBay Managed Payments</option>
+                        <option value="Shopify Payments">Shopify Payments</option>
+                        <option value="Sonstige">Sonstige</option>
+                      </select>
+                      <button 
+                        onClick={() => {
+                          setPaymentMethod('Überweisung');
+                          setPaymentProvider('');
+                          setPaymentReference('');
+                          setPaymentNote('');
+                        }}
+                        className="p-2 border border-slate-200 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-xl transition-all shadow-sm shrink-0 bg-white"
+                        title="Formular zurücksetzen"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Zahlungsdienstleister */}
+                  <div className="grid grid-cols-3 gap-4 items-center">
+                    <label className="text-xs font-black text-slate-500 uppercase tracking-wider">Zahlungsdienstleister</label>
+                    <div className="col-span-2">
+                      <input
+                        type="text"
+                        placeholder="z.B. Stripe, PayPal Inc., Sparkasse"
+                        value={paymentProvider}
+                        onChange={(e) => setPaymentProvider(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm text-slate-900 font-medium placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Zahlungsreferenz */}
+                  <div className="grid grid-cols-3 gap-4 items-center">
+                    <label className="text-xs font-black text-slate-500 uppercase tracking-wider">Zahlungsreferenz</label>
+                    <div className="col-span-2">
+                      <input
+                        type="text"
+                        placeholder="z.B. Transaktions-ID, Verwendungszweck"
+                        value={paymentReference}
+                        onChange={(e) => setPaymentReference(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm text-slate-900 font-medium placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Bemerkung */}
+                  <div className="grid grid-cols-3 gap-4 items-start">
+                    <label className="text-xs font-black text-slate-500 uppercase tracking-wider pt-2">Bemerkung</label>
+                    <div className="col-span-2">
+                      <textarea
+                        rows={3}
+                        placeholder="Interne Notiz zum Zahlungseingang..."
+                        value={paymentNote}
+                        onChange={(e) => setPaymentNote(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm text-slate-900 font-medium placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Betrag */}
+                  <div className="grid grid-cols-3 gap-4 items-center">
+                    <label className="text-xs font-black text-slate-500 uppercase tracking-wider">
+                      <span className="text-rose-500 mr-0.5">*</span>Betrag
+                    </label>
+                    <div className="col-span-2 flex items-center gap-2">
+                      <div className="relative flex-1">
+                        <input
+                          type="number"
+                          step="0.01"
+                          required
+                          value={paymentAmount}
+                          onChange={(e) => setPaymentAmount(e.target.value)}
+                          className="w-full pl-3 pr-8 py-2 border border-slate-200 rounded-xl text-sm text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <span className="absolute inset-y-0 right-3 flex items-center text-slate-400 text-xs font-bold">€</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const val = (parseFloat(paymentInvoice.totalAmount) * 0.98).toFixed(2);
+                          setPaymentAmount(val);
+                        }}
+                        className="px-3 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm shrink-0 bg-white"
+                      >
+                        Betrag mit Skonto (2%)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPaymentAmount(paymentInvoice.totalAmount)}
+                        className="px-3 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm shrink-0 bg-white"
+                      >
+                        Vollständiger Betrag
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Checkboxes */}
+                  <div className="grid grid-cols-3 gap-4 pt-1">
+                    <div />
+                    <div className="col-span-2 space-y-2">
+                      <label className="flex items-center gap-2.5 text-xs text-slate-700 font-semibold select-none cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={paymentHasDunningFee}
+                          onChange={(e) => setPaymentHasDunningFee(e.target.checked)}
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
+                        />
+                        <span className="flex items-center gap-1">
+                          Mahngebühr
+                          <span className="text-[10px] bg-slate-100 hover:bg-slate-200 border text-slate-500 rounded-full w-4 h-4 flex items-center justify-center font-bold" title="Wählen Sie dies, wenn die Zahlung eine Verzugsgebühr enthält.">?</span>
+                        </span>
+                      </label>
+
+                      <label className="flex items-center gap-2.5 text-xs text-slate-700 font-semibold select-none cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={paymentIsSettled}
+                          onChange={(e) => setPaymentIsSettled(e.target.checked)}
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
+                        />
+                        <span>Restbetrag = Skonto / Nachlass / vollständig bezahlt</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Panel: Invoice Summary */}
+              <div className="w-full md:w-80 bg-slate-50 border border-slate-200/60 rounded-2xl p-5 flex flex-col justify-between shrink-0 space-y-6">
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Ausgewählter Beleg</span>
+                    <h4 className="text-sm font-black text-slate-900 leading-snug">
+                      Rechnung: {paymentInvoice.invoiceNumber}
+                    </h4>
+                  </div>
+
+                  <div className="w-full h-[1px] bg-slate-200/60" />
+
+                  <div className="space-y-3 text-xs font-semibold text-slate-600">
+                    <div className="flex justify-between items-center">
+                      <span>Fälligkeit:</span>
+                      <span className="text-slate-800 font-bold">
+                        {paymentInvoice.dueAt ? format(new Date(paymentInvoice.dueAt), 'dd.MM.yyyy') : '–'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span>Gesamtbetrag:</span>
+                      <span className="text-slate-950 font-black text-sm">
+                        {new Intl.NumberFormat('de-DE', { style: 'currency', currency: paymentInvoice.currency }).format(
+                          Number(paymentInvoice.totalAmount)
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-white border border-slate-100 rounded-xl flex flex-col gap-1.5 shadow-sm text-center">
+                  <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Noch zu zahlen</span>
+                  <span className="text-2xl font-black text-rose-600 tracking-tight leading-none">
+                    {new Intl.NumberFormat('de-DE', { style: 'currency', currency: paymentInvoice.currency }).format(
+                      Math.max(0, Number(paymentInvoice.totalAmount) - (parseFloat(paymentAmount) || 0))
+                    )}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end items-center gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowPaymentModal(false)}
+                className="px-5 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-black uppercase rounded-xl transition-all shadow-sm"
+              >
+                Abbrechen
+              </button>
+              
+              <button
+                type="button"
+                onClick={handleSavePayment}
+                disabled={isSavingPayment || !paymentAmount}
+                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black uppercase rounded-xl transition-all shadow-md flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {isSavingPayment ? (
+                  <div className="animate-spin h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full" />
+                ) : (
+                  <span>Speichern und Schließen</span>
                 )}
               </button>
             </div>

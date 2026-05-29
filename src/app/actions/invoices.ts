@@ -802,4 +802,48 @@ export async function saveEmailTemplateAction(content: string, templateName: str
   }
 }
 
+export async function recordPaymentAction(invoiceId: string, data: {
+  date: string
+  method: string
+  provider?: string
+  reference?: string
+  note?: string
+  amount: string
+  isSettled?: boolean
+}) {
+  const auth = await requireAuth()
+  const companyId = auth.activeCompanyId
+
+  const [invoice] = await db
+    .select({ id: invoices.id })
+    .from(invoices)
+    .where(and(eq(invoices.id, invoiceId), eq(invoices.companyId, companyId)))
+    .limit(1)
+
+  if (!invoice) throw new Error('Rechnung nicht gefunden')
+
+  const paymentDate = data.date ? new Date(data.date) : new Date()
+
+  await db
+    .update(invoices)
+    .set({ paidAt: paymentDate })
+    .where(and(eq(invoices.id, invoiceId), eq(invoices.companyId, companyId)))
+
+  const noteMessage = `Zahlungseingang erfasst.
+Betrag: ${data.amount} €
+Datum: ${data.date}
+Zahlung per: ${data.method}
+${data.provider ? `Zahlungsdienstleister: ${data.provider}\n` : ''}${data.reference ? `Referenz: ${data.reference}\n` : ''}${data.note ? `Bemerkung: ${data.note}\n` : ''}${data.isSettled ? 'Restbetrag als Skonto/Nachlass verbucht (vollständig bezahlt).' : ''}`
+
+  await db.insert(invoiceLogs).values({
+    invoiceId,
+    companyId,
+    userId: auth.userId,
+    action: 'payment',
+    note: noteMessage.trim()
+  })
+
+  return { success: true }
+}
+
 
