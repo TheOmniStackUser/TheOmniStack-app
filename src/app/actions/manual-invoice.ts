@@ -151,12 +151,24 @@ export async function createManualInvoiceAction(data: {
       }
     }
 
+    // Ensure marketplaceOrderId is unique within the company to prevent unique constraint violation
+    let uniqueMarketplaceOrderId = orderNumber
+    const existingOrder = await tx.query.orders.findFirst({
+      where: and(
+        eq(orders.companyId, companyId),
+        eq(orders.marketplaceOrderId, uniqueMarketplaceOrderId)
+      )
+    })
+    if (existingOrder) {
+      uniqueMarketplaceOrderId = `${orderNumber}-${Date.now()}`
+    }
+
     const [newOrder] = await tx
       .insert(orders)
       .values({
         companyId,
         marketplace: 'manual',
-        marketplaceOrderId: orderNumber,
+        marketplaceOrderId: uniqueMarketplaceOrderId,
         marketplacePurchaseDate: data.orderDate || new Date(),
         status: data.status === 'draft' ? 'draft' : 'invoiced',
         buyerName: data.customer.name || null,

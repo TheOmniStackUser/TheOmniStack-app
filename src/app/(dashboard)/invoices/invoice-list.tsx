@@ -1419,7 +1419,10 @@ export function InvoiceList({
                       {new Intl.NumberFormat('de-DE', { style: 'currency', currency: invoice.currency }).format(
                         invoice.cancelsInvoiceId ? -Number(invoice.totalAmount) : Number(invoice.totalAmount)
                       )}
-                               {/* ··· action menu – last column, right-aligned */}
+                    </span>
+                  </div>
+                </td>
+                 {/* ··· action menu – last column, right-aligned */}
                  <td className={`px-4 py-4 text-right ${isOverdue(invoice) ? 'border-r-4 border-r-rose-600' : ''}`} onClick={(e) => e.stopPropagation()}>
                    <div className="relative inline-block">
                      <button
