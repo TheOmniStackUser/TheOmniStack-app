@@ -154,7 +154,11 @@ export async function generateMissingInvoicesAction() {
 
   for (const order of ordersWithoutInvoice) {
     try {
-      const integration = activeIntegrations.find(i => i.type === order.marketplace)
+      const integration = activeIntegrations.find(i => 
+        i.type === order.marketplace ||
+        (i.type === 'mirakl_custom' && 
+         ((i.metadata as any)?.customName || '').toLowerCase() === (order.marketplace || '').toLowerCase())
+      )
       const downloadInvoice = !!(integration?.metadata as any)?.downloadInvoice
 
       if (downloadInvoice && integration) {
@@ -163,6 +167,7 @@ export async function generateMissingInvoicesAction() {
           console.log(`[Action] Skipping invoice download for order ${order.marketplaceOrderId} because it is not shipped yet (status: ${order.status}).`)
           continue
         }
+        
         // Initialize adapter
         let adapter: any = null
         if (order.marketplace === 'otto') {
@@ -182,6 +187,24 @@ export async function generateMissingInvoicesAction() {
             adapter = new AboutYouAdapter({
               apiKey: integration.apiKey,
               environment: (integration.environment as 'sandbox' | 'production') || 'production'
+            })
+          }
+        } else if (
+          (order.marketplace && order.marketplace.startsWith('mirakl_')) ||
+          integration.type === 'mirakl_custom'
+        ) {
+          if (integration.clientId) {
+            const { MiraklAdapter } = await import('@/adapters/marketplace/mirakl')
+            const customName = integration.type === 'mirakl_custom'
+              ? ((integration.metadata as any)?.customName || 'mirakl_custom')
+              : integration.type
+            adapter = new MiraklAdapter({
+              instance: customName.toLowerCase(),
+              baseUrl: integration.environment!,
+              clientId: integration.clientId,
+              clientSecret: integration.clientSecret || '',
+              apiKey: integration.apiKey || undefined,
+              shopId: (integration.metadata as any)?.shopId || undefined
             })
           }
         }
