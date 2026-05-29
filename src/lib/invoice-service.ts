@@ -678,7 +678,6 @@ export async function addDunningFeeToInvoice(
         subtotalAmount: newSubtotal.toFixed(2),
         totalAmount: newTotal.toFixed(2),
         taxRate: newTaxRate,
-        updatedAt: new Date()
       })
       .where(eq(invoices.id, invoiceId))
   })
