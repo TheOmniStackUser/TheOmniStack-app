@@ -154,7 +154,11 @@ export async function generateMissingInvoicesAction() {
 
   for (const order of ordersWithoutInvoice) {
     try {
-      const integration = activeIntegrations.find(i => i.type === order.marketplace)
+      const integration = activeIntegrations.find(i => 
+        i.type === order.marketplace ||
+        (i.type === 'mirakl_custom' && 
+         ((i.metadata as any)?.customName || '').toLowerCase() === order.marketplace.toLowerCase())
+      )
       const downloadInvoice = !!(integration?.metadata as any)?.downloadInvoice
 
       if (downloadInvoice && integration) {
@@ -163,31 +167,11 @@ export async function generateMissingInvoicesAction() {
           console.log(`[Action] Skipping invoice download for order ${order.marketplaceOrderId} because it is not shipped yet (status: ${order.status}).`)
           continue
         }
-        // Initialize adapter
-        let adapter: any = null
-        if (order.marketplace === 'otto') {
-          if (integration.clientId && integration.clientSecret) {
-            const { OttoAdapter } = await import('@/adapters/marketplace/otto')
-            adapter = new OttoAdapter({
-              clientId: integration.clientId,
-              clientSecret: integration.clientSecret,
-              environment: (integration.environment as 'sandbox' | 'production') || 'production',
-              installationId: (integration.metadata as any)?.installationId,
-              appId: (integration.metadata as any)?.appId
-            })
-          }
-        } else if (order.marketplace === 'aboutyou') {
-          if (integration.apiKey) {
-            const { AboutYouAdapter } = await import('@/adapters/marketplace/aboutyou')
-            adapter = new AboutYouAdapter({
-              apiKey: integration.apiKey,
-              environment: (integration.environment as 'sandbox' | 'production') || 'production'
-            })
-          }
-        }
+        
+        const { downloadAndSaveMarketplaceInvoice, getAdapterForIntegration } = await import('@/workers/marketplace-sync')
+        const adapter = getAdapterForIntegration(integration)
 
         if (adapter) {
-          const { downloadAndSaveMarketplaceInvoice } = await import('@/workers/marketplace-sync')
           await downloadAndSaveMarketplaceInvoice(order.id, companyId, adapter)
 
           // Check if invoice was successfully downloaded and linked

@@ -158,7 +158,11 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
             {marketplaceIntegrations.map((int) => {
               const cannotCreateInvoice = int.type === 'otto' || int.type === 'aboutyou'
               const downloadInvoice = !!(int.metadata as Record<string, unknown>)?.downloadInvoice
-              
+              const isMirakl = int.type.startsWith('mirakl_')
+              const showDownload = cannotCreateInvoice || isMirakl
+              const isDownloadActive = downloadInvoice
+              const isAutoInvoiceActive = int.autoInvoice
+
               return (
                 <div key={int.id} className="p-5 rounded-2xl border border-gray-100 bg-gray-50/30 flex flex-col lg:row md:flex-row md:items-center justify-between gap-6 transition-all hover:bg-gray-50/50">
                   <div className="flex items-center gap-4">
@@ -191,15 +195,15 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
                     )}
 
                     <div className="flex gap-2">
-                      {cannotCreateInvoice && (
+                      {showDownload && (
                         <button
                           onClick={() => handleToggle(int.id, 'downloadInvoice', downloadInvoice)}
-                          disabled={loadingId === `${int.id}-downloadInvoice`}
+                          disabled={loadingId === `${int.id}-downloadInvoice` || isAutoInvoiceActive}
                           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
                             downloadInvoice 
                               ? 'bg-green-600 border-green-600 text-white shadow-md shadow-green-200' 
                               : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
-                          }`}
+                          } ${isAutoInvoiceActive ? 'opacity-40 cursor-not-allowed grayscale' : ''}`}
                         >
                           <Download size={14} />
                           {loadingId === `${int.id}-downloadInvoice` ? '...' : 'Auto-Download'}
@@ -208,12 +212,12 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
 
                       <button
                         onClick={() => handleToggle(int.id, 'autoInvoice', int.autoInvoice)}
-                        disabled={loadingId === `${int.id}-autoInvoice` || cannotCreateInvoice}
+                        disabled={loadingId === `${int.id}-autoInvoice` || cannotCreateInvoice || isDownloadActive}
                         className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
                           int.autoInvoice 
                             ? 'bg-green-600 border-green-600 text-white shadow-md shadow-green-200' 
                             : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
-                        } ${cannotCreateInvoice ? 'opacity-40 cursor-not-allowed grayscale' : ''}`}
+                        } ${(cannotCreateInvoice || isDownloadActive) ? 'opacity-40 cursor-not-allowed grayscale' : ''}`}
                       >
                         <CheckCircle2 size={14} />
                         {loadingId === `${int.id}-autoInvoice` ? '...' : 'Auto-Rechnung'}
@@ -221,12 +225,12 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
 
                       <button
                         onClick={() => handleToggle(int.id, 'uploadInvoice', int.uploadInvoice)}
-                        disabled={loadingId === `${int.id}-uploadInvoice` || cannotCreateInvoice}
+                        disabled={loadingId === `${int.id}-uploadInvoice` || cannotCreateInvoice || isDownloadActive}
                         className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
                           int.uploadInvoice 
                             ? 'bg-green-600 border-green-600 text-white shadow-md shadow-green-200' 
                             : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
-                        } ${cannotCreateInvoice ? 'opacity-40 cursor-not-allowed grayscale' : ''}`}
+                        } ${(cannotCreateInvoice || isDownloadActive) ? 'opacity-40 cursor-not-allowed grayscale' : ''}`}
                       >
                         <CloudUpload size={14} />
                         {loadingId === `${int.id}-uploadInvoice` ? '...' : 'Auto-Upload'}
