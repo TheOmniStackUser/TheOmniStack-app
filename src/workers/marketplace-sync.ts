@@ -26,7 +26,7 @@ import { EbayAdapter } from '@/adapters/marketplace/ebay'
 import { WooCommerceAdapter } from '@/adapters/marketplace/woocommerce'
 import { ShopwareAdapter } from '@/adapters/marketplace/shopware'
 import type { NormalizedOrder, MarketplaceAdapter } from '@/adapters/marketplace/base'
-import { createInvoiceForOrder, formatDocumentNumber, getDefaultSettings } from '@/lib/invoice-service'
+import { createInvoiceForOrder, formatDocumentNumber, getDefaultSettings, extractPaymentInfo } from '@/lib/invoice-service'
 import { get2LetterCountryCode } from '@/lib/countries'
 
 // ─── Queue Name Constants ─────────────────────────────────────────────────────
@@ -704,6 +704,8 @@ export async function downloadAndSaveMarketplaceInvoice(
       const calculatedTotal = calculatedSubtotal + calculatedTax
       const averageTaxRate = calculatedSubtotal > 0 ? (calculatedTax / calculatedSubtotal) : 0.19
 
+      const { isPaid } = extractPaymentInfo(order)
+
       const [newInvoice] = await tx
         .insert(invoices)
         .values({
@@ -725,7 +727,8 @@ export async function downloadAndSaveMarketplaceInvoice(
           dueAt: order.marketplacePurchaseDate || new Date(),
           pdfStorageKey: storageKey,
           pdfGeneratedAt: new Date(),
-          issuedAt: new Date()
+          issuedAt: new Date(),
+          paidAt: isPaid ? (order.marketplacePurchaseDate || new Date()) : null
         })
         .returning({ id: invoices.id })
 

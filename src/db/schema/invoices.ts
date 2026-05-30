@@ -8,6 +8,7 @@ import {
   boolean,
   unique,
   uniqueIndex,
+  index,
 } from 'drizzle-orm/pg-core'
 import { relations, sql } from 'drizzle-orm'
 import { companies } from './companies'
@@ -70,6 +71,7 @@ export const invoices = pgTable('invoices', {
   unqCompanyInvoiceIndex: uniqueIndex('unq_company_invoice_idx')
     .on(t.companyId, t.invoiceNumber)
     .where(sql`cancels_invoice_id IS NULL`),
+  companyInvoicesIdx: index('invoices_company_doc_created_idx').on(t.companyId, t.documentType, t.createdAt),
 }))
 
 // ─── Invoice Items ────────────────────────────────────────────────────────────

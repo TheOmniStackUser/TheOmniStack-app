@@ -8,6 +8,7 @@ import {
   numeric,
   unique,
   boolean,
+  index,
 } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { companies } from './companies'
@@ -79,7 +80,9 @@ export const orders = pgTable('orders', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({
-  unqOrder: unique('unq_company_marketplace_order').on(t.companyId, t.marketplaceOrderId)
+  unqOrder: unique('unq_company_marketplace_order').on(t.companyId, t.marketplaceOrderId),
+  companyActiveOrdersIdx: index('orders_company_active_idx').on(t.companyId, t.isArchived, t.status, t.marketplacePurchaseDate),
+  companyOrdersCreatedAtIdx: index('orders_company_created_at_idx').on(t.companyId, t.createdAt),
 }))
 
 // ─── Order Items ──────────────────────────────────────────────────────────────

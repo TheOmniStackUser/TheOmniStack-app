@@ -208,7 +208,7 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
   // Dynamic imports required to avoid ESM/CJS module conflict
   const { renderToBuffer } = await import('@react-pdf/renderer')
 
-  const { paymentMethod } = extractPaymentInfo(order)
+  const { paymentMethod, isPaid } = extractPaymentInfo(order)
   const metadata = (order.rawPayload as any)?.manualMetadata || {}
 
   let billingName = order.buyerName || order.shippingName || 'Kunde'
@@ -415,6 +415,7 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
         pdfStorageKey: storageKey,
         pdfGeneratedAt: new Date(),
         issuedAt: status === 'issued' ? new Date() : null,
+        paidAt: isPaid && status === 'issued' ? (order.marketplacePurchaseDate || new Date()) : null,
       })
       .returning({ id: invoices.id })
 
@@ -459,11 +460,8 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
   }
 }
 
-/**
- * Extracts payment method and status from the raw marketplace payload.
- */
-function extractPaymentInfo(order: any) {
-  const marketplace = order.marketplace
+export function extractPaymentInfo(order: any) {
+  const marketplace = order.marketplace ? order.marketplace.toLowerCase() : 'manual'
   const raw = order.rawPayload || {}
   
   let paymentMethod = 'Marketplace'
@@ -472,17 +470,36 @@ function extractPaymentInfo(order: any) {
   try {
     if (marketplace === 'otto') {
       paymentMethod = 'Otto.de'
+    } else if (marketplace === 'aboutyou') {
+      paymentMethod = 'About You'
     } else if (marketplace === 'amazon') {
       paymentMethod = 'Amazon'
-    } else if (marketplace.startsWith('mirakl_')) {
-      // Mirakl payload often has payment_workflow or similar
+    } else if (marketplace === 'kaufland') {
+      paymentMethod = 'Kaufland'
+    } else if (marketplace === 'ebay') {
+      paymentMethod = 'eBay'
+    } else if (
+      marketplace.startsWith('mirakl_') ||
+      marketplace.includes('decathlon') ||
+      marketplace.includes('secret sales') ||
+      marketplace === 'shop-apotheke'
+    ) {
       paymentMethod = raw.payment_type || raw.payment_workflow || 'Marketplace'
     } else if (marketplace === 'shopify') {
       paymentMethod = raw.gateway || 'Shopify'
       isPaid = raw.financial_status === 'paid'
+    } else if (marketplace === 'woocommerce') {
+      paymentMethod = raw.payment_method_title || 'WooCommerce'
+      isPaid = raw.status === 'completed' || raw.status === 'processing'
+    } else if (marketplace === 'shopware') {
+      paymentMethod = raw.transactions?.[0]?.paymentMethod?.name || 'Shopware'
+      isPaid = raw.transactions?.[0]?.stateMachineState?.technicalName === 'paid'
     } else if (marketplace === 'manual') {
       paymentMethod = 'Vorkasse / Überweisung'
-      isPaid = false // Manual orders might not be paid yet
+      isPaid = false
+    } else {
+      paymentMethod = 'Marketplace'
+      isPaid = true
     }
   } catch (err) {
     console.error('[InvoiceService] Error extracting payment info:', err)

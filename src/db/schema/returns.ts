@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, integer, jsonb } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, timestamp, integer, jsonb, index } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { companies } from './companies'
 import { users } from './auth'
@@ -18,7 +18,9 @@ export const returnsLog = pgTable('returns_log', {
   marketplace: text('marketplace'),
   metadata: jsonb('metadata'), 
   notes: text('notes'),
-})
+}, (t) => ({
+  companyScannedAtIdx: index('returns_log_company_scanned_idx').on(t.companyId, t.scannedAt),
+}))
 
 export const returnedItems = pgTable('returned_items', {
   id: uuid('id').primaryKey().defaultRandom(),
