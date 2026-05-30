@@ -244,4 +244,140 @@ export class ShopifyAdapter implements MarketplaceAdapter {
     
     console.log(`[Shopify] Shipment confirmed for order ${marketplaceOrderId}`)
   }
+
+  async refundOrder(
+    marketplaceOrderId: string,
+    refundItems: { sku: string; quantity: number }[],
+    rawOrderPayload?: unknown
+  ): Promise<boolean> {
+    console.log(`[Shopify] Refunding order ${marketplaceOrderId}...`)
+    try {
+      // 1. Fetch order from DB to get companyId
+      const [orderRow] = await db
+        .select()
+        .from(orders)
+        .where(eq(orders.marketplaceOrderId, marketplaceOrderId))
+        .limit(1)
+
+      if (!orderRow) {
+        console.warn(`[Shopify] Order ${marketplaceOrderId} not found in DB`)
+        return false
+      }
+
+      // 2. Fetch active Shopify integration
+      const [integration] = await db
+        .select()
+        .from(marketplaceIntegrations)
+        .where(
+          and(
+            eq(marketplaceIntegrations.companyId, orderRow.companyId),
+            eq(marketplaceIntegrations.type, 'shopify'),
+            eq(marketplaceIntegrations.isActive, true)
+          )
+        )
+        .limit(1)
+
+      if (!integration || !integration.environment || !integration.clientId || !integration.clientSecret) {
+        console.warn(`[Shopify] No active credentials found for company ${orderRow.companyId}`)
+        return false
+      }
+
+      let shopUrl = integration.environment
+      if (!shopUrl.startsWith('http')) shopUrl = `https://${shopUrl}`
+      shopUrl = shopUrl.replace(/\/$/, '')
+
+      // 3. Get access token
+      const tokenRes = await fetch(`${shopUrl}/admin/oauth/access_token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_id: integration.clientId,
+          client_secret: integration.clientSecret,
+          grant_type: 'client_credentials'
+        })
+      })
+
+      let accessToken = ''
+      if (tokenRes.ok) {
+        const data = await tokenRes.json()
+        accessToken = data.access_token
+      } else if (integration.clientSecret.startsWith('shpat_')) {
+        accessToken = integration.clientSecret
+      } else {
+        const errText = await tokenRes.text()
+        throw new Error(`Shopify Auth Fehler: ${tokenRes.status} - ${errText}`)
+      }
+
+      const headers = {
+        'X-Shopify-Access-Token': accessToken,
+        'Content-Type': 'application/json',
+      }
+
+      // 4. Fetch the order from Shopify to get full line_items metadata
+      let shopifyOrder = (rawOrderPayload as any)
+      if (!shopifyOrder || !shopifyOrder.line_items) {
+        console.log(`[Shopify] Fetching order details from Shopify API...`)
+        const getOrderRes = await fetch(`${shopUrl}/admin/api/2024-01/orders/${marketplaceOrderId}.json`, { headers })
+        if (!getOrderRes.ok) {
+          const errText = await getOrderRes.text()
+          throw new Error(`Failed to fetch order details from Shopify: ${getOrderRes.status} ${errText}`)
+        }
+        const orderData = await getOrderRes.json()
+        shopifyOrder = orderData.order
+      }
+
+      if (!shopifyOrder || !shopifyOrder.line_items) {
+        throw new Error(`No Shopify line items found for order ${marketplaceOrderId}`)
+      }
+
+      // 5. Map SKU to Shopify line_item IDs
+      const refundLineItems = refundItems.map(item => {
+        const matchingLineItem = shopifyOrder.line_items.find((li: any) => li.sku === item.sku || li.id.toString() === item.sku)
+        if (!matchingLineItem) {
+          console.warn(`[Shopify] No matching line item found on Shopify for SKU ${item.sku}`)
+          return null
+        }
+        return {
+          line_item_id: matchingLineItem.id,
+          quantity: item.quantity,
+          restock_type: 'no_restock'
+        }
+      }).filter(Boolean)
+
+      if (refundLineItems.length === 0) {
+        console.warn(`[Shopify] No valid line items to refund.`)
+        return false
+      }
+
+      // 6. Post Refund
+      const refundPayload = {
+        refund: {
+          currency: shopifyOrder.currency || 'EUR',
+          notify: true,
+          note: 'OmniScan Return Refund',
+          shipping: { full_refund: false },
+          refund_line_items: refundLineItems
+        }
+      }
+
+      console.log(`[Shopify] Sending refund request for order ${marketplaceOrderId}...`)
+      const refundRes = await fetch(`${shopUrl}/admin/api/2024-01/orders/${marketplaceOrderId}/refunds.json`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(refundPayload)
+      })
+
+      if (!refundRes.ok) {
+        const errText = await refundRes.text()
+        console.error(`[Shopify] Refund request failed: ${refundRes.status} - ${errText}`)
+        throw new Error(`Shopify Refund API Error: ${errText}`)
+      }
+
+      console.log(`[Shopify] Refund processed successfully for order ${marketplaceOrderId}`)
+      return true
+    } catch (error) {
+      console.error(`[Shopify] Error during refund:`, error)
+      return false
+    }
+  }
 }

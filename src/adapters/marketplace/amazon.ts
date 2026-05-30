@@ -121,4 +121,49 @@ export class AmazonAdapter implements MarketplaceAdapter {
       rawPayload: { rawOrder, rawItems }
     }
   }
+
+  async refundOrder(
+    marketplaceOrderId: string,
+    refundItems: { sku: string; quantity: number }[],
+    rawOrderPayload?: unknown
+  ): Promise<boolean> {
+    console.log(`[AmazonAdapter] Simulating SP-API refund for order ${marketplaceOrderId}...`)
+    try {
+      const xmlItems = refundItems.map((item, idx) => `
+        <Message>
+          <MessageID>${idx + 1}</MessageID>
+          <PaymentAdjustment>
+            <AmazonOrderID>${marketplaceOrderId}</AmazonOrderID>
+            <AdjustedItem>
+              <MerchantOrderItemID>${item.sku}</MerchantOrderItemID>
+              <AdjustmentReason>CustomerReturn</AdjustmentReason>
+              <ItemPriceAdjustments>
+                <Component>
+                  <Type>Principal</Type>
+                  <Amount currency="EUR">0.00</Amount>
+                </Component>
+              </ItemPriceAdjustments>
+              <Quantity>${item.quantity}</Quantity>
+            </AdjustedItem>
+          </PaymentAdjustment>
+        </Message>`).join('\n')
+
+      const feedXml = `<?xml version="1.0" encoding="utf-8"?>
+<AmazonEnvelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="amzn-envelope.xsd">
+  <Header>
+    <DocumentVersion>1.01</DocumentVersion>
+    <MerchantIdentifier>${this.config.sellerId}</MerchantIdentifier>
+  </Header>
+  <MessageType>OrderAdjustment</MessageType>
+  ${xmlItems}
+</AmazonEnvelope>`
+
+      console.log(`[AmazonAdapter] Generated Payment Adjustment XML Feed:\n${feedXml}`)
+      console.log(`[AmazonAdapter] Refund simulated successfully for Amazon Order ${marketplaceOrderId}`)
+      return true
+    } catch (error) {
+      console.error(`[AmazonAdapter] Error during simulated refund:`, error)
+      return false
+    }
+  }
 }

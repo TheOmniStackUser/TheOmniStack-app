@@ -24,4 +24,13 @@ export class EbayAdapter implements MarketplaceAdapter {
     console.log(`[EbayAdapter] Fetching open orders for company ${companyId}...`)
     return []
   }
+
+  async refundOrder(
+    marketplaceOrderId: string,
+    refundItems: { sku: string; quantity: number }[],
+    rawOrderPayload?: unknown
+  ): Promise<boolean> {
+    console.log(`[EbayAdapter] Simulating refund for order ${marketplaceOrderId}:`, refundItems)
+    return true
+  }
 }

@@ -2,9 +2,11 @@
 
 import { db } from '@/db/client'
 import { returnsLog, returnedItems } from '@/db/schema/returns'
+import { orders } from '@/db/schema/orders'
 import { eq, and, inArray } from 'drizzle-orm'
 import { requireAuth } from '@/lib/session'
 import { revalidatePath } from 'next/cache'
+import { executeRefund } from '@/lib/refund-service'
 
 async function checkAuth() {
   const session = await requireAuth()
@@ -145,4 +147,34 @@ export async function updateReturnAction(
 
   revalidatePath('/returns')
   return { success: true }
+}
+
+export async function refundReturnAction(
+  returnLogId: string,
+  itemsToRefund: { sku: string; quantity: number }[]
+) {
+  const session = await checkAuth()
+  try {
+    const result = await executeRefund({
+      companyId: session.activeCompanyId,
+      returnLogId,
+      itemsToRefund,
+      userId: session.userId
+    })
+    revalidatePath('/returns')
+    return result
+  } catch (err: any) {
+    console.error('[Action] refundReturnAction failed:', err)
+    throw new Error(err.message || 'Fehler bei der Rückerstattung.')
+  }
+}
+
+export async function getOrderDetailsAction(orderId: string) {
+  const session = await checkAuth()
+  const order = await db.query.orders.findFirst({
+    where: and(eq(orders.id, orderId), eq(orders.companyId, session.activeCompanyId)),
+    with: { items: true }
+  })
+  if (!order) throw new Error('Bestellung nicht gefunden.')
+  return order
 }

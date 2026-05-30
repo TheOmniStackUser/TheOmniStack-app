@@ -78,4 +78,13 @@ export interface MarketplaceAdapter {
   getDeliveryNote?(
     marketplaceOrderId: string
   ): Promise<Buffer>
+
+  /**
+   * Refunds an order (full or partial) on the marketplace.
+   */
+  refundOrder?(
+    marketplaceOrderId: string,
+    refundItems: { sku: string; quantity: number }[],
+    rawOrderPayload?: unknown
+  ): Promise<boolean>
 }

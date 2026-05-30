@@ -269,4 +269,13 @@ export class AboutYouAdapter implements MarketplaceAdapter {
     const arrayBuffer = await response.arrayBuffer()
     return Buffer.from(arrayBuffer)
   }
+
+  async refundOrder(
+    marketplaceOrderId: string,
+    refundItems: { sku: string; quantity: number }[],
+    rawOrderPayload?: unknown
+  ): Promise<boolean> {
+    console.log(`[AboutYouAdapter] Simulating refund for order ${marketplaceOrderId}:`, refundItems)
+    return true
+  }
 }

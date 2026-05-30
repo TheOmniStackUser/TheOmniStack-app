@@ -329,4 +329,96 @@ export class OttoAdapter implements MarketplaceAdapter {
       throw error
     }
   }
+
+  async refundOrder(
+    marketplaceOrderId: string,
+    refundItems: { sku: string; quantity: number }[],
+    rawOrderPayload?: unknown
+  ): Promise<boolean> {
+    console.log(`[OttoAdapter] Refunding order ${marketplaceOrderId}...`)
+    try {
+      const accessToken = await this.getAccessToken()
+
+      // 1. Fetch order details from Otto v4 to get positionItems
+      let ottoOrder = (rawOrderPayload as any)
+      if (!ottoOrder || !ottoOrder.positionItems) {
+        console.log(`[OttoAdapter] Fetching order details from Otto v4 API...`)
+        const response = await fetch(`${this.baseUrl}/v4/orders/${marketplaceOrderId}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json'
+          }
+        })
+        if (!response.ok) {
+          const errText = await response.text()
+          throw new Error(`Failed to fetch order from Otto: ${response.status} - ${errText}`)
+        }
+        ottoOrder = await response.json()
+      }
+
+      if (!ottoOrder || !ottoOrder.positionItems) {
+        throw new Error(`Keine positionItems für Bestellung ${marketplaceOrderId} gefunden.`)
+      }
+
+      // 2. Map returned SKUs to positionItemIds in the order
+      const returnsPayload: any[] = []
+      // Deep clone refundItems so we can mutate quantities safely
+      const remainingRefundItems = refundItems.map(i => ({ ...i }))
+
+      for (const item of ottoOrder.positionItems) {
+        if (!item.positionItemId) continue
+        const itemSku = item.product?.sku || item.product?.articleNumber
+        
+        // Find if this item sku is requested for refund
+        const refundIndex = remainingRefundItems.findIndex(ri => ri.sku === itemSku)
+        if (refundIndex !== -1) {
+          returnsPayload.push({
+            salesOrderId: marketplaceOrderId,
+            positionItemId: item.positionItemId,
+            returnDate: new Date().toISOString().split('.')[0] + 'Z',
+            trackingKey: {
+              carrier: 'DHL',
+              trackingNumber: 'RET-' + marketplaceOrderId
+            }
+          })
+
+          // Decrement the quantity needed to refund
+          remainingRefundItems[refundIndex].quantity--
+          if (remainingRefundItems[refundIndex].quantity <= 0) {
+            remainingRefundItems.splice(refundIndex, 1)
+          }
+        }
+      }
+
+      if (returnsPayload.length === 0) {
+        console.warn(`[OttoAdapter] No matching positionItems found for refunded SKUs.`)
+        return false
+      }
+
+      // 3. Post returns to Otto returns endpoint
+      console.log(`[OttoAdapter] Sending return confirmation to Otto:`, JSON.stringify(returnsPayload))
+      const response = await fetch(`${this.baseUrl}/v1/returns`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(returnsPayload)
+      })
+
+      if (!response.ok) {
+        const errText = await response.text()
+        console.error(`[OttoAdapter] Refund failed: ${response.status} - ${errText}`)
+        throw new Error(`Otto API returns error: ${errText}`)
+      }
+
+      console.log(`[OttoAdapter] Refund successfully confirmed for order ${marketplaceOrderId}`)
+      return true
+    } catch (error) {
+      console.error(`[OttoAdapter] Error refunding order:`, error)
+      return false
+    }
+  }
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/db/client'
 import { companies, returnsLog, returnedItems, orders } from '@/db/schema'
+import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { eq, and, or } from 'drizzle-orm'
 
 export const dynamic = 'force-dynamic'
@@ -185,6 +186,49 @@ export async function POST(req: Request) {
           notes: item.notes || null,
         }))
       )
+    }
+
+    // 6. Automated Refund Trigger (OmniScan Automation)
+    if (matchedOrder && Array.isArray(returned_items) && returned_items.length > 0) {
+      try {
+        const activeIntegrations = await db
+          .select()
+          .from(marketplaceIntegrations)
+          .where(
+            and(
+              eq(marketplaceIntegrations.companyId, company.id),
+              eq(marketplaceIntegrations.isActive, true)
+            )
+          )
+
+        const integration = activeIntegrations.find(i => {
+          if (i.type === matchedOrder.marketplace) return true
+          if (i.type === 'mirakl_custom') {
+            const customName = (i.metadata as any)?.customName || ''
+            return customName.toLowerCase() === matchedOrder.marketplace.toLowerCase()
+          }
+          return false
+        })
+
+        const autoRefund = !!(integration?.metadata as any)?.autoRefund
+
+        if (autoRefund) {
+          console.log(`[API V1 Returns] Auto-refund enabled for ${matchedOrder.marketplace}. Triggering executeRefund...`)
+          const { executeRefund } = await import('@/lib/refund-service')
+          const itemsToRefund = returned_items.map((item: any) => ({
+            sku: item.sku_or_product_name || 'Unknown',
+            quantity: item.quantity || 1
+          }))
+
+          await executeRefund({
+            companyId: company.id,
+            returnLogId: logEntry.id,
+            itemsToRefund
+          })
+        }
+      } catch (refundErr) {
+        console.error(`[API V1 Returns] Auto-refund execution failed:`, refundErr)
+      }
     }
 
     console.log(`[API V1 Returns] Logged return for order ${order_info.order_number} (Company: ${company.id})`)

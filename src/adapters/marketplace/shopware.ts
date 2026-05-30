@@ -294,4 +294,13 @@ export class ShopwareAdapter implements MarketplaceAdapter {
 
     console.log(`[ShopwareAdapter] Shipment confirmed for order ${marketplaceOrderId} (delivery: ${deliveryId})`)
   }
+
+  async refundOrder(
+    marketplaceOrderId: string,
+    refundItems: { sku: string; quantity: number }[],
+    rawOrderPayload?: unknown
+  ): Promise<boolean> {
+    console.log(`[ShopwareAdapter] Simulating refund for order ${marketplaceOrderId}:`, refundItems)
+    return true
+  }
 }

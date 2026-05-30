@@ -7,7 +7,9 @@ import {
   deleteReturnAction,
   bulkDeleteReturnsAction,
   updateReturnStatusAction,
-  updateReturnAction
+  updateReturnAction,
+  refundReturnAction,
+  getOrderDetailsAction
 } from '@/app/actions/returns'
 
 interface ScannedItem {
@@ -73,6 +75,94 @@ export function ReturnsList({
   const [editItems, setEditItems] = useState<ScannedItem[]>([])
   const [editScannedAt, setEditScannedAt] = useState('')
   const [editReceivedAt, setEditReceivedAt] = useState('')
+
+  // Refund Modal State
+  const [refundingLog, setRefundingLog] = useState<ReturnLog | null>(null)
+  const [refundItemsInput, setRefundItemsInput] = useState<{ sku: string; title: string; orderQty: number; returnedQty: number; refundQty: number }[]>([])
+  const [isRefundingPending, startRefundTransition] = useTransition()
+
+  const handleOpenRefund = async (log: ReturnLog) => {
+    if (!log.orderId) return
+    startRefundTransition(async () => {
+      try {
+        const orderDetails = await getOrderDetailsAction(log.orderId)
+        
+        // Match order items with returned items
+        const inputs = orderDetails.items.map((orderItem: any) => {
+          const matchingScannedItem = log.items.find(
+            item => item.skuOrProductName.toLowerCase() === orderItem.sku?.toLowerCase()
+          )
+          const returnedQty = matchingScannedItem ? matchingScannedItem.quantity : 0
+          
+          return {
+            sku: orderItem.sku || 'N/A',
+            title: orderItem.title,
+            orderQty: parseInt(orderItem.quantity) || 1,
+            returnedQty,
+            refundQty: returnedQty // default to the returned quantity
+          }
+        })
+        
+        setRefundItemsInput(inputs)
+        setRefundingLog(log)
+      } catch (err: any) {
+        alert(err.message || 'Fehler beim Laden der Bestelldaten.')
+      }
+    })
+  }
+
+  const handleRefundQtyChange = (index: number, val: number) => {
+    const next = [...refundItemsInput]
+    next[index].refundQty = Math.max(0, Math.min(next[index].orderQty, val))
+    setRefundItemsInput(next)
+  }
+
+  const handleRefundAllToggle = (refundAll: boolean) => {
+    const next = refundItemsInput.map(item => ({
+      ...item,
+      refundQty: refundAll ? item.orderQty : item.returnedQty
+    }))
+    setRefundItemsInput(next)
+  }
+
+  const handleExecuteRefund = async () => {
+    if (!refundingLog) return
+    
+    const payload = refundItemsInput
+      .filter(item => item.refundQty > 0)
+      .map(item => ({
+        sku: item.sku,
+        quantity: item.refundQty
+      }))
+
+    if (payload.length === 0) {
+      alert('Bitte wähle mindestens einen Artikel mit einer Menge größer als 0 aus.')
+      return
+    }
+
+    startRefundTransition(async () => {
+      try {
+        const res = await refundReturnAction(refundingLog.id, payload)
+        if (res.success) {
+          alert(`Erstattung erfolgreich veranlasst (Gutschrift: ${res.creditNoteNumber}).`)
+          // Update status in local logs state
+          setLogs(prev => prev.map(l => {
+            if (l.id === refundingLog.id) {
+              return {
+                ...l,
+                status: 'bearbeitet',
+                notes: `Rückerstattung veranlasst: Gutschrift ${res.creditNoteNumber} erstellt.`
+              }
+            }
+            return l
+          }))
+          setRefundingLog(null)
+        }
+      } catch (err: any) {
+        alert(err.message || 'Fehler bei der Rückerstattung.')
+      }
+    })
+  }
 
   // Search & Filter
   const filteredLogs = logs.filter((log) => {
@@ -593,6 +683,24 @@ export function ReturnsList({
                   {/* Action Buttons */}
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-1.5">
+                      {/* Erstatten Button */}
+                      {log.orderId && (
+                        <button
+                          onClick={() => handleOpenRefund(log)}
+                          disabled={isPending || isRefundingPending || log.status === 'bearbeitet'}
+                          className={`p-2 rounded-lg transition-all ${
+                            log.status === 'bearbeitet'
+                              ? 'text-slate-300 cursor-not-allowed'
+                              : 'text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50'
+                          }`}
+                          title={log.status === 'bearbeitet' ? 'Bereits erstattet' : 'Erstattung veranlassen'}
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </button>
+                      )}
+
                       {/* Edit Button */}
                       <button
                         onClick={() => handleOpenEdit(log)}
@@ -925,6 +1033,119 @@ export function ReturnsList({
                 className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white text-sm font-bold shadow-sm transition-all flex items-center gap-1.5"
               >
                 Speichern
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Refund Modal Dialog */}
+      {refundingLog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white w-full max-w-3xl rounded-2xl border border-slate-200 shadow-2xl overflow-hidden animate-scale-in">
+            {/* Header */}
+            <div className="p-6 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Rückerstattung veranlassen</h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Veranlasse eine Erstattung für Bestellung <span className="font-bold">{refundingLog.orderNumber}</span>. Es wird eine entsprechende Gutschrift (Credit Note) generiert.
+                </p>
+              </div>
+              <button
+                onClick={() => setRefundingLog(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Content Form */}
+            <div className="p-6 space-y-6 max-h-[60vh] overflow-y-auto">
+              {/* Quick Actions */}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleRefundAllToggle(false)}
+                  className="px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition-all"
+                >
+                  Gelesene Retouren-Mengen laden
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleRefundAllToggle(true)}
+                  className="px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-bold transition-all"
+                >
+                  Alles erstatten (Komplett-Storno)
+                </button>
+              </div>
+
+              {/* Items List */}
+              <div className="space-y-4">
+                <div className="grid grid-cols-12 gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider pb-2 border-b border-slate-100">
+                  <div className="col-span-5">Artikel / SKU</div>
+                  <div className="col-span-2 text-center">Bestellt</div>
+                  <div className="col-span-2 text-center">Eingegangen</div>
+                  <div className="col-span-3 text-right">Menge Erstatten</div>
+                </div>
+
+                <div className="space-y-3">
+                  {refundItemsInput.map((item, idx) => (
+                    <div key={idx} className="grid grid-cols-12 gap-2 items-center text-xs p-3 bg-slate-50 rounded-xl border border-slate-150">
+                      <div className="col-span-5">
+                        <div className="font-bold text-slate-900 truncate" title={item.title}>
+                          {item.title}
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate" title={item.sku}>
+                          {item.sku}
+                        </div>
+                      </div>
+
+                      <div className="col-span-2 text-center text-slate-600 font-bold">
+                        {item.orderQty}x
+                      </div>
+
+                      <div className="col-span-2 text-center">
+                        <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
+                          item.returnedQty > 0
+                            ? 'bg-indigo-50 text-indigo-700'
+                            : 'bg-slate-200/50 text-slate-400'
+                        }`}>
+                          {item.returnedQty}x
+                        </span>
+                      </div>
+
+                      <div className="col-span-3 flex justify-end">
+                        <input
+                          type="number"
+                          min="0"
+                          max={item.orderQty}
+                          value={item.refundQty}
+                          onChange={(e) => handleRefundQtyChange(idx, parseInt(e.target.value) || 0)}
+                          className="w-16 px-2.5 py-1 text-center rounded-lg border border-slate-250 bg-white font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="p-6 border-t border-slate-100 bg-slate-50/50 flex gap-3 justify-end">
+              <button
+                onClick={() => setRefundingLog(null)}
+                className="px-5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 text-sm font-semibold transition-all"
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={handleExecuteRefund}
+                disabled={isRefundingPending}
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white text-sm font-bold shadow-sm transition-all flex items-center gap-1.5 shadow-md shadow-emerald-100"
+              >
+                {isRefundingPending ? 'Verarbeite...' : 'Erstattung ausführen'}
               </button>
             </div>
           </div>

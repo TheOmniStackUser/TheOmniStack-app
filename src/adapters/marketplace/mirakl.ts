@@ -678,4 +678,121 @@ export class MiraklAdapter implements MarketplaceAdapter {
       throw error
     }
   }
+
+  async refundOrder(
+    marketplaceOrderId: string,
+    refundItems: { sku: string; quantity: number }[],
+    rawOrderPayload?: unknown
+  ): Promise<boolean> {
+    console.log(`[MiraklAdapter:${this.marketplace}] Refunding order ${marketplaceOrderId}...`)
+    try {
+      const token = await this.getAccessToken()
+      const headers: Record<string, string> = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      } else {
+        const apiKey = this.config.clientSecret === '' || !this.config.clientSecret 
+          ? this.config.clientId 
+          : this.config.apiKey
+        
+        if (apiKey) {
+          headers['Authorization'] = apiKey
+          headers['X-Mirakl-Api-Key'] = apiKey
+        }
+      }
+
+      // 1. Fetch order details from Mirakl to get order lines and prices
+      let miraklOrder = (rawOrderPayload as any)
+      if (!miraklOrder || !miraklOrder.order_lines) {
+        const baseUrl = this.config.baseUrl.replace(/\/$/, '')
+        let orderUrl = `${baseUrl}/api/orders/${marketplaceOrderId}`
+        if (this.config.shopId) {
+          orderUrl += `?shop_id=${this.config.shopId}`
+        }
+
+        console.log(`[MiraklAdapter:${this.marketplace}] Fetching order details via GET ${orderUrl}...`)
+        const response = await fetch(orderUrl, {
+          method: 'GET',
+          headers
+        })
+
+        if (!response.ok) {
+          const errText = await response.text()
+          throw new Error(`Failed to fetch order details from Mirakl: ${response.status} - ${errText}`)
+        }
+
+        const data = await response.json()
+        const orders = data.orders || []
+        miraklOrder = orders[0]
+      }
+
+      if (!miraklOrder || !miraklOrder.order_lines) {
+        throw new Error(`No Mirakl order lines found for order ${marketplaceOrderId}`)
+      }
+
+      // 2. Map SKUs to order lines and build refund items
+      const refunds: any[] = []
+      const remainingRefundItems = refundItems.map(i => ({ ...i }))
+
+      for (const line of miraklOrder.order_lines) {
+        const lineSku = line.offer_sku || line.product_sku
+        const lineId = line.order_line_id
+
+        const refundIndex = remainingRefundItems.findIndex(ri => ri.sku?.toLowerCase() === lineSku?.toLowerCase())
+        if (refundIndex !== -1) {
+          const qtyToRefund = Math.min(line.quantity, remainingRefundItems[refundIndex].quantity)
+          
+          // Get the base unit price
+          const priceUnit = line.price_unit || (line.price / line.quantity) || 0
+
+          refunds.push({
+            order_line_id: lineId,
+            amount: parseFloat((priceUnit * qtyToRefund).toFixed(2)),
+            quantity: qtyToRefund,
+            refund_reason_code: '15' // Default return code
+          })
+
+          remainingRefundItems[refundIndex].quantity -= qtyToRefund
+          if (remainingRefundItems[refundIndex].quantity <= 0) {
+            remainingRefundItems.splice(refundIndex, 1)
+          }
+        }
+      }
+
+      if (refunds.length === 0) {
+        console.warn(`[MiraklAdapter:${this.marketplace}] No matching active order lines found for refund.`)
+        return false
+      }
+
+      // 3. Put Refund
+      const baseUrl = this.config.baseUrl.replace(/\/$/, '')
+      let refundUrl = `${baseUrl}/api/orders/${marketplaceOrderId}/refund`
+      if (this.config.shopId) {
+        refundUrl += `?shop_id=${this.config.shopId}`
+      }
+
+      console.log(`[MiraklAdapter:${this.marketplace}] Sending refund to Mirakl via PUT ${refundUrl}...`)
+      const refundResponse = await fetch(refundUrl, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ refunds })
+      })
+
+      if (!refundResponse.ok) {
+        const errText = await refundResponse.text()
+        console.error(`[MiraklAdapter:${this.marketplace}] Refund failed: ${refundResponse.status} - ${errText}`)
+        throw new Error(`Mirakl Refund API Error: ${errText}`)
+      }
+
+      console.log(`[MiraklAdapter:${this.marketplace}] Refund processed successfully for order ${marketplaceOrderId}`)
+      return true
+    } catch (error) {
+      console.error(`[MiraklAdapter:${this.marketplace}] Error refunding order:`, error)
+      return false
+    }
+  }
 }

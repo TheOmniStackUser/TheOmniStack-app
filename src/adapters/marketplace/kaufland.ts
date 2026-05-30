@@ -311,4 +311,81 @@ export class KauflandAdapter implements MarketplaceAdapter {
       return false
     }
   }
+
+  async refundOrder(
+    marketplaceOrderId: string,
+    refundItems: { sku: string; quantity: number }[],
+    rawOrderPayload?: unknown
+  ): Promise<boolean> {
+    console.log(`[KauflandAdapter] Refunding order ${marketplaceOrderId}...`)
+    try {
+      // 1. Fetch order details to retrieve order units
+      let orderUnits: any[] = []
+      if (Array.isArray(rawOrderPayload)) {
+        orderUnits = rawOrderPayload
+      } else if (rawOrderPayload && typeof rawOrderPayload === 'object' && 'order_units' in rawOrderPayload) {
+        orderUnits = (rawOrderPayload as any).order_units || []
+      }
+
+      if (orderUnits.length === 0) {
+        console.log(`[KauflandAdapter] Order units not in payload. Fetching from /orders/${marketplaceOrderId}...`)
+        const orderDetails = await this.makeRequest('GET', `/orders/${marketplaceOrderId}`, '', {
+          embedded: 'order_units'
+        })
+        orderUnits = orderDetails.data?.order_units || []
+      }
+
+      if (orderUnits.length === 0) {
+        throw new Error(`Keine order units für Bestellung ${marketplaceOrderId} gefunden.`)
+      }
+
+      // 2. Map SKUs to matching order units that can be refunded
+      const remainingRefundItems = refundItems.map(i => ({ ...i }))
+      const refundPromises: Promise<any>[] = []
+
+      for (const unit of orderUnits) {
+        const idOrderUnit = unit.id_order_unit || unit.order_unit_id
+        if (!idOrderUnit) continue
+
+        // Check if this unit is already refunded/cancelled
+        if (unit.status === 'cancelled' || unit.status === 'returned') {
+          continue
+        }
+
+        const sku = unit.id_offer || unit.ean
+        const refundIndex = remainingRefundItems.findIndex(ri => ri.sku === sku)
+        if (refundIndex !== -1) {
+          // Trigger refund for this unit
+          const refundAmount = unit.price || 0 // price in cents
+          const body = JSON.stringify({
+            amount: refundAmount,
+            reason: 'customer_return'
+          })
+
+          console.log(`[KauflandAdapter] Refunding order unit ${idOrderUnit} (sku: ${sku}, amount: ${refundAmount} cents)...`)
+          refundPromises.push(
+            this.makeRequest('POST', `/order-units/${idOrderUnit}/refund`, body)
+          )
+
+          // Decrement remaining quantity
+          remainingRefundItems[refundIndex].quantity--
+          if (remainingRefundItems[refundIndex].quantity <= 0) {
+            remainingRefundItems.splice(refundIndex, 1)
+          }
+        }
+      }
+
+      if (refundPromises.length === 0) {
+        console.warn(`[KauflandAdapter] No matching active order units found for refund items.`)
+        return false
+      }
+
+      await Promise.all(refundPromises)
+      console.log(`[KauflandAdapter] Refund processed successfully for order ${marketplaceOrderId}`)
+      return true
+    } catch (error) {
+      console.error(`[KauflandAdapter] Error refunding order:`, error)
+      return false
+    }
+  }
 }

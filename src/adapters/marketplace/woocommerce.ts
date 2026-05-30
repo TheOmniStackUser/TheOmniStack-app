@@ -209,4 +209,89 @@ export class WooCommerceAdapter implements MarketplaceAdapter {
 
     console.log(`[WooCommerceAdapter] Shipment confirmed for order ${marketplaceOrderId}`)
   }
+
+  async refundOrder(
+    marketplaceOrderId: string,
+    refundItems: { sku: string; quantity: number }[],
+    rawOrderPayload?: unknown
+  ): Promise<boolean> {
+    console.log(`[WooCommerceAdapter] Refunding order ${marketplaceOrderId}...`)
+    try {
+      // 1. Fetch order details if not in payload to map line item IDs
+      let rawOrder = (rawOrderPayload as any)
+      if (!rawOrder || !rawOrder.line_items) {
+        console.log(`[WooCommerceAdapter] Fetching order details from WooCommerce API...`)
+        const response = await fetch(`${this.baseUrl}/wp-json/wc/v3/orders/${marketplaceOrderId}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': this.authHeader,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          }
+        })
+        if (!response.ok) {
+          const errText = await response.text()
+          throw new Error(`Failed to fetch WooCommerce order: ${response.status} ${errText}`)
+        }
+        rawOrder = await response.json()
+      }
+
+      if (!rawOrder || !rawOrder.line_items) {
+        throw new Error(`No WooCommerce line items found for order ${marketplaceOrderId}`)
+      }
+
+      // 2. Map SKUs to Woo line item IDs and calculate total refund amount
+      let refundAmount = 0
+      const refundLineItems = refundItems.map(item => {
+        const matchingLineItem = rawOrder.line_items.find((li: any) => li.sku === item.sku || li.product_id?.toString() === item.sku)
+        if (!matchingLineItem) {
+          console.warn(`[WooCommerceAdapter] No matching line item found on WooCommerce for SKU ${item.sku}`)
+          return null
+        }
+        const unitPrice = parseFloat(matchingLineItem.price || matchingLineItem.total || '0') / Math.max(matchingLineItem.quantity, 1)
+        refundAmount += unitPrice * item.quantity
+
+        return {
+          id: matchingLineItem.id,
+          quantity: item.quantity,
+          refund_total: (unitPrice * item.quantity).toFixed(2)
+        }
+      }).filter(Boolean)
+
+      if (refundLineItems.length === 0) {
+        console.warn(`[WooCommerceAdapter] No valid line items to refund.`)
+        return false
+      }
+
+      // 3. Post refund to WooCommerce API
+      const refundPayload = {
+        amount: refundAmount.toFixed(2),
+        reason: 'OmniScan Return Refund',
+        line_items: refundLineItems
+      }
+
+      console.log(`[WooCommerceAdapter] Posting refund to WooCommerce API...`)
+      const response = await fetch(`${this.baseUrl}/wp-json/wc/v3/orders/${marketplaceOrderId}/refunds`, {
+        method: 'POST',
+        headers: {
+          'Authorization': this.authHeader,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify(refundPayload)
+      })
+
+      if (!response.ok) {
+        const errText = await response.text()
+        console.error(`[WooCommerceAdapter] Refund request failed: ${response.status} - ${errText}`)
+        throw new Error(`WooCommerce Refund API Error: ${errText}`)
+      }
+
+      console.log(`[WooCommerceAdapter] Refund processed successfully for order ${marketplaceOrderId}`)
+      return true
+    } catch (error) {
+      console.error(`[WooCommerceAdapter] Error during WooCommerce refund:`, error)
+      return false
+    }
+  }
 }

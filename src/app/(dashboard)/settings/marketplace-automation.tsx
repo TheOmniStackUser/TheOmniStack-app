@@ -33,13 +33,13 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
       return 0
     })
 
-  const handleToggle = async (id: string, field: 'autoInvoice' | 'uploadInvoice' | 'downloadInvoice' | 'autoCreditNote', currentVal: boolean) => {
+  const handleToggle = async (id: string, field: 'autoInvoice' | 'uploadInvoice' | 'downloadInvoice' | 'autoCreditNote' | 'autoRefund', currentVal: boolean) => {
     const newVal = !currentVal
 
     // Optimistically update local state immediately
     setLocalIntegrations(prev => prev.map(int => {
       if (int.id === id) {
-        if (field === 'downloadInvoice' || field === 'autoCreditNote') {
+        if (field === 'downloadInvoice' || field === 'autoCreditNote' || field === 'autoRefund') {
           const currentMetadata = (int.metadata as Record<string, unknown>) || {}
           return {
             ...int,
@@ -72,14 +72,15 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
       field === 'autoInvoice' ? newVal : integration.autoInvoice,
       field === 'uploadInvoice' ? newVal : integration.uploadInvoice,
       field === 'downloadInvoice' ? newVal : !!(integration.metadata as Record<string, unknown>)?.downloadInvoice,
-      field === 'autoCreditNote' ? newVal : !!(integration.metadata as Record<string, unknown>)?.autoCreditNote
+      field === 'autoCreditNote' ? newVal : !!(integration.metadata as Record<string, unknown>)?.autoCreditNote,
+      field === 'autoRefund' ? newVal : !!(integration.metadata as Record<string, unknown>)?.autoRefund
     )
 
     if (!result.success) {
       // Revert optimistic state on failure
       setLocalIntegrations(prev => prev.map(int => {
         if (int.id === id) {
-          if (field === 'downloadInvoice' || field === 'autoCreditNote') {
+          if (field === 'downloadInvoice' || field === 'autoCreditNote' || field === 'autoRefund') {
             const currentMetadata = (int.metadata as Record<string, unknown>) || {}
             return {
               ...int,
@@ -251,6 +252,19 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
                           {loadingId === `${int.id}-autoCreditNote` ? '...' : 'Auto-Gutschrift'}
                         </button>
                       )}
+
+                      <button
+                        onClick={() => handleToggle(int.id, 'autoRefund', !!(int.metadata as any)?.autoRefund)}
+                        disabled={loadingId === `${int.id}-autoRefund`}
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                          (int.metadata as any)?.autoRefund
+                            ? 'bg-green-600 border-green-600 text-white shadow-md shadow-green-200' 
+                            : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
+                        }`}
+                      >
+                        <RefreshCw size={14} />
+                        {loadingId === `${int.id}-autoRefund` ? '...' : 'Auto-Erstattung'}
+                      </button>
                     </div>
                   </div>
                 </div>
