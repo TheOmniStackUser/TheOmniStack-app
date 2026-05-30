@@ -82,10 +82,11 @@ export function ReturnsList({
   const [isRefundingPending, startRefundTransition] = useTransition()
 
   const handleOpenRefund = async (log: ReturnLog) => {
-    if (!log.orderId) return
+    const orderId = log.orderId
+    if (!orderId) return
     startRefundTransition(async () => {
       try {
-        const orderDetails = await getOrderDetailsAction(log.orderId)
+        const orderDetails = await getOrderDetailsAction(orderId)
         
         // Match order items with returned items
         const inputs = orderDetails.items.map((orderItem: any) => {
