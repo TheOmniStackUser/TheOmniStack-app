@@ -365,12 +365,21 @@ export async function executeRefund({
     if (integration.uploadInvoice && adapter && adapter.uploadInvoice) {
       try {
         console.log(`[RefundService] Uploading credit note ${creditNoteNumber} to marketplace...`)
-        await adapter.uploadInvoice(
-          order.marketplaceOrderId,
-          pdfBuffer,
-          `${creditNoteNumber}.pdf`,
-          true // isCreditNote = true
-        )
+        const isMirakl = order.marketplace.startsWith('mirakl_') || integration.type === 'mirakl_custom'
+        if (isMirakl) {
+          await (adapter as any).uploadInvoice(
+            order.marketplaceOrderId,
+            pdfBuffer,
+            `${creditNoteNumber}.pdf`,
+            true // isCreditNote = true
+          )
+        } else {
+          await adapter.uploadInvoice(
+            order.marketplaceOrderId,
+            pdfBuffer,
+            `${creditNoteNumber}.pdf`
+          )
+        }
         console.log(`[RefundService] Credit note uploaded successfully to marketplace.`)
       } catch (err) {
         console.error(`[RefundService] Failed to upload credit note PDF:`, err)
