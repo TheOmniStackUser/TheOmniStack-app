@@ -41,6 +41,10 @@ export const dunningRules = pgTable('dunning_rules', {
   bodyTemplate: text('body_template').notNull().default(''),
   // Optional flat fee (e.g. 5.00 EUR). Informational only – mentioned in email body, not booked.
   feeAmount: numeric('fee_amount', { precision: 8, scale: 2 }),
+  // Whether to respect exclusions (true = check exclusions list, false = ignore exclusions and send)
+  respectExclusions: boolean('respect_exclusions').notNull().default(true),
+  // Custom sender email address for this dunning stage
+  senderEmail: text('sender_email'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })

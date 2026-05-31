@@ -19,6 +19,8 @@ export interface DunningRuleInput {
   subjectTemplate: string
   bodyTemplate: string
   feeAmount?: string | null
+  respectExclusions: boolean
+  senderEmail?: string | null
 }
 
 // ─── Default templates ────────────────────────────────────────────────────────
@@ -34,6 +36,8 @@ Sollten Sie die Zahlung bereits veranlasst haben, betrachten Sie dieses Schreibe
 
 Bitte überweisen Sie den Betrag auf das unten angegebene Konto.`,
     feeAmount: null,
+    respectExclusions: true,
+    senderEmail: null,
   },
   {
     stage: 'first',
@@ -46,6 +50,8 @@ Wir bitten Sie daher, den ausstehenden Betrag umgehend zu begleichen.
 
 Sollte Ihre Zahlung unsere Mahnung gekreuzt haben, betrachten Sie dieses Schreiben bitte als gegenstandslos.`,
     feeAmount: null,
+    respectExclusions: true,
+    senderEmail: null,
   },
   {
     stage: 'second',
@@ -58,6 +64,8 @@ Wir fordern Sie hiermit letztmalig auf, den ausstehenden Betrag innerhalb von 7 
 
 Sollte bis zum Ablauf dieser Frist keine Zahlung eingehen, sehen wir uns gezwungen, weitere Schritte einzuleiten.`,
     feeAmount: null,
+    respectExclusions: true,
+    senderEmail: null,
   },
 ]
 
@@ -84,6 +92,8 @@ export async function getDunningRulesAction() {
         subjectTemplate: existing.subjectTemplate,
         bodyTemplate: existing.bodyTemplate,
         feeAmount: existing.feeAmount ?? null,
+        respectExclusions: existing.respectExclusions ?? true,
+        senderEmail: existing.senderEmail ?? null,
       }
     }
     const def = DEFAULT_RULES.find((d) => d.stage === stage)!
@@ -111,6 +121,8 @@ export async function saveDunningRulesAction(rules: DunningRuleInput[]) {
       subjectTemplate: rule.subjectTemplate,
       bodyTemplate: rule.bodyTemplate,
       feeAmount: rule.feeAmount ?? null,
+      respectExclusions: rule.respectExclusions ?? true,
+      senderEmail: rule.senderEmail ?? null,
       updatedAt: new Date(),
     }
 

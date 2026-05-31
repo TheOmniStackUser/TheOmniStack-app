@@ -83,6 +83,65 @@ Wir fordern Sie hiermit letztmalig auf, den ausstehenden Betrag innerhalb von 7 
 Sollte bis zum Ablauf dieser Frist keine Zahlung eingehen, sehen wir uns gezwungen, rechtliche Schritte einzuleiten oder die Forderung an ein Inkassounternehmen zu übergeben.`,
 }
 
+function formatSalutation(fullName: string | null | undefined): string {
+  if (!fullName) return 'Sehr geehrte Damen und Herren'
+  
+  const trimmed = fullName.trim()
+  if (!trimmed || trimmed.toLowerCase() === 'kunde') {
+    return 'Sehr geehrte Damen und Herren'
+  }
+
+  // Check for company keywords
+  const companyKeywords = [
+    'gmbh', 'ag', 'gbr', 'ohg', 'kg', 'e.k.', 'inc.', 'co.', 'corp', 'ltd', 'ug', 'b.v.', 's.a.r.l.', 'e.v.', 'ev', 'verwaltung', 'abteilung'
+  ]
+  const lowerName = trimmed.toLowerCase()
+  if (companyKeywords.some(keyword => lowerName.includes(keyword))) {
+    return 'Sehr geehrte Damen und Herren'
+  }
+
+  // Detect explicit prefix
+  if (trimmed.startsWith('Herr ') || trimmed.startsWith('Herrn ')) {
+    const nameWithoutPrefix = trimmed.replace(/^(Herrn?\s+)/i, '').trim()
+    const parts = nameWithoutPrefix.split(/\s+/)
+    const lastName = parts[parts.length - 1]
+    return `Sehr geehrter Herr ${lastName}`
+  }
+  if (trimmed.startsWith('Frau ')) {
+    const nameWithoutPrefix = trimmed.replace(/^(Frau\s+)/i, '').trim()
+    const parts = nameWithoutPrefix.split(/\s+/)
+    const lastName = parts[parts.length - 1]
+    return `Sehr geehrte Frau ${lastName}`
+  }
+
+  // If there are multiple words, try to guess if it's a person
+  const parts = trimmed.split(/\s+/)
+  if (parts.length >= 2) {
+    const firstName = parts[0]
+    const lastName = parts[parts.length - 1]
+
+    const lowerFirst = firstName.toLowerCase()
+    
+    // Heuristic for female name ending in German/English
+    const isFemale = /^[a-z]+(a|e|i|y|gitta|gunde|hild|trud|nne|tte|lle|na|ma|ia|ea|ra|sa|da|la|ka)$/i.test(lowerFirst) && 
+                     !/^(andre|rene|sacha|sascha|luca|mika|niklas|jonas|tobias|matthias|elias|thomas|nils|lars|jens|hannes|klaus|hans)$/i.test(lowerFirst)
+    
+    const isMale = /^[a-z]+(o|us|er|as|an|lf|rt|nd|ut|or|ph|ax|rd|ck|m|n)$/i.test(lowerFirst) || 
+                   /^(andre|rene|sacha|sascha|luca|mika|niklas|jonas|tobias|matthias|elias|thomas|nils|lars|jens|hannes|klaus|hans|alexander)$/i.test(lowerFirst)
+
+    if (isFemale) {
+      return `Sehr geehrte Frau ${lastName}`
+    }
+    if (isMale) {
+      return `Sehr geehrter Herr ${lastName}`
+    }
+
+    return `Sehr geehrte(r) Frau/Herr ${lastName}`
+  }
+
+  return `Sehr geehrte(r) Frau/Herr ${trimmed}`
+}
+
 export const DunningEmail = ({
   stage = 'reminder',
   recipientName = 'Kunde',
@@ -99,10 +158,19 @@ export const DunningEmail = ({
   pdfUrl,
 }: DunningEmailProps) => {
   const config = stageConfig[stage]
-  const bodyText = customBody || defaultBodies[stage]({
+  const rawBodyText = customBody || defaultBodies[stage]({
     stage, recipientName, invoiceNumber, invoiceDate, dueDate,
     amount, companyName, companyEmail, iban, bic, feeAmount, pdfUrl,
   })
+
+  // Normalize greeting and closing
+  const hasGreetingInBody = /^\s*sehr\s+geehrte/i.test(rawBodyText)
+  
+  let finalBody = rawBodyText.trim()
+  const hasClosing = /mit\s+freundlichen/i.test(finalBody)
+  if (!hasClosing) {
+    finalBody = finalBody + `\n\nMit freundlichen Grüßen,\n${companyName}`
+  }
 
   return (
     <Html>
@@ -146,18 +214,20 @@ export const DunningEmail = ({
 
             {/* ── Body ── */}
             <Section style={{ padding: '32px 32px 0 32px' }}>
-              <Heading
-                style={{
-                  color: '#111827',
-                  fontSize: '20px',
-                  fontWeight: '700',
-                  margin: '0 0 16px 0',
-                }}
-              >
-                Sehr geehrte(r) {recipientName},
-              </Heading>
+              {!hasGreetingInBody && (
+                <Heading
+                  style={{
+                    color: '#111827',
+                    fontSize: '20px',
+                    fontWeight: '700',
+                    margin: '0 0 16px 0',
+                  }}
+                >
+                  {formatSalutation(recipientName)},
+                </Heading>
+              )}
 
-              {bodyText.split('\n').map((line, i) =>
+              {finalBody.split('\n').map((line, i) =>
                 line.trim() === '' ? (
                   <br key={i} />
                 ) : (

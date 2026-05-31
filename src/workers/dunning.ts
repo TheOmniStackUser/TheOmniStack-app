@@ -137,13 +137,6 @@ async function processDunningForCompany(
         continue
       }
 
-      // 4b. Skip if customer is excluded
-      if (excludedEmails.has(invoice.recipientEmail.toLowerCase())) {
-        console.log(`[Dunning] Invoice ${invoice.invoiceNumber}: ${invoice.recipientEmail} is excluded. Skipping.`)
-        stats.skipped++
-        continue
-      }
-
       // 4c. Find which dunning stages have already been sent for this invoice
       const sentLogs = await db
         .select({ stage: dunningLogs.stage, sentAt: dunningLogs.sentAt })
@@ -173,6 +166,11 @@ async function processDunningForCompany(
 
         // Check if enough days have passed
         if (daysSinceDue >= rule.daysAfterDue) {
+          // If this stage respects exclusions, and the recipient email is excluded, skip this stage
+          if (rule.respectExclusions && excludedEmails.has(invoice.recipientEmail.toLowerCase())) {
+            console.log(`[Dunning] Invoice ${invoice.invoiceNumber}: ${invoice.recipientEmail} is excluded for stage ${stage}. Skipping stage.`)
+            continue
+          }
           stageToSend = stage
           ruleToApply = rule
           break // Only send the next pending stage, not all at once
@@ -255,6 +253,17 @@ async function processDunningForCompany(
         })
       )
 
+      // Fetch the updated PDF buffer for email attachment
+      let pdfBuffer: Buffer | undefined
+      if (currentInvoice.pdfStorageKey) {
+        const { downloadDocument } = await import('@/lib/storage')
+        try {
+          pdfBuffer = await downloadDocument(currentInvoice.pdfStorageKey)
+        } catch (pdfErr) {
+          console.error('[Dunning Worker] Failed to download PDF for email attachment:', pdfErr)
+        }
+      }
+
       // 4f. Send email
       let emailSent = false
       let emailError: string | undefined
@@ -274,9 +283,13 @@ async function processDunningForCompany(
           tls: { rejectUnauthorized: false },
         })
 
-        const from = company.smtpSettings.fromName
-          ? `"${company.smtpSettings.fromName}" <${company.smtpSettings.fromEmail}>`
+        const fromAddr = ruleToApply.senderEmail && ruleToApply.senderEmail.includes('@')
+          ? ruleToApply.senderEmail.trim()
           : company.smtpSettings.fromEmail
+
+        const from = company.smtpSettings.fromName
+          ? `"${company.smtpSettings.fromName}" <${fromAddr}>`
+          : fromAddr
 
         try {
           await transporter.sendMail({
@@ -285,6 +298,12 @@ async function processDunningForCompany(
             replyTo: company.email || undefined,
             subject,
             html,
+            attachments: pdfBuffer ? [
+              {
+                filename: `Rechnung-${currentInvoice.invoiceNumber}.pdf`,
+                content: pdfBuffer,
+              }
+            ] : undefined,
           })
           emailSent = true
         } catch (err) {
@@ -292,12 +311,22 @@ async function processDunningForCompany(
         }
       } else {
         // Use Resend
+        const fromEmail = ruleToApply.senderEmail && ruleToApply.senderEmail.includes('@')
+          ? ruleToApply.senderEmail.trim()
+          : 'TheOmniStack <noreply@theomnistack.de>'
+
         const { data, error } = await resend.emails.send({
-          from: 'TheOmniStack <noreply@theomnistack.de>',
+          from: fromEmail,
           to: [currentInvoice.recipientEmail!],
           replyTo: company.email || undefined,
           subject,
           html,
+          attachments: pdfBuffer ? [
+            {
+              filename: `Rechnung-${currentInvoice.invoiceNumber}.pdf`,
+              content: pdfBuffer,
+            }
+          ] : undefined,
         })
 
         if (error) {

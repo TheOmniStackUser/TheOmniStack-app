@@ -335,7 +335,7 @@ export function DunningSettings() {
                         {/* Fee */}
                         <div>
                           <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Mahngebühr (informativ, optional)
+                            Mahngebühr (optional)
                           </label>
                           <div className="flex items-center gap-2">
                             <input
@@ -349,7 +349,35 @@ export function DunningSettings() {
                             />
                             <span className="text-sm text-gray-500">EUR</span>
                           </div>
-                          <p className="text-xs text-gray-400 mt-1">Wird nur informativ im E-Mail angezeigt – keine buchhalterische Buchung.</p>
+                          <p className="text-xs text-gray-400 mt-1">Wird direkt als neue Position in der Rechnung aufgeführt und das PDF neu generiert.</p>
+                        </div>
+
+                        {/* Respect Exclusions */}
+                        <div>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={rule.respectExclusions}
+                              onChange={(e) => updateRule(rule.stage as DunningStage, { respectExclusions: e.target.checked })}
+                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-sm font-medium text-gray-700">Ausschlüsse für diese Mahnstufe beachten</span>
+                          </label>
+                          <p className="text-xs text-gray-400 mt-1">Wenn aktiviert, werden E-Mail-Adressen auf der Ausschlussliste bei dieser Stufe übersprungen.</p>
+                        </div>
+
+                        {/* Sender Email */}
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Absender E-Mail-Adresse (optional)
+                          </label>
+                          <input
+                            type="email"
+                            value={rule.senderEmail ?? ''}
+                            onChange={(e) => updateRule(rule.stage as DunningStage, { senderEmail: e.target.value || null })}
+                            className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="z.B. mahnung@ihrefirma.de (falls leer wird Standard-Adresse verwendet)"
+                          />
                         </div>
 
                         {/* Subject */}
