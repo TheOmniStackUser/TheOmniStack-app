@@ -95,7 +95,7 @@ export default async function SettingsPage(props: {
 
       <SmtpSettings company={company} />
 
-      <DunningSettings />
+      <DunningSettings smtpSettings={company.smtpSettings ?? undefined} />
 
       <VatSettings initialSettings={initialVatSettings} />
 

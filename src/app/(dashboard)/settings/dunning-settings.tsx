@@ -40,7 +40,11 @@ function formatAmount(val: string | number | null, currency = 'EUR') {
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
-export function DunningSettings() {
+export function DunningSettings({
+  smtpSettings,
+}: {
+  smtpSettings?: { enabled: boolean; fromEmail?: string }
+}) {
   const [activeTab, setActiveTab] = useState<'rules' | 'exclusions' | 'history'>('rules')
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -369,15 +373,25 @@ export function DunningSettings() {
                         {/* Sender Email */}
                         <div>
                           <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Absender E-Mail-Adresse (optional)
+                            Absender
                           </label>
-                          <input
-                            type="email"
-                            value={rule.senderEmail ?? ''}
-                            onChange={(e) => updateRule(rule.stage as DunningStage, { senderEmail: e.target.value || null })}
-                            className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="z.B. mahnung@ihrefirma.de (falls leer wird Standard-Adresse verwendet)"
-                          />
+                          <select
+                            value={rule.senderEmail || 'noreply@theomnistack.de'}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              updateRule(rule.stage as DunningStage, {
+                                senderEmail: val === 'noreply@theomnistack.de' ? null : val,
+                              });
+                            }}
+                            className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="noreply@theomnistack.de">noreply@theomnistack.de (System-Standard)</option>
+                            {smtpSettings?.enabled && smtpSettings.fromEmail && (
+                              <option value={smtpSettings.fromEmail}>
+                                {smtpSettings.fromEmail} (Eigener Mailserver)
+                              </option>
+                            )}
+                          </select>
                         </div>
 
                         {/* Subject */}

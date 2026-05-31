@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { format } from 'date-fns'
@@ -223,10 +224,36 @@ export function InvoiceList({
     return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)))
   }
 
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null)
+
   // Row menu toggle
-  const toggleRowMenu = (invoiceId: string) => {
-    setActiveRowMenuId(prev => prev === invoiceId ? null : invoiceId)
+  const toggleRowMenu = (invoiceId: string, buttonElement: HTMLButtonElement) => {
+    if (activeRowMenuId === invoiceId) {
+      setActiveRowMenuId(null)
+      setMenuPosition(null)
+    } else {
+      const rect = buttonElement.getBoundingClientRect()
+      setMenuPosition({
+        top: rect.bottom + window.scrollY + 6,
+        left: Math.max(8, rect.right - 288 + window.scrollX)
+      })
+      setActiveRowMenuId(invoiceId)
+    }
   }
+
+  // Handle scroll or resize to close/reposition the active menu
+  useEffect(() => {
+    const handleScrollOrResize = () => {
+      setActiveRowMenuId(null)
+      setMenuPosition(null)
+    }
+    window.addEventListener('scroll', handleScrollOrResize, { passive: true })
+    window.addEventListener('resize', handleScrollOrResize)
+    return () => {
+      window.removeEventListener('scroll', handleScrollOrResize)
+      window.removeEventListener('resize', handleScrollOrResize)
+    }
+  }, [])
 
   // Handle click outside to close dropdowns
   useEffect(() => {
@@ -1424,27 +1451,30 @@ export function InvoiceList({
                 </td>
                  {/* ··· action menu – last column, right-aligned */}
                  <td className={`px-4 py-4 text-right ${isOverdue(invoice) ? 'border-r-4 border-r-rose-600' : ''}`} onClick={(e) => e.stopPropagation()}>
-                   <div className="relative inline-block">
-                     <button
-                       onClick={(e) => {
-                         e.stopPropagation();
-                         toggleRowMenu(invoice.id);
-                       }}
-                       className="row-menu-btn text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1.5 rounded-lg transition-colors"
-                       title="Mehr Aktionen"
-                     >
-                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                         <circle cx="12" cy="12" r="1.5" strokeWidth="2" />
-                         <circle cx="6" cy="12" r="1.5" strokeWidth="2" />
-                         <circle cx="18" cy="12" r="1.5" strokeWidth="2" />
-                       </svg>
-                     </button>
+                    <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleRowMenu(invoice.id, e.currentTarget);
+                        }}
+                        className="row-menu-btn text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1.5 rounded-lg transition-colors"
+                        title="Mehr Aktionen"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <circle cx="12" cy="12" r="1.5" strokeWidth="2" />
+                          <circle cx="6" cy="12" r="1.5" strokeWidth="2" />
+                          <circle cx="18" cy="12" r="1.5" strokeWidth="2" />
+                        </svg>
+                      </button>
 
-                     {activeRowMenuId === invoice.id && (
-                       <div
-                         className="row-menu-dropdown absolute right-0 mt-1.5 w-72 bg-white border border-slate-200 rounded-xl shadow-2xl z-[100] flex flex-col py-1 animate-in fade-in slide-in-from-top-2 duration-150 text-sm text-slate-700 font-medium"
-                         onClick={(e) => e.stopPropagation()}
-                       >
+                      {activeRowMenuId === invoice.id && menuPosition && createPortal(
+                        <div
+                          className="row-menu-dropdown absolute w-72 bg-white border border-slate-200 rounded-xl shadow-2xl z-[999] flex flex-col py-1 animate-in fade-in slide-in-from-top-2 duration-150 text-sm text-slate-700 font-medium"
+                          style={{
+                            top: `${menuPosition.top}px`,
+                            left: `${menuPosition.left}px`,
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
                          {/* Section 1: PDF / Update / XML */}
                          {invoice.status !== 'draft' && (
                            <div className="pb-1 border-b border-slate-100 flex flex-col">
@@ -1612,9 +1642,9 @@ export function InvoiceList({
                              </Link>
                            )}
                          </div>
-                       </div>
+                       </div>,
+                       document.body
                      )}
-                   </div>
                  </td>
                </tr>
              )
