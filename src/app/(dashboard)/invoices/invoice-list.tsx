@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -45,6 +45,12 @@ interface Invoice {
   marketplaceOrderId?: string | null
   lastDunningStage?: string | null
   lastDunningSentAt?: Date | string | null
+}
+
+type SearchSuggestion = {
+  label: string
+  value: string
+  detail: string
 }
 
 const formatCountry = (code?: string | null) => {
@@ -174,7 +180,6 @@ export function InvoiceList({
       ? (initialStatus as any)
       : 'all'
   )
-  const [showSearch, setShowSearch] = useState(false)
 
   // Row context menu state
   const [activeRowMenuId, setActiveRowMenuId] = useState<string | null>(null)
@@ -735,6 +740,40 @@ export function InvoiceList({
   const [draftFromDate, setDraftFromDate] = useState('')
   const [draftToDate, setDraftToDate] = useState('')
 
+  const searchSuggestions = useMemo<SearchSuggestion[]>(() => {
+    const q = draftSearch.trim().toLowerCase()
+    if (q.length < 4) return []
+
+    const suggestions: SearchSuggestion[] = []
+    const seen = new Set<string>()
+
+    const addSuggestion = (label: string, value: string | null | undefined, detail: string) => {
+      const cleanValue = (value || '').trim()
+      if (!cleanValue || !cleanValue.toLowerCase().includes(q)) return
+      const key = `${label}:${cleanValue.toLowerCase()}`
+      if (seen.has(key)) return
+      seen.add(key)
+      suggestions.push({ label, value: cleanValue, detail })
+    }
+
+    for (const invoice of initialInvoices) {
+      const documentLabel = invoice.isCreditNote
+        ? 'Gutschrift'
+        : invoice.documentType === 'quote'
+          ? 'Angebot'
+          : invoice.documentType === 'delivery_note'
+            ? 'Lieferschein'
+            : 'Rechnung'
+      addSuggestion('Rechnungsnummer', invoice.invoiceNumber, invoice.recipientName || documentLabel)
+      addSuggestion('Kunde', invoice.recipientName, invoice.invoiceNumber || documentLabel)
+      addSuggestion('Entwurf', invoice.draftName, invoice.recipientName || documentLabel)
+      addSuggestion('Bestellnummer', invoice.marketplaceOrderId, invoice.invoiceNumber || documentLabel)
+      if (suggestions.length >= 6) break
+    }
+
+    return suggestions.slice(0, 6)
+  }, [draftSearch, initialInvoices])
+
   // Pagination
   const [pageSize, setPageSize] = useState(25)
   const [currentPage, setCurrentPage] = useState(1)
@@ -841,6 +880,15 @@ export function InvoiceList({
     setActiveFilters(prev => ({
       ...prev,
       search: ''
+    }))
+    setCurrentPage(1)
+  }
+
+  const handleSelectSearchSuggestion = (value: string) => {
+    setDraftSearch(value)
+    setActiveFilters(prev => ({
+      ...prev,
+      search: value
     }))
     setCurrentPage(1)
   }
@@ -1151,26 +1199,9 @@ export function InvoiceList({
           )
         })}
 
-        {/* Search Toggle Tab */}
-        <button
-          onClick={() => setShowSearch(!showSearch)}
-          className={`flex flex-col items-start justify-center px-6 py-3.5 rounded-xl border transition-all min-w-[115px] shadow-sm select-none font-bold text-sm leading-none ${
-            showSearch
-              ? 'bg-slate-100 border-slate-300 ring-1 ring-slate-300 text-slate-900'
-              : 'bg-white border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-slate-500'
-          }`}
-        >
-          <div className="flex items-center gap-1.5 py-1">
-            <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <span className="text-sm font-black text-slate-700 tracking-wide uppercase">Suchen</span>
-          </div>
-        </button>
       </div>
 
-      {showSearch && (
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-5">
+      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-5">
           {/* Row 1: Search */}
           <div className="flex flex-col sm:flex-row gap-4 items-center">
             <div className="flex-1 w-full">
@@ -1199,6 +1230,27 @@ export function InvoiceList({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
+                )}
+                {searchSuggestions.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
+                    {searchSuggestions.map((suggestion) => (
+                      <button
+                        key={`${suggestion.label}-${suggestion.value}`}
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => handleSelectSearchSuggestion(suggestion.value)}
+                        className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-sm hover:bg-blue-50 transition-colors"
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate font-bold text-slate-900">{suggestion.value}</span>
+                          <span className="block truncate text-xs text-slate-500">{suggestion.detail}</span>
+                        </span>
+                        <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                          {suggestion.label}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
                 )}
               </div>
             </div>
@@ -1299,8 +1351,7 @@ export function InvoiceList({
               </button>
             </div>
           </div>
-        </div>
-      )}
+      </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
         <table className="w-full text-left border-collapse text-sm min-w-[1200px]">

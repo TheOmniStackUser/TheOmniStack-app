@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, Fragment, ReactNode, useEffect } from 'react'
+import { useState, Fragment, ReactNode, useEffect, useMemo } from 'react'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
 import { generateHermesLabelsAction, generateDhlLabelsAction } from '@/app/actions/shipping'
@@ -11,6 +11,22 @@ import type { Invoice, InvoiceLog } from '@/db/schema/invoices'
 import type { DhlConfig } from '@/app/(dashboard)/integrations/dhl-form'
 
 export type OrderWithItems = Order & { items: OrderItem[], invoice?: (Invoice & { logs?: InvoiceLog[] }) | null }
+
+type SearchSuggestion = {
+  label: string
+  value: string
+  detail: string
+}
+
+const getOrderNumber = (order: OrderWithItems) => {
+  const source = order as OrderWithItems & { rawPayload?: { orderNumber?: unknown } | null }
+  return String(source.rawPayload?.orderNumber || order.marketplaceOrderId || '')
+}
+
+const getOrderBuyerName = (order: OrderWithItems) => {
+  const source = order as OrderWithItems & { buyer?: { name?: string | null } | null; buyerName?: string | null }
+  return String(source.buyerName || source.buyer?.name || '')
+}
 
 const formatCountry = (code?: string | null) => {
   if (!code) return 'DE'
@@ -583,6 +599,32 @@ export function OrdersTable({
   })
   const [isProgressDropdownOpen, setIsProgressDropdownOpen] = useState(false)
 
+  const searchSuggestions = useMemo<SearchSuggestion[]>(() => {
+    const q = draftSearch.trim().toLowerCase()
+    if (q.length < 4) return []
+
+    const suggestions: SearchSuggestion[] = []
+    const seen = new Set<string>()
+
+    const addSuggestion = (label: string, value: string, detail: string) => {
+      const cleanValue = value.trim()
+      if (!cleanValue || !cleanValue.toLowerCase().includes(q)) return
+      const key = `${label}:${cleanValue.toLowerCase()}`
+      if (seen.has(key)) return
+      seen.add(key)
+      suggestions.push({ label, value: cleanValue, detail })
+    }
+
+    for (const order of orders) {
+      addSuggestion('Bestellnummer', getOrderNumber(order), getOrderBuyerName(order) || formatMarketplaceName(order.marketplace, order.shippingCountry))
+      addSuggestion('Kunde', getOrderBuyerName(order), getOrderNumber(order))
+      addSuggestion('Sendungsnummer', order.trackingNumber || '', getOrderNumber(order))
+      if (suggestions.length >= 6) break
+    }
+
+    return suggestions.slice(0, 6)
+  }, [draftSearch, orders])
+
   // Pagination
   const [pageSize, setPageSize] = useState(25)
   const [currentPage, setCurrentPage] = useState(1)
@@ -663,6 +705,15 @@ export function OrdersTable({
     setActiveFilters(prev => ({
       ...prev,
       search: ''
+    }))
+    setCurrentPage(1)
+  }
+
+  const handleSelectSearchSuggestion = (value: string) => {
+    setDraftSearch(value)
+    setActiveFilters(prev => ({
+      ...prev,
+      search: value
     }))
     setCurrentPage(1)
   }
@@ -761,11 +812,10 @@ export function OrdersTable({
     // Filter by Search (Order ID, Customer Name)
     if (activeFilters.search.trim() !== '') {
       const q = activeFilters.search.toLowerCase()
-      // @ts-ignore
-      const orderNumber = String(order.rawPayload?.orderNumber || order.marketplaceOrderId).toLowerCase()
-      // @ts-ignore
-      const buyerName = String(order.buyerName || order.buyer?.name || '').toLowerCase()
-      if (!orderNumber.includes(q) && !buyerName.includes(q)) {
+      const orderNumber = getOrderNumber(order).toLowerCase()
+      const buyerName = getOrderBuyerName(order).toLowerCase()
+      const trackingNumber = (order.trackingNumber || '').toLowerCase()
+      if (!orderNumber.includes(q) && !buyerName.includes(q) && !trackingNumber.includes(q)) {
         return false
       }
     }
@@ -1514,7 +1564,7 @@ export function OrdersTable({
                 value={draftSearch}
                 onChange={(e) => setDraftSearch(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleApplyFilters()}
-                placeholder="Nach Bestellnummer oder Kunde suchen..."
+                placeholder="Nach Bestellnummer, Kunde oder Sendungsnummer suchen..."
                 className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 font-medium placeholder-gray-500 bg-gray-50/30 transition-all"
               />
               {draftSearch && (
@@ -1528,6 +1578,27 @@ export function OrdersTable({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
+              )}
+              {searchSuggestions.length > 0 && (
+                <div className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+                  {searchSuggestions.map((suggestion) => (
+                    <button
+                      key={`${suggestion.label}-${suggestion.value}`}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => handleSelectSearchSuggestion(suggestion.value)}
+                      className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-sm hover:bg-blue-50 transition-colors"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate font-bold text-gray-900">{suggestion.value}</span>
+                        <span className="block truncate text-xs text-gray-500">{suggestion.detail}</span>
+                      </span>
+                      <span className="shrink-0 rounded-md bg-gray-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-gray-500">
+                        {suggestion.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
           </div>
