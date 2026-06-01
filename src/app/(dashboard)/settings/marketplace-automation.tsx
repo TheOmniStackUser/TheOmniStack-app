@@ -10,7 +10,7 @@ type Integration = {
   type: string
   autoInvoice: boolean
   uploadInvoice: boolean
-  metadata?: MarketplaceMetadata
+  metadata?: unknown
 }
 
 type MarketplaceMetadata = {
@@ -19,6 +19,13 @@ type MarketplaceMetadata = {
   autoCreditNote?: boolean
   autoRefund?: boolean
   [key: string]: unknown
+}
+
+const getMarketplaceMetadata = (metadata: unknown): MarketplaceMetadata => {
+  if (metadata && typeof metadata === 'object') {
+    return metadata as MarketplaceMetadata
+  }
+  return {}
 }
 
 export function MarketplaceAutomation({ integrations }: { integrations: Integration[] }) {
@@ -48,7 +55,7 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
     setLocalIntegrations(prev => prev.map(int => {
       if (int.id === id) {
         if (field === 'downloadInvoice' || field === 'autoCreditNote' || field === 'autoRefund') {
-          const currentMetadata = (int.metadata as Record<string, unknown>) || {}
+          const currentMetadata = getMarketplaceMetadata(int.metadata)
           return {
             ...int,
             metadata: {
@@ -79,9 +86,9 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
       id,
       field === 'autoInvoice' ? newVal : integration.autoInvoice,
       field === 'uploadInvoice' ? newVal : integration.uploadInvoice,
-      field === 'downloadInvoice' ? newVal : !!(integration.metadata as Record<string, unknown>)?.downloadInvoice,
-      field === 'autoCreditNote' ? newVal : !!(integration.metadata as Record<string, unknown>)?.autoCreditNote,
-      field === 'autoRefund' ? newVal : !!(integration.metadata as Record<string, unknown>)?.autoRefund
+      field === 'downloadInvoice' ? newVal : !!getMarketplaceMetadata(integration.metadata).downloadInvoice,
+      field === 'autoCreditNote' ? newVal : !!getMarketplaceMetadata(integration.metadata).autoCreditNote,
+      field === 'autoRefund' ? newVal : !!getMarketplaceMetadata(integration.metadata).autoRefund
     )
 
     if (!result.success) {
@@ -89,7 +96,7 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
       setLocalIntegrations(prev => prev.map(int => {
         if (int.id === id) {
           if (field === 'downloadInvoice' || field === 'autoCreditNote' || field === 'autoRefund') {
-            const currentMetadata = (int.metadata as Record<string, unknown>) || {}
+            const currentMetadata = getMarketplaceMetadata(int.metadata)
             return {
               ...int,
               metadata: {
@@ -113,7 +120,7 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
 
   const getLabel = (int: Integration) => {
     if (int.type === 'mirakl_custom') {
-      const customName = int.metadata?.customName
+      const customName = getMarketplaceMetadata(int.metadata).customName
       return customName ? `${customName} (Mirakl)` : 'Anderer Mirakl Marktplatz'
     }
     const labels: Record<string, string> = {
@@ -170,7 +177,8 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
           <div className="space-y-4">
             {marketplaceIntegrations.map((int) => {
               const cannotCreateInvoice = int.type === 'otto' || int.type === 'aboutyou'
-              const downloadInvoice = !!(int.metadata as Record<string, unknown>)?.downloadInvoice
+              const metadata = getMarketplaceMetadata(int.metadata)
+              const downloadInvoice = !!metadata.downloadInvoice
               const isMirakl = int.type.startsWith('mirakl_')
               const showDownload = cannotCreateInvoice || isMirakl
               const isDownloadActive = downloadInvoice
@@ -251,10 +259,10 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
 
                       {isMirakl && (
                         <button
-                          onClick={() => handleToggle(int.id, 'autoCreditNote', !!int.metadata?.autoCreditNote)}
+                          onClick={() => handleToggle(int.id, 'autoCreditNote', !!metadata.autoCreditNote)}
                           disabled={loadingId === `${int.id}-autoCreditNote`}
                           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
-                            int.metadata?.autoCreditNote
+                            metadata.autoCreditNote
                               ? 'bg-green-600 border-green-600 text-white shadow-md shadow-green-200' 
                               : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
                           }`}
@@ -265,10 +273,10 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
                       )}
 
                       <button
-                        onClick={() => handleToggle(int.id, 'autoRefund', !!int.metadata?.autoRefund)}
+                        onClick={() => handleToggle(int.id, 'autoRefund', !!metadata.autoRefund)}
                         disabled={loadingId === `${int.id}-autoRefund`}
                         className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
-                          int.metadata?.autoRefund
+                          metadata.autoRefund
                             ? 'bg-green-600 border-green-600 text-white shadow-md shadow-green-200' 
                             : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
                         }`}
