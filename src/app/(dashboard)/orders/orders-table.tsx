@@ -28,6 +28,11 @@ const getOrderBuyerName = (order: OrderWithItems) => {
   return String(source.buyerName || source.buyer?.name || '')
 }
 
+const getDisplayStatus = (status: string | null) => {
+  if (status === 'invoiced') return 'pending'
+  return status || 'pending'
+}
+
 const formatCountry = (code?: string | null) => {
   if (!code) return 'DE'
   const map: Record<string, string> = {
@@ -1641,7 +1646,6 @@ export function OrdersTable({
           >
             <option value="all">Alle Status</option>
             <option value="pending">Pending</option>
-            <option value="invoiced">Invoiced</option>
             <option value="later_shipment">Later Shipment</option>
             <option value="shipped">Versendet</option>
             <option value="cancelled">Storniert</option>
@@ -1877,13 +1881,12 @@ export function OrdersTable({
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
-                          order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                          order.status === 'invoiced' ? 'bg-blue-100 text-blue-800' :
-                          order.status === 'later_shipment' ? 'bg-purple-100 text-purple-800' :
-                          order.status === 'shipped' ? 'bg-green-100 text-green-800' :
+                          getDisplayStatus(order.status) === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                          getDisplayStatus(order.status) === 'later_shipment' ? 'bg-purple-100 text-purple-800' :
+                          getDisplayStatus(order.status) === 'shipped' ? 'bg-green-100 text-green-800' :
                           'bg-gray-100 text-gray-800'
                         }`}>
-                          {order.status === 'later_shipment' ? 'Later Shipment' : order.status}
+                          {getDisplayStatus(order.status) === 'later_shipment' ? 'Later Shipment' : getDisplayStatus(order.status)}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
