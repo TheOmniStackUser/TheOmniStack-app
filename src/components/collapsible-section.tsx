@@ -84,11 +84,12 @@ export function CollapsibleSection({
         </div>
       </div>
       
-      {isOpen && (
-        <div className={contentClassName}>
-          {children}
-        </div>
-      )}
+      <div 
+        className={contentClassName}
+        style={{ display: isOpen ? 'block' : 'none' }}
+      >
+        {children}
+      </div>
     </section>
   )
 }
