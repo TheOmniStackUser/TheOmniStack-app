@@ -10,7 +10,15 @@ type Integration = {
   type: string
   autoInvoice: boolean
   uploadInvoice: boolean
-  metadata?: unknown
+  metadata?: MarketplaceMetadata
+}
+
+type MarketplaceMetadata = {
+  customName?: string
+  downloadInvoice?: boolean
+  autoCreditNote?: boolean
+  autoRefund?: boolean
+  [key: string]: unknown
 }
 
 export function MarketplaceAutomation({ integrations }: { integrations: Integration[] }) {
@@ -105,7 +113,7 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
 
   const getLabel = (int: Integration) => {
     if (int.type === 'mirakl_custom') {
-      const customName = (int.metadata as any)?.customName
+      const customName = int.metadata?.customName
       return customName ? `${customName} (Mirakl)` : 'Anderer Mirakl Marktplatz'
     }
     const labels: Record<string, string> = {
@@ -146,6 +154,9 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
             </li>
             <li>
               <strong>Auto-Upload:</strong> Sobald die Rechnung erstellt bzw. heruntergeladen wurde, wird sie automatisch an den Marktplatz (z. B. Decathlon, Kaufland, eBay, Amazon) hochgeladen.
+            </li>
+            <li>
+              <strong>Auto-Erstattung:</strong> Wenn eine Retoure zu einer Bestellung eingeht, wird automatisch eine Erstattung veranlasst. Dabei wird bei Bedarf zuerst die Rechnung erstellt, anschließend eine Gutschrift erzeugt und die Erstattung beim Marktplatz ausgelöst, sofern die Integration dies unterstützt.
             </li>
           </ul>
         </div>
@@ -240,10 +251,10 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
 
                       {isMirakl && (
                         <button
-                          onClick={() => handleToggle(int.id, 'autoCreditNote', !!(int.metadata as any)?.autoCreditNote)}
+                          onClick={() => handleToggle(int.id, 'autoCreditNote', !!int.metadata?.autoCreditNote)}
                           disabled={loadingId === `${int.id}-autoCreditNote`}
                           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
-                            (int.metadata as any)?.autoCreditNote
+                            int.metadata?.autoCreditNote
                               ? 'bg-green-600 border-green-600 text-white shadow-md shadow-green-200' 
                               : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
                           }`}
@@ -254,10 +265,10 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
                       )}
 
                       <button
-                        onClick={() => handleToggle(int.id, 'autoRefund', !!(int.metadata as any)?.autoRefund)}
+                        onClick={() => handleToggle(int.id, 'autoRefund', !!int.metadata?.autoRefund)}
                         disabled={loadingId === `${int.id}-autoRefund`}
                         className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
-                          (int.metadata as any)?.autoRefund
+                          int.metadata?.autoRefund
                             ? 'bg-green-600 border-green-600 text-white shadow-md shadow-green-200' 
                             : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
                         }`}
