@@ -41,6 +41,14 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
       .where(eq(companies.id, auth.activeCompanyId))
       .limit(1)
 
+    if (!company) {
+      return { error: 'Unternehmensdaten konnten nicht geladen werden.' }
+    }
+
+    if (!company.street || !company.zip || !company.city) {
+      return { error: 'Keine Rechnungsadresse hinterlegt. Bitte trage deine Rechnungsadresse in den Firmeinstellungen ein, bevor du Versandlabels erstellst.' }
+    }
+
     // Fetch active integrations and initialize adapters dynamically
     const activeIntegrations = await db
       .select()
@@ -299,6 +307,10 @@ export async function generateDhlLabelsAction(
 
     if (!company) {
       return { error: 'Unternehmensdaten konnten nicht geladen werden.' }
+    }
+
+    if (!company.street || !company.zip || !company.city) {
+      return { error: 'Keine Rechnungsadresse hinterlegt. Bitte trage deine Rechnungsadresse in den Firmeinstellungen ein, bevor du Versandlabels erstellst.' }
     }
 
     // 2. Find pending orders

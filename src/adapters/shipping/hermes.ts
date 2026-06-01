@@ -154,6 +154,10 @@ export class HermesAdapter {
   ): Promise<{ labelUrl: string, returnLabelUrl?: string, trackingNumber: string, returnTrackingNumber?: string }> {
     console.log(`[Hermes Adapter] Generiere Versandetikett für Bestellung ${order.marketplaceOrderId || order.id} (Klasse: ${parcelClass})...`)
 
+    if (!company || !company.street || !company.zip || !company.city) {
+      throw new Error('Keine Rechnungsadresse hinterlegt. Bitte trage deine Rechnungsadresse in den Firmeinstellungen ein.')
+    }
+
     const token = await this.getAccessToken()
 
     // Map class to max volume (dl)
