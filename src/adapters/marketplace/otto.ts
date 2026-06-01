@@ -104,7 +104,7 @@ export class OttoAdapter implements MarketplaceAdapter {
 
       while (nextUrl) {
         console.log(`[OttoAdapter] Fetching page: ${nextUrl}`)
-        const response = await fetch(nextUrl, {
+        const res = await fetch(nextUrl, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -112,12 +112,12 @@ export class OttoAdapter implements MarketplaceAdapter {
           }
         })
 
-        if (!response.ok) {
-          const errText = await response.text()
-          throw new Error(`[OttoAdapter] Failed to fetch orders: ${response.status} - ${errText}`)
+        if (!res.ok) {
+          const errText = await res.text()
+          throw new Error(`[OttoAdapter] Failed to fetch orders: ${res.status} - ${errText}`)
         }
 
-        const responseData = await response.json()
+        const responseData = await res.json()
         const rawOrders = responseData.resources || []
         allRawOrders.push(...rawOrders)
         console.log(`[OttoAdapter] Fetched ${rawOrders.length} raw orders in this page (total so far: ${allRawOrders.length}).`)
