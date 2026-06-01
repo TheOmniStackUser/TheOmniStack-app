@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { db } from '@/db/client'
-
-export const dynamic = 'force-dynamic'
-export const maxDuration = 60 // Gemini kann beim 2. Call länger brauchen
 import { companies } from '@/db/schema/companies'
 import { orders } from '@/db/schema/orders'
 import { eq, and } from 'drizzle-orm'
+
+export const dynamic = 'force-dynamic'
+export const maxDuration = 60 // Gemini kann beim 2. Call länger brauchen
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
 
@@ -19,19 +19,19 @@ const MOBILE_SAFE_HEADERS = {
 
 export async function POST(req: NextRequest) {
   const apiKey = req.headers.get('x-api-key')
-  if (!apiKey) return NextResponse.json({ error: 'Missing API Key' }, { status: 401 }, { headers: MOBILE_SAFE_HEADERS })
+  if (!apiKey) return NextResponse.json({ error: 'Missing API Key' }, { status: 401, headers: MOBILE_SAFE_HEADERS })
 
   const lookupKey = (apiKey === 'os_302e3932303033373033393234333436' || apiKey === 'os_live_leis_leis_gb_7747099a')
     ? 'os_live_leis_leis_gb_7747099a'
     : apiKey
 
   const [company] = await db.select().from(companies).where(eq(companies.apiKey, lookupKey)).limit(1)
-  if (!company) return NextResponse.json({ error: 'Invalid API Key' }, { status: 401 }, { headers: MOBILE_SAFE_HEADERS })
+  if (!company) return NextResponse.json({ error: 'Invalid API Key' }, { status: 401, headers: MOBILE_SAFE_HEADERS })
 
   try {
     const formData = await req.formData()
     const imageFile = formData.get('image') as File
-    if (!imageFile) return NextResponse.json({ error: 'No image provided' }, { status: 400 }, { headers: MOBILE_SAFE_HEADERS })
+    if (!imageFile) return NextResponse.json({ error: 'No image provided' }, { status: 400, headers: MOBILE_SAFE_HEADERS })
 
     const arrayBuffer = await imageFile.arrayBuffer()
     const base64Image = Buffer.from(arrayBuffer).toString('base64')
@@ -163,6 +163,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(parsedData, { headers: MOBILE_SAFE_HEADERS })
   } catch (error: any) {
     console.error('AI Analysis Error:', error)
-    return NextResponse.json({ error: 'Analysis failed', details: error.message }, { status: 500 }, { headers: MOBILE_SAFE_HEADERS })
+    return NextResponse.json({ error: 'Analysis failed', details: error.message }, { status: 500, headers: MOBILE_SAFE_HEADERS })
   }
 }
