@@ -104,7 +104,7 @@ export class OttoAdapter implements MarketplaceAdapter {
 
       while (nextUrl) {
         console.log(`[OttoAdapter] Fetching page: ${nextUrl}`)
-        const res = await fetch(nextUrl, {
+        const res: Response = await fetch(nextUrl, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${accessToken}`,
