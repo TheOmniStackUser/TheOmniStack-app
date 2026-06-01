@@ -6,6 +6,13 @@ import { eq, and, or } from 'drizzle-orm'
 
 export const dynamic = 'force-dynamic'
 
+// iOS URLSession-Fix: Verbindung nach jedem Request schließen
+// verhindert NSURLErrorBadServerResponse -1011 beim zweiten Scan
+const MOBILE_SAFE_HEADERS = {
+  'Connection': 'close',
+  'Cache-Control': 'no-store',
+}
+
 /**
  * POST /api/v1/returns/incoming
  * Mobile Return Scanning Integration Endpoint
@@ -15,7 +22,7 @@ export async function POST(req: Request) {
     // 1. Authenticate via API Key
     const apiKey = req.headers.get('x-api-key')
     if (!apiKey) {
-      return NextResponse.json({ error: 'Unauthorized: Missing x-api-key header' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized: Missing x-api-key header' }, { status: 401, headers: MOBILE_SAFE_HEADERS })
     }
 
     const lookupKey = (apiKey === 'os_302e3932303033373033393234333436' || apiKey === 'os_live_leis_leis_gb_7747099a')
@@ -29,7 +36,7 @@ export async function POST(req: Request) {
       .limit(1)
 
     if (!company) {
-      return NextResponse.json({ error: 'Unauthorized: Invalid API Key' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized: Invalid API Key' }, { status: 401, headers: MOBILE_SAFE_HEADERS })
     }
 
     // 2. Parse and Validate Payload
@@ -37,7 +44,7 @@ export async function POST(req: Request) {
     const { customer_info, order_info, returned_items, return_metadata } = body
 
     if (!order_info?.order_number) {
-      return NextResponse.json({ error: 'Bad Request: Missing order_number' }, { status: 400 })
+      return NextResponse.json({ error: 'Bad Request: Missing order_number' }, { status: 400, headers: MOBILE_SAFE_HEADERS })
     }
 
     // 3. Attempt to Match existing Marketplace Order
@@ -238,9 +245,9 @@ export async function POST(req: Request) {
       return_id: logEntry.id, 
       matched_order: !!matchedOrder,
       message: matchedOrder ? 'Return logged and matched to order' : 'Return logged (no matching order found)'
-    })
+    }, { headers: MOBILE_SAFE_HEADERS })
   } catch (error: any) {
     console.error('[API V1 Returns Error]', error)
-    return NextResponse.json({ error: 'Internal Server Error', details: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Internal Server Error', details: error.message }, { status: 500, headers: MOBILE_SAFE_HEADERS })
   }
 }
