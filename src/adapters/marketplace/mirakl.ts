@@ -485,14 +485,41 @@ export class MiraklAdapter implements MarketplaceAdapter {
 
       console.log(`[MiraklAdapter:${this.marketplace}] Confirming/validating shipment for order ${marketplaceOrderId} via PUT ${shipUrl}...`)
 
+      // Build order_lines array from rawOrderPayload if available
+      let shipOrderLines: any[] | undefined = undefined
+      if (rawOrderPayload && typeof rawOrderPayload === 'object') {
+        const rawLines = (rawOrderPayload as any).order_lines
+        if (Array.isArray(rawLines) && rawLines.length > 0) {
+          shipOrderLines = rawLines.map((line: any) => ({
+            id: line.order_line_id,
+            quantity: line.quantity ?? 1,
+          }))
+        }
+      }
+
+      const shipBody: Record<string, any> = {
+        carrier_code: resolvedCarrier,
+        carrier_name: resolvedCarrier,
+        tracking_number: trackingNumber,
+        shipping_date: new Date().toISOString(),
+      }
+      if (shipOrderLines && shipOrderLines.length > 0) {
+        shipBody.order_lines = shipOrderLines
+      }
+
       const shipRes = await fetch(shipUrl, {
         method: 'PUT',
         headers,
-        body: JSON.stringify({})
+        body: JSON.stringify(shipBody)
       })
 
       if (!shipRes.ok) {
         const shipErrText = await shipRes.text()
+        // 404 means the order is already shipped or not found in SHIPPING state — treat as success
+        if (shipRes.status === 404) {
+          console.warn(`[MiraklAdapter:${this.marketplace}] Order ${marketplaceOrderId} not found for /ship (404) — likely already shipped or accepted by marketplace. Treating as success.`)
+          return
+        }
         console.error(`[MiraklAdapter:${this.marketplace}] Confirm Shipment failed (${shipRes.status}): ${shipErrText}`)
         throw new Error(`Confirm Shipment failed (${shipRes.status}): ${shipErrText}`)
       }
