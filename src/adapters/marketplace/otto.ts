@@ -96,30 +96,41 @@ export class OttoAdapter implements MarketplaceAdapter {
     try {
       const accessToken = await this.getAccessToken()
       
-      let url = `${this.baseUrl}/v4/orders?fulfillmentStatus=PROCESSABLE&limit=100`
-      if (options?.fromDate) url += `&fromOrderDate=${options.fromDate}T00:00:00Z`
-      if (options?.toDate) url += `&toOrderDate=${options.toDate}T23:59:59Z`
+      let nextUrl: string | null = `${this.baseUrl}/v4/orders?fulfillmentStatus=PROCESSABLE&limit=50`
+      if (options?.fromDate) nextUrl += `&fromOrderDate=${options.fromDate}T00:00:00Z`
+      if (options?.toDate) nextUrl += `&toOrderDate=${options.toDate}T23:59:59Z`
 
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Accept': 'application/json'
+      const allRawOrders: any[] = []
+
+      while (nextUrl) {
+        console.log(`[OttoAdapter] Fetching page: ${nextUrl}`)
+        const response = await fetch(nextUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json'
+          }
+        })
+
+        if (!response.ok) {
+          const errText = await response.text()
+          throw new Error(`[OttoAdapter] Failed to fetch orders: ${response.status} - ${errText}`)
         }
-      })
 
-      if (!response.ok) {
-        const errText = await response.text()
-        throw new Error(`[OttoAdapter] Failed to fetch orders: ${response.status} - ${errText}`)
+        const responseData = await response.json()
+        const rawOrders = responseData.resources || []
+        allRawOrders.push(...rawOrders)
+        console.log(`[OttoAdapter] Fetched ${rawOrders.length} raw orders in this page (total so far: ${allRawOrders.length}).`)
+
+        // Find the "next" link in the links array
+        const links = responseData.links || []
+        const nextLink = links.find((l: any) => l.rel === 'next')
+        nextUrl = nextLink && nextLink.href ? nextLink.href : null
       }
 
-      const responseData = await response.json()
-      // Otto returns an array of orders inside 'resources'
-      const rawOrders = responseData.resources || []
-      
-      console.log(`[OttoAdapter] Fetched ${rawOrders.length} raw orders from Otto.`)
+      console.log(`[OttoAdapter] Sync completed. Total orders fetched: ${allRawOrders.length}`)
 
-      return rawOrders.map((ro: any) => this.normalizeOrder(ro, companyId))
+      return allRawOrders.map((ro: any) => this.normalizeOrder(ro, companyId))
     } catch (error) {
       console.error('[OttoAdapter] Error syncing orders:', error)
       throw error
