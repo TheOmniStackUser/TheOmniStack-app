@@ -1,8 +1,8 @@
 import { Worker, Queue, type Job } from 'bullmq'
 import IORedis from 'ioredis'
 import { db } from '@/db/client'
-import { companies, invoices, dunningRules, dunningLogs, dunningExclusions, invoiceLogs } from '@/db/schema'
-import { eq, and, isNull, lt, desc } from 'drizzle-orm'
+import { companies, invoices, dunningRules, dunningLogs, dunningExclusions, invoiceLogs, orders } from '@/db/schema'
+import { eq, and, or, isNull, lt, desc } from 'drizzle-orm'
 import { format, subDays, addDays } from 'date-fns'
 import { de } from 'date-fns/locale'
 import { Resend } from 'resend'
@@ -109,9 +109,12 @@ async function processDunningForCompany(
 
   // 4. Find all overdue, unpaid, non-cancelled invoices
   const now = new Date()
-  const overdueInvoices = await db
-    .select()
+  const overdueRows = await db
+    .select({
+      invoice: invoices,
+    })
     .from(invoices)
+    .leftJoin(orders, eq(invoices.id, orders.invoiceId))
     .where(
       and(
         eq(invoices.companyId, companyId),
@@ -120,9 +123,15 @@ async function processDunningForCompany(
         eq(invoices.isCreditNote, false),
         isNull(invoices.paidAt),
         isNull(invoices.cancelsInvoiceId),
-        lt(invoices.dueAt, now)
+        lt(invoices.dueAt, now),
+        or(
+          isNull(orders.marketplace),
+          eq(orders.marketplace, 'manual')
+        )
       )
     )
+
+  const overdueInvoices = overdueRows.map((row) => row.invoice)
 
   console.log(`[Dunning] ${company.name}: ${overdueInvoices.length} overdue invoices found.`)
 

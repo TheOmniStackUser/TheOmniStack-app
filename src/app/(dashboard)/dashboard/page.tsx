@@ -1,7 +1,7 @@
 import { requireAuth, getCurrentUser } from '@/lib/session'
 import { db } from '@/db/client'
 import { companies } from '@/db/schema/companies'
-import { eq, and, ne, sql, inArray, isNull, lt } from 'drizzle-orm'
+import { eq, and, or, ne, sql, inArray, isNull, lt } from 'drizzle-orm'
 import { orders } from '@/db/schema/orders'
 import { invoices } from '@/db/schema/invoices'
 import { SyncButton } from './sync-button'
@@ -88,6 +88,7 @@ export default async function DashboardPage() {
       revenue: sql<number>`COALESCE(sum(${invoices.totalAmount}::numeric), 0)::float`,
     })
     .from(invoices)
+    .leftJoin(orders, eq(invoices.id, orders.invoiceId))
     .where(
       and(
         eq(invoices.companyId, auth.activeCompanyId),
@@ -95,7 +96,11 @@ export default async function DashboardPage() {
         eq(invoices.status, 'issued'),
         eq(invoices.isCreditNote, false),
         isNull(invoices.paidAt),
-        lt(invoices.dueAt, now)
+        lt(invoices.dueAt, now),
+        or(
+          isNull(orders.marketplace),
+          eq(orders.marketplace, 'manual')
+        )
       )
     )
 

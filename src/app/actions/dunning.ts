@@ -7,8 +7,9 @@ import {
   dunningLogs,
   dunningExclusions,
   invoices,
+  orders,
 } from '@/db/schema'
-import { eq, and, desc, isNull, lt } from 'drizzle-orm'
+import { eq, and, or, desc, isNull, lt } from 'drizzle-orm'
 import type { DunningStage } from '@/emails/DunningEmail'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -264,6 +265,7 @@ export async function getOverdueInvoiceStatsAction() {
       dueAt: invoices.dueAt,
     })
     .from(invoices)
+    .leftJoin(orders, eq(invoices.id, orders.invoiceId))
     .where(
       and(
         eq(invoices.companyId, companyId),
@@ -272,7 +274,11 @@ export async function getOverdueInvoiceStatsAction() {
         eq(invoices.isCreditNote, false),
         isNull(invoices.paidAt),
         isNull(invoices.cancelsInvoiceId),
-        lt(invoices.dueAt, now)
+        lt(invoices.dueAt, now),
+        or(
+          isNull(orders.marketplace),
+          eq(orders.marketplace, 'manual')
+        )
       )
     )
 
