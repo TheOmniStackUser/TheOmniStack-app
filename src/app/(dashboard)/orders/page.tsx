@@ -62,15 +62,9 @@ export default async function OrdersPage() {
 
   // Fetch relations in parallel
   const [items, allInvoices, allLogs] = await Promise.all([
-    orderIds.length > 0 
-      ? db.select().from(orderItems).where(inArray(orderItems.orderId, orderIds))
-      : Promise.resolve([]),
-    invoiceIds.length > 0 
-      ? db.select().from(invoices).where(inArray(invoices.id, invoiceIds))
-      : Promise.resolve([]),
-    invoiceIds.length > 0 
-      ? db.select().from(invoiceLogs).where(inArray(invoiceLogs.invoiceId, invoiceIds))
-      : Promise.resolve([])
+    db.select().from(orderItems).where(eq(orderItems.companyId, auth.activeCompanyId)),
+    db.select().from(invoices).where(eq(invoices.companyId, auth.activeCompanyId)),
+    db.select().from(invoiceLogs).where(eq(invoiceLogs.companyId, auth.activeCompanyId))
   ])
 
   // Stitch them together in memory (O(N) operations, extremely fast)
