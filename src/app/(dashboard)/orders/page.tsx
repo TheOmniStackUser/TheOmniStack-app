@@ -3,7 +3,7 @@ import { db } from '@/db/client'
 import { orders, orderItems } from '@/db/schema/orders'
 import { invoices, invoiceLogs } from '@/db/schema/invoices'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
-import { eq, desc, and, ne, inArray, getTableColumns, sql } from 'drizzle-orm'
+import { eq, desc, and, ne, inArray } from 'drizzle-orm'
 import { OrdersTable } from './orders-table'
 import { ManualImport } from './manual-import'
 import type { HermesConfig } from '@/app/(dashboard)/integrations/hermes-form'
@@ -12,30 +12,9 @@ import type { DhlConfig } from '@/app/(dashboard)/integrations/dhl-form'
 export default async function OrdersPage() {
   const auth = await requireAuth()
 
-  // Extract columns without the massive rawPayload
-  const { rawPayload, ...orderColumns } = getTableColumns(orders)
-
   // First fetch base orders and integrations in parallel
   const [baseOrders, hermesIntegration, integrations] = await Promise.all([
-    db.select({
-      ...orderColumns,
-      rawPayload: sql`
-        CASE 
-          WHEN ${orders.rawPayload} IS NULL THEN NULL
-          ELSE jsonb_build_object(
-            'orderNumber', ${orders.rawPayload}->>'orderNumber',
-            'financial_status', ${orders.rawPayload}->>'financial_status',
-            'manualBillingAddress', ${orders.rawPayload}->'manualBillingAddress',
-            'invoiceAddress', ${orders.rawPayload}->'invoiceAddress',
-            'customer', CASE WHEN ${orders.rawPayload}->'customer' IS NOT NULL THEN jsonb_build_object('billing_address', ${orders.rawPayload}->'customer'->'billing_address') ELSE NULL END,
-            'billing_street', ${orders.rawPayload}->>'billing_street',
-            'billing_zip_code', ${orders.rawPayload}->>'billing_zip_code',
-            'billing_city', ${orders.rawPayload}->>'billing_city',
-            'billing_country_code', ${orders.rawPayload}->>'billing_country_code'
-          )
-        END
-      `
-    }).from(orders).where(
+    db.select().from(orders).where(
       and(
         eq(orders.companyId, auth.activeCompanyId),
         eq(orders.isArchived, false),
