@@ -170,7 +170,7 @@ const getTrackingUrl = (trackingNumber: string): string => {
     /^H\d{19}$/.test(upper) ||
     /^\d{14}$/.test(upper)
   ) {
-    return `https://www.myhermes.de/empfangen/sendungsverfolgung/details/${clean}`
+    return `https://www.myhermes.de/empfangen/sendungsverfolgung/sendungsinformation/#${clean}`
   }
 
   // 3. DPD (typically 11, 14, or 15 digits)
