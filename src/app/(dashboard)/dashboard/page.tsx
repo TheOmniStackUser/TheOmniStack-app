@@ -72,13 +72,18 @@ export default async function DashboardPage() {
       revenue: sql<number>`COALESCE(sum(${invoices.totalAmount}::numeric), 0)::float`,
     })
     .from(invoices)
+    .leftJoin(orders, eq(invoices.id, orders.invoiceId))
     .where(
       and(
         eq(invoices.companyId, auth.activeCompanyId),
         eq(invoices.documentType, 'invoice'),
         eq(invoices.status, 'issued'),
         eq(invoices.isCreditNote, false),
-        isNull(invoices.paidAt)
+        isNull(invoices.paidAt),
+        or(
+          isNull(orders.marketplace),
+          eq(orders.marketplace, 'manual')
+        )
       )
     )
 

@@ -197,6 +197,51 @@ export function InvoiceList({
   // Row context menu state
   const [activeRowMenuId, setActiveRowMenuId] = useState<string | null>(null)
 
+  // Build and sort marketplace categories
+  const groupedMarketplaces = (() => {
+    const direct: { value: string; label: string }[] = []
+    const decathlon: { value: string; label: string }[] = []
+    const secretSales: { value: string; label: string }[] = []
+    const other: { value: string; label: string }[] = []
+
+    // Core / direct integrations
+    if (hasOttoIntegration) direct.push({ value: 'otto', label: 'Otto' })
+    if (hasAboutYouIntegration) direct.push({ value: 'aboutyou', label: 'About You' })
+    if (hasShopifyIntegration) direct.push({ value: 'shopify', label: 'Shopify' })
+    if (hasKauflandIntegration) direct.push({ value: 'kaufland', label: 'Kaufland' })
+    if (hasEbayIntegration) direct.push({ value: 'ebay', label: 'eBay' })
+    if (hasAmazonIntegration) direct.push({ value: 'amazon', label: 'Amazon' })
+    if (hasMediamarktIntegration) direct.push({ value: 'mirakl_mediamarkt', label: 'MediaMarkt' })
+
+    // Decathlon
+    if (hasDecathlonIntegration) decathlon.push({ value: 'mirakl_decathlon', label: 'Decathlon DE' })
+    if (hasDecathlonEuIntegration) decathlon.push({ value: 'mirakl_decathlon_eu', label: 'Decathlon EU' })
+
+    // Custom integrations
+    customMiraklIntegrations.forEach((integration) => {
+      const name = (integration.metadata as any)?.customName || 'Unbenannter Mirakl Marktplatz'
+      const lowerName = name.toLowerCase()
+      const value = lowerName
+      const label = name
+
+      if (lowerName.startsWith('decathlon')) {
+        decathlon.push({ value, label })
+      } else if (lowerName.startsWith('secret sales')) {
+        secretSales.push({ value, label })
+      } else {
+        other.push({ value, label })
+      }
+    })
+
+    const sortFn = (a: { label: string }, b: { label: string }) => a.label.localeCompare(b.label, 'de')
+    direct.sort(sortFn)
+    decathlon.sort(sortFn)
+    secretSales.sort(sortFn)
+    other.sort(sortFn)
+
+    return { direct, decathlon, secretSales, other }
+  })()
+
   // Payments Modal States
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null)
@@ -230,10 +275,13 @@ export function InvoiceList({
     }).catch(console.error)
   }, [])
 
+  const isPaid = (invoice: Invoice) => {
+    return !!invoice.paidAt || (invoice.marketplace && invoice.marketplace.toLowerCase() !== 'manual')
+  }
+
   const isOverdue = (invoice: Invoice) => {
-    if (invoice.status !== 'issued' || invoice.paidAt) return false
+    if (invoice.status !== 'issued' || isPaid(invoice)) return false
     if (!invoice.dueAt) return false
-    if (invoice.marketplace && invoice.marketplace.toLowerCase() !== 'manual') return false
     return new Date() > new Date(invoice.dueAt)
   }
 
@@ -1023,9 +1071,9 @@ export function InvoiceList({
   // Unfiltered counts for status tabs
   const totalCount = initialInvoices.length
   const draftsCount = initialInvoices.filter(i => i.status === 'draft').length
-  const openCount = initialInvoices.filter(i => i.status === 'issued' && !i.paidAt).length
+  const openCount = initialInvoices.filter(i => i.status === 'issued' && !isPaid(i)).length
   const overdueCount = initialInvoices.filter(i => isOverdue(i)).length
-  const paidCount = initialInvoices.filter(i => i.status === 'issued' && i.paidAt).length
+  const paidCount = initialInvoices.filter(i => i.status === 'issued' && isPaid(i)).length
   const cancelledCount = initialInvoices.filter(i => i.status === 'cancelled').length
 
   const searchFilteredInvoices = initialInvoices.filter(invoice => {
@@ -1077,11 +1125,11 @@ export function InvoiceList({
       case 'drafts':
         return invoice.status === 'draft'
       case 'open':
-        return invoice.status === 'issued' && !invoice.paidAt
+        return invoice.status === 'issued' && !isPaid(invoice)
       case 'overdue':
         return isOverdue(invoice)
       case 'paid':
-        return invoice.status === 'issued' && !!invoice.paidAt
+        return invoice.status === 'issued' && isPaid(invoice)
       case 'cancelled':
         return invoice.status === 'cancelled'
       case 'all':
@@ -1307,23 +1355,38 @@ export function InvoiceList({
             >
               <option value="all">Alle Marktplätze</option>
               <option value="manual">Manuell</option>
-              {hasOttoIntegration && <option value="otto">Otto</option>}
-              {hasAboutYouIntegration && <option value="aboutyou">About You</option>}
-              {hasDecathlonIntegration && <option value="mirakl_decathlon">Decathlon DE</option>}
-              {hasDecathlonEuIntegration && <option value="mirakl_decathlon_eu">Decathlon EU</option>}
-              {hasMediamarktIntegration && <option value="mirakl_mediamarkt">MediaMarkt</option>}
-              {hasAmazonIntegration && <option value="amazon">Amazon</option>}
-              {hasShopifyIntegration && <option value="shopify">Shopify</option>}
-              {hasKauflandIntegration && <option value="kaufland">Kaufland</option>}
-              {hasEbayIntegration && <option value="ebay">eBay</option>}
-              {customMiraklIntegrations.map((integration) => {
-                const name = (integration.metadata as any)?.customName || 'Unbenannter Mirakl Marktplatz'
-                return (
-                  <option key={integration.id} value={name.toLowerCase()}>
-                    {name}
-                  </option>
-                )
-              })}
+
+              {groupedMarketplaces.direct.length > 0 && (
+                <optgroup label="Direkte Integrationen">
+                  {groupedMarketplaces.direct.map((m) => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </optgroup>
+              )}
+
+              {groupedMarketplaces.decathlon.length > 0 && (
+                <optgroup label="Decathlon Marktplätze">
+                  {groupedMarketplaces.decathlon.map((m) => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </optgroup>
+              )}
+
+              {groupedMarketplaces.secretSales.length > 0 && (
+                <optgroup label="Secret Sales Marktplätze">
+                  {groupedMarketplaces.secretSales.map((m) => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </optgroup>
+              )}
+
+              {groupedMarketplaces.other.length > 0 && (
+                <optgroup label="Weitere Marktplätze">
+                  {groupedMarketplaces.other.map((m) => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </optgroup>
+              )}
             </select>
 
             <div className="flex items-center gap-2">
@@ -1630,7 +1693,7 @@ export function InvoiceList({
                                Versenden
                              </button>
                            )}
-                           {invoice.status !== 'draft' && !invoice.paidAt && invoice.status !== 'cancelled' && (
+                           {invoice.status !== 'draft' && !isPaid(invoice) && invoice.status !== 'cancelled' && (
                              <button
                                type="button"
                                onClick={() => handleOpenPaymentModal(invoice)}
@@ -1657,7 +1720,7 @@ export function InvoiceList({
                          </div>
 
                          {/* Section 3: Mahnwesen */}
-                         {(invoice.status === 'issued' && !invoice.paidAt) && (
+                         {(invoice.status === 'issued' && !isPaid(invoice)) && (
                            <div className="border-t border-slate-100 py-1">
                              <button
                                type="button"
@@ -2131,7 +2194,7 @@ export function InvoiceList({
                         </button>
 
                         {/* Mahnwesen button – only for overdue/open invoices */}
-                        {details.invoice.status === 'issued' && !details.invoice.paidAt && details.invoice.status !== 'cancelled' && (
+                        {details.invoice.status === 'issued' && !isPaid(details.invoice) && details.invoice.status !== 'cancelled' && (
                           <button
                             onClick={() => handleOpenDunningModal(details.invoice)}
                             className="inline-flex items-center gap-1.5 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
@@ -2144,7 +2207,7 @@ export function InvoiceList({
                         )}
 
                         {/* Bezahlt */}
-                        {(details.invoice.paidAt || details.invoice.logs?.some((l: any) => l.action === 'payment')) ? (
+                        {(isPaid(details.invoice) || details.invoice.logs?.some((l: any) => l.action === 'payment')) ? (
                           <div className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 border border-emerald-100 rounded-xl text-xs font-bold text-emerald-700 shadow-sm">
                             <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
