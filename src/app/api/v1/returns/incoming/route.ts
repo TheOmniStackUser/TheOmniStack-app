@@ -219,18 +219,24 @@ export async function POST(req: Request) {
         const autoRefund = !!(integration?.metadata as any)?.autoRefund
 
         if (autoRefund) {
-          console.log(`[API V1 Returns] Auto-refund enabled for ${matchedOrder.marketplace}. Triggering executeRefund...`)
-          const { executeRefund } = await import('@/lib/refund-service')
-          const itemsToRefund = returned_items.map((item: any) => ({
-            sku: item.sku_or_product_name || 'Unknown',
-            quantity: item.quantity || 1
-          }))
+          const itemsToRefund = returned_items
+            .filter((item: any) => item.condition !== 'fremd')
+            .map((item: any) => ({
+              sku: item.sku_or_product_name || 'Unknown',
+              quantity: item.quantity || 1
+            }))
 
-          await executeRefund({
-            companyId: company.id,
-            returnLogId: logEntry.id,
-            itemsToRefund
-          })
+          if (itemsToRefund.length > 0) {
+            console.log(`[API V1 Returns] Auto-refund enabled for ${matchedOrder.marketplace}. Triggering executeRefund...`)
+            const { executeRefund } = await import('@/lib/refund-service')
+            await executeRefund({
+              companyId: company.id,
+              returnLogId: logEntry.id,
+              itemsToRefund
+            })
+          } else {
+            console.log(`[API V1 Returns] Auto-refund skipped: only Fremdware returned.`)
+          }
         }
       } catch (refundErr) {
         console.error(`[API V1 Returns] Auto-refund execution failed:`, refundErr)

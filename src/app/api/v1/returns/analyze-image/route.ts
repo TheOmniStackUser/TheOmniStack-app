@@ -3,7 +3,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 import { db } from '@/db/client'
 import { companies } from '@/db/schema/companies'
 import { orders } from '@/db/schema/orders'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, or } from 'drizzle-orm'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60 // Gemini kann beim 2. Call länger brauchen
@@ -129,32 +129,70 @@ export async function POST(req: NextRequest) {
       parsedData.customer_name = String(parsedData.customer_name)
     }
 
-    // Apply database lookup and pattern-based guessing to assist image analysis
-    if (!parsedData.marketplace && parsedData.order_number) {
-      // 1. Try database lookup!
+    // Match with database order and auto-populate metadata & items if needed
+    const scanInput = parsedData.order_number?.trim()
+    if (scanInput) {
       const matchedOrder = await db.query.orders.findFirst({
         where: and(
           eq(orders.companyId, company.id),
-          eq(orders.marketplaceOrderId, parsedData.order_number)
-        )
+          or(
+            eq(orders.marketplaceOrderId, scanInput),
+            eq(orders.trackingNumber, scanInput),
+            eq(orders.returnTrackingNumber, scanInput)
+          )
+        ),
+        with: {
+          items: true
+        }
       })
 
-      if (matchedOrder?.marketplace) {
-        const rawMp = String(matchedOrder.marketplace).trim()
-        if (rawMp) {
-          parsedData.marketplace = rawMp.charAt(0).toUpperCase() + rawMp.slice(1)
+      if (matchedOrder) {
+        // Correct order number if a tracking number was scanned
+        parsedData.order_number = matchedOrder.marketplaceOrderId
+
+        // Resolve marketplace
+        if (!parsedData.marketplace && matchedOrder.marketplace) {
+          const rawMp = String(matchedOrder.marketplace).trim()
+          if (rawMp) {
+            parsedData.marketplace = rawMp.charAt(0).toUpperCase() + rawMp.slice(1)
+          }
+        }
+
+        // Resolve customer name if missing or generic
+        if (!parsedData.customer_name || parsedData.customer_name === 'N/A') {
+          parsedData.customer_name = matchedOrder.buyerName || matchedOrder.shippingName || parsedData.customer_name
+        }
+
+        // Resolve shipping address if missing
+        if (!parsedData.shipping_address || parsedData.shipping_address === 'N/A') {
+          parsedData.shipping_address = [
+            matchedOrder.shippingName || matchedOrder.buyerName || '',
+            matchedOrder.shippingStreet || '',
+            `${matchedOrder.shippingZip || ''} ${matchedOrder.shippingCity || ''}`.trim(),
+            matchedOrder.shippingCountry || ''
+          ].filter(Boolean).join('\n')
+        }
+
+        // Auto-populate items from order if no items were parsed from image (e.g. only shipping label scanned)
+        if (matchedOrder.items && (!parsedData.items || parsedData.items.length === 0)) {
+          parsedData.items = matchedOrder.items.map((item: any) => ({
+            sku: item.sku || item.title || 'Unknown',
+            quantity: parseInt(item.quantity) || 1
+          }))
         }
       } else {
-        // 2. Try pattern guessing!
-        const cleanNum = parsedData.order_number.trim().replace(/\s+/g, '')
-        if (/^\d{3}-\d{7}-\d{7}$/.test(cleanNum)) {
-          parsedData.marketplace = 'Amazon'
-        } else if (/^\d{12}$/.test(cleanNum) || /^\d{2}-\d{5}-\d{5}$/.test(cleanNum)) {
-          parsedData.marketplace = 'eBay'
-        } else if (/^105\d{11}$/.test(cleanNum)) {
-          parsedData.marketplace = 'Zalando'
-        } else if (/^10\d{8}$/.test(cleanNum) || /^20\d{8}$/.test(cleanNum) || /^cbn/i.test(cleanNum)) {
-          parsedData.marketplace = 'Otto'
+        // Try pattern-based marketplace guessing if no order matched
+        if (!parsedData.marketplace) {
+          const cleanNum = scanInput.replace(/\s+/g, '')
+          if (/^\d{3}-\d{7}-\d{7}$/.test(cleanNum)) {
+            parsedData.marketplace = 'Amazon'
+          } else if (/^\d{12}$/.test(cleanNum) || /^\d{2}-\d{5}-\d{5}$/.test(cleanNum)) {
+            parsedData.marketplace = 'eBay'
+          } else if (/^105\d{11}$/.test(cleanNum)) {
+            parsedData.marketplace = 'Zalando'
+          } else if (/^10\d{8}$/.test(cleanNum) || /^20\d{8}$/.test(cleanNum) || /^cbn/i.test(cleanNum)) {
+            parsedData.marketplace = 'Otto'
+          }
         }
       }
     }

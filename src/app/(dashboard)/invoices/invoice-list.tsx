@@ -233,6 +233,7 @@ export function InvoiceList({
   const isOverdue = (invoice: Invoice) => {
     if (invoice.status !== 'issued' || invoice.paidAt) return false
     if (!invoice.dueAt) return false
+    if (invoice.marketplace && invoice.marketplace.toLowerCase() !== 'manual') return false
     return new Date() > new Date(invoice.dueAt)
   }
 

@@ -667,9 +667,11 @@ export function ReturnsList({
                               ? 'bg-green-50 text-green-700 border border-green-200'
                               : item.condition === 'damaged'
                               ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                              : item.condition === 'fremd'
+                              ? 'bg-purple-50 text-purple-700 border border-purple-200'
                               : 'bg-amber-50 text-amber-700 border border-amber-200'
                           }`}>
-                            {item.condition === 'new' ? 'Neu' : item.condition === 'damaged' ? 'Defekt' : item.condition === 'used' ? 'Gebraucht' : item.condition}
+                            {item.condition === 'new' ? 'Neu' : item.condition === 'damaged' ? 'Defekt' : item.condition === 'used' ? 'Gebraucht' : item.condition === 'fremd' ? 'Fremdware' : item.condition}
                           </span>
                         </div>
                         {item.notes && (
@@ -981,6 +983,7 @@ export function ReturnsList({
                           <option value="new">Neu</option>
                           <option value="used">Gebraucht</option>
                           <option value="damaged">Defekt</option>
+                          <option value="fremd">Fremdware</option>
                         </select>
                       </div>
 
