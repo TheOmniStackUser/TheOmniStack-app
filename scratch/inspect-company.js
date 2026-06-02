@@ -5,11 +5,10 @@ const sql = postgres('postgresql://neondb_owner:npg_iYQt4xBdqH5l@ep-little-band-
 async function main() {
   try {
     const company = await sql`
-      SELECT id, name, "legal_name", "vat_id", "tax_id", "country", "vat_rates"
+      SELECT id, name, legal_name, vat_id, tax_id, street, zip, city, country
       FROM companies
-      WHERE id = 'abe0132f-18e4-41a8-92f7-e65005cfa6aa'
     `;
-    console.log('Company VAT:', JSON.stringify(company, null, 2));
+    console.log('All Companies:', JSON.stringify(company, null, 2));
   } catch (err) {
     console.error(err);
   } finally {

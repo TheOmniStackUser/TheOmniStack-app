@@ -348,7 +348,11 @@ export async function getInvoiceDetailsAction(invoiceId: string) {
     })
 
     return {
-      invoice,
+      invoice: {
+        ...invoice,
+        marketplace: linkedOrder?.marketplace || null,
+        marketplaceOrderId: linkedOrder?.marketplaceOrderId || null,
+      },
       linkedOrder: linkedOrder || null
     }
   }
@@ -390,6 +394,8 @@ export async function getInvoiceDetailsAction(invoiceId: string) {
       isCreditNote: false,
       cancelsInvoiceId: null,
       createdAt: order.createdAt,
+      marketplace: order.marketplace || null,
+      marketplaceOrderId: order.marketplaceOrderId || null,
       items: order.items.map((item, index) => ({
         id: item.id,
         invoiceId: order.id,

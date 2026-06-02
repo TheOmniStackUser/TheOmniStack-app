@@ -1,22 +1,33 @@
-import { db } from '../src/db/client'
-import { orders } from '../src/db/schema/orders'
-import { eq, and } from 'drizzle-orm'
+import { db } from '../src/db/client';
+import { orders } from '../src/db/schema/orders';
+import { invoices } from '../src/db/schema/invoices';
+import { eq, sql } from 'drizzle-orm';
 
 async function run() {
-  const companyId = '549c1c0b-0d32-42b7-912f-0c1198d676e'
-  const orderId = 'B-10001'
-  console.log(`--- DETAIL FOR ORDER B-10001 ---`)
-  const result = await db.select().from(orders).where(
-    and(
-      eq(orders.companyId, companyId),
-      eq(orders.marketplaceOrderId, orderId)
-    )
-  )
-  console.dir(result, { depth: null })
-  process.exit(0)
+  const marketplaces = await db
+    .select({
+      marketplace: orders.marketplace,
+      count: sql<number>`count(*)::int`
+    })
+    .from(orders)
+    .groupBy(orders.marketplace);
+  
+  console.log("MARKETPLACES IN ORDERS:");
+  console.log(marketplaces);
+
+  const invoiceStats = await db
+    .select({
+      marketplace: orders.marketplace,
+      status: invoices.status,
+      paidAtNull: sql<boolean>`${invoices.paidAt} IS NULL`,
+      count: sql<number>`count(*)::int`
+    })
+    .from(invoices)
+    .leftJoin(orders, eq(invoices.id, orders.invoiceId))
+    .groupBy(orders.marketplace, invoices.status, sql`${invoices.paidAt} IS NULL`);
+
+  console.log("\nINVOICE STATS:");
+  console.log(invoiceStats);
 }
 
-run().catch(err => {
-  console.error(err)
-  process.exit(1)
-})
+run().catch(console.error).then(() => process.exit(0));
