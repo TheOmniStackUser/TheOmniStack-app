@@ -2169,38 +2169,31 @@ export function OrdersTable({
                               <div className="border-t border-slate-100 my-1"></div>
 
                               {/* 4. DHL-Label erstellen */}
-                              {order.status !== 'shipped' && dhlConfig ? (
+                              {dhlConfig ? (
                                 <button
                                   type="button"
                                   onClick={() => handleSingleOrderDhl(order)}
                                   className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors whitespace-nowrap"
                                 >
                                   <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
-                                  DHL-Label erstellen
+                                  {order.status === 'shipped' ? 'DHL-Ersatzlabel erstellen' : 'DHL-Label erstellen'}
                                 </button>
                               ) : (
-                                <span className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-400 bg-slate-50/30 cursor-not-allowed select-none whitespace-nowrap" title={!dhlConfig ? "DHL nicht konfiguriert" : "Bestellung bereits versendet"}>
+                                <span className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-400 bg-slate-50/30 cursor-not-allowed select-none whitespace-nowrap" title="DHL nicht konfiguriert">
                                   <svg className="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
                                   DHL-Label erstellen
                                 </span>
                               )}
 
                               {/* 5. Hermes-Label erstellen */}
-                              {order.status !== 'shipped' ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleSingleOrderHermes(order)}
-                                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors whitespace-nowrap"
-                                >
-                                  <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
-                                  Hermes-Label erstellen
-                                </button>
-                              ) : (
-                                <span className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-400 bg-slate-50/30 cursor-not-allowed select-none whitespace-nowrap">
-                                  <svg className="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
-                                  Hermes-Label erstellen
-                                </span>
-                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleSingleOrderHermes(order)}
+                                className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors whitespace-nowrap"
+                              >
+                                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                                {order.status === 'shipped' ? 'Hermes-Ersatzlabel erstellen' : 'Hermes-Label erstellen'}
+                              </button>
 
                               {/* 6. Manuell versenden */}
                               {order.status !== 'shipped' ? (
@@ -2364,6 +2357,30 @@ export function OrdersTable({
                                         Manuell versenden
                                       </button>
                                     )}
+
+                                    {dhlConfig && (
+                                      <button 
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleSingleOrderDhl(order)
+                                        }}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 transition-all shadow-sm"
+                                      >
+                                        <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                                        {order.status === 'shipped' ? 'DHL-Ersatzlabel' : 'DHL-Label'}
+                                      </button>
+                                    )}
+
+                                    <button 
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleSingleOrderHermes(order)
+                                      }}
+                                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 transition-all shadow-sm"
+                                    >
+                                      <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                                      {order.status === 'shipped' ? 'Hermes-Ersatzlabel' : 'Hermes-Label'}
+                                    </button>
                                   </div>
                                 </div>
                                 {/* Weight display - now enabled after DB migration */}
