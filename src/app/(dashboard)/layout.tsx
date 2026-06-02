@@ -6,6 +6,7 @@ import { SidebarNav } from './sidebar-nav'
 import { db } from '@/db/client'
 import { users } from '@/db/schema/auth'
 import { eq } from 'drizzle-orm'
+import { AutoRefresh } from '@/components/auto-refresh'
 
 export default async function DashboardLayout({
   children,
@@ -108,6 +109,7 @@ export default async function DashboardLayout({
 
       {/* Main Content */}
       <main className="flex-1 p-8 overflow-y-auto overflow-x-auto">
+        <AutoRefresh />
         {children}
       </main>
     </div>
