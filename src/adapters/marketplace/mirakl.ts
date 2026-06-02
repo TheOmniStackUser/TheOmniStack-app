@@ -138,7 +138,31 @@ export class MiraklAdapter implements MarketplaceAdapter {
       const isCountryRestricted = this.config.baseUrl.includes('decathlon') || this.marketplace.toLowerCase().includes('secret sales')
       if (match && isCountryRestricted) {
         const expectedChannel = match[1].toUpperCase()
+        const countryMapping: Record<string, string[]> = {
+          'DE': ['DE', 'DEU', 'GERMANY'],
+          'NL': ['NL', 'NLD', 'NETHERLANDS'],
+          'SE': ['SE', 'SWE', 'SWEDEN'],
+          'BE': ['BE', 'BEL', 'BELGIUM'],
+          'IE': ['IE', 'IRL', 'IRELAND'],
+          'FR': ['FR', 'FRA', 'FRANCE'],
+          'IT': ['IT', 'ITA', 'ITALY'],
+          'ES': ['ES', 'ESP', 'SPAIN'],
+          'AT': ['AT', 'AUT', 'AUSTRIA'],
+          'CH': ['CH', 'CHE', 'SWITZERLAND'],
+          'GB': ['GB', 'GBR', 'UK', 'UNITED KINGDOM'],
+        }
+
         rawOrders = rawOrders.filter((raw: any) => {
+          // Secret Sales channel codes are sometimes misconfigured (e.g. DE orders have channel_be).
+          // Fall back to checking shipping address country.
+          const shippingIso = (raw.customer?.shipping_address?.country_iso_code || '').toUpperCase()
+          const shippingName = (raw.customer?.shipping_address?.country || '').toUpperCase()
+          const validCountries = countryMapping[expectedChannel] || [expectedChannel]
+          
+          if (validCountries.includes(shippingIso) || validCountries.includes(shippingName)) {
+            return true
+          }
+
           const channelCode = raw.channel?.code?.toUpperCase()
           if (!channelCode) return false
           return (
