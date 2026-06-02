@@ -526,3 +526,24 @@ export async function updateOrderBillingAddressAction(
   }
 }
 
+export async function getOrderLabelsAction(orderId: string) {
+  try {
+    const auth = await requireAuth()
+    const [order] = await db
+      .select({ labelUrl: orders.labelUrl, returnLabelUrl: orders.returnLabelUrl })
+      .from(orders)
+      .where(
+        and(
+          eq(orders.id, orderId),
+          eq(orders.companyId, auth.activeCompanyId)
+        )
+      )
+      .limit(1)
+    
+    return { success: true, labelUrl: order?.labelUrl, returnLabelUrl: order?.returnLabelUrl }
+  } catch (error) {
+    console.error('Error fetching labels:', error)
+    return { error: 'Fehler beim Laden der Etiketten.' }
+  }
+}
+

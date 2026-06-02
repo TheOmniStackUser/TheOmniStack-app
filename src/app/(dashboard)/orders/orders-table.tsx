@@ -4,7 +4,7 @@ import { useState, Fragment, ReactNode, useEffect, useMemo } from 'react'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
 import { generateHermesLabelsAction, generateDhlLabelsAction } from '@/app/actions/shipping'
-import { archiveOrderAction, archiveOrdersBulkAction, updateOrderStatusAction, updateOrderAddressAction, updateOrderBillingAddressAction, generateOrDownloadInvoicesBulkAction, markOrderAsShippedManuallyAction } from '@/app/actions/orders'
+import { archiveOrderAction, archiveOrdersBulkAction, updateOrderStatusAction, updateOrderAddressAction, updateOrderBillingAddressAction, generateOrDownloadInvoicesBulkAction, markOrderAsShippedManuallyAction, getOrderLabelsAction } from '@/app/actions/orders'
 import { getInvoiceDownloadUrl } from '@/app/actions/invoices'
 import type { Order, OrderItem } from '@/db/schema/orders'
 import type { Invoice, InvoiceLog } from '@/db/schema/invoices'
@@ -1080,33 +1080,53 @@ export function OrdersTable({
   // Helper: open a label — handles http URLs, data URIs, and raw base64 PDFs
 
 
-  const openLabel = (url: string) => {
-    if (!url) return
+  const [isOpeningLabel, setIsOpeningLabel] = useState(false)
 
-    let base64: string | null = null
-
-    if (url.startsWith('data:application/pdf;base64,')) {
-      // Already a proper data URI
-      base64 = url.split(',')[1]
-    } else if (!url.startsWith('http')) {
-      // Raw base64 string (e.g. from DHL Sandbox returning label.b64)
-      base64 = url
-    }
-
-    if (base64) {
-      try {
-        const binary = atob(base64)
-        const bytes = new Uint8Array(binary.length)
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-        const blob = new Blob([bytes], { type: 'application/pdf' })
-        const blobUrl = URL.createObjectURL(blob)
-        window.open(blobUrl, '_blank')
-      } catch (e) {
-        showToast('Das Label konnte nicht geöffnet werden. Bitte versuche es erneut.', 'error')
-        console.error('[openLabel] base64 decode error:', e)
+  const openLabel = async (orderId: string, type: 'labelUrl' | 'returnLabelUrl') => {
+    try {
+      setIsOpeningLabel(true)
+      const res = await getOrderLabelsAction(orderId)
+      
+      if (res.error) {
+        showToast(res.error, 'error')
+        return
       }
-    } else {
-      window.open(url, '_blank')
+
+      const url = type === 'labelUrl' ? res.labelUrl : res.returnLabelUrl
+      if (!url) {
+        showToast('Etikett nicht gefunden.', 'error')
+        return
+      }
+
+      let base64: string | null = null
+
+      if (url.startsWith('data:application/pdf;base64,')) {
+        // Already a proper data URI
+        base64 = url.split(',')[1]
+      } else if (!url.startsWith('http')) {
+        // Raw base64 string (e.g. from DHL Sandbox returning label.b64)
+        base64 = url
+      }
+
+      if (base64) {
+        try {
+          const binary = atob(base64)
+          const bytes = new Uint8Array(binary.length)
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+          const blob = new Blob([bytes], { type: 'application/pdf' })
+          const blobUrl = URL.createObjectURL(blob)
+          window.open(blobUrl, '_blank')
+        } catch (e) {
+          showToast('Das Label konnte nicht geöffnet werden. Bitte versuche es erneut.', 'error')
+          console.error('[openLabel] base64 decode error:', e)
+        }
+      } else {
+        window.open(url, '_blank')
+      }
+    } catch (e) {
+      showToast('Ein Fehler ist aufgetreten.', 'error')
+    } finally {
+      setIsOpeningLabel(false)
     }
   }
 
@@ -2408,8 +2428,9 @@ export function OrdersTable({
                                   <div>
                                     <span className="font-medium">Versandetikett:</span> 
                                     <button 
-                                      onClick={() => openLabel(order.labelUrl!)}
-                                      className="ml-2 text-blue-600 hover:text-blue-800 underline inline-flex items-center gap-1"
+                                      onClick={() => openLabel(order.id, 'labelUrl')}
+                                      disabled={isOpeningLabel}
+                                      className="ml-2 text-blue-600 hover:text-blue-800 underline inline-flex items-center gap-1 disabled:opacity-50"
                                     >
                                       Label öffnen
                                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
@@ -2443,12 +2464,12 @@ export function OrdersTable({
                                 )}
                                 {order.returnLabelUrl && (
                                   <div>
-                                    <span className="font-medium">Retourenetikett:</span> 
                                     <button 
-                                      onClick={() => openLabel(order.returnLabelUrl!)}
-                                      className="ml-2 text-blue-600 hover:text-blue-800 underline inline-flex items-center gap-1"
+                                      onClick={() => openLabel(order.id, 'returnLabelUrl')}
+                                      disabled={isOpeningLabel}
+                                      className="ml-2 text-blue-600 hover:text-blue-800 underline inline-flex items-center gap-1 disabled:opacity-50"
                                     >
-                                      Label herunterladen
+                                      Retoure öffnen
                                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                                     </button>
                                   </div>

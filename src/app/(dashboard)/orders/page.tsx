@@ -109,7 +109,9 @@ export default async function OrdersPage() {
     }
     return {
       ...order,
-      rawPayload: strippedPayload
+      rawPayload: strippedPayload,
+      labelUrl: order.labelUrl ? 'EXISTS' : null,
+      returnLabelUrl: order.returnLabelUrl ? 'EXISTS' : null,
     }
   })
 
