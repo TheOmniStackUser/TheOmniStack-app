@@ -257,20 +257,18 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
                         {loadingId === `${int.id}-uploadInvoice` ? '...' : 'Auto-Upload'}
                       </button>
 
-                      {isMirakl && (
-                        <button
-                          onClick={() => handleToggle(int.id, 'autoCreditNote', !!metadata.autoCreditNote)}
-                          disabled={loadingId === `${int.id}-autoCreditNote`}
-                          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
-                            metadata.autoCreditNote
-                              ? 'bg-green-600 border-green-600 text-white shadow-md shadow-green-200' 
-                              : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
-                          }`}
-                        >
-                          <RefreshCw size={14} />
-                          {loadingId === `${int.id}-autoCreditNote` ? '...' : 'Auto-Gutschrift'}
-                        </button>
-                      )}
+                      <button
+                        onClick={() => handleToggle(int.id, 'autoCreditNote', !!metadata.autoCreditNote)}
+                        disabled={loadingId === `${int.id}-autoCreditNote`}
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                          metadata.autoCreditNote
+                            ? 'bg-green-600 border-green-600 text-white shadow-md shadow-green-200' 
+                            : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
+                        }`}
+                      >
+                        <RefreshCw size={14} />
+                        {loadingId === `${int.id}-autoCreditNote` ? '...' : 'Auto-Gutschrift'}
+                      </button>
 
                       <button
                         onClick={() => handleToggle(int.id, 'autoRefund', !!metadata.autoRefund)}
