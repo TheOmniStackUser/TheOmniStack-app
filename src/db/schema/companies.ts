@@ -138,6 +138,7 @@ export const companyMembers = pgTable('company_members', {
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
   role: memberRoleEnum('role').notNull().default('staff'), // Default to staff (safest)
+  apiKey: text('api_key').unique(), // Personal API key for mobile app
   joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
 })
 

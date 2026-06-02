@@ -25,6 +25,11 @@ export default async function ReturnsPage() {
             totalAmount: true,
             currency: true
           }
+        },
+        user: {
+          columns: {
+            name: true
+          }
         }
       }
     }),

@@ -54,7 +54,7 @@ export function ApiSettings() {
     >
       <div className="p-6 space-y-6">
         <div className="space-y-2">
-          <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Dein API-Key</label>
+          <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Dein persönlicher API-Key</label>
           <div className="flex gap-2">
             <input
               type={showKey ? 'text' : 'password'}
@@ -124,7 +124,7 @@ export function ApiSettings() {
         </div>
         
         <p className="text-xs text-gray-400 italic">
-          Hinweis: Ein neuer Key macht den alten sofort ungültig. Die mobile App muss danach neu verbunden werden.
+          Hinweis: Dieser persönliche API-Key ist nur für dich. Ein neuer Key macht deinen alten sofort ungültig. Die mobile App muss danach neu verbunden werden. Andere Mitarbeiter sind davon nicht betroffen.
         </p>
       </div>
     </CollapsibleSection>

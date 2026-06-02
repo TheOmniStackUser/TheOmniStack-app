@@ -33,6 +33,7 @@ interface ReturnLog {
   orderId: string | null
   metadata: any
   items: ScannedItem[]
+  user?: { name: string } | null
 }
 
 interface ReturnsListProps {
@@ -512,6 +513,7 @@ export function ReturnsList({
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Eingang</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Scan-Zeitpunkt</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Mitarbeiter</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Marktplatz</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Bestellnummer</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Versand</th>
@@ -523,7 +525,7 @@ export function ReturnsList({
           <tbody className="divide-y divide-slate-100">
             {filteredLogs.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-6 py-12 text-center text-slate-400 italic">
+                <td colSpan={11} className="px-6 py-12 text-center text-slate-400 italic">
                   Keine Retouren gefunden.
                 </td>
               </tr>
@@ -575,6 +577,20 @@ export function ReturnsList({
                       </svg>
                       <span>{format(log.scannedAt, 'dd.MM.yyyy HH:mm', { locale: de })}</span>
                     </div>
+                  </td>
+
+                  {/* Mitarbeiter */}
+                  <td className="px-6 py-4">
+                    {log.user?.name ? (
+                      <div className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg">
+                        <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        {log.user.name}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-slate-400 italic">Unbekannt</span>
+                    )}
                   </td>
 
                   {/* Marketplace Badge */}

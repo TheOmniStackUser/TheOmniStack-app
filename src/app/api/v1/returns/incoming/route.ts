@@ -28,13 +28,35 @@ export async function POST(req: Request) {
       ? 'os_live_leis_leis_gb_7747099a'
       : apiKey
 
-    const [company] = await db
-      .select({ id: companies.id })
-      .from(companies)
-      .where(eq(companies.apiKey, lookupKey))
+    let companyId: string | null = null
+    const { companyMembers } = await import('@/db/schema/companies')
+    
+    // First, try to find a personal API key in companyMembers
+    const [member] = await db
+      .select({ companyId: companyMembers.companyId, userId: companyMembers.userId })
+      .from(companyMembers)
+      .where(eq(companyMembers.apiKey, lookupKey))
       .limit(1)
 
-    if (!company) {
+    let autoProcessedByUserId: string | null = null
+
+    if (member) {
+      companyId = member.companyId
+      autoProcessedByUserId = member.userId
+    } else {
+      // Fallback: check legacy company API key
+      const [company] = await db
+        .select({ id: companies.id })
+        .from(companies)
+        .where(eq(companies.apiKey, lookupKey))
+        .limit(1)
+      
+      if (company) {
+        companyId = company.id
+      }
+    }
+
+    if (!companyId) {
       return NextResponse.json({ error: 'Unauthorized: Invalid API Key' }, { status: 401, headers: MOBILE_SAFE_HEADERS })
     }
 
@@ -51,7 +73,7 @@ export async function POST(req: Request) {
     const scanInput = order_info.order_number.trim()
     const matchedOrder = await db.query.orders.findFirst({
       where: and(
-        eq(orders.companyId, company.id),
+        eq(orders.companyId, companyId),
         or(
           eq(orders.marketplaceOrderId, scanInput),
           eq(orders.trackingNumber, scanInput),
@@ -169,12 +191,12 @@ export async function POST(req: Request) {
 
     // 5. Persistence — Log the Return Entry
     const [logEntry] = await db.insert(returnsLog).values({
-      companyId: company.id,
+      companyId: companyId,
       orderId: matchedOrder?.id,
       orderNumber: matchedOrder?.marketplaceOrderId || order_info.order_number, // Use the matched order number if a tracking number was scanned!
       customerName: resolvedCustomerName,
       shippingAddress: resolvedShippingAddress,
-      processedByUserId: return_metadata?.processed_by_user_id || null,
+      processedByUserId: autoProcessedByUserId || return_metadata?.processed_by_user_id || null,
       marketplace: resolvedMarketplace,
       scannedAt: resolvedScannedAt,
       receivedAt: resolvedReceivedAt,
@@ -202,7 +224,7 @@ export async function POST(req: Request) {
           .from(marketplaceIntegrations)
           .where(
             and(
-              eq(marketplaceIntegrations.companyId, company.id),
+              eq(marketplaceIntegrations.companyId, companyId),
               eq(marketplaceIntegrations.isActive, true)
             )
           )
@@ -231,7 +253,7 @@ export async function POST(req: Request) {
             console.log(`[API V1 Returns] Auto-refund enabled for ${matchedOrder.marketplace}. Triggering executeRefund...`)
             const { executeRefund } = await import('@/lib/refund-service')
             await executeRefund({
-              companyId: company.id,
+              companyId: companyId,
               returnLogId: logEntry.id,
               itemsToRefund
             })
@@ -244,7 +266,7 @@ export async function POST(req: Request) {
       }
     }
 
-    console.log(`[API V1 Returns] Logged return for order ${order_info.order_number} (Company: ${company.id})`)
+    console.log(`[API V1 Returns] Logged return for order ${order_info.order_number} (Company: ${companyId})`)
 
     return NextResponse.json({ 
       success: true, 
