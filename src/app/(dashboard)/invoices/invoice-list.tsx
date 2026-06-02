@@ -1160,6 +1160,10 @@ export function InvoiceList({
         valA = a.invoiceNumber || ''
         valB = b.invoiceNumber || ''
         break
+      case 'marketplaceOrderId':
+        valA = a.marketplaceOrderId || ''
+        valB = b.marketplaceOrderId || ''
+        break
       case 'type':
         valA = getInvoiceTypeLabel(a)
         valB = getInvoiceTypeLabel(b)
@@ -1363,37 +1367,39 @@ export function InvoiceList({
               <option value="manual">Manuell</option>
 
               {groupedMarketplaces.direct.length > 0 && (
-                <optgroup label="Direkte Integrationen">
+                <>
+                  <option disabled className="font-semibold text-gray-500 bg-gray-50">Direkte Integrationen</option>
                   {groupedMarketplaces.direct.map((m) => (
-                    <option key={m.value} value={m.value}>{m.label}</option>
+                    <option key={m.value} value={m.value}>{"\u00A0\u00A0"}{m.label}</option>
                   ))}
-                </optgroup>
+                </>
               )}
 
               {groupedMarketplaces.decathlon.length > 0 && (
-                <optgroup label="Decathlon Marktplätze">
-                  <option value="group_decathlon">Decathlon (Alle)</option>
+                <>
+                  <option value="group_decathlon" className="font-semibold bg-gray-50">Decathlon Marktplätze</option>
                   {groupedMarketplaces.decathlon.map((m) => (
-                    <option key={m.value} value={m.value}>{m.label}</option>
+                    <option key={m.value} value={m.value}>{"\u00A0\u00A0"}{m.label}</option>
                   ))}
-                </optgroup>
+                </>
               )}
 
               {groupedMarketplaces.secretSales.length > 0 && (
-                <optgroup label="Secret Sales Marktplätze">
-                  <option value="group_secret_sales">Secret Sales (Alle)</option>
+                <>
+                  <option value="group_secret_sales" className="font-semibold bg-gray-50">Secret Sales Marktplätze</option>
                   {groupedMarketplaces.secretSales.map((m) => (
-                    <option key={m.value} value={m.value}>{m.label}</option>
+                    <option key={m.value} value={m.value}>{"\u00A0\u00A0"}{m.label}</option>
                   ))}
-                </optgroup>
+                </>
               )}
 
               {groupedMarketplaces.other.length > 0 && (
-                <optgroup label="Weitere Marktplätze">
+                <>
+                  <option disabled className="font-semibold text-gray-500 bg-gray-50">Weitere Marktplätze</option>
                   {groupedMarketplaces.other.map((m) => (
-                    <option key={m.value} value={m.value}>{m.label}</option>
+                    <option key={m.value} value={m.value}>{"\u00A0\u00A0"}{m.label}</option>
                   ))}
-                </optgroup>
+                </>
               )}
             </select>
 
@@ -1459,6 +1465,7 @@ export function InvoiceList({
             <tr className="bg-slate-50 border-b border-slate-200">
               {renderSortableHeader('Datum', 'createdAt')}
               {renderSortableHeader('Belegnummer', 'invoiceNumber')}
+              {renderSortableHeader('Bestellnummer', 'marketplaceOrderId')}
               {renderSortableHeader('Typ', 'type')}
               {renderSortableHeader('Marktplatz', 'marketplace')}
               {renderSortableHeader('Kunde', 'recipientName')}
@@ -1522,6 +1529,9 @@ export function InvoiceList({
                         </span>
                       )}
                     </div>
+                  </td>
+                  <td className="px-6 py-4 font-mono text-xs text-slate-600">
+                    {invoice.marketplaceOrderId || '–'}
                   </td>
                   <td className="px-6 py-4">
                     {(() => {

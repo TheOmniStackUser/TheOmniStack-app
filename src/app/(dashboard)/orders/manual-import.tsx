@@ -131,35 +131,39 @@ export function ManualImport({
             <option value="all">Alle Marktplätze</option>
 
             {groupedMarketplaces.direct.length > 0 && (
-              <optgroup label="Direkte Integrationen">
+              <>
+                <option disabled className="font-semibold text-gray-500 bg-gray-50">Direkte Integrationen</option>
                 {groupedMarketplaces.direct.map((m) => (
-                  <option key={m.value} value={m.value}>{m.label}</option>
+                  <option key={m.value} value={m.value}>{"\u00A0\u00A0"}{m.label}</option>
                 ))}
-              </optgroup>
+              </>
             )}
 
             {groupedMarketplaces.decathlon.length > 0 && (
-              <optgroup label="Decathlon Marktplätze">
+              <>
+                <option disabled className="font-semibold text-gray-500 bg-gray-50">Decathlon Marktplätze</option>
                 {groupedMarketplaces.decathlon.map((m) => (
-                  <option key={m.value} value={m.value}>{m.label}</option>
+                  <option key={m.value} value={m.value}>{"\u00A0\u00A0"}{m.label}</option>
                 ))}
-              </optgroup>
+              </>
             )}
 
             {groupedMarketplaces.secretSales.length > 0 && (
-              <optgroup label="Secret Sales Marktplätze">
+              <>
+                <option disabled className="font-semibold text-gray-500 bg-gray-50">Secret Sales Marktplätze</option>
                 {groupedMarketplaces.secretSales.map((m) => (
-                  <option key={m.value} value={m.value}>{m.label}</option>
+                  <option key={m.value} value={m.value}>{"\u00A0\u00A0"}{m.label}</option>
                 ))}
-              </optgroup>
+              </>
             )}
 
             {groupedMarketplaces.other.length > 0 && (
-              <optgroup label="Weitere Marktplätze">
+              <>
+                <option disabled className="font-semibold text-gray-500 bg-gray-50">Weitere Marktplätze</option>
                 {groupedMarketplaces.other.map((m) => (
-                  <option key={m.value} value={m.value}>{m.label}</option>
+                  <option key={m.value} value={m.value}>{"\u00A0\u00A0"}{m.label}</option>
                 ))}
-              </optgroup>
+              </>
             )}
           </select>
         </div>
