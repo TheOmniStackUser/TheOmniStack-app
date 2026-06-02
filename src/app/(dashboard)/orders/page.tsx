@@ -57,18 +57,18 @@ export default async function OrdersPage() {
     acc[item.orderId] = acc[item.orderId] || []
     acc[item.orderId].push(item)
     return acc
-  }, {} as Record<string, typeof items>)
+  }, {} as Record<string, any[]>)
 
   const logsByInvoiceId = allLogs.reduce((acc, log) => {
     acc[log.invoiceId] = acc[log.invoiceId] || []
     acc[log.invoiceId].push(log)
     return acc
-  }, {} as Record<string, typeof allLogs>)
+  }, {} as Record<string, any[]>)
 
   const invoiceById = allInvoices.reduce((acc, inv) => {
     acc[inv.id] = inv
     return acc
-  }, {} as Record<string, typeof allInvoices[0]>)
+  }, {} as Record<string, any>)
 
   const allOrders = baseOrders.map(o => {
     const inv = o.invoiceId ? invoiceById[o.invoiceId] : null
