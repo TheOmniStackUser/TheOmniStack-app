@@ -840,9 +840,27 @@ export function InvoiceList({
   const [pageSize, setPageSize] = useState(25)
   const [currentPage, setCurrentPage] = useState(1)
 
+  // Selected Invoices
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [isBulkDownloading, setIsBulkDownloading] = useState(false)
+
   // Sorting
   const [sortField, setSortField] = useState<string | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | null>(null)
+
+  const handleBulkDownload = async () => {
+    if (selectedIds.length === 0) return
+    try {
+      setIsBulkDownloading(true)
+      const url = `/api/invoices/bulk-download?ids=${selectedIds.join(',')}`
+      window.open(url, '_blank')
+    } catch (error) {
+      showToast('Fehler beim Herunterladen der Rechnungen.', 'error')
+    } finally {
+      setIsBulkDownloading(false)
+      setSelectedIds([])
+    }
+  }
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -1440,6 +1458,25 @@ export function InvoiceList({
             </div>
 
             <div className="ml-auto flex gap-2">
+              {selectedIds.length > 0 && (
+                <button
+                  onClick={handleBulkDownload}
+                  disabled={isBulkDownloading}
+                  className="px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 transition-all shadow-sm flex items-center gap-2 disabled:opacity-50"
+                >
+                  {isBulkDownloading ? (
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                  )}
+                  {selectedIds.length} als PDF laden
+                </button>
+              )}
               <button
                 onClick={handleResetFilters}
                 className="px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-all"
@@ -1471,6 +1508,28 @@ export function InvoiceList({
         <table className="w-full text-left border-collapse text-sm min-w-[1200px]">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
+              <th className="px-6 py-4 w-12">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
+                  checked={paginatedInvoices.length > 0 && paginatedInvoices.every(i => selectedIds.includes(i.id))}
+                  ref={input => {
+                    if (input) {
+                      input.indeterminate = paginatedInvoices.some(i => selectedIds.includes(i.id)) && !paginatedInvoices.every(i => selectedIds.includes(i.id))
+                    }
+                  }}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      const newIds = new Set(selectedIds)
+                      paginatedInvoices.forEach(i => newIds.add(i.id))
+                      setSelectedIds(Array.from(newIds))
+                    } else {
+                      const toRemove = new Set(paginatedInvoices.map(i => i.id))
+                      setSelectedIds(selectedIds.filter(id => !toRemove.has(id)))
+                    }
+                  }}
+                />
+              </th>
               {renderSortableHeader('Datum', 'createdAt')}
               {renderSortableHeader('Belegnummer', 'invoiceNumber')}
               {renderSortableHeader('Bestellnummer', 'marketplaceOrderId')}
@@ -1500,6 +1559,20 @@ export function InvoiceList({
                   }} 
                   className="border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer"
                 >
+                  <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
+                      checked={selectedIds.includes(invoice.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedIds([...selectedIds, invoice.id])
+                        } else {
+                          setSelectedIds(selectedIds.filter(id => id !== invoice.id))
+                        }
+                      }}
+                    />
+                  </td>
                   <td className="px-6 py-4 text-slate-600">
                     {format(new Date(invoice.createdAt), 'dd.MM.yyyy HH:mm', { locale: de })}
                   </td>
@@ -1820,7 +1893,7 @@ export function InvoiceList({
            })}
             {filteredInvoices.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-6 py-12 text-center text-slate-500">
+                <td colSpan={10} className="px-6 py-12 text-center text-slate-500">
                   Keine Rechnungen entsprechen deiner Suche.
                 </td>
               </tr>
