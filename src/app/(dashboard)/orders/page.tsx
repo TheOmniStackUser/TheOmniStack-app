@@ -57,6 +57,30 @@ export default async function OrdersPage() {
   const hasEbayIntegration = integrations.some(i => i.type === 'ebay' && i.clientId && i.clientSecret)
   const hasAboutYouIntegration = integrations.some(i => i.type === 'aboutyou' && i.apiKey)
  
+  // Optimize payload size for Client Component
+  // rawPayload can be huge (MBs) for 600+ orders, causing slow Next.js serialization
+  const optimizedOrders = allOrders.map(order => {
+    const raw = order.rawPayload as any
+    let strippedPayload = null
+    if (raw) {
+      strippedPayload = {
+        orderNumber: raw.orderNumber,
+        financial_status: raw.financial_status,
+        manualBillingAddress: raw.manualBillingAddress,
+        invoiceAddress: raw.invoiceAddress,
+        customer: raw.customer ? { billing_address: raw.customer.billing_address } : undefined,
+        billing_street: raw.billing_street,
+        billing_zip_code: raw.billing_zip_code,
+        billing_city: raw.billing_city,
+        billing_country_code: raw.billing_country_code,
+      }
+    }
+    return {
+      ...order,
+      rawPayload: strippedPayload
+    }
+  })
+
   return (
     <div className="max-w-[1600px] mx-auto">
       <header className="mb-8">
@@ -75,7 +99,7 @@ export default async function OrdersPage() {
       />
 
       <OrdersTable 
-        orders={allOrders} 
+        orders={optimizedOrders} 
         hermesDefaultParcelClass={defaultParcelClass} 
         customMiraklIntegrations={customMiraklIntegrations}
         dhlConfig={dhlConfig}

@@ -127,7 +127,7 @@ export function createMarketplaceSyncWorker() {
               integrationId: integration.id,
             },
             {
-              jobId: `sync-${integration.type}-${companyId}-${Date.now()}`
+              jobId: `sync-${integration.type}-${integration.id}-${companyId}-${Date.now()}`
             }
           )
         }
@@ -527,7 +527,7 @@ export async function generateOrDownloadDeliveryNote(
   let pdfBuffer: Buffer
   if (order.marketplace === 'aboutyou' && adapter && 'getDeliveryNote' in adapter && typeof (adapter as any).getDeliveryNote === 'function') {
     try {
-      pdfBuffer = await (adapter as any).getDeliveryNote(order.marketplaceOrderId)
+      pdfBuffer = await (adapter as any).getDeliveryNote(order.marketplaceOrderId, order.rawPayload)
     } catch (err) {
       console.error(`[Worker] Failed to download delivery note from About You for order ${order.marketplaceOrderId}:`, err)
       return
@@ -594,7 +594,7 @@ export async function downloadAndSaveMarketplaceInvoice(
 
   console.log(`[Worker] Downloading marketplace invoice for order ${order.marketplaceOrderId}...`)
   try {
-    const result = await adapter.getInvoice(order.marketplaceOrderId)
+    const result = await adapter.getInvoice(order.marketplaceOrderId, order.rawPayload)
     if (!result) {
       console.log(`[Worker] Adapter returned no invoice for order ${order.marketplaceOrderId}`)
       return

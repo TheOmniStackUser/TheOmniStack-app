@@ -179,7 +179,7 @@ export class OttoAdapter implements MarketplaceAdapter {
 
     return {
       marketplace: this.marketplace,
-      marketplaceOrderId: raw.salesOrderId || raw.orderNumber || `OTTO-${Date.now()}`,
+      marketplaceOrderId: raw.orderNumber || raw.salesOrderId || `OTTO-${Date.now()}`,
       purchaseDate: new Date(raw.orderDate || Date.now()),
       buyer: {
         name: `${raw.invoiceAddress?.firstName || ''} ${raw.invoiceAddress?.lastName || ''}`.trim() || 'Otto Customer',
@@ -232,7 +232,7 @@ export class OttoAdapter implements MarketplaceAdapter {
           if (item.positionItemId) {
             positionItems.push({
               positionItemId: item.positionItemId,
-              salesOrderId: marketplaceOrderId, // marketplaceOrderId is the UUID (salesOrderId)
+              salesOrderId: rawOrderPayload.salesOrderId || marketplaceOrderId,
               ...(returnTrackingNumber ? { returnTrackingKey: { carrier: carrier.toUpperCase(), trackingNumber: returnTrackingNumber } } : {}),
               ...(returnAddressCarrierId ? { returnAddressCarrierId } : {})
             })
@@ -295,12 +295,13 @@ export class OttoAdapter implements MarketplaceAdapter {
   /**
    * Fetches the official invoice PDF from Otto Market
    */
-  async getInvoice(marketplaceOrderId: string): Promise<{ pdfBuffer: Buffer, receiptNumber: string } | null> {
-    console.log(`[OttoAdapter] Fetching receipts list for salesOrderId ${marketplaceOrderId}...`)
+  async getInvoice(marketplaceOrderId: string, rawOrderPayload?: unknown): Promise<{ pdfBuffer: Buffer, receiptNumber: string } | null> {
+    const salesOrderId = (rawOrderPayload as any)?.salesOrderId || marketplaceOrderId
+    console.log(`[OttoAdapter] Fetching receipts list for salesOrderId ${salesOrderId}...`)
     try {
       const accessToken = await this.getAccessToken()
       
-      const listUrl = `${this.baseUrl}/v3/receipts?salesOrderId=${marketplaceOrderId}`
+      const listUrl = `${this.baseUrl}/v3/receipts?salesOrderId=${salesOrderId}`
       const response = await fetch(listUrl, {
         method: 'GET',
         headers: {
@@ -319,7 +320,7 @@ export class OttoAdapter implements MarketplaceAdapter {
       const purchaseReceipt = (data.resources || []).find((r: any) => r.receiptType === 'PURCHASE')
       
       if (!purchaseReceipt || !purchaseReceipt.receiptNumber) {
-        console.warn(`[OttoAdapter] No purchase receipt found for salesOrderId ${marketplaceOrderId}`)
+        console.warn(`[OttoAdapter] No purchase receipt found for salesOrderId ${salesOrderId}`)
         return null
       }
 
@@ -362,9 +363,10 @@ export class OttoAdapter implements MarketplaceAdapter {
 
       // 1. Fetch order details from Otto v4 to get positionItems
       let ottoOrder = (rawOrderPayload as any)
+      const salesOrderId = ottoOrder?.salesOrderId || marketplaceOrderId
       if (!ottoOrder || !ottoOrder.positionItems) {
         console.log(`[OttoAdapter] Fetching order details from Otto v4 API...`)
-        const response = await fetch(`${this.baseUrl}/v4/orders/${marketplaceOrderId}`, {
+        const response = await fetch(`${this.baseUrl}/v4/orders/${salesOrderId}`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -395,7 +397,7 @@ export class OttoAdapter implements MarketplaceAdapter {
         const refundIndex = remainingRefundItems.findIndex(ri => ri.sku === itemSku)
         if (refundIndex !== -1) {
           returnsPayload.push({
-            salesOrderId: marketplaceOrderId,
+            salesOrderId: salesOrderId,
             positionItemId: item.positionItemId,
             returnDate: new Date().toISOString().split('.')[0] + 'Z',
             trackingKey: {
