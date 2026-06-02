@@ -509,6 +509,12 @@ export function DeliveryNoteList({
       const dnMp = (dn.marketplace || 'manual').toLowerCase()
       if (targetMp === 'manual') {
         if (dnMp !== 'manual' && dnMp !== '') return false
+      } else if (targetMp === 'group_decathlon') {
+        const isDecathlon = dnMp === 'mirakl_decathlon' || dnMp === 'mirakl_decathlon_eu' || dnMp.startsWith('decathlon')
+        if (!isDecathlon) return false
+      } else if (targetMp === 'group_secret_sales') {
+        const isSecretSales = dnMp.startsWith('secret sales')
+        if (!isSecretSales) return false
       } else if (dnMp !== targetMp) {
         return false
       }
@@ -702,8 +708,9 @@ export function DeliveryNoteList({
               </optgroup>
             )}
 
-            {groupedMarketplaces.decathlon.length > 0 && (
+             {groupedMarketplaces.decathlon.length > 0 && (
               <optgroup label="Decathlon Marktplätze">
+                <option value="group_decathlon">Decathlon (Alle)</option>
                 {groupedMarketplaces.decathlon.map((m) => (
                   <option key={m.value} value={m.value}>{m.label}</option>
                 ))}
@@ -712,6 +719,7 @@ export function DeliveryNoteList({
 
             {groupedMarketplaces.secretSales.length > 0 && (
               <optgroup label="Secret Sales Marktplätze">
+                <option value="group_secret_sales">Secret Sales (Alle)</option>
                 {groupedMarketplaces.secretSales.map((m) => (
                   <option key={m.value} value={m.value}>{m.label}</option>
                 ))}

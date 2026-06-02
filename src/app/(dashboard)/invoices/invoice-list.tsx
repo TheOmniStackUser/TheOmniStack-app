@@ -1089,6 +1089,12 @@ export function InvoiceList({
       const invoiceMp = (invoice.marketplace || 'manual').toLowerCase()
       if (targetMp === 'manual') {
         if (invoiceMp !== 'manual' && invoiceMp !== '') return false
+      } else if (targetMp === 'group_decathlon') {
+        const isDecathlon = invoiceMp === 'mirakl_decathlon' || invoiceMp === 'mirakl_decathlon_eu' || invoiceMp.startsWith('decathlon')
+        if (!isDecathlon) return false
+      } else if (targetMp === 'group_secret_sales') {
+        const isSecretSales = invoiceMp.startsWith('secret sales')
+        if (!isSecretSales) return false
       } else if (invoiceMp !== targetMp) {
         return false
       }
@@ -1366,6 +1372,7 @@ export function InvoiceList({
 
               {groupedMarketplaces.decathlon.length > 0 && (
                 <optgroup label="Decathlon Marktplätze">
+                  <option value="group_decathlon">Decathlon (Alle)</option>
                   {groupedMarketplaces.decathlon.map((m) => (
                     <option key={m.value} value={m.value}>{m.label}</option>
                   ))}
@@ -1374,6 +1381,7 @@ export function InvoiceList({
 
               {groupedMarketplaces.secretSales.length > 0 && (
                 <optgroup label="Secret Sales Marktplätze">
+                  <option value="group_secret_sales">Secret Sales (Alle)</option>
                   {groupedMarketplaces.secretSales.map((m) => (
                     <option key={m.value} value={m.value}>{m.label}</option>
                   ))}

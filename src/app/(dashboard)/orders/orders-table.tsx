@@ -804,6 +804,16 @@ export function OrdersTable({
         if (orderMp !== 'manual' && orderMp !== '') {
           return false
         }
+      } else if (targetMp === 'group_decathlon') {
+        const isDecathlon = orderMp === 'mirakl_decathlon' || orderMp === 'mirakl_decathlon_eu' || orderMp.startsWith('decathlon')
+        if (!isDecathlon) {
+          return false
+        }
+      } else if (targetMp === 'group_secret_sales') {
+        const isSecretSales = orderMp.startsWith('secret sales')
+        if (!isSecretSales) {
+          return false
+        }
       } else if (orderMp !== targetMp) {
         return false
       }
@@ -1699,6 +1709,7 @@ export function OrdersTable({
 
             {groupedMarketplaces.decathlon.length > 0 && (
               <optgroup label="Decathlon Marktplätze">
+                <option value="group_decathlon">Decathlon (Alle)</option>
                 {groupedMarketplaces.decathlon.map((m) => (
                   <option key={m.value} value={m.value}>{m.label}</option>
                 ))}
@@ -1707,6 +1718,7 @@ export function OrdersTable({
 
             {groupedMarketplaces.secretSales.length > 0 && (
               <optgroup label="Secret Sales Marktplätze">
+                <option value="group_secret_sales">Secret Sales (Alle)</option>
                 {groupedMarketplaces.secretSales.map((m) => (
                   <option key={m.value} value={m.value}>{m.label}</option>
                 ))}

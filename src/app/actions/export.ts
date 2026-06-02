@@ -59,7 +59,16 @@ export async function exportInvoiceJournalAction(filters: {
   const filteredResults = results.filter(r => {
     if (!filters.marketplace || filters.marketplace === 'all') return true
     const order = orderMap.get(r.id)
-    return order?.marketplace === filters.marketplace
+    if (!order) return false
+    const orderMp = (order.marketplace || 'manual').toLowerCase()
+    const targetMp = filters.marketplace.toLowerCase()
+    
+    if (targetMp === 'group_decathlon') {
+      return orderMp === 'mirakl_decathlon' || orderMp === 'mirakl_decathlon_eu' || orderMp.startsWith('decathlon')
+    } else if (targetMp === 'group_secret_sales') {
+      return orderMp.startsWith('secret sales')
+    }
+    return orderMp === targetMp
   })
 
   const taxRates = [19, 23, 27, 20, 21, 22, 17, 0, 25]
