@@ -52,6 +52,50 @@ export async function executeRefund({
     throw new Error(`Bestellung ${returnEntry.orderNumber} wurde im System nicht gefunden.`)
   }
 
+  // For About You, we bypass the internal credit note generation and only trigger the API.
+  if (order.marketplace === 'aboutyou') {
+    console.log(`[RefundService] Marketplace is About You. Skipping internal credit note generation...`)
+    
+    const activeIntegrations = await db.select().from(marketplaceIntegrations).where(and(eq(marketplaceIntegrations.companyId, companyId), eq(marketplaceIntegrations.isActive, true)))
+    const integration = activeIntegrations.find(i => i.type === 'aboutyou')
+    
+    if (integration) {
+      const adapter = getAdapterForIntegration(integration)
+      if (adapter && adapter.refundOrder) {
+        try {
+          console.log(`[RefundService] Triggering API refund for marketplace aboutyou...`)
+          const apiSuccess = await adapter.refundOrder(
+            order.marketplaceOrderId,
+            itemsToRefund,
+            order.rawPayload
+          )
+          if (apiSuccess) {
+            console.log(`[RefundService] API refund processed successfully on marketplace.`)
+            // Update Return Log entry
+            const existingMetadata = (returnEntry.metadata as Record<string, any>) || {}
+            await db.update(returnsLog)
+              .set({
+                status: 'bearbeitet',
+                notes: `Rückerstattung an About You übermittelt. Gutschrift wird von About You erstellt.`,
+                metadata: {
+                  ...existingMetadata,
+                  refundedItems: itemsToRefund
+                }
+              })
+              .where(eq(returnsLog.id, returnLogId))
+            return { success: true, creditNoteNumber: 'Von About You erstellt' }
+          } else {
+             throw new Error('Fehler bei der Rückerstattung über die About You API.')
+          }
+        } catch (err: any) {
+          console.error(`[RefundService] Failed to trigger API refund on marketplace:`, err)
+          throw new Error(`Fehler bei der Kommunikation mit About You: ${err?.message || 'Unbekannter Fehler'}`)
+        }
+      }
+    }
+    throw new Error('About You Integration nicht gefunden oder Adapter unterstützt keine Erstattung.')
+  }
+
   // 3. Ensure order has a linked invoice; otherwise generate it first
   if (!order.invoiceId) {
     console.log(`[RefundService] Order ${order.marketplaceOrderId} has no linked invoice. Creating invoice first...`)

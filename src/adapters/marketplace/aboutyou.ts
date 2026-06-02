@@ -273,9 +273,67 @@ export class AboutYouAdapter implements MarketplaceAdapter {
   async refundOrder(
     marketplaceOrderId: string,
     refundItems: { sku: string; quantity: number }[],
-    rawOrderPayload?: unknown
+    rawOrderPayload?: any
   ): Promise<boolean> {
-    console.log(`[AboutYouAdapter] Simulating refund for order ${marketplaceOrderId}:`, refundItems)
-    return true
+    console.log(`[AboutYouAdapter] Processing return/refund for order ${marketplaceOrderId}...`)
+    
+    try {
+      const rawOrder = rawOrderPayload
+      if (!rawOrder || !rawOrder.order_items) {
+        throw new Error(`Keine order_items für Bestellung ${marketplaceOrderId} im Payload gefunden.`)
+      }
+
+      const orderItemIdsToReturn: (string | number)[] = []
+      const availableItems = [...rawOrder.order_items]
+
+      for (const refundItem of refundItems) {
+        let neededQty = refundItem.quantity
+        for (let i = 0; i < availableItems.length; i++) {
+          const item = availableItems[i]
+          if (item && item.sku === refundItem.sku && neededQty > 0) {
+            orderItemIdsToReturn.push(item.order_item_id || item.id)
+            neededQty -= 1
+            availableItems[i] = null // Mark as used
+          }
+        }
+        if (neededQty > 0) {
+          console.warn(`[AboutYouAdapter] Not enough lines found for SKU ${refundItem.sku}. Missing: ${neededQty}`)
+        }
+      }
+
+      if (orderItemIdsToReturn.length === 0) {
+         throw new Error(`Konnte keine passenden Artikel (SKUs) in der AboutYou Bestellung ${marketplaceOrderId} finden.`)
+      }
+
+      const returnPayload = {
+        items: [
+          {
+            order_items: orderItemIdsToReturn,
+            return_tracking_key: rawOrder.return_tracking_number || ""
+          }
+        ]
+      }
+
+      const response = await fetch(`${this.baseUrl}/orders/return`, {
+        method: 'POST',
+        headers: {
+          'X-API-Key': this.config.apiKey,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(returnPayload)
+      })
+
+      if (!response.ok) {
+        const errText = await response.text()
+        throw new Error(`About You API Fehler beim Erstatten: ${response.status} - ${errText}`)
+      }
+
+      console.log(`[AboutYouAdapter] Return/Refund reported successfully for ${marketplaceOrderId}`)
+      return true
+    } catch (error) {
+      console.error('[AboutYouAdapter] Error confirming return:', error)
+      throw error
+    }
   }
 }
