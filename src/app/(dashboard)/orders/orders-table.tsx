@@ -409,7 +409,23 @@ export function OrdersTable({
     if (hasAmazonIntegration) direct.push({ value: 'amazon', label: 'Amazon' })
 
     // 2. Decathlon (core / direct)
-    if (hasDecathlonIntegration) decathlon.push({ value: 'mirakl_decathlon', label: 'Decathlon DE' })
+    if (hasDecathlonIntegration) {
+      const decathlonCountries = new Set<string>()
+      orders.forEach(o => {
+        if (o.marketplace?.toLowerCase() === 'mirakl_decathlon') {
+          decathlonCountries.add(formatCountry(o.shippingCountry))
+        }
+      })
+      
+      const sortedCountries = Array.from(decathlonCountries).sort()
+      if (sortedCountries.length > 0) {
+        sortedCountries.forEach(country => {
+          decathlon.push({ value: `mirakl_decathlon_${country.toLowerCase()}`, label: `Decathlon ${country}` })
+        })
+      } else {
+        decathlon.push({ value: 'mirakl_decathlon_de', label: 'Decathlon DE' })
+      }
+    }
 
     // 3. Custom integrations
     customMiraklIntegrations.forEach((integration) => {
@@ -824,6 +840,11 @@ export function OrdersTable({
         const isSecretSales = orderMp.startsWith('secret sales')
         const isDirect = ['otto', 'aboutyou', 'shopify', 'kaufland', 'ebay', 'amazon'].includes(orderMp)
         if (orderMp === 'manual' || orderMp === '' || isDecathlon || isSecretSales || isDirect) {
+          return false
+        }
+      } else if (targetMp.startsWith('mirakl_decathlon_') && targetMp !== 'mirakl_decathlon_eu') {
+        const country = targetMp.replace('mirakl_decathlon_', '').toUpperCase()
+        if (orderMp !== 'mirakl_decathlon' || formatCountry(order.shippingCountry) !== country) {
           return false
         }
       } else if (orderMp !== targetMp) {
