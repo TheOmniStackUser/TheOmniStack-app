@@ -9,50 +9,6 @@ import { revalidatePath } from 'next/cache'
 export async function saveCompanySettingsAction(prevState: any, formData: FormData) {
   const auth = await requireAuth()
 
-  const name = formData.get('name') as string
-  const legalName = formData.get('legalName') as string
-  const vatId = formData.get('vatId') as string
-  const taxId = formData.get('taxId') as string
-  const street = formData.get('street') as string
-  const zip = formData.get('zip') as string
-  const city = formData.get('city') as string
-  const country = formData.get('country') as string || 'DE'
-
-  const warehouseStreet = formData.get('warehouseStreet') as string
-  const warehouseZip = formData.get('warehouseZip') as string
-  const warehouseCity = formData.get('warehouseCity') as string
-  const warehouseCountry = formData.get('warehouseCountry') as string || 'DE'
-
-  const email = formData.get('email') as string
-  const phone = formData.get('phone') as string
-  const website = formData.get('website') as string
-
-  const logoFile = formData.get('logoFile') as File | null
-  const existingLogoUrl = formData.get('existingLogoUrl') as string
-  let logoUrl = existingLogoUrl
-
-  if (logoFile && logoFile.size > 0) {
-    const buffer = Buffer.from(await logoFile.arrayBuffer())
-    const base64 = buffer.toString('base64')
-    logoUrl = `data:${logoFile.type};base64,${base64}`
-  }
-
-  const paymentRecipient = formData.get('paymentRecipient') as string
-  const bankName = formData.get('bankName') as string
-  const iban = formData.get('iban') as string
-  const bic = formData.get('bic') as string
-  const management = formData.get('management') as string
-  const registrationCourt = formData.get('registrationCourt') as string
-  const deliveryNoteFooter = formData.get('deliveryNoteFooter') as string
-  const deliveryNoteFooterEn = formData.get('deliveryNoteFooterEn') as string
-  const invoiceFooter = formData.get('invoiceFooter') as string
-  const invoiceFooterEn = formData.get('invoiceFooterEn') as string
-  const offerFooter = formData.get('offerFooter') as string
-  const offerFooterEn = formData.get('offerFooterEn') as string
-  const returnsNote = formData.get('returnsNote') as string
-  const returnsNoteEn = formData.get('returnsNoteEn') as string
-  const internationalLanguage = formData.get('internationalLanguage') as string || 'en'
-
   try {
     const [company] = await db
       .select()
@@ -64,70 +20,112 @@ export async function saveCompanySettingsAction(prevState: any, formData: FormDa
       return { success: false, message: 'Unternehmen nicht gefunden.' }
     }
 
-    let emailToUpdate: string | null = company.email
-    let newPendingEmail: string | null = company.newPendingEmail
-    let emailVerificationToken: string | null = company.emailVerificationToken
-    let emailVerifiedAt: Date | null = company.emailVerifiedAt
+    const updateData: Record<string, any> = {
+      updatedAt: new Date()
+    }
+
+    const setIfPresent = (key: string, dbKey: string = key) => {
+      const val = formData.get(key)
+      if (val !== null) {
+        updateData[dbKey] = val as string
+      }
+    }
+
+    setIfPresent('name')
+    setIfPresent('legalName')
+    setIfPresent('vatId')
+    setIfPresent('taxId')
+    setIfPresent('street')
+    setIfPresent('zip')
+    setIfPresent('city')
+    if (formData.has('country')) {
+      updateData.country = formData.get('country') as string || 'DE'
+    }
+
+    setIfPresent('warehouseStreet')
+    setIfPresent('warehouseZip')
+    setIfPresent('warehouseCity')
+    if (formData.has('warehouseCountry')) {
+      updateData.warehouseCountry = formData.get('warehouseCountry') as string || 'DE'
+    }
+
+    setIfPresent('phone')
+    setIfPresent('website')
+
+    // Handle logoUrl
+    if (formData.has('logoFile') || formData.has('existingLogoUrl')) {
+      const logoFile = formData.get('logoFile') as File | null
+      const existingLogoUrl = formData.get('existingLogoUrl') as string
+      let logoUrl = existingLogoUrl
+
+      if (logoFile && logoFile.size > 0) {
+        const buffer = Buffer.from(await logoFile.arrayBuffer())
+        const base64 = buffer.toString('base64')
+        logoUrl = `data:${logoFile.type};base64,${base64}`
+      }
+      updateData.logoUrl = logoUrl
+    }
+
+    // Handle email
     let sentVerification = false
+    if (formData.has('email')) {
+      const email = formData.get('email') as string
+      let emailToUpdate: string | null = company.email
+      let newPendingEmail: string | null = company.newPendingEmail
+      let emailVerificationToken: string | null = company.emailVerificationToken
+      let emailVerifiedAt: Date | null = company.emailVerifiedAt
 
-    const submittedEmail = email?.trim().toLowerCase() || ''
-    const currentEmail = company.email?.trim().toLowerCase() || ''
+      const submittedEmail = email?.trim().toLowerCase() || ''
+      const currentEmail = company.email?.trim().toLowerCase() || ''
 
-    if (!submittedEmail) {
-      emailToUpdate = null
-      newPendingEmail = null
-      emailVerificationToken = null
-      emailVerifiedAt = null
-    } else if (submittedEmail !== currentEmail) {
-      // It's a new email address, keep current active email until verified
-      newPendingEmail = submittedEmail
-      const crypto = await import('crypto')
-      emailVerificationToken = crypto.randomUUID()
-      
-      const { sendCompanyEmailVerificationEmail } = await import('@/lib/email')
-      await sendCompanyEmailVerificationEmail(submittedEmail, name || company.name, emailVerificationToken)
-      sentVerification = true
+      if (!submittedEmail) {
+        emailToUpdate = null
+        newPendingEmail = null
+        emailVerificationToken = null
+        emailVerifiedAt = null
+      } else if (submittedEmail !== currentEmail) {
+        // It's a new email address, keep current active email until verified
+        newPendingEmail = submittedEmail
+        const crypto = await import('crypto')
+        emailVerificationToken = crypto.randomUUID()
+        
+        const { sendCompanyEmailVerificationEmail } = await import('@/lib/email')
+        await sendCompanyEmailVerificationEmail(
+          submittedEmail,
+          (formData.get('name') as string) || company.name,
+          emailVerificationToken
+        )
+        sentVerification = true
+      }
+
+      updateData.email = emailToUpdate
+      updateData.newPendingEmail = newPendingEmail
+      updateData.emailVerificationToken = emailVerificationToken
+      updateData.emailVerifiedAt = emailVerifiedAt
+    }
+
+    setIfPresent('paymentRecipient')
+    setIfPresent('bankName')
+    setIfPresent('iban')
+    setIfPresent('bic')
+    setIfPresent('management')
+    setIfPresent('registrationCourt')
+    setIfPresent('deliveryNoteFooter')
+    setIfPresent('deliveryNoteFooterEn')
+    setIfPresent('invoiceFooter')
+    setIfPresent('invoiceFooterEn')
+    setIfPresent('offerFooter')
+    setIfPresent('offerFooterEn')
+    setIfPresent('returnsNote')
+    setIfPresent('returnsNoteEn')
+
+    if (formData.has('internationalLanguage')) {
+      updateData.internationalLanguage = formData.get('internationalLanguage') as string || 'en'
     }
 
     await db
       .update(companies)
-      .set({
-        name,
-        legalName,
-        vatId,
-        taxId,
-        street,
-        zip,
-        city,
-        country,
-        warehouseStreet,
-        warehouseZip,
-        warehouseCity,
-        warehouseCountry,
-        email: emailToUpdate,
-        newPendingEmail,
-        emailVerificationToken,
-        emailVerifiedAt,
-        phone,
-        website,
-        logoUrl,
-        paymentRecipient,
-        bankName,
-        iban,
-        bic,
-        management,
-        registrationCourt,
-        deliveryNoteFooter,
-        deliveryNoteFooterEn,
-        invoiceFooter,
-        invoiceFooterEn,
-        offerFooter,
-        offerFooterEn,
-        returnsNote,
-        returnsNoteEn,
-        internationalLanguage,
-        updatedAt: new Date()
-      })
+      .set(updateData)
       .where(eq(companies.id, auth.activeCompanyId))
 
     revalidatePath('/settings')

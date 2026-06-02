@@ -4,6 +4,7 @@ import { useActionState, useState } from 'react'
 import { saveCompanySettingsAction, resendCompanyVerificationEmailAction } from '@/app/actions/settings'
 import type { Company } from '@/db/schema/companies'
 import { CollapsibleSection } from '@/components/collapsible-section'
+import { DocumentTextSettings } from './document-text-settings'
 
 export function SettingsForm({ company }: { company: Company }) {
   const [state, action, isPending] = useActionState(saveCompanySettingsAction, undefined)
@@ -414,6 +415,8 @@ export function SettingsForm({ company }: { company: Company }) {
           </div>
         </div>
       </CollapsibleSection>
+
+      <DocumentTextSettings company={company} isPending={isPending} state={state} />
 
     </form>
   )

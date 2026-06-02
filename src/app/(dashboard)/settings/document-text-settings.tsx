@@ -2,9 +2,15 @@
 
 import { CollapsibleSection } from '@/components/collapsible-section'
 import type { Company } from '@/db/schema/companies'
-import { FileText } from 'lucide-react'
+import { FileText, Check } from 'lucide-react'
 
-export function DocumentTextSettings({ company }: { company: Company }) {
+interface DocumentTextSettingsProps {
+  company: Company
+  isPending?: boolean
+  state?: { success: boolean; message: string } | null
+}
+
+export function DocumentTextSettings({ company, isPending, state }: DocumentTextSettingsProps) {
   return (
     <CollapsibleSection
       title="Dokumenten-Einstellungen"
@@ -22,7 +28,6 @@ export function DocumentTextSettings({ company }: { company: Company }) {
           <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Sprache für internationale Sendungen</label>
           <select
             name="internationalLanguage"
-            form="settings-profile-form"
             defaultValue={company.internationalLanguage || 'en'}
             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none bg-white text-gray-900"
           >
@@ -38,7 +43,6 @@ export function DocumentTextSettings({ company }: { company: Company }) {
             <label className="text-xs font-bold text-gray-500 uppercase tracking-wider text-blue-600">Lieferschein-Fußtext (DE)</label>
             <textarea
               name="deliveryNoteFooter"
-              form="settings-profile-form"
               defaultValue={company.deliveryNoteFooter || ''}
               rows={6}
               placeholder="Bitte beachten Sie im Falle einer Retoure folgendes:..."
@@ -51,7 +55,6 @@ export function DocumentTextSettings({ company }: { company: Company }) {
             <label className="text-xs font-bold text-gray-500 uppercase tracking-wider text-blue-600">Lieferschein-Fußtext (EN)</label>
             <textarea
               name="deliveryNoteFooterEn"
-              form="settings-profile-form"
               defaultValue={company.deliveryNoteFooterEn || ''}
               rows={6}
               placeholder="In case of a return, please note the following:..."
@@ -67,7 +70,6 @@ export function DocumentTextSettings({ company }: { company: Company }) {
             <label className="text-xs font-bold text-gray-500 uppercase tracking-wider text-blue-600">Rechnungs-Fußtext (DE)</label>
             <textarea
               name="invoiceFooter"
-              form="settings-profile-form"
               defaultValue={company.invoiceFooter || ''}
               rows={6}
               placeholder="Vielen Dank für Ihren Auftrag! Bitte begleichen Sie den offenen Betrag..."
@@ -80,7 +82,6 @@ export function DocumentTextSettings({ company }: { company: Company }) {
             <label className="text-xs font-bold text-gray-500 uppercase tracking-wider text-blue-600">Rechnungs-Fußtext (EN)</label>
             <textarea
               name="invoiceFooterEn"
-              form="settings-profile-form"
               defaultValue={company.invoiceFooterEn || ''}
               rows={6}
               placeholder="Thank you for your order! Please transfer the open amount..."
@@ -96,7 +97,6 @@ export function DocumentTextSettings({ company }: { company: Company }) {
             <label className="text-xs font-bold text-gray-500 uppercase tracking-wider text-blue-600">Angebots-Fußtext (DE)</label>
             <textarea
               name="offerFooter"
-              form="settings-profile-form"
               defaultValue={company.offerFooter || ''}
               rows={6}
               placeholder="Gerne unterbreiten wir Ihnen folgendes Angebot..."
@@ -109,7 +109,6 @@ export function DocumentTextSettings({ company }: { company: Company }) {
             <label className="text-xs font-bold text-gray-500 uppercase tracking-wider text-blue-600">Angebots-Fußtext (EN)</label>
             <textarea
               name="offerFooterEn"
-              form="settings-profile-form"
               defaultValue={company.offerFooterEn || ''}
               rows={6}
               placeholder="We are pleased to submit the following quote..."
@@ -122,11 +121,21 @@ export function DocumentTextSettings({ company }: { company: Company }) {
         <div className="flex flex-col sm:flex-row items-center gap-4 pt-4 border-t border-gray-100 mt-2">
           <button
             type="submit"
-            form="settings-profile-form"
-            className="px-6 py-2.5 rounded-xl font-bold text-white text-sm shadow-md bg-blue-600 hover:bg-blue-700 hover:shadow-blue-500/20 transition-all cursor-pointer"
+            disabled={isPending}
+            className={`px-6 py-2.5 rounded-xl font-bold text-white text-sm shadow-md transition-all ${
+              isPending ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 hover:shadow-blue-500/20'
+            }`}
           >
-            Änderungen speichern
+            {isPending ? 'Speichert...' : 'Änderungen speichern'}
           </button>
+          {state?.message && (
+            <div className={`text-xs font-medium px-3 py-1.5 rounded-lg flex items-center gap-1.5 ${
+              state.success ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'
+            }`}>
+              {state.success && <Check className="w-3.5 h-3.5" />}
+              {state.message}
+            </div>
+          )}
         </div>
       </div>
     </CollapsibleSection>

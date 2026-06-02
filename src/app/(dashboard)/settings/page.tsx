@@ -4,7 +4,6 @@ import { companies } from '@/db/schema/companies'
 import { eq } from 'drizzle-orm'
 import { SettingsForm } from './settings-form'
 import { DocumentNumbersForm } from './document-numbers-form'
-import { DocumentTextSettings } from './document-text-settings'
 import { VatSettings } from './vat-settings'
 import { MarketplaceAutomation } from './marketplace-automation'
 import { TwoFactorSettings } from './two-factor-settings'
@@ -84,8 +83,6 @@ export default async function SettingsPage(props: {
       <SettingsForm company={company} />
 
       <DocumentNumbersForm company={company} />
-
-      <DocumentTextSettings company={company} />
 
       <TwoFactorSettings initialEnabled={user?.twoFactorEnabled ?? false} />
 
