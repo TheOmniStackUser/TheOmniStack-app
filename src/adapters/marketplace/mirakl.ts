@@ -154,12 +154,18 @@ export class MiraklAdapter implements MarketplaceAdapter {
 
         rawOrders = rawOrders.filter((raw: any) => {
           // Secret Sales channel codes are sometimes misconfigured (e.g. DE orders have channel_be).
-          // Fall back to checking shipping address country.
+          // Fall back to checking shipping address country or channel label.
+          // Note: Mirakl hides `shipping_address` during WAITING_ACCEPTANCE, so channel.label is critical.
           const shippingIso = (raw.customer?.shipping_address?.country_iso_code || '').toUpperCase()
           const shippingName = (raw.customer?.shipping_address?.country || '').toUpperCase()
+          const channelLabel = (raw.channel?.label || '').toUpperCase()
           const validCountries = countryMapping[expectedChannel] || [expectedChannel]
           
-          if (validCountries.includes(shippingIso) || validCountries.includes(shippingName)) {
+          if (
+            validCountries.includes(shippingIso) || 
+            validCountries.includes(shippingName) ||
+            validCountries.includes(channelLabel)
+          ) {
             return true
           }
 
