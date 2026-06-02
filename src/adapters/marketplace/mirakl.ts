@@ -110,78 +110,80 @@ export class MiraklAdapter implements MarketplaceAdapter {
       if (options?.toDate) url += `&end_date=${options.toDate}T23:59:59Z`
       if (this.config.shopId) url += `&shop_id=${this.config.shopId}`
 
-      const response = await fetch(url, {
-        method: 'GET',
-        headers
-      })
+      const fetchAndFilterOrders = async () => {
+        const response = await fetch(url, {
+          method: 'GET',
+          headers
+        })
 
-      const bodyText = await response.text()
-      console.log(`[MiraklAdapter:${this.marketplace}] Response start: ${bodyText.substring(0, 50).replace(/\n/g, ' ')}`)
-      
-      if (!response.ok) {
-        console.error(`[MiraklAdapter:${this.marketplace}] API Error ${response.status}: ${bodyText.substring(0, 500)}`)
-        throw new Error(`Mirakl API Error ${response.status}: ${bodyText.substring(0, 100)}`)
-      }
-
-      if (bodyText.trim().startsWith('<!DOCTYPE') || bodyText.trim().startsWith('<html')) {
-        console.error(`[MiraklAdapter:${this.marketplace}] API returned HTML instead of JSON: ${bodyText.substring(0, 500)}`)
-        throw new Error(`Mirakl API returned HTML instead of JSON (likely a redirect or 404)`)
-      }
-
-      const data = JSON.parse(bodyText)
-      let rawOrders = data.orders || []
-      
-      console.log(`[MiraklAdapter:${this.marketplace}] Fetched ${rawOrders.length} raw orders.`)
-
-      // Filter orders by channel code if this instance is restricted to a specific country
-      const match = this.marketplace.match(/\s([a-z]{2})$/i)
-      const isCountryRestricted = this.config.baseUrl.includes('decathlon') || this.marketplace.toLowerCase().includes('secret sales')
-      if (match && isCountryRestricted) {
-        const expectedChannel = match[1].toUpperCase()
-        const countryMapping: Record<string, string[]> = {
-          'DE': ['DE', 'DEU', 'GERMANY'],
-          'NL': ['NL', 'NLD', 'NETHERLANDS'],
-          'SE': ['SE', 'SWE', 'SWEDEN'],
-          'BE': ['BE', 'BEL', 'BELGIUM'],
-          'IE': ['IE', 'IRL', 'IRELAND'],
-          'FR': ['FR', 'FRA', 'FRANCE'],
-          'IT': ['IT', 'ITA', 'ITALY'],
-          'ES': ['ES', 'ESP', 'SPAIN'],
-          'AT': ['AT', 'AUT', 'AUSTRIA'],
-          'CH': ['CH', 'CHE', 'SWITZERLAND'],
-          'GB': ['GB', 'GBR', 'UK', 'UNITED KINGDOM'],
+        const bodyText = await response.text()
+        if (!response.ok) {
+          console.error(`[MiraklAdapter:${this.marketplace}] API Error ${response.status}: ${bodyText.substring(0, 500)}`)
+          throw new Error(`Mirakl API Error ${response.status}: ${bodyText.substring(0, 100)}`)
         }
 
-        rawOrders = rawOrders.filter((raw: any) => {
-          // Secret Sales channel codes are sometimes misconfigured (e.g. DE orders have channel_be).
-          // Fall back to checking shipping address country or channel label.
-          // Note: Mirakl hides `shipping_address` during WAITING_ACCEPTANCE, so channel.label is critical.
-          const shippingIso = (raw.customer?.shipping_address?.country_iso_code || '').toUpperCase()
-          const shippingName = (raw.customer?.shipping_address?.country || '').toUpperCase()
-          const channelLabel = (raw.channel?.label || '').toUpperCase()
-          const validCountries = countryMapping[expectedChannel] || [expectedChannel]
-          
-          if (
-            validCountries.includes(shippingIso) || 
-            validCountries.includes(shippingName) ||
-            validCountries.includes(channelLabel)
-          ) {
-            return true
+        if (bodyText.trim().startsWith('<!DOCTYPE') || bodyText.trim().startsWith('<html')) {
+          console.error(`[MiraklAdapter:${this.marketplace}] API returned HTML instead of JSON: ${bodyText.substring(0, 500)}`)
+          throw new Error(`Mirakl API returned HTML instead of JSON (likely a redirect or 404)`)
+        }
+
+        const data = JSON.parse(bodyText)
+        let orders = data.orders || []
+
+        // Filter orders by channel code if this instance is restricted to a specific country
+        const match = this.marketplace.match(/\s([a-z]{2})$/i)
+        const isCountryRestricted = this.config.baseUrl.includes('decathlon') || this.marketplace.toLowerCase().includes('secret sales')
+        if (match && isCountryRestricted) {
+          const expectedChannel = match[1].toUpperCase()
+          const countryMapping: Record<string, string[]> = {
+            'DE': ['DE', 'DEU', 'GERMANY'],
+            'NL': ['NL', 'NLD', 'NETHERLANDS'],
+            'SE': ['SE', 'SWE', 'SWEDEN'],
+            'BE': ['BE', 'BEL', 'BELGIUM'],
+            'IE': ['IE', 'IRL', 'IRELAND'],
+            'FR': ['FR', 'FRA', 'FRANCE'],
+            'IT': ['IT', 'ITA', 'ITALY'],
+            'ES': ['ES', 'ESP', 'SPAIN'],
+            'AT': ['AT', 'AUT', 'AUSTRIA'],
+            'CH': ['CH', 'CHE', 'SWITZERLAND'],
+            'GB': ['GB', 'GBR', 'UK', 'UNITED KINGDOM'],
           }
 
-          const channelCode = raw.channel?.code?.toUpperCase()
-          if (!channelCode) return false
-          return (
-            channelCode === expectedChannel ||
-            channelCode.endsWith('_' + expectedChannel) ||
-            channelCode.endsWith(expectedChannel)
-          )
-        })
-        console.log(`[MiraklAdapter:${this.marketplace}] Filtered orders by channel ${expectedChannel}: ${rawOrders.length} orders kept.`)
+          orders = orders.filter((raw: any) => {
+            // Secret Sales channel codes are sometimes misconfigured (e.g. DE orders have channel_be).
+            // Fall back to checking shipping address country or channel label.
+            // Note: Mirakl hides `shipping_address` during WAITING_ACCEPTANCE, so channel.label is critical.
+            const shippingIso = (raw.customer?.shipping_address?.country_iso_code || '').toUpperCase()
+            const shippingName = (raw.customer?.shipping_address?.country || '').toUpperCase()
+            const channelLabel = (raw.channel?.label || '').toUpperCase()
+            const validCountries = countryMapping[expectedChannel] || [expectedChannel]
+            
+            if (
+              validCountries.includes(shippingIso) || 
+              validCountries.includes(shippingName) ||
+              validCountries.includes(channelLabel)
+            ) {
+              return true
+            }
+
+            const channelCode = raw.channel?.code?.toUpperCase()
+            if (!channelCode) return false
+            return (
+              channelCode === expectedChannel ||
+              channelCode.endsWith('_' + expectedChannel) ||
+              channelCode.endsWith(expectedChannel)
+            )
+          })
+        }
+        return orders
       }
+
+      let rawOrders = await fetchAndFilterOrders()
+      console.log(`[MiraklAdapter:${this.marketplace}] Fetched ${rawOrders.length} raw orders.`)
 
       // Auto-accept orders in WAITING_ACCEPTANCE state
       const waitingAcceptanceOrders = rawOrders.filter((raw: any) => raw.order_state === 'WAITING_ACCEPTANCE')
+      let acceptedAny = false
       if (waitingAcceptanceOrders.length > 0) {
         console.log(`[MiraklAdapter:${this.marketplace}] Found ${waitingAcceptanceOrders.length} orders in WAITING_ACCEPTANCE state. Auto-accepting...`)
         for (const raw of waitingAcceptanceOrders) {
@@ -190,11 +192,21 @@ export class MiraklAdapter implements MarketplaceAdapter {
             accepted: true
           }))
           if (lines.length > 0) {
-            await this.acceptOrder(raw.order_id, lines)
+            const success = await this.acceptOrder(raw.order_id, lines)
+            if (success) acceptedAny = true
           } else {
             console.warn(`[MiraklAdapter:${this.marketplace}] Order ${raw.order_id} has no order lines, skipping auto-accept.`)
           }
         }
+      }
+
+      // If we accepted any orders, we must wait a few seconds for Mirakl to release the 
+      // customer shipping addresses, and then re-fetch.
+      if (acceptedAny) {
+        console.log(`[MiraklAdapter:${this.marketplace}] Waiting 3 seconds for Mirakl to release customer addresses...`)
+        await new Promise(resolve => setTimeout(resolve, 3000))
+        console.log(`[MiraklAdapter:${this.marketplace}] Re-fetching orders...`)
+        rawOrders = await fetchAndFilterOrders()
       }
 
       // Only normalize and return orders that are in 'SHIPPING' state,
