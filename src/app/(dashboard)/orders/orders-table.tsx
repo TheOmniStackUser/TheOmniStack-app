@@ -408,24 +408,9 @@ export function OrdersTable({
     if (hasEbayIntegration) direct.push({ value: 'ebay', label: 'eBay' })
     if (hasAmazonIntegration) direct.push({ value: 'amazon', label: 'Amazon' })
 
-    // 2. Decathlon (core / direct)
-    if (hasDecathlonIntegration) {
-      const decathlonCountries = new Set<string>()
-      orders.forEach(o => {
-        if (o.marketplace?.toLowerCase() === 'mirakl_decathlon') {
-          decathlonCountries.add(formatCountry(o.shippingCountry))
-        }
-      })
-      
-      const sortedCountries = Array.from(decathlonCountries).sort()
-      if (sortedCountries.length > 0) {
-        sortedCountries.forEach(country => {
-          decathlon.push({ value: `mirakl_decathlon_${country.toLowerCase()}`, label: `Decathlon ${country}` })
-        })
-      } else {
-        decathlon.push({ value: 'mirakl_decathlon_de', label: 'Decathlon DE' })
-      }
-    }
+    // 2. Decathlon (dynamic based on displayed names)
+    const decathlonDisplayNames = new Set<string>()
+    if (hasDecathlonIntegration) decathlonDisplayNames.add('Decathlon DE')
 
     // 3. Custom integrations
     customMiraklIntegrations.forEach((integration) => {
@@ -435,12 +420,25 @@ export function OrdersTable({
       const label = name
 
       if (lowerName.startsWith('decathlon')) {
-        decathlon.push({ value, label })
+        decathlonDisplayNames.add(name)
       } else if (lowerName.startsWith('secret sales')) {
         secretSales.push({ value, label })
       } else {
         other.push({ value, label })
       }
+    })
+
+    // Extract from actual orders
+    orders.forEach(o => {
+      const displayName = formatMarketplaceName(o.marketplace, o.shippingCountry)
+      if (displayName.toLowerCase().startsWith('decathlon')) {
+        decathlonDisplayNames.add(displayName)
+      }
+    })
+
+    const sortedDecathlon = Array.from(decathlonDisplayNames).sort()
+    sortedDecathlon.forEach(name => {
+      decathlon.push({ value: `display_${name.toLowerCase()}`, label: name })
     })
 
     // Sort alphabetically by label
@@ -816,6 +814,8 @@ export function OrdersTable({
     if (activeFilters.marketplace !== 'all') {
       const orderMp = (order.marketplace || 'manual').toLowerCase()
       const targetMp = activeFilters.marketplace.toLowerCase()
+      const formattedOrderMp = formatMarketplaceName(order.marketplace, order.shippingCountry).toLowerCase()
+      
       if (targetMp === 'manual') {
         if (orderMp !== 'manual' && orderMp !== '') {
           return false
@@ -826,7 +826,7 @@ export function OrdersTable({
           return false
         }
       } else if (targetMp === 'group_decathlon') {
-        const isDecathlon = orderMp === 'mirakl_decathlon' || orderMp === 'mirakl_decathlon_eu' || orderMp.startsWith('decathlon')
+        const isDecathlon = formattedOrderMp.startsWith('decathlon') || orderMp === 'mirakl_decathlon_eu'
         if (!isDecathlon) {
           return false
         }
@@ -836,15 +836,15 @@ export function OrdersTable({
           return false
         }
       } else if (targetMp === 'group_other') {
-        const isDecathlon = orderMp === 'mirakl_decathlon' || orderMp === 'mirakl_decathlon_eu' || orderMp.startsWith('decathlon')
+        const isDecathlon = formattedOrderMp.startsWith('decathlon') || orderMp === 'mirakl_decathlon_eu'
         const isSecretSales = orderMp.startsWith('secret sales')
         const isDirect = ['otto', 'aboutyou', 'shopify', 'kaufland', 'ebay', 'amazon'].includes(orderMp)
         if (orderMp === 'manual' || orderMp === '' || isDecathlon || isSecretSales || isDirect) {
           return false
         }
-      } else if (targetMp.startsWith('mirakl_decathlon_') && targetMp !== 'mirakl_decathlon_eu') {
-        const country = targetMp.replace('mirakl_decathlon_', '').toUpperCase()
-        if (orderMp !== 'mirakl_decathlon' || formatCountry(order.shippingCountry) !== country) {
+      } else if (targetMp.startsWith('display_')) {
+        const displayTarget = targetMp.replace('display_', '')
+        if (formattedOrderMp !== displayTarget) {
           return false
         }
       } else if (orderMp !== targetMp) {
