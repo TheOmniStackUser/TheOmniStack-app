@@ -804,6 +804,11 @@ export function OrdersTable({
         if (orderMp !== 'manual' && orderMp !== '') {
           return false
         }
+      } else if (targetMp === 'group_direct') {
+        const isDirect = ['otto', 'aboutyou', 'shopify', 'kaufland', 'ebay', 'amazon'].includes(orderMp)
+        if (!isDirect) {
+          return false
+        }
       } else if (targetMp === 'group_decathlon') {
         const isDecathlon = orderMp === 'mirakl_decathlon' || orderMp === 'mirakl_decathlon_eu' || orderMp.startsWith('decathlon')
         if (!isDecathlon) {
@@ -812,6 +817,13 @@ export function OrdersTable({
       } else if (targetMp === 'group_secret_sales') {
         const isSecretSales = orderMp.startsWith('secret sales')
         if (!isSecretSales) {
+          return false
+        }
+      } else if (targetMp === 'group_other') {
+        const isDecathlon = orderMp === 'mirakl_decathlon' || orderMp === 'mirakl_decathlon_eu' || orderMp.startsWith('decathlon')
+        const isSecretSales = orderMp.startsWith('secret sales')
+        const isDirect = ['otto', 'aboutyou', 'shopify', 'kaufland', 'ebay', 'amazon'].includes(orderMp)
+        if (orderMp === 'manual' || orderMp === '' || isDecathlon || isSecretSales || isDirect) {
           return false
         }
       } else if (orderMp !== targetMp) {
@@ -1701,7 +1713,7 @@ export function OrdersTable({
             
             {groupedMarketplaces.direct.length > 0 && (
               <>
-                <option disabled className="font-semibold text-gray-500 bg-gray-50">Direkte Integrationen</option>
+                <option value="group_direct" className="font-semibold bg-gray-50">Direkte Integrationen</option>
                 {groupedMarketplaces.direct.map((m) => (
                   <option key={m.value} value={m.value}>{"\u00A0\u00A0"}{m.label}</option>
                 ))}
@@ -1728,7 +1740,7 @@ export function OrdersTable({
 
             {groupedMarketplaces.other.length > 0 && (
               <>
-                <option disabled className="font-semibold text-gray-500 bg-gray-50">Weitere Marktplätze</option>
+                <option value="group_other" className="font-semibold bg-gray-50">Weitere Marktplätze</option>
                 {groupedMarketplaces.other.map((m) => (
                   <option key={m.value} value={m.value}>{"\u00A0\u00A0"}{m.label}</option>
                 ))}

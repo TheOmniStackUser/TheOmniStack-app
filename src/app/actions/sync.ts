@@ -55,22 +55,37 @@ export async function triggerSyncAction() {
 export async function triggerManualSyncAction(data: { marketplace: string, fromDate?: string, toDate?: string }) {
   const auth = await requireAuth()
 
-  // Find integrations based on selection
   let query: any = and(
     eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
     eq(marketplaceIntegrations.isActive, true)
   )
 
-  if (data.marketplace !== 'all') {
-    if (data.marketplace.startsWith('mirakl_custom_')) {
-      const integrationId = data.marketplace.replace('mirakl_custom_', '')
-      query = and(query, eq(marketplaceIntegrations.id, integrationId))
-    } else {
-      query = and(query, eq(marketplaceIntegrations.type, data.marketplace as any))
-    }
-  }
+  const allActiveIntegrations = await db.select().from(marketplaceIntegrations).where(query)
 
-  const activeIntegrations = await db.select().from(marketplaceIntegrations).where(query)
+  let activeIntegrations = allActiveIntegrations
+  if (data.marketplace !== 'all') {
+    activeIntegrations = allActiveIntegrations.filter(integration => {
+      if (data.marketplace === 'group_direct') {
+        return ['otto', 'aboutyou', 'shopify', 'kaufland', 'ebay', 'amazon'].includes(integration.type)
+      } else if (data.marketplace === 'group_decathlon') {
+        const customName = ((integration.metadata as any)?.customName || '').toLowerCase()
+        return integration.type === 'mirakl_decathlon' || integration.type === 'mirakl_decathlon_eu' || customName.startsWith('decathlon')
+      } else if (data.marketplace === 'group_secret_sales') {
+        const customName = ((integration.metadata as any)?.customName || '').toLowerCase()
+        return customName.startsWith('secret sales')
+      } else if (data.marketplace === 'group_other') {
+        const customName = ((integration.metadata as any)?.customName || '').toLowerCase()
+        const isDecathlon = integration.type === 'mirakl_decathlon' || integration.type === 'mirakl_decathlon_eu' || customName.startsWith('decathlon')
+        const isSecretSales = customName.startsWith('secret sales')
+        const isDirect = ['otto', 'aboutyou', 'shopify', 'kaufland', 'ebay', 'amazon'].includes(integration.type)
+        return !isDecathlon && !isSecretSales && !isDirect
+      } else if (data.marketplace.startsWith('mirakl_custom_')) {
+        return integration.id === data.marketplace.replace('mirakl_custom_', '')
+      } else {
+        return integration.type === data.marketplace
+      }
+    })
+  }
 
   if (activeIntegrations.length === 0) {
     return { error: 'Für diese Auswahl sind keine aktiven Marktplätze verknüpft.' }

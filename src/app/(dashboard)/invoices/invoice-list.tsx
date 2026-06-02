@@ -1089,12 +1089,20 @@ export function InvoiceList({
       const invoiceMp = (invoice.marketplace || 'manual').toLowerCase()
       if (targetMp === 'manual') {
         if (invoiceMp !== 'manual' && invoiceMp !== '') return false
+      } else if (targetMp === 'group_direct') {
+        const isDirect = ['otto', 'aboutyou', 'shopify', 'kaufland', 'ebay', 'amazon'].includes(invoiceMp)
+        if (!isDirect) return false
       } else if (targetMp === 'group_decathlon') {
         const isDecathlon = invoiceMp === 'mirakl_decathlon' || invoiceMp === 'mirakl_decathlon_eu' || invoiceMp.startsWith('decathlon')
         if (!isDecathlon) return false
       } else if (targetMp === 'group_secret_sales') {
         const isSecretSales = invoiceMp.startsWith('secret sales')
         if (!isSecretSales) return false
+      } else if (targetMp === 'group_other') {
+        const isDecathlon = invoiceMp === 'mirakl_decathlon' || invoiceMp === 'mirakl_decathlon_eu' || invoiceMp.startsWith('decathlon')
+        const isSecretSales = invoiceMp.startsWith('secret sales')
+        const isDirect = ['otto', 'aboutyou', 'shopify', 'kaufland', 'ebay', 'amazon'].includes(invoiceMp)
+        if (invoiceMp === 'manual' || invoiceMp === '' || isDecathlon || isSecretSales || isDirect) return false
       } else if (invoiceMp !== targetMp) {
         return false
       }
@@ -1368,7 +1376,7 @@ export function InvoiceList({
 
               {groupedMarketplaces.direct.length > 0 && (
                 <>
-                  <option disabled className="font-semibold text-gray-500 bg-gray-50">Direkte Integrationen</option>
+                  <option value="group_direct" className="font-semibold bg-gray-50">Direkte Integrationen</option>
                   {groupedMarketplaces.direct.map((m) => (
                     <option key={m.value} value={m.value}>{"\u00A0\u00A0"}{m.label}</option>
                   ))}
@@ -1395,7 +1403,7 @@ export function InvoiceList({
 
               {groupedMarketplaces.other.length > 0 && (
                 <>
-                  <option disabled className="font-semibold text-gray-500 bg-gray-50">Weitere Marktplätze</option>
+                  <option value="group_other" className="font-semibold bg-gray-50">Weitere Marktplätze</option>
                   {groupedMarketplaces.other.map((m) => (
                     <option key={m.value} value={m.value}>{"\u00A0\u00A0"}{m.label}</option>
                   ))}
