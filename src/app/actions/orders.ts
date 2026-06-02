@@ -184,6 +184,7 @@ export async function generateOrDownloadInvoicesBulkAction(orderIds: string[]) {
     for (const order of candidateOrders) {
       const integration = integrations.find(i => 
         i.type === order.marketplace ||
+        (i.type === 'mirakl_decathlon' && order.marketplace === 'Decathlon DE') ||
         (i.type === 'mirakl_custom' && 
          ((i.metadata as any)?.customName || '').toLowerCase() === order.marketplace.toLowerCase())
       )
@@ -313,6 +314,7 @@ export async function markOrderAsShippedManuallyAction(
 
       const integration = activeIntegrations.find(i => 
         i.type === order.marketplace ||
+        (i.type === 'mirakl_decathlon' && order.marketplace === 'Decathlon DE') ||
         (i.type === 'mirakl_custom' && 
          ((i.metadata as any)?.customName || '').toLowerCase() === order.marketplace.toLowerCase())
       )
@@ -364,6 +366,7 @@ export async function markOrderAsShippedManuallyAction(
         const { getAdapterForIntegration } = await import('@/workers/marketplace-sync')
         const integration = activeIntegrations.find(i => 
           i.type === order.marketplace ||
+          (i.type === 'mirakl_decathlon' && order.marketplace === 'Decathlon DE') ||
           (i.type === 'mirakl_custom' && 
            ((i.metadata as any)?.customName || '').toLowerCase() === order.marketplace.toLowerCase())
         )

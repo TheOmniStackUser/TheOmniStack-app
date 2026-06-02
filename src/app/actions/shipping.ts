@@ -70,7 +70,10 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
           const customName = (integration.metadata as any)?.customName
           if (customName) {
             adaptersMap.set(customName.toLowerCase(), adapter)
+            adaptersMap.set(customName, adapter)
           }
+        } else if (integration.type === 'mirakl_decathlon') {
+          adaptersMap.set('Decathlon DE', adapter)
         }
       }
     }
@@ -106,6 +109,7 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
         try {
           const integration = activeIntegrations.find(i => 
             i.type === order.marketplace ||
+            (i.type === 'mirakl_decathlon' && order.marketplace === 'Decathlon DE') ||
             (i.type === 'mirakl_custom' && 
              ((i.metadata as any)?.customName || '').toLowerCase() === order.marketplace.toLowerCase())
           )
@@ -365,7 +369,10 @@ export async function generateDhlLabelsAction(
           const customName = (integration.metadata as any)?.customName
           if (customName) {
             adaptersMap.set(customName.toLowerCase(), adapter)
+            adaptersMap.set(customName, adapter)
           }
+        } else if (integration.type === 'mirakl_decathlon') {
+          adaptersMap.set('Decathlon DE', adapter)
         }
       }
     }
@@ -653,6 +660,7 @@ export async function generateDhlLabelsAction(
         try {
           const integration = activeIntegrations.find(i => 
             i.type === order.marketplace ||
+            (i.type === 'mirakl_decathlon' && order.marketplace === 'Decathlon DE') ||
             (i.type === 'mirakl_custom' && 
              ((i.metadata as any)?.customName || '').toLowerCase() === order.marketplace.toLowerCase())
           )

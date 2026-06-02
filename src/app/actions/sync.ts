@@ -119,6 +119,7 @@ export async function triggerManualSyncAction(data: { marketplace: string, fromD
     for (const order of candidateOrders) {
       const integration = activeIntegrations.find(i => 
         i.type === order.marketplace ||
+        (i.type === 'mirakl_decathlon' && order.marketplace === 'Decathlon DE') ||
         (i.type === 'mirakl_custom' && 
          ((i.metadata as any)?.customName || '').toLowerCase() === order.marketplace.toLowerCase())
       )

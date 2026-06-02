@@ -332,6 +332,7 @@ export async function executeRefund({
 
   const integration = activeIntegrations.find(i => {
     if (i.type === order.marketplace) return true
+    if (i.type === 'mirakl_decathlon' && order.marketplace === 'Decathlon DE') return true
     if (i.type === 'mirakl_custom') {
       const customName = (i.metadata as any)?.customName || ''
       return customName.toLowerCase() === order.marketplace.toLowerCase()

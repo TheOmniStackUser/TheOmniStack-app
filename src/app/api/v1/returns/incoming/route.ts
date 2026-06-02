@@ -209,6 +209,7 @@ export async function POST(req: Request) {
 
         const integration = activeIntegrations.find(i => {
           if (i.type === matchedOrder.marketplace) return true
+          if (i.type === 'mirakl_decathlon' && matchedOrder.marketplace === 'Decathlon DE') return true
           if (i.type === 'mirakl_custom') {
             const customName = (i.metadata as any)?.customName || ''
             return customName.toLowerCase() === matchedOrder.marketplace.toLowerCase()
