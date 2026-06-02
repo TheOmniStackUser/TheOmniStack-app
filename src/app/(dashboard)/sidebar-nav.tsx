@@ -28,6 +28,7 @@ export function SidebarNav({ role }: { role: string }) {
           <div key={link.href}>
             <Link
               href={link.href}
+              prefetch={true}
               className={`flex items-center px-4 py-2.5 text-sm font-medium rounded-xl transition-all duration-200 ${
                 isActive 
                   ? 'bg-cyan-500/10 text-cyan-400 shadow-[inset_0_0_10px_rgba(34,211,238,0.1)]' 
