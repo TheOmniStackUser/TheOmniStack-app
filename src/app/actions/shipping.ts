@@ -531,6 +531,26 @@ export async function generateDhlLabelsAction(
           }
         }
 
+        const matchingProduct = config.products?.find(p => p.productCode === resolvedProductCode) || config.products?.find(p => p.productCode === productCode)
+        const additionalServices = matchingProduct?.additionalServices || []
+
+        const dhlServices: any = {}
+        
+        if (additionalServices.includes('Premiumversand')) {
+          dhlServices.premium = true
+        }
+        if (additionalServices.includes('Retoure sofort')) {
+          dhlServices.endorsement = 'IMMEDIATE'
+        }
+        if (additionalServices.includes('Alterssichtprüfung')) {
+          dhlServices.visualCheckOfAge = { type: 'A18' }
+        }
+        if (additionalServices.includes('Versandbestätigung') && order.buyerEmail) {
+          dhlServices.notification = { email: order.buyerEmail }
+        }
+
+        const passEmail = additionalServices.includes('Paketankündigung')
+
         const shipmentPayload: any = {
           profile: 'STANDARD_GRUPPENPROFIL',
           combinedPrinting: useCombine,
@@ -559,10 +579,12 @@ export async function generateDhlLabelsAction(
               postalCode: resolvedZip,
               city: order.shippingCity ?? '',
               country: toIso3(order.shippingCountry),
+              ...(passEmail && order.buyerEmail ? { email: order.buyerEmail, contact: { email: order.buyerEmail } } : {}),
             },
             details: {
               weight: { uom: 'kg', value: resolvedWeight },
             },
+            ...(Object.keys(dhlServices).length > 0 ? { services: dhlServices } : {})
           }],
         }
 
