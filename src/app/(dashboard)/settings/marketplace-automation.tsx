@@ -126,7 +126,7 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
     const labels: Record<string, string> = {
       'amazon': 'Amazon SP-API',
       'otto': 'Otto Market',
-      'mirakl_decathlon': 'Decathlon (Mirakl)',
+      'mirakl_decathlon': 'Decathlon DE (Mirakl)',
       'mirakl_decathlon_eu': 'Decathlon EU (Mirakl)',
       'mirakl_mediamarkt': 'MediaMarkt (Mirakl)',
       'shopify': 'Shopify',

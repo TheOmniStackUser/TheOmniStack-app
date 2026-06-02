@@ -56,7 +56,7 @@ export default async function IntegrationsPage(props: {
       else if (i.type === 'ebay') label = 'eBay'
       else if (i.type === 'woocommerce') label = 'WooCommerce'
       else if (i.type === 'shopware') label = 'Shopware 6'
-      else if (i.type === 'mirakl_decathlon') label = 'Decathlon (Mirakl)'
+      else if (i.type === 'mirakl_decathlon') label = 'Decathlon DE (Mirakl)'
       else if (i.type === 'mirakl_custom') {
         label = (i.metadata as any)?.customName || 'Anderer Mirakl Marktplatz'
       }
@@ -82,7 +82,7 @@ export default async function IntegrationsPage(props: {
       else if (i.type === 'ebay') label = 'eBay'
       else if (i.type === 'woocommerce') label = 'WooCommerce'
       else if (i.type === 'shopware') label = 'Shopware 6'
-      else if (i.type === 'mirakl_decathlon') label = 'Decathlon (Mirakl)'
+      else if (i.type === 'mirakl_decathlon') label = 'Decathlon DE (Mirakl)'
       else if (i.type === 'mirakl_custom') {
         label = (i.metadata as any)?.customName || 'Anderer Mirakl Marktplatz'
       }
@@ -349,10 +349,9 @@ export default async function IntegrationsPage(props: {
               </div>
             </CollapsibleSection>
 
-            {/* Decathlon (Mirakl) Card */}
             <CollapsibleSection
-              title="Decathlon (Mirakl)"
-              subtitle="API Anbindung für Decathlon Bestellungen"
+              title="Decathlon DE (Mirakl)"
+              subtitle="API Anbindung für Decathlon DE Bestellungen"
               icon={
                 <div className="w-10 h-10 bg-sky-50 border border-sky-200 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform duration-200 hover:scale-105">
                   <span className="text-[#0082C3] font-black text-[8px] tracking-tighter">DECATHLON</span>

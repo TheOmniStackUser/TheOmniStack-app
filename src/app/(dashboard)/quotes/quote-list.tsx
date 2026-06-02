@@ -33,7 +33,13 @@ const formatCountry = (code?: string | null) => {
 const formatMarketplaceName = (mp: string | null, shippingCountry?: string | null) => {
   if (!mp || mp.toLowerCase() === 'manual') return 'Manuell'
   const lower = mp.toLowerCase()
-  if (lower === 'mirakl_decathlon') return 'Decathlon'
+  if (lower === 'mirakl_decathlon') {
+    if (shippingCountry) {
+      const countryCode = formatCountry(shippingCountry)
+      return `Decathlon ${countryCode}`
+    }
+    return 'Decathlon DE'
+  }
   if (lower === 'mirakl_decathlon_eu') return 'MIRAKL Hauptaccount'
   if (lower === 'mirakl_mediamarkt') return 'MediaMarkt'
   if (lower === 'otto') return 'Otto'
@@ -45,16 +51,23 @@ const formatMarketplaceName = (mp: string | null, shippingCountry?: string | nul
 
   let resolvedName = mp
   if (lower === 'mirakl_custom') {
-    resolvedName = 'Decathlon'
+    resolvedName = 'Decathlon DE'
   } else if (lower.includes('decathlon')) {
-    resolvedName = 'Decathlon'
+    const parts = lower.split(' ')
+    if (parts.length > 1 && parts[0] === 'decathlon') {
+      resolvedName = `Decathlon ${parts[1].toUpperCase()}`
+    } else {
+      resolvedName = 'Decathlon DE'
+    }
   } else {
     resolvedName = mp.charAt(0).toUpperCase() + mp.slice(1)
   }
 
   if (resolvedName.toLowerCase().startsWith('decathlon') && shippingCountry) {
     const countryCode = formatCountry(shippingCountry)
-    return `Decathlon ${countryCode}`
+    if (!resolvedName.toLowerCase().endsWith(` ${countryCode.toLowerCase()}`)) {
+      return `Decathlon ${countryCode}`
+    }
   }
 
   return resolvedName

@@ -90,7 +90,7 @@ export function ManualImport({
             {hasOttoIntegration && <option value="otto">Otto</option>}
             {hasAboutYouIntegration && <option value="aboutyou">About You</option>}
             {hasShopifyIntegration && <option value="shopify">Shopify</option>}
-            {hasDecathlonIntegration && <option value="mirakl_decathlon">Decathlon</option>}
+            {hasDecathlonIntegration && <option value="mirakl_decathlon">Decathlon DE</option>}
             {hasKauflandIntegration && <option value="kaufland">Kaufland</option>}
             {hasEbayIntegration && <option value="ebay">eBay</option>}
             {customMiraklIntegrations.map((integration) => {
