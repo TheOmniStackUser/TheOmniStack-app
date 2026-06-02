@@ -70,6 +70,7 @@ def init_db():
                 screenshot TEXT,
                 erstellt_am TEXT NOT NULL,
                 geaendert_am TEXT NOT NULL,
+                geschlossen_am TEXT,
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
         ''')
@@ -77,6 +78,10 @@ def init_db():
         for migration in [
             'ALTER TABLE tickets ADD COLUMN user_id INTEGER',
             "ALTER TABLE tickets ADD COLUMN kategorie TEXT NOT NULL DEFAULT 'TheOmniStack'",
+            "ALTER TABLE users ADD COLUMN default_status_filter TEXT DEFAULT 'alle'",
+            "ALTER TABLE users ADD COLUMN default_prioritaet_filter TEXT DEFAULT 'alle'",
+            "ALTER TABLE users ADD COLUMN default_kategorie_filter TEXT DEFAULT 'alle'",
+            "ALTER TABLE tickets ADD COLUMN geschlossen_am TEXT",
         ]:
             try:
                 conn.execute(migration)
@@ -218,13 +223,30 @@ def logout():
 @app.route('/')
 @login_required
 def dashboard():
-    status_filter     = request.args.get('status', 'alle')
-    prioritaet_filter = request.args.get('prioritaet', 'alle')
-    kategorie_filter  = request.args.get('kategorie', 'alle')
-    suche             = request.args.get('suche', '').strip()
-
     user_role = session.get('role', 'haendler')
     user_id   = session.get('user_id')
+
+    # Standard-Filter laden, falls keine URL-Parameter übergeben wurden
+    user_defaults = None
+    if 'status' not in request.args and 'prioritaet' not in request.args and 'kategorie' not in request.args:
+        with get_db() as conn:
+            user_defaults = conn.execute(
+                'SELECT default_status_filter, default_prioritaet_filter, default_kategorie_filter FROM users WHERE id = ?',
+                (user_id,)
+            ).fetchone()
+
+    if user_defaults:
+        status_filter     = user_defaults['default_status_filter'] or 'alle'
+        prioritaet_filter = user_defaults['default_prioritaet_filter'] or 'alle'
+        kategorie_filter  = user_defaults['default_kategorie_filter'] or 'alle'
+    else:
+        status_filter     = request.args.get('status', 'alle')
+        prioritaet_filter = request.args.get('prioritaet', 'alle')
+        kategorie_filter  = request.args.get('kategorie', 'alle')
+
+    suche             = request.args.get('suche', '').strip()
+    erstellt_am_filter = request.args.get('erstellt_am', '').strip()
+    geschlossen_am_filter = request.args.get('geschlossen_am', '').strip()
 
     query  = '''SELECT t.*, u.name as user_name, u.email as user_email
                 FROM tickets t LEFT JOIN users u ON t.user_id = u.id
@@ -236,7 +258,27 @@ def dashboard():
         query += ' AND t.user_id = ?'
         params.append(user_id)
 
-    if status_filter != 'alle':
+    if erstellt_am_filter:
+        try:
+            d = datetime.strptime(erstellt_am_filter, '%Y-%m-%d')
+            erstellt_date_str = d.strftime('%d.%m.%Y')
+            query += " AND t.erstellt_am LIKE ?"
+            params.append(f"{erstellt_date_str}%")
+        except ValueError:
+            pass
+
+    if geschlossen_am_filter:
+        try:
+            d = datetime.strptime(geschlossen_am_filter, '%Y-%m-%d')
+            geschlossen_date_str = d.strftime('%d.%m.%Y')
+            query += " AND t.geschlossen_am LIKE ?"
+            params.append(f"{geschlossen_date_str}%")
+        except ValueError:
+            pass
+
+    if status_filter == 'nicht_erledigt':
+        query += " AND t.status != 'Erledigt'"
+    elif status_filter != 'alle':
         query += ' AND t.status = ?'
         params.append(status_filter)
 
@@ -280,6 +322,8 @@ def dashboard():
         prioritaet_filter=prioritaet_filter,
         kategorie_filter=kategorie_filter,
         suche=suche,
+        erstellt_am_filter=erstellt_am_filter,
+        geschlossen_am_filter=geschlossen_am_filter,
         user_role=user_role,
         kategorien=KATEGORIEN,
     )
@@ -440,8 +484,10 @@ def update_status(ticket_id):
         return jsonify({'error': 'Ungültiger Status'}), 400
 
     with get_db() as conn:
-        conn.execute('UPDATE tickets SET status=?, geaendert_am=? WHERE id=?',
-                     (status, jetzt(), ticket_id))
+        jetzt_str = jetzt()
+        geschlossen_am = jetzt_str if status == 'Erledigt' else None
+        conn.execute('UPDATE tickets SET status=?, geaendert_am=?, geschlossen_am=? WHERE id=?',
+                     (status, jetzt_str, geschlossen_am, ticket_id))
         conn.commit()
 
     return jsonify({'success': True, 'status': status})
@@ -474,6 +520,65 @@ def delete_ticket(ticket_id):
         conn.commit()
 
     return jsonify({'success': True})
+
+# ---------------------------------------------------------------------------
+# API: Benutzer-Einstellungen ändern (AJAX)
+# ---------------------------------------------------------------------------
+@app.route('/api/user/settings', methods=['POST'])
+@login_required
+def update_user_settings():
+    user_id = session.get('user_id')
+    data = request.get_json() or {}
+    status = data.get('status', 'alle')
+    prioritaet = data.get('prioritaet', 'alle')
+    kategorie = data.get('kategorie', 'alle')
+
+    if status not in ['alle', 'nicht_erledigt', 'Offen', 'In Bearbeitung', 'Erledigt']:
+        return jsonify({'error': 'Ungültiger Status'}), 400
+    if prioritaet not in ['alle', 'Hoch', 'Mittel', 'Niedrig']:
+        return jsonify({'error': 'Ungültige Priorität'}), 400
+    if kategorie not in ['alle'] + KATEGORIEN:
+        return jsonify({'error': 'Ungültige Kategorie'}), 400
+
+    with get_db() as conn:
+        conn.execute('''
+            UPDATE users
+            SET default_status_filter = ?, default_prioritaet_filter = ?, default_kategorie_filter = ?
+            WHERE id = ?
+        ''', (status, prioritaet, kategorie, user_id))
+        conn.commit()
+
+    return jsonify({'success': True})
+
+# ---------------------------------------------------------------------------
+# API: Ticket Suchvorschläge (AJAX)
+# ---------------------------------------------------------------------------
+@app.route('/api/tickets/suggest')
+@login_required
+def tickets_suggest():
+    q = request.args.get('q', '').strip()
+    if not q:
+        return jsonify([])
+
+    user_role = session.get('role', 'haendler')
+    user_id = session.get('user_id')
+
+    query = '''SELECT t.id, t.titel, t.status 
+               FROM tickets t 
+               WHERE (t.titel LIKE ? OR t.beschreibung LIKE ?)'''
+    params = [f'%{q}%', f'%{q}%']
+
+    if user_role == 'haendler':
+        query += ' AND t.user_id = ?'
+        params.append(user_id)
+
+    query += ' LIMIT 6'
+
+    with get_db() as conn:
+        rows = conn.execute(query, params).fetchall()
+
+    suggestions = [{'id': r['id'], 'titel': r['titel'], 'status': r['status']} for r in rows]
+    return jsonify(suggestions)
 
 # ---------------------------------------------------------------------------
 # Uploads ausliefern

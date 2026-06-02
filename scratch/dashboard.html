@@ -20,16 +20,19 @@
 <!-- Filter -->
 <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-4">
   <form method="GET" action="{{ url_for('dashboard') }}" class="flex flex-wrap gap-3 items-end">
-    <div class="flex-1 min-w-[200px]">
+    <div class="flex-1 min-w-[200px] relative">
       <label class="block text-xs font-semibold text-gray-500 mb-1">SUCHE</label>
-      <input type="text" name="suche" value="{{ suche }}"
+      <input type="text" name="suche" value="{{ suche }}" autocomplete="off"
              placeholder="Titel oder Beschreibung ..."
              class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400 transition" />
+      <div id="searchSuggestions" class="hidden absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden text-sm divide-y divide-gray-50 max-h-60 overflow-y-auto">
+      </div>
     </div>
     <div>
       <label class="block text-xs font-semibold text-gray-500 mb-1">STATUS</label>
-      <select name="status" class="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400 bg-white">
+      <select name="status" onchange="this.form.submit()" class="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400 bg-white">
         <option value="alle" {% if status_filter=='alle' %}selected{% endif %}>Alle</option>
+        <option value="nicht_erledigt" {% if status_filter=='nicht_erledigt' %}selected{% endif %}>Nicht erledigt</option>
         {% for s in ['Offen','In Bearbeitung','Erledigt'] %}
         <option value="{{ s }}" {% if status_filter==s %}selected{% endif %}>{{ s }}</option>
         {% endfor %}
@@ -37,7 +40,7 @@
     </div>
     <div>
       <label class="block text-xs font-semibold text-gray-500 mb-1">PRIORITÄT</label>
-      <select name="prioritaet" class="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400 bg-white">
+      <select name="prioritaet" onchange="this.form.submit()" class="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400 bg-white">
         <option value="alle" {% if prioritaet_filter=='alle' %}selected{% endif %}>Alle</option>
         {% for p in ['Hoch','Mittel','Niedrig'] %}
         <option value="{{ p }}" {% if prioritaet_filter==p %}selected{% endif %}>{{ p }}</option>
@@ -46,21 +49,34 @@
     </div>
     <div>
       <label class="block text-xs font-semibold text-gray-500 mb-1">KATEGORIE</label>
-      <select name="kategorie" class="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400 bg-white">
+      <select name="kategorie" onchange="this.form.submit()" class="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400 bg-white">
         <option value="alle" {% if kategorie_filter=='alle' %}selected{% endif %}>Alle</option>
         {% for k in kategorien %}
         <option value="{{ k }}" {% if kategorie_filter==k %}selected{% endif %}>{{ k }}</option>
         {% endfor %}
       </select>
     </div>
+    <div>
+      <label class="block text-xs font-semibold text-gray-500 mb-1">ERSTELLT AM</label>
+      <input type="date" name="erstellt_am" value="{{ erstellt_am_filter or '' }}" onchange="this.form.submit()"
+             class="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400 bg-white" />
+    </div>
+    <div>
+      <label class="block text-xs font-semibold text-gray-500 mb-1">GESCHLOSSEN AM</label>
+      <input type="date" name="geschlossen_am" value="{{ geschlossen_am_filter or '' }}" onchange="this.form.submit()"
+             class="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400 bg-white" />
+    </div>
     <button type="submit" class="px-5 py-2 bg-navy-900 text-white text-sm font-bold rounded-xl hover:bg-navy-700 transition">
       Suchen
     </button>
-    {% if suche or status_filter != 'alle' or prioritaet_filter != 'alle' or kategorie_filter != 'alle' %}
+    {% if suche or status_filter != 'alle' or prioritaet_filter != 'alle' or kategorie_filter != 'alle' or erstellt_am_filter or geschlossen_am_filter %}
     <a href="{{ url_for('dashboard') }}" class="px-4 py-2 text-sm text-gray-400 hover:text-gray-600 rounded-xl border border-gray-200 hover:bg-gray-50 transition">
       Zurücksetzen
     </a>
     {% endif %}
+    <button type="button" onclick="saveAsDefault()" class="px-4 py-2 text-sm text-cyan-600 hover:text-cyan-700 font-semibold rounded-xl border border-cyan-200 hover:bg-cyan-50 transition flex items-center gap-1.5">
+      ⚙️ Als Standard speichern
+    </button>
   </form>
 </div>
 
@@ -244,6 +260,24 @@ async function deleteTicket(id, titel) {
   } catch(e) { showToast('Fehler beim Löschen', 'error'); }
 }
 
+async function saveAsDefault() {
+  const status = document.querySelector('select[name="status"]').value;
+  const prioritaet = document.querySelector('select[name="prioritaet"]').value;
+  const kategorie = document.querySelector('select[name="kategorie"]').value;
+
+  try {
+    const res = await fetch('/api/user/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, prioritaet, kategorie })
+    });
+    if (!res.ok) throw new Error('Fehler');
+    showToast('Filter als Standard gespeichert', 'success');
+  } catch(e) {
+    showToast('Fehler beim Speichern des Standards', 'error');
+  }
+}
+
 function showToast(msg, type) {
   const div = document.createElement('div');
   div.className = `fixed top-16 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-sm font-medium ${type === 'success' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`;
@@ -252,5 +286,64 @@ function showToast(msg, type) {
   document.body.appendChild(div);
   setTimeout(() => div.remove(), 3000);
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+  const searchInput = document.querySelector('input[name="suche"]');
+  const suggestionsBox = document.getElementById('searchSuggestions');
+
+  if (!searchInput || !suggestionsBox) return;
+
+  let debounceTimer;
+
+  searchInput.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    const q = searchInput.value.trim();
+    if (q.length < 2) {
+      suggestionsBox.innerHTML = '';
+      suggestionsBox.classList.add('hidden');
+      return;
+    }
+
+    debounceTimer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/tickets/suggest?q=${encodeURIComponent(q)}`);
+        if (!res.ok) throw new Error('API Fehler');
+        const tickets = await res.json();
+        
+        if (tickets.length === 0) {
+          suggestionsBox.innerHTML = '<div class="px-4 py-3 text-xs text-gray-400">Keine passenden Vorschläge</div>';
+          suggestionsBox.classList.remove('hidden');
+          return;
+        }
+
+        suggestionsBox.innerHTML = tickets.map(t => {
+          const badgeClass = t.status === 'Offen' ? 'bg-blue-50 text-blue-600' :
+                             t.status === 'In Bearbeitung' ? 'bg-orange-50 text-orange-600' :
+                             'bg-emerald-50 text-emerald-600';
+          return `
+            <a href="/ticket/${t.id}" class="block px-4 py-2.5 hover:bg-cyan-50/50 text-navy-900 transition flex items-center justify-between">
+              <span class="font-semibold truncate mr-2">${escapeHtml(t.titel)}</span>
+              <span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold ${badgeClass}">${t.status}</span>
+            </a>
+          `;
+        }).join('');
+        
+        suggestionsBox.classList.remove('hidden');
+      } catch(e) {
+        console.error(e);
+      }
+    }, 200);
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!searchInput.contains(e.target) && !suggestionsBox.contains(e.target)) {
+      suggestionsBox.classList.add('hidden');
+    }
+  });
+
+  function escapeHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+  }
+});
 </script>
 {% endblock %}
