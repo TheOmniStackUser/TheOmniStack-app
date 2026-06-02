@@ -193,6 +193,51 @@ export function DeliveryNoteList({
   const [sendMailBody, setSendMailBody] = useState('')
   const [isSendingMail, setIsSendingMail] = useState(false)
 
+  // Build and sort marketplace categories
+  const groupedMarketplaces = (() => {
+    const direct: { value: string; label: string }[] = []
+    const decathlon: { value: string; label: string }[] = []
+    const secretSales: { value: string; label: string }[] = []
+    const other: { value: string; label: string }[] = []
+
+    // Core / direct integrations
+    if (hasOttoIntegration) direct.push({ value: 'otto', label: 'Otto' })
+    if (hasAboutYouIntegration) direct.push({ value: 'aboutyou', label: 'About You' })
+    if (hasShopifyIntegration) direct.push({ value: 'shopify', label: 'Shopify' })
+    if (hasKauflandIntegration) direct.push({ value: 'kaufland', label: 'Kaufland' })
+    if (hasEbayIntegration) direct.push({ value: 'ebay', label: 'eBay' })
+    if (hasAmazonIntegration) direct.push({ value: 'amazon', label: 'Amazon' })
+    if (hasMediamarktIntegration) direct.push({ value: 'mirakl_mediamarkt', label: 'MediaMarkt' })
+
+    // Decathlon
+    if (hasDecathlonIntegration) decathlon.push({ value: 'mirakl_decathlon', label: 'Decathlon DE' })
+    if (hasDecathlonEuIntegration) decathlon.push({ value: 'mirakl_decathlon_eu', label: 'Decathlon EU' })
+
+    // Custom integrations
+    customMiraklIntegrations.forEach((integration) => {
+      const name = (integration.metadata as any)?.customName || 'Unbenannter Mirakl Marktplatz'
+      const lowerName = name.toLowerCase()
+      const value = lowerName
+      const label = name
+
+      if (lowerName.startsWith('decathlon')) {
+        decathlon.push({ value, label })
+      } else if (lowerName.startsWith('secret sales')) {
+        secretSales.push({ value, label })
+      } else {
+        other.push({ value, label })
+      }
+    })
+
+    const sortFn = (a: { label: string }, b: { label: string }) => a.label.localeCompare(b.label, 'de')
+    direct.sort(sortFn)
+    decathlon.sort(sortFn)
+    secretSales.sort(sortFn)
+    other.sort(sortFn)
+
+    return { direct, decathlon, secretSales, other }
+  })()
+
   // Email Template Editor State
   const [isEditingTemplate, setIsEditingTemplate] = useState(false)
   const [templateText, setTemplateText] = useState(initialEmailTemplate || '')
@@ -648,23 +693,38 @@ export function DeliveryNoteList({
           >
             <option value="all">Alle Marktplätze</option>
             <option value="manual">Manuell</option>
-            {hasOttoIntegration && <option value="otto">Otto</option>}
-            {hasAboutYouIntegration && <option value="aboutyou">About You</option>}
-            {hasDecathlonIntegration && <option value="mirakl_decathlon">Decathlon DE</option>}
-            {hasDecathlonEuIntegration && <option value="mirakl_decathlon_eu">Decathlon EU</option>}
-            {hasMediamarktIntegration && <option value="mirakl_mediamarkt">MediaMarkt</option>}
-            {hasAmazonIntegration && <option value="amazon">Amazon</option>}
-            {hasShopifyIntegration && <option value="shopify">Shopify</option>}
-            {hasKauflandIntegration && <option value="kaufland">Kaufland</option>}
-            {hasEbayIntegration && <option value="ebay">eBay</option>}
-            {customMiraklIntegrations.map((integration) => {
-              const name = (integration.metadata as any)?.customName || 'Unbenannter Mirakl Marktplatz'
-              return (
-                <option key={integration.id} value={name.toLowerCase()}>
-                  {name}
-                </option>
-              )
-            })}
+
+            {groupedMarketplaces.direct.length > 0 && (
+              <optgroup label="Direkte Integrationen">
+                {groupedMarketplaces.direct.map((m) => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </optgroup>
+            )}
+
+            {groupedMarketplaces.decathlon.length > 0 && (
+              <optgroup label="Decathlon Marktplätze">
+                {groupedMarketplaces.decathlon.map((m) => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </optgroup>
+            )}
+
+            {groupedMarketplaces.secretSales.length > 0 && (
+              <optgroup label="Secret Sales Marktplätze">
+                {groupedMarketplaces.secretSales.map((m) => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </optgroup>
+            )}
+
+            {groupedMarketplaces.other.length > 0 && (
+              <optgroup label="Weitere Marktplätze">
+                {groupedMarketplaces.other.map((m) => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </optgroup>
+            )}
           </select>
 
           <div className="flex items-center gap-2">
