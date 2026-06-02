@@ -9,7 +9,6 @@ export const dynamic = 'force-dynamic'
 // iOS URLSession-Fix: Verbindung nach jedem Request schließen
 // verhindert NSURLErrorBadServerResponse -1011 beim zweiten Scan
 const MOBILE_SAFE_HEADERS = {
-  'Connection': 'close',
   'Cache-Control': 'no-store',
 }
 

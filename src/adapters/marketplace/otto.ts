@@ -125,7 +125,17 @@ export class OttoAdapter implements MarketplaceAdapter {
         // Find the "next" link in the links array
         const links = responseData.links || []
         const nextLink = links.find((l: any) => l.rel === 'next')
-        nextUrl = nextLink && nextLink.href ? nextLink.href : null
+        const rawNextUrl = nextLink && nextLink.href ? nextLink.href : null
+        if (rawNextUrl) {
+          if (rawNextUrl.startsWith('http')) {
+            nextUrl = rawNextUrl
+          } else {
+            const separator = rawNextUrl.startsWith('/') ? '' : '/'
+            nextUrl = `${this.baseUrl}${separator}${rawNextUrl}`
+          }
+        } else {
+          nextUrl = null
+        }
       }
 
       console.log(`[OttoAdapter] Sync completed. Total orders fetched: ${allRawOrders.length}`)

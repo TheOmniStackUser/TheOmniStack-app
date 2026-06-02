@@ -13,7 +13,6 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
 // iOS URLSession-Fix: Gemeinsame Response-Headers damit der Client
 // die Verbindung NICHT wiederverwendet (verhindert NSURLErrorBadServerResponse -1011)
 const MOBILE_SAFE_HEADERS = {
-  'Connection': 'close',
   'Cache-Control': 'no-store',
 }
 

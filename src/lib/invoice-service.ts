@@ -437,7 +437,7 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
     }
 
     // Link to Order and update status if it is a standard invoice
-    const newStatus = order.status === 'shipped' ? 'shipped' : (order.status === 'pending' ? 'invoiced' : order.status)
+    const newStatus = order.status
     await tx.update(orders)
       .set({ 
         invoiceId: newInvoice.id,
