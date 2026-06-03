@@ -44,7 +44,7 @@ export class OttoAdapter implements MarketplaceAdapter {
       },
       body: new URLSearchParams({
         grant_type: 'client_credentials',
-        scope: this.config.environment === 'sandbox' ? 'developer' : 'orders receipts shipments',
+        scope: this.config.environment === 'sandbox' ? 'developer' : 'orders receipts shipments returns',
       }).toString(),
     })
 
@@ -70,7 +70,7 @@ export class OttoAdapter implements MarketplaceAdapter {
         },
         body: new URLSearchParams({
           grant_type: 'client_credentials',
-          scope: 'orders receipts shipments'
+          scope: 'orders receipts shipments returns'
         }).toString()
       })
 
@@ -403,13 +403,8 @@ export class OttoAdapter implements MarketplaceAdapter {
           returnsPayload.push({
             salesOrderId: salesOrderId,
             positionItemId: item.positionItemId,
-            returnDate: new Date().toISOString().split('.')[0] + 'Z',
-            returnReason: 'RETURN_RECEIVED',
-            condition: 'A',
-            trackingKey: {
-              carrier: 'DHL',
-              trackingNumber: 'RET-' + marketplaceOrderId
-            }
+            reason: 'RETURN_RECEIVED',
+            condition: 'A'
           })
 
           // Decrement the quantity needed to refund
@@ -425,16 +420,17 @@ export class OttoAdapter implements MarketplaceAdapter {
         return false
       }
 
-      // 3. Post returns to Otto returns endpoint
-      console.log(`[OttoAdapter] Sending return confirmation to Otto:`, JSON.stringify(returnsPayload))
-      const response = await fetch(`${this.baseUrl}/v1/returns`, {
+      // 3. Post returns to Otto returns endpoint (v3/returns/acceptance)
+      const requestBody = JSON.stringify({ positionItems: returnsPayload })
+      console.log(`[OttoAdapter] Sending return confirmation to Otto:`, requestBody)
+      const response = await fetch(`${this.baseUrl}/v3/returns/acceptance`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify(returnsPayload)
+        body: requestBody
       })
 
       if (!response.ok) {
