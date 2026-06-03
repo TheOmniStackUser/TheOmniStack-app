@@ -791,6 +791,7 @@ export function InvoiceList({
     search: '',
     country: 'all',
     marketplace: 'all',
+    documentType: 'all',
     fromDate: '',
     toDate: '',
   })
@@ -799,6 +800,7 @@ export function InvoiceList({
   const [draftSearch, setDraftSearch] = useState('')
   const [draftCountry, setDraftCountry] = useState('all')
   const [draftMarketplace, setDraftMarketplace] = useState('all')
+  const [draftDocumentType, setDraftDocumentType] = useState('all')
   const [draftFromDate, setDraftFromDate] = useState('')
   const [draftToDate, setDraftToDate] = useState('')
 
@@ -931,6 +933,7 @@ export function InvoiceList({
       search: draftSearch,
       country: draftCountry,
       marketplace: draftMarketplace,
+      documentType: draftDocumentType,
       fromDate: draftFromDate,
       toDate: draftToDate,
     })
@@ -941,12 +944,14 @@ export function InvoiceList({
     setDraftSearch('')
     setDraftCountry('all')
     setDraftMarketplace('all')
+    setDraftDocumentType('all')
     setDraftFromDate('')
     setDraftToDate('')
     setActiveFilters({
       search: '',
       country: 'all',
       marketplace: 'all',
+      documentType: 'all',
       fromDate: '',
       toDate: '',
     })
@@ -1099,6 +1104,17 @@ export function InvoiceList({
     if (activeFilters.country !== 'all') {
       const code = formatCountry(invoice.recipientCountry)
       if (code !== activeFilters.country) return false
+    }
+
+    // Filter by Document Type
+    if (activeFilters.documentType !== 'all') {
+      if (activeFilters.documentType === 'invoice') {
+        if (invoice.isCreditNote || invoice.status === 'cancelled') return false
+      } else if (activeFilters.documentType === 'credit_note') {
+        if (!invoice.isCreditNote) return false
+      } else if (activeFilters.documentType === 'storno') {
+        if (invoice.status !== 'cancelled' && !invoice.cancelsInvoiceId) return false
+      }
     }
 
     // Filter by Marketplace
@@ -1384,6 +1400,22 @@ export function InvoiceList({
               {uniqueCountries.map(c => (
                 <option key={c} value={c}>{c}</option>
               ))}
+            </select>
+
+            <select
+              value={draftDocumentType}
+              onChange={(e) => {
+                const val = e.target.value
+                setDraftDocumentType(val)
+                setActiveFilters(prev => ({ ...prev, documentType: val }))
+                setCurrentPage(1)
+              }}
+              className="px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px] text-sm text-slate-900 font-medium"
+            >
+              <option value="all">Alle Dokumente</option>
+              <option value="invoice">Rechnungen</option>
+              <option value="credit_note">Gutschriften</option>
+              <option value="storno">Stornos</option>
             </select>
 
             <select
