@@ -147,6 +147,10 @@ export class MiraklAdapter implements MarketplaceAdapter {
             'AT': ['AT', 'AUT', 'AUSTRIA'],
             'CH': ['CH', 'CHE', 'SWITZERLAND'],
             'GB': ['GB', 'GBR', 'UK', 'UNITED KINGDOM'],
+            'CZ': ['CZ', 'CZE', 'CZECHIA', 'CZECH REPUBLIC'],
+            'PL': ['PL', 'POL', 'POLAND'],
+            'HU': ['HU', 'HUN', 'HUNGARY'],
+            'RO': ['RO', 'ROU', 'ROMANIA'],
           }
 
           orders = orders.filter((raw: any) => {
