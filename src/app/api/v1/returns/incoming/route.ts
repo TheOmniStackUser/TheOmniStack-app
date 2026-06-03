@@ -10,6 +10,7 @@ export const dynamic = 'force-dynamic'
 // verhindert NSURLErrorBadServerResponse -1011 beim zweiten Scan
 const MOBILE_SAFE_HEADERS = {
   'Cache-Control': 'no-store',
+  'Connection': 'close',
 }
 
 /**

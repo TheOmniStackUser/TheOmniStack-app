@@ -14,6 +14,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
 // die Verbindung NICHT wiederverwendet (verhindert NSURLErrorBadServerResponse -1011)
 const MOBILE_SAFE_HEADERS = {
   'Cache-Control': 'no-store',
+  'Connection': 'close',
 }
 
 export async function POST(req: NextRequest) {
