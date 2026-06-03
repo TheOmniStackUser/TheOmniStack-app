@@ -197,7 +197,7 @@ export function ReturnsList({
     startRefundTransition(async () => {
       try {
         const res = await refundReturnAction(refundingLog.id, payload)
-        if (res.success) {
+        if (res.success && 'creditNoteNumber' in res) {
           showToast(`Erstattung erfolgreich veranlasst (Gutschrift: ${res.creditNoteNumber}).`, 'success')
           // Update status in local logs state
           setLogs(prev => prev.map(l => {
@@ -211,8 +211,10 @@ export function ReturnsList({
             return l
           }))
           setRefundingLog(null)
-        } else {
+        } else if (!res.success && 'error' in res) {
           showToast(res.error || 'Fehler bei der Rückerstattung.', 'error')
+        } else {
+          showToast('Ein unbekannter Fehler ist aufgetreten.', 'error')
         }
       } catch (err: any) {
         showToast(err.message || 'Fehler bei der Rückerstattung.', 'error')
