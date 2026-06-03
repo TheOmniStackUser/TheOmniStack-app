@@ -57,9 +57,9 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await imageFile.arrayBuffer()
     const base64Image = Buffer.from(arrayBuffer).toString('base64')
 
-    // Modell-Fallback-Kette: bei 503 (Überlastung) wird automatisch auf
+    // Modell-Fallback-Kette: bei 503 (Überlastung) oder 404 (Modell existiert nicht) wird automatisch auf
     // das nächste Modell gewechselt.
-    const MODEL_CHAIN = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash']
+    const MODEL_CHAIN = ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.5-flash-8b']
 
     const prompt = `
       Du bist ein Experte für Logistik-Belege.
@@ -146,8 +146,9 @@ export async function POST(req: NextRequest) {
         lastError = err
         const msg = String(err?.message || '')
         const is503 = msg.includes('503') || msg.includes('Service Unavailable') || msg.includes('high demand') || msg.includes('overloaded')
-        if (is503) {
-          console.warn(`[analyze-image] Model ${modelName} overloaded (503), trying next...`)
+        const is404 = msg.includes('404') || msg.includes('not found') || msg.includes('no longer available')
+        if (is503 || is404) {
+          console.warn(`[analyze-image] Model ${modelName} unavailable (${is404 ? '404' : '503'}), trying next...`)
           continue // Nächstes Modell versuchen
         }
         throw err // Anderer Fehler → sofort weiterwerfen
