@@ -1252,6 +1252,7 @@ export async function persistOrders(
           shippingName: order.shippingAddress.name,
           shippingCompany: order.shippingAddress.company,
           shippingAddressAddition: order.shippingAddress.addressAddition,
+          shippingPhone: order.shippingAddress.phone,
           shippingStreet: order.shippingAddress.street,
           shippingCity: order.shippingAddress.city,
           shippingZip: order.shippingAddress.zip,

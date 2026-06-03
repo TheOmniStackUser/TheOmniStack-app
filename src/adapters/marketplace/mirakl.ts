@@ -259,9 +259,13 @@ export class MiraklAdapter implements MarketplaceAdapter {
       buyer: {
         name: `${billing.firstname || ''} ${billing.lastname || ''}`.trim() || 'Mirakl Customer',
         email: customer.customer_id ? `${customer.customer_id}@mirakl.net` : 'no-reply@mirakl.net',
+        phone: billing.phone || billing.phone_secondary || undefined,
       },
       shippingAddress: {
         name: `${shipping.firstname || ''} ${shipping.lastname || ''}`.trim(),
+        company: shipping.company || shipping.company_2 || undefined,
+        addressAddition: shipping.additional_info || shipping.street_2 || undefined,
+        phone: shipping.phone || shipping.phone_secondary || undefined,
         street: shipping.street_1 || '',
         city: shipping.city || '',
         zip: shipping.zip_code || '',

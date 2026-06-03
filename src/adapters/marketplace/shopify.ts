@@ -112,9 +112,13 @@ export class ShopifyAdapter implements MarketplaceAdapter {
         buyer: {
           name: sa.name || order.customer?.first_name + ' ' + order.customer?.last_name || 'Unbekannt',
           email: order.contact_email || order.email || order.customer?.email,
+          phone: order.customer?.phone || order.billing_address?.phone || undefined,
         },
         shippingAddress: {
           name: sa.name || order.customer?.first_name + ' ' + order.customer?.last_name || 'Unbekannt',
+          company: sa.company || undefined,
+          addressAddition: sa.address2 || undefined,
+          phone: sa.phone || undefined,
           street: `${sa.address1 || ''} ${sa.address2 || ''}`.trim(),
           city: sa.city || '',
           zip: sa.zip || '',

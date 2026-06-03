@@ -100,9 +100,13 @@ export class AmazonAdapter implements MarketplaceAdapter {
       buyer: {
         name: rawOrder.ShippingAddress?.Name || 'Amazon Kunde',
         email: rawOrder.BuyerEmail || '',
+        phone: rawOrder.ShippingAddress?.Phone || undefined,
       },
       shippingAddress: {
         name: rawOrder.ShippingAddress?.Name || '',
+        company: rawOrder.ShippingAddress?.CompanyName || undefined,
+        addressAddition: rawOrder.ShippingAddress?.AddressLine2 || undefined,
+        phone: rawOrder.ShippingAddress?.Phone || undefined,
         street: rawOrder.ShippingAddress?.AddressLine1 || '',
         city: rawOrder.ShippingAddress?.City || '',
         zip: rawOrder.ShippingAddress?.PostalCode || '',

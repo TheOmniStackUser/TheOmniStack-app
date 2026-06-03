@@ -105,9 +105,13 @@ export class AboutYouAdapter implements MarketplaceAdapter {
       buyer: {
         name: `${raw.billing_recipient_first_name || ''} ${raw.billing_recipient_last_name || ''}`.trim() || 'About You Customer',
         email: raw.customer_email || 'no-reply@aboutyou.market',
+        phone: raw.billing_phone || raw.shipping_phone || undefined,
       },
       shippingAddress: {
         name: `${shipping.first_name || ''} ${shipping.last_name || ''}`.trim(),
+        company: raw.shipping_company || undefined,
+        addressAddition: raw.shipping_address_addition || raw.shipping_addition || undefined,
+        phone: raw.shipping_phone || raw.billing_phone || undefined,
         street: shipping.street,
         city: shipping.city,
         zip: shipping.zip_code,

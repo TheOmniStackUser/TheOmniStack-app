@@ -214,9 +214,13 @@ export class ShopwareAdapter implements MarketplaceAdapter {
       buyer: {
         name: `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || shippingName,
         email: customer.email || undefined,
+        phone: customer.phoneNumber || undefined,
       },
       shippingAddress: {
         name: shippingName,
+        company: shippingAddr.company || undefined,
+        addressAddition: shippingAddr.additionalAddressLine1 || shippingAddr.department || undefined,
+        phone: shippingAddr.phoneNumber || undefined,
         street,
         city: shippingAddr.city || '',
         zip: shippingAddr.zipcode || '',

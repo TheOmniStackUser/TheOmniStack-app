@@ -184,9 +184,13 @@ export class OttoAdapter implements MarketplaceAdapter {
       buyer: {
         name: `${raw.invoiceAddress?.firstName || ''} ${raw.invoiceAddress?.lastName || ''}`.trim() || 'Otto Customer',
         email: raw.invoiceAddress?.email || 'no-reply@otto.market',
+        phone: raw.invoiceAddress?.phoneNumber || undefined,
       },
       shippingAddress: {
         name: `${delivery.firstName || ''} ${delivery.lastName || ''}`.trim(),
+        company: delivery.companyName || undefined,
+        addressAddition: delivery.addition || undefined,
+        phone: delivery.phoneNumber || undefined,
         street: `${delivery.street || ''} ${delivery.houseNumber || ''}`.trim(),
         city: delivery.city || '',
         zip: delivery.zipCode || '',

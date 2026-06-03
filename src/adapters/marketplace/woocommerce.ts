@@ -133,9 +133,13 @@ export class WooCommerceAdapter implements MarketplaceAdapter {
       buyer: {
         name: `${billing.first_name || ''} ${billing.last_name || ''}`.trim() || shippingName,
         email: billing.email || raw.customer_email || undefined,
+        phone: billing.phone || undefined,
       },
       shippingAddress: {
         name: shippingName,
+        company: shipping.company || undefined,
+        addressAddition: shipping.address_2 || undefined,
+        phone: shipping.phone || undefined,
         street,
         city: shipping.city || billing.city || '',
         zip: shipping.postcode || billing.postcode || '',

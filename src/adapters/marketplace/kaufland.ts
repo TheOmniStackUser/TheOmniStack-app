@@ -203,10 +203,14 @@ export class KauflandAdapter implements MarketplaceAdapter {
         purchaseDate: new Date(firstUnit.ts_created_iso || Date.now()),
         buyer: {
           name: buyerName,
-          email: firstUnit.buyer?.email || 'no-reply@kaufland.de'
+          email: firstUnit.buyer?.email || 'no-reply@kaufland.de',
+          phone: firstUnit.buyer?.phone || billing.phone || undefined,
         },
         shippingAddress: {
           name: shippingName,
+          company: shipping.company_name || undefined,
+          addressAddition: shipping.additional_field || undefined,
+          phone: shipping.phone || undefined,
           street: `${shipping.street || ''} ${shipping.house_number || ''}`.trim(),
           city: shipping.city || '',
           zip: shipping.postcode || '',
