@@ -875,7 +875,8 @@ export function ReturnsList({
                         </div>
                       )}
                     </div>
-                  </td>
+                  </div>
+                </td>
                 </tr>
                 
                 {expandedLogId === log.id && (
