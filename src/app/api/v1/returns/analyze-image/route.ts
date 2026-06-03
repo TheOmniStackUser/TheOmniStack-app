@@ -57,11 +57,10 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await imageFile.arrayBuffer()
     const base64Image = Buffer.from(arrayBuffer).toString('base64')
 
-    const model = genAI.getGenerativeModel({ 
-      model: 'gemini-2.5-flash',
-      generationConfig: { responseMimeType: "application/json" }
-    })
-    
+    // Modell-Fallback-Kette: bei 503 (Überlastung) wird automatisch auf
+    // das nächste Modell gewechselt.
+    const MODEL_CHAIN = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash']
+
     const prompt = `
       Du bist ein Experte für Logistik-Belege.
       Der aktive Händler in diesem System heißt: "${companyName}".
@@ -125,15 +124,43 @@ export async function POST(req: NextRequest) {
       mimeType = 'image/jpeg'
     }
 
-    const result = await model.generateContent([
+    const inlineContent = [
       prompt,
-      {
-        inlineData: {
-          data: base64Image,
-          mimeType: mimeType
+      { inlineData: { data: base64Image, mimeType: mimeType } }
+    ]
+
+    // Probiere alle Modelle der Fallback-Kette durch
+    let result: any = null
+    let lastError: any = null
+    for (const modelName of MODEL_CHAIN) {
+      try {
+        console.log(`[analyze-image] Trying model: ${modelName}`)
+        const model = genAI.getGenerativeModel({
+          model: modelName,
+          generationConfig: { responseMimeType: 'application/json' }
+        })
+        result = await model.generateContent(inlineContent)
+        console.log(`[analyze-image] Success with model: ${modelName}`)
+        break // Erfolgreich → Schleife beenden
+      } catch (err: any) {
+        lastError = err
+        const msg = String(err?.message || '')
+        const is503 = msg.includes('503') || msg.includes('Service Unavailable') || msg.includes('high demand') || msg.includes('overloaded')
+        if (is503) {
+          console.warn(`[analyze-image] Model ${modelName} overloaded (503), trying next...`)
+          continue // Nächstes Modell versuchen
         }
+        throw err // Anderer Fehler → sofort weiterwerfen
       }
-    ])
+    }
+
+    if (!result) {
+      // Alle Modelle überlastet
+      return NextResponse.json(
+        { error: 'Analysis failed', details: 'Alle KI-Modelle sind aktuell überlastet. Bitte versuche es in 1-2 Minuten erneut.' },
+        { status: 503, headers: MOBILE_SAFE_HEADERS }
+      )
+    }
 
     const responseText = result.response.text().trim()
     console.log('AI Analysis Result for Company', companyName, ':', responseText)
