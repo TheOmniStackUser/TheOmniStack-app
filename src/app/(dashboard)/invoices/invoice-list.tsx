@@ -291,7 +291,7 @@ export function InvoiceList({
     return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)))
   }
 
-  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null)
+  const [menuPosition, setMenuPosition] = useState<{ top?: number; bottom?: number; left: number } | null>(null)
 
   // Row menu toggle
   const toggleRowMenu = (invoiceId: string, buttonElement: HTMLButtonElement) => {
@@ -300,10 +300,20 @@ export function InvoiceList({
       setMenuPosition(null)
     } else {
       const rect = buttonElement.getBoundingClientRect()
-      setMenuPosition({
-        top: rect.bottom + window.scrollY + 6,
-        left: Math.max(8, rect.right - 288 + window.scrollX)
-      })
+      const spaceBelow = window.innerHeight - rect.bottom
+      const estimatedMenuHeight = 400
+
+      if (spaceBelow < estimatedMenuHeight && rect.top > spaceBelow) {
+        setMenuPosition({
+          bottom: window.innerHeight - rect.top + 6,
+          left: Math.max(8, rect.right - 288)
+        })
+      } else {
+        setMenuPosition({
+          top: rect.bottom + 6,
+          left: Math.max(8, rect.right - 288)
+        })
+      }
       setActiveRowMenuId(invoiceId)
     }
   }
@@ -1749,9 +1759,10 @@ export function InvoiceList({
 
                       {activeRowMenuId === invoice.id && menuPosition && createPortal(
                         <div
-                          className="row-menu-dropdown absolute w-72 bg-white border border-slate-200 rounded-xl shadow-2xl z-[999] flex flex-col py-1 animate-in fade-in slide-in-from-top-2 duration-150 text-sm text-slate-700 font-medium"
+                          className={`row-menu-dropdown fixed w-72 bg-white border border-slate-200 rounded-xl shadow-2xl z-[999] flex flex-col py-1 animate-in fade-in duration-150 text-sm text-slate-700 font-medium ${menuPosition.bottom !== undefined ? 'slide-in-from-bottom-2' : 'slide-in-from-top-2'}`}
                           style={{
-                            top: `${menuPosition.top}px`,
+                            top: menuPosition.top !== undefined ? `${menuPosition.top}px` : undefined,
+                            bottom: menuPosition.bottom !== undefined ? `${menuPosition.bottom}px` : undefined,
                             left: `${menuPosition.left}px`,
                           }}
                           onClick={(e) => e.stopPropagation()}
