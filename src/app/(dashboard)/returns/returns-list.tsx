@@ -759,16 +759,35 @@ export function ReturnsList({
 
                   {/* Action Buttons */}
                   <td className="px-6 py-4 text-right">
-                    <div className="relative inline-block text-left action-dropdown-container">
-                      <button
-                        onClick={() => setOpenDropdownId(openDropdownId === log.id ? null : log.id)}
-                        className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-all"
-                        title="Aktionen"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                        </svg>
-                      </button>
+                    <div className="flex items-center justify-end gap-1.5">
+                      {/* Erstatten Button (Outside Menu) */}
+                      {log.orderId && (
+                        <button
+                          onClick={() => handleOpenRefund(log)}
+                          disabled={isPending || isRefundingPending || log.status === 'bearbeitet'}
+                          className={`p-2 rounded-lg transition-all ${
+                            log.status === 'bearbeitet'
+                              ? 'text-slate-300 cursor-not-allowed'
+                              : 'text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50'
+                          }`}
+                          title={log.status === 'bearbeitet' ? 'Bereits erstattet' : 'Erstattung veranlassen'}
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </button>
+                      )}
+
+                      <div className="relative inline-block text-left action-dropdown-container">
+                        <button
+                          onClick={() => setOpenDropdownId(openDropdownId === log.id ? null : log.id)}
+                          className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-all"
+                          title="Aktionen"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                          </svg>
+                        </button>
                       
                       {openDropdownId === log.id && (
                         <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-slate-200 z-50 py-1">
