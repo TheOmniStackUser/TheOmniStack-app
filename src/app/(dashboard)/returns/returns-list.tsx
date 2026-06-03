@@ -91,6 +91,16 @@ export function ReturnsList({
   const [editScannedAt, setEditScannedAt] = useState('')
   const [editReceivedAt, setEditReceivedAt] = useState('')
 
+  // Toast State
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
+  
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ message, type })
+    setTimeout(() => {
+      setToast(current => current?.message === message ? null : current)
+    }, 5000)
+  }
+
   // Refund Modal State
   const [refundingLog, setRefundingLog] = useState<ReturnLog | null>(null)
   const [refundItemsInput, setRefundItemsInput] = useState<{ sku: string; title: string; orderQty: number; returnedQty: number; refundQty: number }[]>([])
@@ -150,7 +160,7 @@ export function ReturnsList({
         setRefundItemsInput(inputs)
         setRefundingLog(log)
       } catch (err: any) {
-        alert(err.message || 'Fehler beim Laden der Bestelldaten.')
+        showToast(err.message || 'Fehler beim Laden der Bestelldaten.', 'error')
       }
     })
   }
@@ -180,7 +190,7 @@ export function ReturnsList({
       }))
 
     if (payload.length === 0) {
-      alert('Bitte wähle mindestens einen Artikel mit einer Menge größer als 0 aus.')
+      showToast('Bitte wähle mindestens einen Artikel mit einer Menge größer als 0 aus.', 'error')
       return
     }
 
@@ -188,7 +198,7 @@ export function ReturnsList({
       try {
         const res = await refundReturnAction(refundingLog.id, payload)
         if (res.success) {
-          alert(`Erstattung erfolgreich veranlasst (Gutschrift: ${res.creditNoteNumber}).`)
+          showToast(`Erstattung erfolgreich veranlasst (Gutschrift: ${res.creditNoteNumber}).`, 'success')
           // Update status in local logs state
           setLogs(prev => prev.map(l => {
             if (l.id === refundingLog.id) {
@@ -203,7 +213,7 @@ export function ReturnsList({
           setRefundingLog(null)
         }
       } catch (err: any) {
-        alert(err.message || 'Fehler bei der Rückerstattung.')
+        showToast(err.message || 'Fehler bei der Rückerstattung.', 'error')
       }
     })
   }
@@ -264,7 +274,7 @@ export function ReturnsList({
           return next
         })
       } catch (err) {
-        alert('Fehler beim Löschen.')
+        showToast('Fehler beim Löschen.', 'error')
       }
     })
   }
@@ -281,7 +291,7 @@ export function ReturnsList({
         setLogs((prev) => prev.filter((l) => !selectedIds.has(l.id)))
         setSelectedIds(new Set())
       } catch (err) {
-        alert('Fehler beim Massen-Löschen.')
+        showToast('Fehler beim Massen-Löschen.', 'error')
       }
     })
   }
@@ -295,7 +305,7 @@ export function ReturnsList({
           prev.map((l) => (l.id === id ? { ...l, status: newStatus } : l))
         )
       } catch (err) {
-        alert('Fehler beim Ändern des Status.')
+        showToast('Fehler beim Ändern des Status.', 'error')
       }
     })
   }
@@ -313,7 +323,7 @@ export function ReturnsList({
         )
         setSelectedIds(new Set())
       } catch (err) {
-        alert('Fehler beim Massen-Status-Änderung.')
+        showToast('Fehler beim Massen-Status-Änderung.', 'error')
       }
     })
   }
@@ -366,7 +376,7 @@ export function ReturnsList({
     if (!editingLog) return
     const cleanedOrderNumber = editOrderNumber.trim()
     if (!cleanedOrderNumber) {
-      alert('Bestellnummer darf nicht leer sein.')
+      showToast('Bestellnummer darf nicht leer sein.', 'error')
       return
     }
 
@@ -411,7 +421,7 @@ export function ReturnsList({
         )
         setEditingLog(null)
       } catch (err) {
-        alert('Fehler beim Speichern der Änderungen.')
+        showToast('Fehler beim Speichern der Änderungen.', 'error')
       }
     })
   }
@@ -1370,6 +1380,27 @@ export function ReturnsList({
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed bottom-6 right-6 px-6 py-4 rounded-xl shadow-xl z-50 flex items-center gap-3 animate-fade-in-up transition-all border ${
+          toast.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 
+          toast.type === 'error' ? 'bg-rose-50 border-rose-200 text-rose-800' : 
+          'bg-indigo-50 border-indigo-200 text-indigo-800'
+        }`}>
+          {toast.type === 'success' ? (
+            <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
+          ) : toast.type === 'error' ? (
+            <svg className="w-6 h-6 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          ) : (
+            <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          )}
+          <span className="font-semibold text-sm">{toast.message}</span>
+          <button onClick={() => setToast(null)} className="ml-4 text-slate-400 hover:text-slate-600 transition-colors">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
         </div>
       )}
     </div>
