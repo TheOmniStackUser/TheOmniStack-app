@@ -67,15 +67,10 @@ export async function POST(req: Request) {
 
     const extractedOrderNumber = order_info?.order_number || body.order_number || return_metadata?.order_number || body.tracking_number;
 
-    // Optional: Allow saving without an order number if the user couldn't identify one
-    if (!extractedOrderNumber && body.force_save_without_order !== true) {
-       // We'll still allow it if force_save_without_order is true, or we just allow it generally now
-       // The user requested to be able to save without order number
-    }
-
     // 3. Attempt to Match existing Marketplace Order
     // Match by: marketplaceOrderId, outbound tracking number, or return tracking number
-    const scanInput = String(extractedOrderNumber).trim()
+    const finalOrderNumber = extractedOrderNumber || "Ohne Zuordnung"
+    const scanInput = String(finalOrderNumber).trim()
     const matchedOrder = await db.query.orders.findFirst({
       where: and(
         eq(orders.companyId, companyId),
@@ -198,7 +193,7 @@ export async function POST(req: Request) {
     const [logEntry] = await db.insert(returnsLog).values({
       companyId: companyId,
       orderId: matchedOrder?.id,
-      orderNumber: matchedOrder?.marketplaceOrderId || String(extractedOrderNumber), // Use the matched order number if a tracking number was scanned!
+      orderNumber: matchedOrder?.marketplaceOrderId || finalOrderNumber, // Use the matched order number if a tracking number was scanned!
       customerName: String(resolvedCustomerName),
       shippingAddress: resolvedShippingAddress,
       processedByUserId: autoProcessedByUserId || return_metadata?.processed_by_user_id || null,
