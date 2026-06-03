@@ -179,7 +179,7 @@ export class OttoAdapter implements MarketplaceAdapter {
 
     return {
       marketplace: this.marketplace,
-      marketplaceOrderId: raw.orderNumber || raw.salesOrderId || `OTTO-${Date.now()}`,
+      marketplaceOrderId: raw.salesOrderId || raw.orderNumber || `OTTO-${Date.now()}`,
       purchaseDate: new Date(raw.orderDate || Date.now()),
       buyer: {
         name: `${raw.invoiceAddress?.firstName || ''} ${raw.invoiceAddress?.lastName || ''}`.trim() || 'Otto Customer',
