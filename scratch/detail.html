@@ -66,6 +66,37 @@
     </div>
     {% endif %}
 
+    <!-- Kommentare -->
+    <div class="mb-6 pt-5 border-t border-gray-100">
+      <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Kommentare</h2>
+      
+      <div class="space-y-4 mb-4">
+        {% if comments %}
+          {% for comment in comments %}
+            <div class="bg-white rounded-xl p-4 text-sm text-gray-700 leading-relaxed border border-gray-100 shadow-sm">
+              <div class="flex items-center justify-between mb-2 pb-2 border-b border-gray-100">
+                <span class="font-semibold text-navy-900">{{ comment.user_name }} {% if comment.user_role != 'haendler' %}<span class="text-xs bg-purple-50 text-purple-700 border border-purple-100 px-2 py-0.5 rounded-md ml-2">{{ comment.user_role|capitalize }}</span>{% endif %}</span>
+                <span class="text-xs text-gray-400">{{ comment.erstellt_am }}</span>
+              </div>
+              <div class="whitespace-pre-wrap">{{ comment.text }}</div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <p class="text-sm text-gray-500 italic">Noch keine Kommentare vorhanden.</p>
+        {% endif %}
+      </div>
+
+      <!-- Neues Kommentar Formular -->
+      <div class="mt-4 bg-gray-50 rounded-xl p-4 border border-gray-100">
+        <textarea id="commentText" rows="3" class="w-full text-sm border-gray-200 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition mb-3" placeholder="Geben Sie hier neue Informationen oder Rückfragen ein..."></textarea>
+        <div class="flex justify-end">
+          <button onclick="submitComment()" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-semibold transition shadow-sm">
+            Kommentieren
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Status-Buttons (nur für Support/Admin) -->
     {% if user_role != 'haendler' %}
     <div class="border-t border-gray-100 pt-5">
@@ -131,6 +162,31 @@ async function deleteAndRedirect() {
   if (!confirm('Ticket wirklich löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.')) return;
   const res = await fetch(`/api/ticket/{{ ticket.id }}`, { method: 'DELETE' });
   if (res.ok) window.location.href = '/';
+}
+
+async function submitComment() {
+  const text = document.getElementById('commentText').value;
+  if (!text.trim()) {
+    alert('Bitte geben Sie einen Kommentar ein.');
+    return;
+  }
+  const btn = event.currentTarget;
+  btn.disabled = true;
+  btn.textContent = 'Speichere...';
+  
+  const res = await fetch(`/api/ticket/{{ ticket.id }}/comment`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text })
+  });
+  
+  if (res.ok) {
+    window.location.reload();
+  } else {
+    alert('Fehler beim Speichern des Kommentars.');
+    btn.disabled = false;
+    btn.textContent = 'Kommentieren';
+  }
 }
 </script>
 {% endblock %}

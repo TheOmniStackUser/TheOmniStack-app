@@ -87,6 +87,19 @@ def init_db():
                 conn.execute(migration)
             except Exception:
                 pass
+                
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS comments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticket_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                text TEXT NOT NULL,
+                erstellt_am TEXT NOT NULL,
+                FOREIGN KEY (ticket_id) REFERENCES tickets(id),
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        ''')
+        
         conn.commit()
 
 # ---------------------------------------------------------------------------
@@ -384,6 +397,13 @@ def detail(ticket_id):
             WHERE t.id = ?
         ''', (ticket_id,)).fetchone()
 
+        comments = conn.execute('''
+            SELECT c.*, u.name as user_name, u.role as user_role
+            FROM comments c LEFT JOIN users u ON c.user_id = u.id
+            WHERE c.ticket_id = ?
+            ORDER BY c.id ASC
+        ''', (ticket_id,)).fetchall()
+
     if not ticket:
         flash('Ticket nicht gefunden.', 'error')
         return redirect(url_for('dashboard'))
@@ -393,7 +413,7 @@ def detail(ticket_id):
         flash('Keine Berechtigung.', 'error')
         return redirect(url_for('dashboard'))
 
-    return render_template('detail.html', ticket=ticket, user_role=user_role)
+    return render_template('detail.html', ticket=ticket, user_role=user_role, comments=comments)
 
 # ---------------------------------------------------------------------------
 # Admin: Benutzerverwaltung
@@ -517,6 +537,38 @@ def delete_ticket(ticket_id):
                 pass
 
         conn.execute('DELETE FROM tickets WHERE id=?', (ticket_id,))
+        conn.commit()
+
+    return jsonify({'success': True})
+
+# ---------------------------------------------------------------------------
+# API: Kommentar hinzufügen (AJAX)
+# ---------------------------------------------------------------------------
+@app.route('/api/ticket/<int:ticket_id>/comment', methods=['POST'])
+@login_required
+def add_comment(ticket_id):
+    user_id = session.get('user_id')
+    user_role = session.get('role', 'haendler')
+    
+    data = request.get_json() or {}
+    text = data.get('text', '').strip()
+    
+    if not text:
+        return jsonify({'error': 'Kommentar darf nicht leer sein.'}), 400
+
+    with get_db() as conn:
+        ticket = conn.execute('SELECT user_id FROM tickets WHERE id=?', (ticket_id,)).fetchone()
+        if not ticket:
+            return jsonify({'error': 'Ticket nicht gefunden'}), 404
+            
+        if user_role == 'haendler' and ticket['user_id'] != user_id:
+            return jsonify({'error': 'Keine Berechtigung'}), 403
+
+        jetzt_str = jetzt()
+        conn.execute('''
+            INSERT INTO comments (ticket_id, user_id, text, erstellt_am)
+            VALUES (?, ?, ?, ?)
+        ''', (ticket_id, user_id, text, jetzt_str))
         conn.commit()
 
     return jsonify({'success': True})
