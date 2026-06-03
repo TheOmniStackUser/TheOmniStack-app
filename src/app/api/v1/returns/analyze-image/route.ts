@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
       8. KUNDENADRESSE / VERSANDADRESSE (shipping_address):
          - Suche nach der vollständigen Adresse des Kunden (Absender auf dem Label oder Lieferanschrift auf dem Lieferschein). Gib sie als sauber formatierten String zurück (z.B. "Musterstraße 12, 12345 Musterstadt"). Wenn keine Adresse gefunden wird, gib null zurück.
 
-      ANTWORTE NUR ALS JSON:
+      Antworte AUSSCHLIESSLICH im folgenden JSON-Format ohne Markdown-Blöcke oder weiteren Text:
       {
         "order_number": "String",
         "customer_name": "String",
@@ -145,7 +145,7 @@ export async function POST(req: NextRequest) {
       } catch (err: any) {
         const msg = String(err?.message || '')
         errors.push(`${modelName}: ${msg}`)
-        const is503 = msg.includes('503') || msg.includes('Service Unavailable') || msg.includes('high demand') || msg.includes('overloaded') || msg.includes('429') || msg.includes('Resource Exhausted')
+        const is503 = msg.includes('503') || msg.includes('Service Unavailable') || msg.includes('high demand') || msg.includes('overloaded') || msg.includes('429') || msg.includes('Resource Exhausted') || msg.includes('500') || msg.includes('Internal Server Error')
         const is404 = msg.includes('404') || msg.includes('not found') || msg.includes('no longer available')
         if (is503 || is404) {
           console.warn(`[analyze-image] Model ${modelName} unavailable (${is404 ? '404' : '503'}), trying next...`)
