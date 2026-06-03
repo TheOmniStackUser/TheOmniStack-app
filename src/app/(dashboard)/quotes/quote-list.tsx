@@ -398,26 +398,36 @@ export function QuoteList({
 
       {/* Search */}
       <div className="mb-5">
-        <div className="relative w-full max-w-xs">
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Angebot suchen…"
-            className="w-full pr-10 pl-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 bg-white text-slate-800 placeholder-slate-400 font-medium"
-          />
-          {search && (
+        <div className="flex flex-col sm:flex-row gap-4 items-center">
+          <div className="flex-1 w-full flex gap-2">
+            <div className="relative flex-1 max-w-xs">
+              <input
+                type="text"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Angebot suchen…"
+                className="w-full pr-10 pl-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 bg-white text-slate-800 placeholder-slate-400 font-medium"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                  title="Suche leeren"
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
             <button
               type="button"
-              onClick={() => setSearch('')}
-              className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
-              title="Suche leeren"
+              className="px-5 py-2.5 bg-amber-600 text-white text-sm font-semibold rounded-lg hover:bg-amber-700 transition-colors shadow-sm whitespace-nowrap"
             >
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              Suchen
             </button>
-          )}
+          </div>
         </div>
       </div>
 
