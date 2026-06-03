@@ -1175,7 +1175,7 @@ export function OrdersTable({
         country: order.invoice.recipientCountry || '',
         company: (order.invoice as any).recipientCompany || '',
         addressAddition: '',
-        phone: order.buyerPhone || ''
+        phone: (order as any).buyerPhone || ''
       }
     }
 
@@ -1189,7 +1189,7 @@ export function OrdersTable({
           country: raw.manualBillingAddress.country || 'DE',
           company: raw.manualBillingAddress.company || '',
           addressAddition: raw.manualBillingAddress.addressAddition || '',
-          phone: raw.manualBillingAddress.phone || order.buyerPhone || ''
+          phone: raw.manualBillingAddress.phone || (order as any).buyerPhone || ''
         }
       }
       // 2. Otto Structure
@@ -1201,7 +1201,7 @@ export function OrdersTable({
           country: raw.invoiceAddress.countryCode || '',
           company: raw.invoiceAddress.companyName || raw.invoiceAddress.company || '',
           addressAddition: raw.invoiceAddress.addition || '',
-          phone: order.buyerPhone || ''
+          phone: (order as any).buyerPhone || ''
         }
       }
 
@@ -1215,7 +1215,7 @@ export function OrdersTable({
           country: addr.country_iso_code || addr.country || '',
           company: addr.company || '',
           addressAddition: addr.additional_info || '',
-          phone: order.buyerPhone || ''
+          phone: (order as any).buyerPhone || ''
         }
       }
 
@@ -1228,7 +1228,7 @@ export function OrdersTable({
           country: raw.billing_country_code || '',
           company: raw.billing_company || '',
           addressAddition: raw.billing_address_addition || '',
-          phone: order.buyerPhone || ''
+          phone: (order as any).buyerPhone || ''
         }
       }
     }
@@ -1242,7 +1242,7 @@ export function OrdersTable({
         country: order.shippingCountry || '',
         company: (order as any).shippingCompany || '',
         addressAddition: (order as any).shippingAddressAddition || '',
-        phone: order.buyerPhone || ''
+        phone: (order as any).buyerPhone || ''
       }
     }
 
@@ -2719,7 +2719,7 @@ export function OrdersTable({
                                       {order.shippingZip} {order.shippingCity}<br/>
                                       {formatCountry(order.shippingCountry)}
                                       {order.buyerEmail && <><br/>{order.buyerEmail}</>}
-                                      {order.buyerPhone && <><br/>{order.buyerPhone}</>}
+                                      {(order as any).buyerPhone && <><br/>{(order as any).buyerPhone}</>}
                                     </div>
                                   </div>
                                 )}
