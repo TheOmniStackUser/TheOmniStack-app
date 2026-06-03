@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import React, { useState, useTransition, Fragment } from 'react'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
 import {
@@ -81,6 +81,34 @@ export function ReturnsList({
   const [refundingLog, setRefundingLog] = useState<ReturnLog | null>(null)
   const [refundItemsInput, setRefundItemsInput] = useState<{ sku: string; title: string; orderQty: number; returnedQty: number; refundQty: number }[]>([])
   const [isRefundingPending, startRefundTransition] = useTransition()
+
+  // Expandable Order Details State
+  const [expandedLogId, setExpandedLogId] = useState<string | null>(null)
+  const [orderDetailsCache, setOrderDetailsCache] = useState<Record<string, any>>({})
+  const [isLoadingOrderDetails, setIsLoadingOrderDetails] = useState<Record<string, boolean>>({})
+
+  const handleToggleExpand = async (log: ReturnLog) => {
+    if (expandedLogId === log.id) {
+      setExpandedLogId(null)
+      return
+    }
+    
+    if (!log.orderId) return
+    
+    setExpandedLogId(log.id)
+    
+    if (!orderDetailsCache[log.id]) {
+      setIsLoadingOrderDetails(prev => ({ ...prev, [log.id]: true }))
+      try {
+        const details = await getOrderDetailsAction(log.orderId)
+        setOrderDetailsCache(prev => ({ ...prev, [log.id]: details }))
+      } catch (err) {
+        console.error('Failed to load order details:', err)
+      } finally {
+        setIsLoadingOrderDetails(prev => ({ ...prev, [log.id]: false }))
+      }
+    }
+  }
 
   const handleOpenRefund = async (log: ReturnLog) => {
     const orderId = log.orderId
@@ -539,7 +567,8 @@ export function ReturnsList({
               </tr>
             ) : (
               paginatedLogs.map((log) => (
-                <tr key={log.id} className="hover:bg-slate-50/30 transition-colors">
+                <Fragment key={log.id}>
+                  <tr className="hover:bg-slate-50/30 transition-colors">
                   {/* Checkbox */}
                   <td className="px-6 py-4 text-center">
                     <input
@@ -628,9 +657,16 @@ export function ReturnsList({
                   <td className="px-6 py-4">
                     <div className="font-bold text-slate-900">{log.orderNumber}</div>
                     {log.orderId ? (
-                      <span className="inline-flex items-center text-[10px] font-bold text-emerald-600 mt-0.5">
+                      <button
+                        onClick={() => handleToggleExpand(log)}
+                        className="inline-flex items-center text-[10px] font-bold text-emerald-600 mt-0.5 hover:text-emerald-700 transition-colors cursor-pointer outline-none"
+                        title="Bestelldetails anzeigen"
+                      >
                         ● Zugeordnet
-                      </span>
+                        <svg className={`w-3.5 h-3.5 ml-1 transition-transform ${expandedLogId === log.id ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
                     ) : (
                       <span className="inline-flex items-center text-[10px] font-bold text-slate-400 mt-0.5">
                         ● Nicht gefunden
@@ -754,7 +790,76 @@ export function ReturnsList({
                     </div>
                   </td>
                 </tr>
-              ))
+                
+                {expandedLogId === log.id && (
+                  <tr className="bg-slate-50/50">
+                    <td colSpan={11} className="p-0">
+                      <div className="px-6 py-4 border-t border-slate-100 animate-fade-in">
+                        {isLoadingOrderDetails[log.id] ? (
+                          <div className="text-sm text-slate-500 flex items-center justify-center py-4">
+                            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Lade Bestelldetails...
+                          </div>
+                        ) : orderDetailsCache[log.id] ? (
+                          <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm">
+                            <h4 className="text-sm font-bold text-slate-800 mb-3 border-b border-slate-100 pb-2">Bestelldetails ({orderDetailsCache[log.id].marketplaceOrderId})</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
+                              <div>
+                                <div className="font-semibold text-slate-500 text-xs uppercase tracking-wider mb-2">Kunde & Versand</div>
+                                <div className="text-slate-700">
+                                  <div className="font-medium">{orderDetailsCache[log.id].shippingName || orderDetailsCache[log.id].buyerName}</div>
+                                  <div>{orderDetailsCache[log.id].shippingStreet}</div>
+                                  <div>{orderDetailsCache[log.id].shippingZip} {orderDetailsCache[log.id].shippingCity}</div>
+                                  <div>{orderDetailsCache[log.id].shippingCountry}</div>
+                                </div>
+                              </div>
+                              <div>
+                                <div className="font-semibold text-slate-500 text-xs uppercase tracking-wider mb-2">Zahlung</div>
+                                <div className="text-slate-700 space-y-1">
+                                  <div className="flex justify-between">
+                                    <span className="text-slate-500">Zwischensumme:</span>
+                                    <span>{Number(orderDetailsCache[log.id].subtotalAmount || 0).toFixed(2)} {orderDetailsCache[log.id].currency}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-slate-500">Steuern:</span>
+                                    <span>{Number(orderDetailsCache[log.id].taxAmount || 0).toFixed(2)} {orderDetailsCache[log.id].currency}</span>
+                                  </div>
+                                  <div className="flex justify-between font-bold text-slate-900 pt-1 border-t border-slate-100 mt-1">
+                                    <span>Gesamt:</span>
+                                    <span>{Number(orderDetailsCache[log.id].totalAmount || 0).toFixed(2)} {orderDetailsCache[log.id].currency}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div>
+                                <div className="font-semibold text-slate-500 text-xs uppercase tracking-wider mb-2">Artikel in Bestellung</div>
+                                <ul className="space-y-2 max-h-40 overflow-y-auto pr-2">
+                                  {orderDetailsCache[log.id].items?.map((item: any, idx: number) => (
+                                    <li key={idx} className="flex flex-col border-b border-slate-50 pb-2 last:border-0 last:pb-0">
+                                      <div className="font-medium text-slate-800 line-clamp-1" title={item.title}>{item.title}</div>
+                                      <div className="flex justify-between text-xs text-slate-500 mt-0.5">
+                                        <span>SKU: {item.sku || 'N/A'}</span>
+                                        <span>{item.quantity}x á {Number(item.unitPrice || 0).toFixed(2)} {orderDetailsCache[log.id].currency}</span>
+                                      </div>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-sm text-red-500 py-4 text-center">
+                            Details konnten nicht geladen werden.
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            ))
             )}
           </tbody>
         </table>
