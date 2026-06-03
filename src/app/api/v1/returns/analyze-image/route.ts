@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
 
     // Modell-Fallback-Kette: bei 503 (Überlastung) oder 404 (Modell existiert nicht) wird automatisch auf
     // das nächste Modell gewechselt.
-    const MODEL_CHAIN = ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.5-flash-8b']
+    const MODEL_CHAIN = ['gemini-1.5-pro', 'gemini-1.5-flash']
 
     const prompt = `
       Du bist ein Experte für Logistik-Belege.
@@ -131,7 +131,7 @@ export async function POST(req: NextRequest) {
 
     // Probiere alle Modelle der Fallback-Kette durch
     let result: any = null
-    let lastError: any = null
+    const errors: string[] = []
     for (const modelName of MODEL_CHAIN) {
       try {
         console.log(`[analyze-image] Trying model: ${modelName}`)
@@ -143,9 +143,9 @@ export async function POST(req: NextRequest) {
         console.log(`[analyze-image] Success with model: ${modelName}`)
         break // Erfolgreich → Schleife beenden
       } catch (err: any) {
-        lastError = err
         const msg = String(err?.message || '')
-        const is503 = msg.includes('503') || msg.includes('Service Unavailable') || msg.includes('high demand') || msg.includes('overloaded')
+        errors.push(`${modelName}: ${msg}`)
+        const is503 = msg.includes('503') || msg.includes('Service Unavailable') || msg.includes('high demand') || msg.includes('overloaded') || msg.includes('429') || msg.includes('Resource Exhausted')
         const is404 = msg.includes('404') || msg.includes('not found') || msg.includes('no longer available')
         if (is503 || is404) {
           console.warn(`[analyze-image] Model ${modelName} unavailable (${is404 ? '404' : '503'}), trying next...`)
@@ -158,7 +158,7 @@ export async function POST(req: NextRequest) {
     if (!result) {
       // Alle Modelle überlastet
       return NextResponse.json(
-        { error: 'Analysis failed', details: `Alle KI-Modelle sind aktuell überlastet. Letzter Fehler: ${lastError?.message || 'Unbekannt'}. Bitte versuche es in 1-2 Minuten erneut.` },
+        { error: 'Analysis failed', details: `Alle KI-Modelle sind aktuell überlastet. Fehler: ${errors.join(' | ')}. Bitte versuche es in 1-2 Minuten erneut.` },
         { status: 503, headers: MOBILE_SAFE_HEADERS }
       )
     }

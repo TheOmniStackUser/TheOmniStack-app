@@ -104,7 +104,7 @@ interface InvoiceProps {
     footerTextEn?: string
     internationalLanguage?: string
   }
-  recipient: { name: string, street: string, zip: string, city: string, country: string }
+  recipient: { name: string, company?: string, addressAddition?: string, phone?: string, street: string, zip: string, city: string, country: string }
   items: Array<{ sku?: string, title: string, quantity: number, unitPrice: number, taxRate: number }>
   currency: string
   paymentMethod?: string
