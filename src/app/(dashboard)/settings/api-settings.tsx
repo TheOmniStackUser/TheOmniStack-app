@@ -12,10 +12,16 @@ export function ApiSettings() {
   const [status, setStatus] = useState<{ success: boolean; message: string } | null>(null)
 
   useEffect(() => {
-    getApiKeyAction().then((key) => {
-      setApiKey(key || null)
-      setLoading(false)
-    })
+    getApiKeyAction()
+      .then((key) => {
+        setApiKey(key || null)
+      })
+      .catch((err) => {
+        console.error("Failed to load API key:", err)
+      })
+      .finally(() => {
+        setLoading(false)
+      })
   }, [])
 
   const handleGenerate = async () => {
