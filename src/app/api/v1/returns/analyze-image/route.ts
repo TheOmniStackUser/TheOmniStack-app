@@ -18,38 +18,38 @@ const MOBILE_SAFE_HEADERS = {
 }
 
 export async function POST(req: NextRequest) {
-  const apiKey = req.headers.get('x-api-key')
-  if (!apiKey) return NextResponse.json({ error: 'Missing API Key' }, { status: 401, headers: MOBILE_SAFE_HEADERS })
-
-  const lookupKey = (apiKey === 'os_302e3932303033373033393234333436' || apiKey === 'os_live_leis_leis_gb_7747099a')
-    ? 'os_live_leis_leis_gb_7747099a'
-    : apiKey
-
-  let companyId: string | null = null
-  let companyName: string = 'Firma'
-  const { companyMembers } = await import('@/db/schema/companies')
-  
-  const [member] = await db
-    .select({ companyId: companyMembers.companyId })
-    .from(companyMembers)
-    .where(eq(companyMembers.apiKey, lookupKey))
-    .limit(1)
-
-  if (member) {
-    companyId = member.companyId
-    const [c] = await db.select({ name: companies.name }).from(companies).where(eq(companies.id, companyId)).limit(1)
-    if (c) companyName = c.name
-  } else {
-    const [company] = await db.select().from(companies).where(eq(companies.apiKey, lookupKey)).limit(1)
-    if (company) {
-      companyId = company.id
-      companyName = company.name
-    }
-  }
-
-  if (!companyId) return NextResponse.json({ error: 'Invalid API Key' }, { status: 401, headers: MOBILE_SAFE_HEADERS })
-
   try {
+    const apiKey = req.headers.get('x-api-key')
+    if (!apiKey) return NextResponse.json({ error: 'Missing API Key' }, { status: 401, headers: MOBILE_SAFE_HEADERS })
+
+    const lookupKey = (apiKey === 'os_302e3932303033373033393234333436' || apiKey === 'os_live_leis_leis_gb_7747099a')
+      ? 'os_live_leis_leis_gb_7747099a'
+      : apiKey
+
+    let companyId: string | null = null
+    let companyName: string = 'Firma'
+    const { companyMembers } = await import('@/db/schema/companies')
+    
+    const [member] = await db
+      .select({ companyId: companyMembers.companyId })
+      .from(companyMembers)
+      .where(eq(companyMembers.apiKey, lookupKey))
+      .limit(1)
+
+    if (member) {
+      companyId = member.companyId
+      const [c] = await db.select({ name: companies.name }).from(companies).where(eq(companies.id, companyId)).limit(1)
+      if (c) companyName = c.name
+    } else {
+      const [company] = await db.select().from(companies).where(eq(companies.apiKey, lookupKey)).limit(1)
+      if (company) {
+        companyId = company.id
+        companyName = company.name
+      }
+    }
+
+    if (!companyId) return NextResponse.json({ error: 'Invalid API Key' }, { status: 401, headers: MOBILE_SAFE_HEADERS })
+
     const formData = await req.formData()
     const imageFile = formData.get('image') as File
     if (!imageFile) return NextResponse.json({ error: 'No image provided' }, { status: 400, headers: MOBILE_SAFE_HEADERS })
