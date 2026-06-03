@@ -165,7 +165,7 @@ export async function refundReturnAction(
     return result
   } catch (err: any) {
     console.error('[Action] refundReturnAction failed:', err)
-    throw new Error(err.message || 'Fehler bei der Rückerstattung.')
+    return { success: false, error: err.message || 'Fehler bei der Rückerstattung.' }
   }
 }
 

@@ -211,6 +211,8 @@ export function ReturnsList({
             return l
           }))
           setRefundingLog(null)
+        } else {
+          showToast(res.error || 'Fehler bei der Rückerstattung.', 'error')
         }
       } catch (err: any) {
         showToast(err.message || 'Fehler bei der Rückerstattung.', 'error')

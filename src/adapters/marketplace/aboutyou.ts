@@ -292,6 +292,7 @@ export class AboutYouAdapter implements MarketplaceAdapter {
 
       for (const refundItem of refundItems) {
         let neededQty = refundItem.quantity
+        // 1. Strict SKU match
         for (let i = 0; i < availableItems.length; i++) {
           const item = availableItems[i]
           const itemSku = item?.sku || 'UNKNOWN'
@@ -301,6 +302,19 @@ export class AboutYouAdapter implements MarketplaceAdapter {
             availableItems[i] = null // Mark as used
           }
         }
+        
+        // 2. Fallback: If strict match failed (e.g. because of typos/casing), grab ANY available item
+        if (neededQty > 0) {
+          for (let i = 0; i < availableItems.length; i++) {
+            const item = availableItems[i]
+            if (item && neededQty > 0) {
+              orderItemIdsToReturn.push(item.order_item_id || item.id)
+              neededQty -= 1
+              availableItems[i] = null // Mark as used
+            }
+          }
+        }
+
         if (neededQty > 0) {
           console.warn(`[AboutYouAdapter] Not enough lines found for SKU ${refundItem.sku}. Missing: ${neededQty}`)
         }
