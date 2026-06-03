@@ -63,7 +63,7 @@ export function ApiSettings() {
           <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Dein persönlicher API-Key</label>
           <div className="flex gap-2">
             <input
-              type={showKey ? 'text' : 'password'}
+              type={(!apiKey || showKey) ? 'text' : 'password'}
               value={loading ? 'Lädt...' : (apiKey || 'Noch kein Key generiert')}
               readOnly
               className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 font-mono text-sm text-slate-800 font-semibold outline-none"
