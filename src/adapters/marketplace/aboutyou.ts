@@ -331,6 +331,8 @@ export class AboutYouAdapter implements MarketplaceAdapter {
       const trackingKey = rawOrder.return_tracking_number || rawOrder.return_tracking_key
       if (trackingKey && trackingKey.trim() !== '') {
         payloadItem.return_tracking_key = trackingKey
+      } else {
+        payloadItem.return_tracking_key = 'NOT_PROVIDED'
       }
 
       const returnPayload = {
