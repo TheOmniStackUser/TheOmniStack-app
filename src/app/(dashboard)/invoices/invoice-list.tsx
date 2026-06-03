@@ -276,7 +276,7 @@ export function InvoiceList({
   }, [])
 
   const isPaid = (invoice: Invoice) => {
-    return !!invoice.paidAt || (invoice.marketplace && invoice.marketplace.toLowerCase() !== 'manual')
+    return !!invoice.paidAt || (invoice.marketplace && invoice.marketplace.toLowerCase() !== 'manual') || invoice.isCreditNote || !!invoice.cancelsInvoiceId
   }
 
   const isOverdue = (invoice: Invoice) => {
@@ -2313,12 +2313,22 @@ export function InvoiceList({
                         )}
 
                         {/* Bezahlt */}
-                        {(isPaid(details.invoice) || details.invoice.logs?.some((l: any) => l.action === 'payment')) ? (
-                          <div className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 border border-emerald-100 rounded-xl text-xs font-bold text-emerald-700 shadow-sm">
-                            <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        {(isPaid(details.invoice) || details.invoice.status === 'cancelled' || details.invoice.logs?.some((l: any) => l.action === 'payment')) ? (
+                          <div className={`inline-flex items-center gap-1.5 px-3 py-2 border rounded-xl text-xs font-bold shadow-sm ${
+                            details.invoice.status === 'cancelled' 
+                              ? 'bg-slate-100 border-slate-200 text-slate-700' 
+                              : 'bg-emerald-50 border-emerald-100 text-emerald-700'
+                          }`}>
+                            <svg className={`w-3.5 h-3.5 ${details.invoice.status === 'cancelled' ? 'text-slate-500' : 'text-emerald-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              {details.invoice.status === 'cancelled' ? (
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                              ) : (
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              )}
                             </svg>
-                            Bezahlt
+                            {details.invoice.status === 'cancelled' 
+                              ? 'Storniert' 
+                              : (details.invoice.cancelsInvoiceId ? 'Verrechnet' : 'Bezahlt')}
                           </div>
                         ) : (
                           <button
