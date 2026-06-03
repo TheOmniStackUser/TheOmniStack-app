@@ -1250,8 +1250,11 @@ export function OrdersTable({
   }
 
   const handleGenerateLabels = async () => {
-    const idsToProcess = Array.from(selectedIds)
-    if (idsToProcess.length === 0) return
+    const idsToProcess = Array.from(selectedIds).filter(id => orders.find(o => o.id === id)?.status !== 'shipped')
+    if (idsToProcess.length === 0) {
+      showToast('Keine unversendeten Bestellungen ausgewählt.', 'error')
+      return
+    }
     
     // Initialize with the configured default parcel class
     const initialSelections: Record<string, string> = {}
@@ -1266,7 +1269,7 @@ export function OrdersTable({
     setShowHermesModal(false)
     setIsGenerating(true)
     try {
-      const ids = Array.from(selectedIds)
+      const ids = Object.keys(hermesSelections)
       const result = await generateHermesLabelsAction(ids, hermesSelections)
       if (result.error) {
         showToast(result.error, 'error')
@@ -1294,8 +1297,11 @@ export function OrdersTable({
       return
     }
 
-    const idsToProcess = Array.from(selectedIds)
-    if (idsToProcess.length === 0) return
+    const idsToProcess = Array.from(selectedIds).filter(id => orders.find(o => o.id === id)?.status !== 'shipped')
+    if (idsToProcess.length === 0) {
+      showToast('Keine unversendeten Bestellungen ausgewählt.', 'error')
+      return
+    }
 
     // Initialize selections for each order
     const initialSelections: Record<string, { productCode: string; weight: number }> = {}
@@ -1336,7 +1342,7 @@ export function OrdersTable({
     setShowDhlModal(false)
     setIsDhlGenerating(true)
     try {
-      const ids = Array.from(selectedIds)
+      const ids = Object.keys(dhlSelections)
       const result = await generateDhlLabelsAction(ids, dhlSelections)
       if (result.error) {
         showToast(result.error, 'error')
@@ -1660,10 +1666,9 @@ export function OrdersTable({
             </button>
           )}
 
-          {/* DHL Labels Button */}
           <button
             onClick={handleGenerateDhlLabels}
-            disabled={selectedIds.size === 0 || isDhlGenerating || isDeletingBulk || isGenerating}
+            disabled={selectedUnshippedCount === 0 || isDhlGenerating || isDeletingBulk || isGenerating}
             className="flex items-center gap-2 bg-yellow-400 text-gray-900 hover:bg-yellow-500 font-semibold py-2 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow-sm"
           >
             {isDhlGenerating ? (
@@ -1674,19 +1679,18 @@ export function OrdersTable({
             ) : (
               <span className="font-black text-xs tracking-tighter">DHL</span>
             )}
-            {selectedIds.size > 0 ? `Labels generieren (${selectedIds.size})` : 'DHL Labels'}
+            {selectedUnshippedCount > 0 ? `Labels generieren (${selectedUnshippedCount})` : 'DHL Labels'}
           </button>
 
-          {/* Hermes Labels Button */}
           <button
             onClick={handleGenerateLabels}
-            disabled={selectedIds.size === 0 || isGenerating || isDeletingBulk || isDhlGenerating}
+            disabled={selectedUnshippedCount === 0 || isGenerating || isDeletingBulk || isDhlGenerating}
             className="flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-700 font-semibold py-2 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow-sm"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
             </svg>
-            {selectedIds.size > 0 ? `Hermes Labels generieren (${selectedIds.size})` : 'Hermes Labels generieren'}
+            {selectedUnshippedCount > 0 ? `Hermes Labels generieren (${selectedUnshippedCount})` : 'Hermes Labels generieren'}
           </button>
         </div>
       </div>
@@ -2867,7 +2871,7 @@ export function OrdersTable({
             </div>
             
             <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar">
-              {orders.filter(o => selectedIds.has(o.id)).map((order) => {
+              {orders.filter(o => o.id in hermesSelections).map((order) => {
                 const orderNum = (order.rawPayload as any)?.orderNumber || order.marketplaceOrderId
                 const currentSize = hermesSelections[order.id] || 'S'
                 const skus = order.items?.map(item => item.sku).filter(Boolean) || []
@@ -2927,7 +2931,7 @@ export function OrdersTable({
                 onClick={confirmGenerateHermesLabels} 
                 className="flex-1 py-4 bg-blue-600 text-white font-black rounded-2xl hover:bg-blue-700 shadow-xl shadow-blue-600/30 transition-all transform active:scale-[0.98]"
               >
-                Labels erstellen ({selectedIds.size})
+                Labels erstellen ({Object.keys(hermesSelections).length})
               </button>
             </div>
           </div>
@@ -2948,7 +2952,7 @@ export function OrdersTable({
             </div>
             
             <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar">
-              {orders.filter(o => selectedIds.has(o.id)).map((order) => {
+              {orders.filter(o => o.id in dhlSelections).map((order) => {
                 const orderNum = (order.rawPayload as any)?.orderNumber || order.marketplaceOrderId
                 const selection = dhlSelections[order.id] || { productCode: getDefaultDhlProductCode(order.shippingCountry, dhlConfig), weight: 1 }
                 const skus = order.items?.map(item => item.sku).filter(Boolean) || []
@@ -3035,7 +3039,7 @@ export function OrdersTable({
                 onClick={confirmGenerateDhlLabels} 
                 className="flex-1 py-4 bg-yellow-400 text-gray-900 font-black rounded-2xl hover:bg-yellow-500 shadow-xl shadow-yellow-400/30 transition-all transform active:scale-[0.98]"
               >
-                Labels generieren ({selectedIds.size})
+                Labels generieren ({Object.keys(dhlSelections).length})
               </button>
             </div>
           </div>
