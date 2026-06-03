@@ -65,13 +65,15 @@ export async function POST(req: Request) {
     const body = await req.json()
     const { customer_info, order_info, returned_items, return_metadata } = body
 
-    if (!order_info?.order_number) {
+    const extractedOrderNumber = order_info?.order_number || body.order_number || return_metadata?.order_number || body.tracking_number;
+
+    if (!extractedOrderNumber) {
       return NextResponse.json({ error: 'Bad Request: Missing order_number' }, { status: 400, headers: MOBILE_SAFE_HEADERS })
     }
 
     // 3. Attempt to Match existing Marketplace Order
     // Match by: marketplaceOrderId, outbound tracking number, or return tracking number
-    const scanInput = order_info.order_number.trim()
+    const scanInput = String(extractedOrderNumber).trim()
     const matchedOrder = await db.query.orders.findFirst({
       where: and(
         eq(orders.companyId, companyId),
@@ -194,8 +196,8 @@ export async function POST(req: Request) {
     const [logEntry] = await db.insert(returnsLog).values({
       companyId: companyId,
       orderId: matchedOrder?.id,
-      orderNumber: matchedOrder?.marketplaceOrderId || order_info.order_number, // Use the matched order number if a tracking number was scanned!
-      customerName: resolvedCustomerName,
+      orderNumber: matchedOrder?.marketplaceOrderId || String(extractedOrderNumber), // Use the matched order number if a tracking number was scanned!
+      customerName: String(resolvedCustomerName),
       shippingAddress: resolvedShippingAddress,
       processedByUserId: autoProcessedByUserId || return_metadata?.processed_by_user_id || null,
       marketplace: resolvedMarketplace,
@@ -205,11 +207,12 @@ export async function POST(req: Request) {
     }).returning({ id: returnsLog.id })
 
     // 5. Persistence — Log returned Items
-    if (Array.isArray(returned_items) && returned_items.length > 0) {
+    const actualReturnedItems = Array.isArray(returned_items) ? returned_items : (Array.isArray(body.items) ? body.items : []);
+    if (actualReturnedItems.length > 0) {
       await db.insert(returnedItems).values(
-        returned_items.map((item: any) => ({
+        actualReturnedItems.map((item: any) => ({
           returnLogId: logEntry.id,
-          skuOrProductName: item.sku_or_product_name || 'Unknown',
+          skuOrProductName: item.sku_or_product_name || item.sku || 'Unknown',
           quantity: item.quantity || 1,
           condition: item.condition || 'new',
           notes: item.notes || null,
@@ -218,7 +221,7 @@ export async function POST(req: Request) {
     }
 
     // 6. Automated Refund Trigger (OmniScan Automation)
-    if (matchedOrder && Array.isArray(returned_items) && returned_items.length > 0) {
+    if (matchedOrder && actualReturnedItems.length > 0) {
       try {
         const activeIntegrations = await db
           .select()
@@ -243,10 +246,10 @@ export async function POST(req: Request) {
         const autoRefund = !!(integration?.metadata as any)?.autoRefund
 
         if (autoRefund) {
-          const itemsToRefund = returned_items
+          const itemsToRefund = actualReturnedItems
             .filter((item: any) => item.condition !== 'fremd')
             .map((item: any) => ({
-              sku: item.sku_or_product_name || 'Unknown',
+              sku: item.sku_or_product_name || item.sku || 'Unknown',
               quantity: item.quantity || 1
             }))
 
@@ -267,7 +270,7 @@ export async function POST(req: Request) {
       }
     }
 
-    console.log(`[API V1 Returns] Logged return for order ${order_info.order_number} (Company: ${companyId})`)
+    console.log(`[API V1 Returns] Logged return for order ${extractedOrderNumber} (Company: ${companyId})`)
 
     return NextResponse.json({ 
       success: true, 
