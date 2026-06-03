@@ -472,24 +472,48 @@ export class MiraklAdapter implements MarketplaceAdapter {
       const isRo = ['RO', 'ROU'].includes(upperCountry)
       const isGb = ['GB', 'GBR'].includes(upperCountry)
 
+      const isSecretSales = this.marketplace.toLowerCase().includes('secret sales') || baseUrl.includes('miraklconnect.com')
+
       let resolvedCarrier = carrier
       if (carrier.toLowerCase() === 'dhl') {
-        if (isDe) resolvedCarrier = 'DHLDE'
-        else if (isNl) resolvedCarrier = 'DHL (NL)'
-        else if (isEs) resolvedCarrier = 'DHLESP'
-        else if (isBe) resolvedCarrier = 'DHLBE'
-        else if (isCh) resolvedCarrier = 'DHL-CH'
-        else if (isFr) resolvedCarrier = 'DHLFR'
-        else if (isPl) resolvedCarrier = 'DHL PL'
-        else if (isIt) resolvedCarrier = 'DHL ITA'
-        else if (isCz) resolvedCarrier = 'DHL-CZ'
-        else if (isHu) resolvedCarrier = 'DHLHU'
-        else if (isRo) resolvedCarrier = 'DHL RO'
-        else if (isGb) resolvedCarrier = 'dhlUK'
-        else resolvedCarrier = 'DHLDE' // Default to Germany DHL
+        if (isSecretSales) {
+          if (isDe) resolvedCarrier = 'DHL_DE'
+          else if (isNl) resolvedCarrier = 'DHL_NL'
+          else if (isGb) resolvedCarrier = 'DHL_UK'
+          else if (isEs) resolvedCarrier = 'DHL_SP'
+          else resolvedCarrier = 'dhl'
+        } else {
+          if (isDe) resolvedCarrier = 'DHLDE'
+          else if (isNl) resolvedCarrier = 'DHL (NL)'
+          else if (isEs) resolvedCarrier = 'DHLESP'
+          else if (isBe) resolvedCarrier = 'DHLBE'
+          else if (isCh) resolvedCarrier = 'DHL-CH'
+          else if (isFr) resolvedCarrier = 'DHLFR'
+          else if (isPl) resolvedCarrier = 'DHL PL'
+          else if (isIt) resolvedCarrier = 'DHL ITA'
+          else if (isCz) resolvedCarrier = 'DHL-CZ'
+          else if (isHu) resolvedCarrier = 'DHLHU'
+          else if (isRo) resolvedCarrier = 'DHL RO'
+          else if (isGb) resolvedCarrier = 'dhlUK'
+          else resolvedCarrier = 'DHLDE' // Default to Germany DHL
+        }
       } else if (carrier.toLowerCase() === 'hermes') {
-        if (isGb) resolvedCarrier = 'HermesUK'
-        else resolvedCarrier = 'HermesGER' // Default to Germany Hermes
+        if (isSecretSales) {
+          if (isDe) resolvedCarrier = 'hermes-de'
+          else if (isGb) resolvedCarrier = 'Hermes'
+          else resolvedCarrier = 'Hermes'
+        } else {
+          if (isGb) resolvedCarrier = 'HermesUK'
+          else resolvedCarrier = 'HermesGER' // Default to Germany Hermes
+        }
+      } else if (carrier.toLowerCase() === 'dpd') {
+        if (isSecretSales) {
+          if (isDe) resolvedCarrier = 'dpdGermany'
+          else if (isGb) resolvedCarrier = 'DPD_UK'
+          else if (isNl) resolvedCarrier = 'dpd_nl'
+          else if (isBe) resolvedCarrier = 'dpd_be'
+          else resolvedCarrier = 'DPD'
+        }
       }
 
       const trackingPayload = {
