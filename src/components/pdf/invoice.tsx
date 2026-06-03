@@ -29,7 +29,7 @@ const styles = StyleSheet.create({
   infoSection: { marginTop: 20 },
   
   titleBlock: { marginBottom: 30 },
-  mainTitle: { fontSize: 24, fontWeight: 'bold', marginBottom: 5 },
+  mainTitle: { fontSize: 14, fontWeight: 'bold', marginBottom: 5 },
   
   table: { marginTop: 20 },
   tableHeader: { flexDirection: 'row', borderBottom: '2px solid #000', paddingBottom: 5, marginBottom: 5, fontWeight: 'bold' },
