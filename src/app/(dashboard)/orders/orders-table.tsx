@@ -2867,7 +2867,7 @@ export function OrdersTable({
             </div>
             
             <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar">
-              {orders.filter(o => selectedIds.has(o.id) && o.status !== 'shipped').map((order) => {
+              {orders.filter(o => selectedIds.has(o.id)).map((order) => {
                 const orderNum = (order.rawPayload as any)?.orderNumber || order.marketplaceOrderId
                 const currentSize = hermesSelections[order.id] || 'S'
                 const skus = order.items?.map(item => item.sku).filter(Boolean) || []
@@ -2927,7 +2927,7 @@ export function OrdersTable({
                 onClick={confirmGenerateHermesLabels} 
                 className="flex-1 py-4 bg-blue-600 text-white font-black rounded-2xl hover:bg-blue-700 shadow-xl shadow-blue-600/30 transition-all transform active:scale-[0.98]"
               >
-                Labels erstellen ({selectedUnshippedCount})
+                Labels erstellen ({selectedIds.size})
               </button>
             </div>
           </div>
@@ -2948,7 +2948,7 @@ export function OrdersTable({
             </div>
             
             <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar">
-              {orders.filter(o => selectedIds.has(o.id) && o.status !== 'shipped').map((order) => {
+              {orders.filter(o => selectedIds.has(o.id)).map((order) => {
                 const orderNum = (order.rawPayload as any)?.orderNumber || order.marketplaceOrderId
                 const selection = dhlSelections[order.id] || { productCode: getDefaultDhlProductCode(order.shippingCountry, dhlConfig), weight: 1 }
                 const skus = order.items?.map(item => item.sku).filter(Boolean) || []
@@ -3033,9 +3033,9 @@ export function OrdersTable({
               </button>
               <button 
                 onClick={confirmGenerateDhlLabels} 
-                className="flex-1 py-3 bg-yellow-400 hover:bg-yellow-500 text-gray-900 rounded-xl font-black shadow-lg shadow-yellow-400/20 transition-all text-sm"
+                className="flex-1 py-4 bg-yellow-400 text-gray-900 font-black rounded-2xl hover:bg-yellow-500 shadow-xl shadow-yellow-400/30 transition-all transform active:scale-[0.98]"
               >
-                Labels generieren
+                Labels generieren ({selectedIds.size})
               </button>
             </div>
           </div>
