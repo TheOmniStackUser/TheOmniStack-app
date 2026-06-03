@@ -25,8 +25,29 @@ export async function POST(req: NextRequest) {
     ? 'os_live_leis_leis_gb_7747099a'
     : apiKey
 
-  const [company] = await db.select().from(companies).where(eq(companies.apiKey, lookupKey)).limit(1)
-  if (!company) return NextResponse.json({ error: 'Invalid API Key' }, { status: 401, headers: MOBILE_SAFE_HEADERS })
+  let companyId: string | null = null
+  let companyName: string = 'Firma'
+  const { companyMembers } = await import('@/db/schema/companies')
+  
+  const [member] = await db
+    .select({ companyId: companyMembers.companyId })
+    .from(companyMembers)
+    .where(eq(companyMembers.apiKey, lookupKey))
+    .limit(1)
+
+  if (member) {
+    companyId = member.companyId
+    const [c] = await db.select({ name: companies.name }).from(companies).where(eq(companies.id, companyId)).limit(1)
+    if (c) companyName = c.name
+  } else {
+    const [company] = await db.select().from(companies).where(eq(companies.apiKey, lookupKey)).limit(1)
+    if (company) {
+      companyId = company.id
+      companyName = company.name
+    }
+  }
+
+  if (!companyId) return NextResponse.json({ error: 'Invalid API Key' }, { status: 401, headers: MOBILE_SAFE_HEADERS })
 
   try {
     const formData = await req.formData()
@@ -43,7 +64,7 @@ export async function POST(req: NextRequest) {
     
     const prompt = `
       Du bist ein Experte für Logistik-Belege.
-      Der aktive Händler in diesem System heißt: "${company.name}".
+      Der aktive Händler in diesem System heißt: "${companyName}".
 
       Analysiere das Bild und extrahiere die Daten STRENG nach diesen Regeln:
 
@@ -68,12 +89,12 @@ export async function POST(req: NextRequest) {
 
       6. FIRMEN-ABGLEICH (company_mismatch & detected_company):
          - Definitionen:
-           * Eigene Händler-Firma: "${company.name}" (und Teilwörter davon, wie z.B. "Leis").
+           * Eigene Händler-Firma: "${companyName}" (und Teilwörter davon, wie z.B. "Leis").
            * Erlaubte Marktplätze (KEIN Mismatch!): Amazon, Otto, Zalando, Kaufland, eBay, Mirakl, Otto Market, etc. (Da die eigene Firma ihre Waren über diese Plattformen vertreiben darf).
          - Logik:
-           * Wenn die eigene Händler-Firma "${company.name}" (oder Wortbestandteile wie "Leis") auf dem Beleg (Absender, Empfänger, Text) erwähnt wird, setze "company_mismatch" auf false und "detected_company" auf null.
+           * Wenn die eigene Händler-Firma "${companyName}" (oder Wortbestandteile wie "Leis") auf dem Beleg (Absender, Empfänger, Text) erwähnt wird, setze "company_mismatch" auf false und "detected_company" auf null.
            * Wenn Marktplätze wie Otto, Zalando, Amazon, etc. auf dem Beleg vorkommen, ignoriere diese, da sie erlaubt sind (kein Mismatch).
-           * **Wann liegt ein Mismatch vor?** Nur wenn du die eigene Firma "${company.name}" (oder Teilwörter davon) **NICHT** auf dem Beleg finden kannst **UND** du stattdessen eine andere, eindeutig fremde Händler- oder Firmenadresse (die kein Marktplatz ist, z.B. eine Drittanbieter-Firma wie "Müller GmbH", "Schmidt Mode") erkennst.
+           * **Wann liegt ein Mismatch vor?** Nur wenn du die eigene Firma "${companyName}" (oder Teilwörter davon) **NICHT** auf dem Beleg finden kannst **UND** du stattdessen eine andere, eindeutig fremde Händler- oder Firmenadresse (die kein Marktplatz ist, z.B. eine Drittanbieter-Firma wie "Müller GmbH", "Schmidt Mode") erkennst.
            * Nur in diesem Fall: Setze "company_mismatch" auf true und "detected_company" auf den Namen der erkannten Fremdfirma. Andernfalls setze "company_mismatch" auf false und "detected_company" auf null.
 
       7. MARKTPLATZ (marketplace):
@@ -115,7 +136,7 @@ export async function POST(req: NextRequest) {
     ])
 
     const responseText = result.response.text().trim()
-    console.log('AI Analysis Result for Company', company.name, ':', responseText)
+    console.log('AI Analysis Result for Company', companyName, ':', responseText)
     
     const jsonMatch = responseText.match(/\{[\s\S]*\}/)
     const cleanJson = jsonMatch ? jsonMatch[0] : responseText
@@ -135,7 +156,7 @@ export async function POST(req: NextRequest) {
     if (scanInput) {
       const matchedOrder = await db.query.orders.findFirst({
         where: and(
-          eq(orders.companyId, company.id),
+          eq(orders.companyId, companyId),
           or(
             eq(orders.marketplaceOrderId, scanInput),
             eq(orders.trackingNumber, scanInput),
