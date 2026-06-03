@@ -404,6 +404,8 @@ export class OttoAdapter implements MarketplaceAdapter {
             salesOrderId: salesOrderId,
             positionItemId: item.positionItemId,
             returnDate: new Date().toISOString().split('.')[0] + 'Z',
+            reason: 'RETURN_RECEIVED',
+            condition: 'A',
             trackingKey: {
               carrier: 'DHL',
               trackingNumber: 'RET-' + marketplaceOrderId
