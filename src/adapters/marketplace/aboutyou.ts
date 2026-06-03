@@ -294,7 +294,8 @@ export class AboutYouAdapter implements MarketplaceAdapter {
         let neededQty = refundItem.quantity
         for (let i = 0; i < availableItems.length; i++) {
           const item = availableItems[i]
-          if (item && item.sku === refundItem.sku && neededQty > 0) {
+          const itemSku = item?.sku || 'UNKNOWN'
+          if (item && itemSku === refundItem.sku && neededQty > 0) {
             orderItemIdsToReturn.push(item.order_item_id || item.id)
             neededQty -= 1
             availableItems[i] = null // Mark as used
