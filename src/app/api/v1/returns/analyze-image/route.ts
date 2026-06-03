@@ -6,7 +6,7 @@ import { orders } from '@/db/schema/orders'
 import { eq, and, or } from 'drizzle-orm'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60 // Gemini kann beim 2. Call länger brauchen
+export const maxDuration = 300 // Erhöht auf 5 Minuten, da Gemini (vor allem im Fallback) länger brauchen kann
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
 
