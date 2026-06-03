@@ -103,10 +103,13 @@ export async function updateOrderAddressAction(
   orderId: string,
   address: {
     shippingName: string
+    shippingCompany?: string
+    shippingAddressAddition?: string
     shippingStreet: string
     shippingZip: string
     shippingCity: string
     shippingCountry: string
+    buyerPhone?: string
   }
 ) {
   try {
@@ -116,10 +119,13 @@ export async function updateOrderAddressAction(
       .update(orders)
       .set({
         shippingName: address.shippingName,
+        shippingCompany: address.shippingCompany,
+        shippingAddressAddition: address.shippingAddressAddition,
         shippingStreet: address.shippingStreet,
         shippingZip: address.shippingZip,
         shippingCity: address.shippingCity,
         shippingCountry: address.shippingCountry,
+        buyerPhone: address.buyerPhone,
         updatedAt: new Date()
       })
       .where(
@@ -447,10 +453,13 @@ export async function updateOrderBillingAddressAction(
   orderId: string,
   address: {
     buyerName: string
+    company?: string
+    addressAddition?: string
     street: string
     zip: string
     city: string
     country: string
+    phone?: string
   }
 ) {
   try {
@@ -476,6 +485,9 @@ export async function updateOrderBillingAddressAction(
         .update(invoices)
         .set({
           recipientName: address.buyerName,
+          recipientCompany: address.company,
+          recipientAddressAddition: address.addressAddition,
+          recipientPhone: address.phone,
           recipientStreet: address.street,
           recipientZip: address.zip,
           recipientCity: address.city,
@@ -497,6 +509,9 @@ export async function updateOrderBillingAddressAction(
       ...currentRaw,
       manualBillingAddress: {
         name: address.buyerName,
+        company: address.company,
+        addressAddition: address.addressAddition,
+        phone: address.phone,
         street: address.street,
         zip: address.zip,
         city: address.city,

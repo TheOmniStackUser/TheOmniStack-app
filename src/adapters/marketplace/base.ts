@@ -14,6 +14,9 @@ export type MarketplaceOrderItem = {
 
 export type MarketplaceAddress = {
   name: string
+  company?: string
+  addressAddition?: string
+  phone?: string
   street: string
   city: string
   zip: string
@@ -27,6 +30,7 @@ export type NormalizedOrder = {
   buyer: {
     name: string
     email?: string
+    phone?: string
   }
   shippingAddress: MarketplaceAddress
   currency: string

@@ -309,10 +309,13 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
           <View style={styles.leftCol}>
             <Text style={styles.senderLine}>{senderLineText}</Text>
             <View style={styles.recipientBlock}>
+              {recipient.company && <Text style={styles.bold}>{recipient.company}</Text>}
+              {recipient.addressAddition && <Text style={styles.bold}>{recipient.addressAddition}</Text>}
               <Text style={styles.bold}>{recipient.name}</Text>
               <Text style={styles.bold}>{recipient.street}</Text>
               <Text style={styles.bold}>{recipient.zip} {recipient.city}</Text>
               <Text style={styles.bold}>{countryDisplay}</Text>
+              {recipient.phone && <Text style={{ ...styles.bold, marginTop: 5 }}>Tel: {recipient.phone}</Text>}
             </View>
           </View>
 

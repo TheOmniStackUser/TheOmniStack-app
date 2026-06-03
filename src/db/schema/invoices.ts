@@ -42,6 +42,9 @@ export const invoices = pgTable('invoices', {
   status: invoiceStatusEnum('status').notNull().default('draft'),
   // Recipient snapshot (immutable copy at time of issuance)
   recipientName: text('recipient_name').notNull(),
+  recipientCompany: text('recipient_company'),
+  recipientAddressAddition: text('recipient_address_addition'),
+  recipientPhone: text('recipient_phone'),
   recipientStreet: text('recipient_street'),
   recipientZip: text('recipient_zip'),
   recipientCity: text('recipient_city'),

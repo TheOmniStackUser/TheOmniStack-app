@@ -260,10 +260,13 @@ function DeliveryNotePage({ order, company }: DeliveryNoteProps) {
       <View style={styles.topSection}>
         <View style={styles.addressBlock}>
           <Text style={styles.companyLine}>{companyShortLine}</Text>
+          {order.shippingCompany && <Text style={styles.bold}>{order.shippingCompany}</Text>}
+          {order.shippingAddressAddition && <Text style={styles.bold}>{order.shippingAddressAddition}</Text>}
           <Text style={styles.bold}>{order.shippingName}</Text>
           <Text style={styles.bold}>{order.shippingStreet}</Text>
           <Text style={styles.bold}>{order.shippingZip} {order.shippingCity}</Text>
           <Text style={styles.bold}>{shippingCountryFull}</Text>
+          {order.shippingPhone && <Text style={{ ...styles.bold, marginTop: 5 }}>Tel: {order.shippingPhone}</Text>}
         </View>
 
         <View style={styles.contactBlock}>

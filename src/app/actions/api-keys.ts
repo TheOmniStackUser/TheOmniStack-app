@@ -31,14 +31,19 @@ export async function generateApiKeyAction() {
   // Generate a completely secure, cryptographically random high-entropy hex string
   const newApiKey = `os_live_${crypto.randomBytes(24).toString('hex')}`
 
-  await db
-    .update(companyMembers)
-    .set({ apiKey: newApiKey })
-    .where(and(
-      eq(companyMembers.companyId, session.activeCompanyId),
-      eq(companyMembers.userId, session.userId)
-    ))
+  try {
+    await db
+      .update(companyMembers)
+      .set({ apiKey: newApiKey })
+      .where(and(
+        eq(companyMembers.companyId, session.activeCompanyId),
+        eq(companyMembers.userId, session.userId)
+      ))
 
-  revalidatePath('/settings')
-  return newApiKey
+    revalidatePath('/settings')
+    return newApiKey
+  } catch (error) {
+    console.error("Error generating API key:", error)
+    throw error
+  }
 }

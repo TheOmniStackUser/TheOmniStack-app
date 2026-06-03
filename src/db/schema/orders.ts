@@ -53,7 +53,10 @@ export const orders = pgTable('orders', {
   // Buyer information
   buyerName: text('buyer_name'),
   buyerEmail: text('buyer_email'),
+  buyerPhone: text('buyer_phone'),
   shippingName: text('shipping_name'),
+  shippingCompany: text('shipping_company'),
+  shippingAddressAddition: text('shipping_address_addition'),
   shippingStreet: text('shipping_street'),
   shippingCity: text('shipping_city'),
   shippingZip: text('shipping_zip'),

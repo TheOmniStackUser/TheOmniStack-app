@@ -212,6 +212,9 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
   const metadata = (order.rawPayload as any)?.manualMetadata || {}
 
   let billingName = order.buyerName || order.shippingName || 'Kunde'
+  let billingCompany = order.shippingCompany || ''
+  let billingAddressAddition = order.shippingAddressAddition || ''
+  let billingPhone = order.buyerPhone || ''
   let billingStreet = order.shippingStreet || ''
   let billingZip = order.shippingZip || ''
   let billingCity = order.shippingCity || ''
@@ -221,22 +224,31 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
   if (raw) {
     if (raw.manualBillingAddress) {
       billingName = raw.manualBillingAddress.name || billingName
+      billingCompany = raw.manualBillingAddress.company || ''
+      billingAddressAddition = raw.manualBillingAddress.addressAddition || ''
+      billingPhone = raw.manualBillingAddress.phone || order.buyerPhone || ''
       billingStreet = raw.manualBillingAddress.street || ''
       billingZip = raw.manualBillingAddress.zip || ''
       billingCity = raw.manualBillingAddress.city || ''
       billingCountry = raw.manualBillingAddress.country || 'DE'
     } else if (raw.invoiceAddress) {
+      billingCompany = raw.invoiceAddress.companyName || raw.invoiceAddress.company || ''
+      billingAddressAddition = raw.invoiceAddress.addition || ''
       billingStreet = `${raw.invoiceAddress.street || ''} ${raw.invoiceAddress.houseNumber || ''}`.trim()
       billingZip = raw.invoiceAddress.zipCode || ''
       billingCity = raw.invoiceAddress.city || ''
       billingCountry = raw.invoiceAddress.countryCode || 'DE'
     } else if (raw.customer?.billing_address) {
       const addr = raw.customer.billing_address
+      billingCompany = addr.company || ''
+      billingAddressAddition = addr.additional_info || ''
       billingStreet = `${addr.street_1 || ''} ${addr.street_2 || ''}`.trim()
       billingZip = addr.zip_code || ''
       billingCity = addr.city || ''
       billingCountry = addr.country_iso_code || addr.country || 'DE'
     } else if (raw.billing_street) {
+      billingCompany = raw.billing_company || ''
+      billingAddressAddition = raw.billing_address_addition || ''
       billingStreet = raw.billing_street || ''
       billingZip = raw.billing_zip_code || ''
       billingCity = raw.billing_city || ''
@@ -254,6 +266,9 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
     const { DeliveryNoteDocument } = await import('@/components/pdf/delivery-note')
     const mappedOrder = {
       shippingName: order.shippingName || order.buyerName || 'Kunde',
+      shippingCompany: order.shippingCompany || '',
+      shippingAddressAddition: order.shippingAddressAddition || '',
+      shippingPhone: order.buyerPhone || '',
       shippingStreet: order.shippingStreet || '',
       shippingZip: order.shippingZip || '',
       shippingCity: order.shippingCity || '',
@@ -312,6 +327,9 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
         },
         recipient: {
           name: billingName,
+          company: billingCompany,
+          addressAddition: billingAddressAddition,
+          phone: billingPhone,
           street: billingStreet,
           zip: billingZip,
           city: billingCity,
@@ -399,6 +417,9 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
         draftName,
         documentType,
         recipientName: billingName,
+        recipientCompany: billingCompany,
+        recipientAddressAddition: billingAddressAddition,
+        recipientPhone: billingPhone,
         recipientStreet: billingStreet,
         recipientZip: billingZip,
         recipientCity: billingCity,
@@ -543,6 +564,9 @@ export async function regenerateInvoicePdf(invoiceId: string, companyId: string)
     const { DeliveryNoteDocument } = await import('@/components/pdf/delivery-note')
     const mappedOrder = {
       shippingName: invoice.recipientName || 'Kunde',
+      shippingCompany: invoice.recipientCompany || '',
+      shippingAddressAddition: invoice.recipientAddressAddition || '',
+      shippingPhone: invoice.recipientPhone || '',
       shippingStreet: invoice.recipientStreet || '',
       shippingZip: invoice.recipientZip || '',
       shippingCity: invoice.recipientCity || '',
@@ -601,6 +625,9 @@ export async function regenerateInvoicePdf(invoiceId: string, companyId: string)
         },
         recipient: {
           name: invoice.recipientName || 'Kunde',
+          company: invoice.recipientCompany || '',
+          addressAddition: invoice.recipientAddressAddition || '',
+          phone: invoice.recipientPhone || '',
           street: invoice.recipientStreet || '',
           zip: invoice.recipientZip || '',
           city: invoice.recipientCity || '',
