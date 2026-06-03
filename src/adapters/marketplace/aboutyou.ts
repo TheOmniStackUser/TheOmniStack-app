@@ -324,13 +324,17 @@ export class AboutYouAdapter implements MarketplaceAdapter {
          throw new Error(`Konnte keine passenden Artikel (SKUs) in der AboutYou Bestellung ${marketplaceOrderId} finden.`)
       }
 
+      const payloadItem: any = {
+        order_items: orderItemIdsToReturn
+      }
+      
+      const trackingKey = rawOrder.return_tracking_number || rawOrder.return_tracking_key
+      if (trackingKey && trackingKey.trim() !== '') {
+        payloadItem.return_tracking_key = trackingKey
+      }
+
       const returnPayload = {
-        items: [
-          {
-            order_items: orderItemIdsToReturn,
-            return_tracking_key: rawOrder.return_tracking_number || ""
-          }
-        ]
+        items: [payloadItem]
       }
 
       const response = await fetch(`${this.baseUrl}/orders/return`, {
