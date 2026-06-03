@@ -158,7 +158,7 @@ export async function POST(req: NextRequest) {
     if (!result) {
       // Alle Modelle überlastet
       return NextResponse.json(
-        { error: 'Analysis failed', details: 'Alle KI-Modelle sind aktuell überlastet. Bitte versuche es in 1-2 Minuten erneut.' },
+        { error: 'Analysis failed', details: `Alle KI-Modelle sind aktuell überlastet. Letzter Fehler: ${lastError?.message || 'Unbekannt'}. Bitte versuche es in 1-2 Minuten erneut.` },
         { status: 503, headers: MOBILE_SAFE_HEADERS }
       )
     }
