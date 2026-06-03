@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
 
     // Modell-Fallback-Kette: bei 503 (Überlastung) oder 404 (Modell existiert nicht) wird automatisch auf
     // das nächste Modell gewechselt.
-    const MODEL_CHAIN = ['gemini-1.5-flash-latest', 'gemini-1.5-pro-latest']
+    const MODEL_CHAIN = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-3.5-flash']
 
     const prompt = `
       Du bist ein Experte für Logistik-Belege.
@@ -136,7 +136,8 @@ export async function POST(req: NextRequest) {
       try {
         console.log(`[analyze-image] Trying model: ${modelName}`)
         const model = genAI.getGenerativeModel({
-          model: modelName
+          model: modelName,
+          generationConfig: { responseMimeType: 'application/json' }
         })
         result = await model.generateContent(inlineContent)
         console.log(`[analyze-image] Success with model: ${modelName}`)
