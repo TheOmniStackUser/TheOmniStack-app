@@ -1172,7 +1172,10 @@ export function OrdersTable({
         street: order.invoice.recipientStreet || '',
         zip: order.invoice.recipientZip || '',
         city: order.invoice.recipientCity || '',
-        country: order.invoice.recipientCountry || ''
+        country: order.invoice.recipientCountry || '',
+        company: (order.invoice as any).recipientCompany || '',
+        addressAddition: '',
+        phone: order.buyerPhone || ''
       }
     }
 
@@ -1183,7 +1186,10 @@ export function OrdersTable({
           street: raw.manualBillingAddress.street || '',
           zip: raw.manualBillingAddress.zip || '',
           city: raw.manualBillingAddress.city || '',
-          country: raw.manualBillingAddress.country || 'DE'
+          country: raw.manualBillingAddress.country || 'DE',
+          company: raw.manualBillingAddress.company || '',
+          addressAddition: raw.manualBillingAddress.addressAddition || '',
+          phone: raw.manualBillingAddress.phone || order.buyerPhone || ''
         }
       }
       // 2. Otto Structure
@@ -1192,7 +1198,10 @@ export function OrdersTable({
           street: `${raw.invoiceAddress.street || ''} ${raw.invoiceAddress.houseNumber || ''}`.trim(),
           zip: raw.invoiceAddress.zipCode || '',
           city: raw.invoiceAddress.city || '',
-          country: raw.invoiceAddress.countryCode || ''
+          country: raw.invoiceAddress.countryCode || '',
+          company: raw.invoiceAddress.companyName || raw.invoiceAddress.company || '',
+          addressAddition: raw.invoiceAddress.addition || '',
+          phone: order.buyerPhone || ''
         }
       }
 
@@ -1203,7 +1212,10 @@ export function OrdersTable({
           street: `${addr.street_1 || ''} ${addr.street_2 || ''}`.trim(),
           zip: addr.zip_code || '',
           city: addr.city || '',
-          country: addr.country_iso_code || addr.country || ''
+          country: addr.country_iso_code || addr.country || '',
+          company: addr.company || '',
+          addressAddition: addr.additional_info || '',
+          phone: order.buyerPhone || ''
         }
       }
 
@@ -1213,7 +1225,10 @@ export function OrdersTable({
           street: raw.billing_street || '',
           zip: raw.billing_zip_code || '',
           city: raw.billing_city || '',
-          country: raw.billing_country_code || ''
+          country: raw.billing_country_code || '',
+          company: raw.billing_company || '',
+          addressAddition: raw.billing_address_addition || '',
+          phone: order.buyerPhone || ''
         }
       }
     }
@@ -1224,7 +1239,10 @@ export function OrdersTable({
         street: order.shippingStreet,
         zip: order.shippingZip || '',
         city: order.shippingCity || '',
-        country: order.shippingCountry || ''
+        country: order.shippingCountry || '',
+        company: (order as any).shippingCompany || '',
+        addressAddition: (order as any).shippingAddressAddition || '',
+        phone: order.buyerPhone || ''
       }
     }
 
@@ -1232,12 +1250,12 @@ export function OrdersTable({
   }
 
   const handleGenerateLabels = async () => {
-    const unshippedIds = Array.from(selectedIds).filter(id => orders.find(o => o.id === id)?.status !== 'shipped')
-    if (unshippedIds.length === 0) return
+    const idsToProcess = Array.from(selectedIds)
+    if (idsToProcess.length === 0) return
     
     // Initialize with the configured default parcel class
     const initialSelections: Record<string, string> = {}
-    unshippedIds.forEach(id => {
+    idsToProcess.forEach(id => {
       initialSelections[id] = hermesDefaultParcelClass
     })
     setHermesSelections(initialSelections)
@@ -1248,7 +1266,7 @@ export function OrdersTable({
     setShowHermesModal(false)
     setIsGenerating(true)
     try {
-      const ids = Array.from(selectedIds).filter(id => orders.find(o => o.id === id)?.status !== 'shipped')
+      const ids = Array.from(selectedIds)
       const result = await generateHermesLabelsAction(ids, hermesSelections)
       if (result.error) {
         showToast(result.error, 'error')
@@ -1276,12 +1294,12 @@ export function OrdersTable({
       return
     }
 
-    const unshippedIds = Array.from(selectedIds).filter(id => orders.find(o => o.id === id)?.status !== 'shipped')
-    if (unshippedIds.length === 0) return
+    const idsToProcess = Array.from(selectedIds)
+    if (idsToProcess.length === 0) return
 
     // Initialize selections for each order
     const initialSelections: Record<string, { productCode: string; weight: number }> = {}
-    unshippedIds.forEach(id => {
+    idsToProcess.forEach(id => {
       const order = orders.find(o => o.id === id)
       if (!order) return
 
@@ -1318,7 +1336,7 @@ export function OrdersTable({
     setShowDhlModal(false)
     setIsDhlGenerating(true)
     try {
-      const ids = Array.from(selectedIds).filter(id => orders.find(o => o.id === id)?.status !== 'shipped')
+      const ids = Array.from(selectedIds)
       const result = await generateDhlLabelsAction(ids, dhlSelections)
       if (result.error) {
         showToast(result.error, 'error')
@@ -1645,7 +1663,7 @@ export function OrdersTable({
           {/* DHL Labels Button */}
           <button
             onClick={handleGenerateDhlLabels}
-            disabled={selectedUnshippedCount === 0 || isDhlGenerating || isDeletingBulk || isGenerating}
+            disabled={selectedIds.size === 0 || isDhlGenerating || isDeletingBulk || isGenerating}
             className="flex items-center gap-2 bg-yellow-400 text-gray-900 hover:bg-yellow-500 font-semibold py-2 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow-sm"
           >
             {isDhlGenerating ? (
@@ -1656,19 +1674,19 @@ export function OrdersTable({
             ) : (
               <span className="font-black text-xs tracking-tighter">DHL</span>
             )}
-            {selectedIds.size > 0 ? `Labels generieren (${selectedUnshippedCount})` : 'DHL Labels'}
+            {selectedIds.size > 0 ? `Labels generieren (${selectedIds.size})` : 'DHL Labels'}
           </button>
 
           {/* Hermes Labels Button */}
           <button
             onClick={handleGenerateLabels}
-            disabled={selectedUnshippedCount === 0 || isGenerating || isDeletingBulk || isDhlGenerating}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 font-medium hover:bg-blue-100 transition-all disabled:opacity-50"
+            disabled={selectedIds.size === 0 || isGenerating || isDeletingBulk || isDhlGenerating}
+            className="flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-700 font-semibold py-2 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow-sm"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
             </svg>
-            {selectedIds.size > 0 ? `Hermes Labels generieren (${selectedUnshippedCount})` : 'Hermes Labels generieren'}
+            {selectedIds.size > 0 ? `Hermes Labels generieren (${selectedIds.size})` : 'Hermes Labels generieren'}
           </button>
         </div>
       </div>
@@ -2595,9 +2613,13 @@ export function OrdersTable({
                                           if (!addr) return <span>Keine Rechnungsadresse hinterlegt</span>
                                           return (
                                             <>
+                                              {addr.company && <>{addr.company}<br/></>}
+                                              {addr.addressAddition && <>{addr.addressAddition}<br/></>}
                                               {addr.street}<br/>
                                               {addr.zip} {addr.city}<br/>
                                               {formatCountry(addr.country)}
+                                              {order.buyerEmail && order.buyerName && <><br/>{order.buyerEmail}</>}
+                                              {addr.phone && <><br/>{addr.phone}</>}
                                             </>
                                           )
                                         })()}
@@ -2691,9 +2713,13 @@ export function OrdersTable({
                                     </div>
                                     <div className="mt-1 text-gray-600 bg-white p-3 rounded-md border border-gray-200">
                                       {order.shippingName}<br/>
+                                      {(order as any).shippingCompany && <>{(order as any).shippingCompany}<br/></>}
+                                      {(order as any).shippingAddressAddition && <>{(order as any).shippingAddressAddition}<br/></>}
                                       {order.shippingStreet}<br/>
                                       {order.shippingZip} {order.shippingCity}<br/>
                                       {formatCountry(order.shippingCountry)}
+                                      {order.buyerEmail && <><br/>{order.buyerEmail}</>}
+                                      {order.buyerPhone && <><br/>{order.buyerPhone}</>}
                                     </div>
                                   </div>
                                 )}
@@ -3042,7 +3068,7 @@ export function OrdersTable({
                     value={manualTrackingNumber} 
                     onChange={(e) => setManualTrackingNumber(e.target.value)}
                     placeholder="z.B. RR123456789CH oder 333844215670"
-                    className="w-full text-sm p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white" 
+                    className="w-full text-sm p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white text-slate-900 font-medium" 
                   />
                 </div>
 
@@ -3053,7 +3079,7 @@ export function OrdersTable({
                   <select
                     value={manualCarrier}
                     onChange={(e) => setManualCarrier(e.target.value)}
-                    className="w-full text-sm p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                    className="w-full text-sm p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white text-slate-900 font-medium"
                   >
                     <option value="DHL">DHL</option>
                     <option value="Deutsche Post">Deutsche Post</option>
@@ -3077,7 +3103,7 @@ export function OrdersTable({
                       onChange={(e) => setCustomCarrier(e.target.value)}
                       placeholder="Name des Dienstleisters"
                       required
-                      className="w-full text-sm p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white" 
+                      className="w-full text-sm p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white text-slate-900 font-medium" 
                     />
                   </div>
                 )}

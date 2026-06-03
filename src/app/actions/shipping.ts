@@ -18,20 +18,19 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
   try {
     const hermes = await HermesAdapter.initialize(auth.activeCompanyId)
 
-    // Find all 'pending' orders that need labels
+    // Find all 'pending' orders that need labels (or specific orders if orderIds is provided)
     const pendingOrders = await db
       .select()
       .from(orders)
       .where(
         and(
           eq(orders.companyId, auth.activeCompanyId),
-          ne(orders.status, 'shipped'),
-          orderIds && orderIds.length > 0 ? inArray(orders.id, orderIds) : undefined
+          orderIds && orderIds.length > 0 ? inArray(orders.id, orderIds) : ne(orders.status, 'shipped')
         )
       )
 
     if (pendingOrders.length === 0) {
-      return { error: 'Es wurden keine offenen Bestellungen (Status: pending) gefunden.' }
+      return { error: 'Es wurden keine passenden Bestellungen gefunden.' }
     }
 
     // Fetch company info for shipper address
@@ -105,42 +104,46 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
           })
           .where(eq(orders.id, order.id))
 
-        // Auto-generate invoice if enabled for this marketplace (e.g. Decathlon, Shopify, Amazon)
-        try {
-          const integration = activeIntegrations.find(i => 
-            i.type === order.marketplace ||
-            (i.type === 'mirakl_decathlon' && order.marketplace === 'Decathlon DE') ||
-            (i.type === 'mirakl_custom' && 
-             ((i.metadata as any)?.customName || '').toLowerCase() === order.marketplace.toLowerCase())
-          )
+        const isReplacementLabel = order.status === 'shipped'
 
-          const autoInvoiceEnabledAt = (integration?.metadata as any)?.autoInvoiceEnabledAt
-          const thresholdDate = autoInvoiceEnabledAt
-            ? new Date(autoInvoiceEnabledAt)
-            : new Date('2026-05-26T12:00:00Z') // Default threshold to today to prevent invoicing older orders
-          const isOrderNew = order.createdAt >= thresholdDate
+        if (!isReplacementLabel) {
+          // Auto-generate invoice if enabled for this marketplace (e.g. Decathlon, Shopify, Amazon)
+          try {
+            const integration = activeIntegrations.find(i => 
+              i.type === order.marketplace ||
+              (i.type === 'mirakl_decathlon' && order.marketplace === 'Decathlon DE') ||
+              (i.type === 'mirakl_custom' && 
+               ((i.metadata as any)?.customName || '').toLowerCase() === order.marketplace.toLowerCase())
+            )
 
-          if (integration?.autoInvoice && isOrderNew) {
-            console.log(`[Hermes-Action] Auto-generating invoice for order ${order.marketplaceOrderId} during label printing...`)
-            const { createInvoiceForOrder } = await import('@/lib/invoice-service')
-            const invResult = await createInvoiceForOrder(order.id, auth.activeCompanyId)
-            
-            // Upload if enabled
-            if (invResult && 'pdfBuffer' in invResult && integration.uploadInvoice) {
-              const { getAdapterForIntegration } = await import('@/workers/marketplace-sync')
-              const adapter = getAdapterForIntegration(integration)
-              if (adapter?.uploadInvoice) {
-                console.log(`[Hermes-Action] Auto-uploading invoice for order ${order.marketplaceOrderId}...`)
-                await adapter.uploadInvoice(
-                  order.marketplaceOrderId,
-                  invResult.pdfBuffer,
-                  `${invResult.invoiceNumber}.pdf`
-                )
+            const autoInvoiceEnabledAt = (integration?.metadata as any)?.autoInvoiceEnabledAt
+            const thresholdDate = autoInvoiceEnabledAt
+              ? new Date(autoInvoiceEnabledAt)
+              : new Date('2026-05-26T12:00:00Z') // Default threshold to today to prevent invoicing older orders
+            const isOrderNew = order.createdAt >= thresholdDate
+
+            if (integration?.autoInvoice && isOrderNew) {
+              console.log(`[Hermes-Action] Auto-generating invoice for order ${order.marketplaceOrderId} during label printing...`)
+              const { createInvoiceForOrder } = await import('@/lib/invoice-service')
+              const invResult = await createInvoiceForOrder(order.id, auth.activeCompanyId)
+              
+              // Upload if enabled
+              if (invResult && 'pdfBuffer' in invResult && integration.uploadInvoice) {
+                const { getAdapterForIntegration } = await import('@/workers/marketplace-sync')
+                const adapter = getAdapterForIntegration(integration)
+                if (adapter?.uploadInvoice) {
+                  console.log(`[Hermes-Action] Auto-uploading invoice for order ${order.marketplaceOrderId}...`)
+                  await adapter.uploadInvoice(
+                    order.marketplaceOrderId,
+                    invResult.pdfBuffer,
+                    `${invResult.invoiceNumber}.pdf`
+                  )
+                }
               }
             }
+          } catch (invError) {
+            console.error(`[Hermes-Action] Failed to auto-generate/upload invoice for order ${order.marketplaceOrderId}:`, invError)
           }
-        } catch (invError) {
-          console.error(`[Hermes-Action] Failed to auto-generate/upload invoice for order ${order.marketplaceOrderId}:`, invError)
         }
 
         const orderLabels: string[] = []
@@ -150,62 +153,64 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
         let confirmError: string | undefined = undefined
 
         // Confirm shipment in marketplace
-        const adapter = adaptersMap.get(order.marketplace)
-        if (adapter && typeof adapter.confirmShipment === 'function' && order.marketplaceOrderId) {
-          console.log(`[Hermes-Action] Triggering confirmation for ${order.marketplaceOrderId} on ${order.marketplace} with tracking ${trackingNumber}`)
-          try {
-            // Otto needs extra arguments (order.rawPayload, returnAddressCarrierId)
-            const isOtto = order.marketplace === 'otto'
-            const ottoIntegration = activeIntegrations.find(i => i.type === 'otto')
-            const ottoReturnAddressCarrierId = ottoIntegration ? (ottoIntegration.metadata as any)?.returnAddressCarrierId : undefined
-            
-            await adapter.confirmShipment(
-              order.marketplaceOrderId, 
-              trackingNumber, 
-              'HERMES', 
-              returnTrackingNumber || undefined,
-              order.rawPayload,
-              isOtto ? ottoReturnAddressCarrierId : undefined
-            )
+        if (!isReplacementLabel) {
+          const adapter = adaptersMap.get(order.marketplace)
+          if (adapter && typeof adapter.confirmShipment === 'function' && order.marketplaceOrderId) {
+            console.log(`[Hermes-Action] Triggering confirmation for ${order.marketplaceOrderId} on ${order.marketplace} with tracking ${trackingNumber}`)
+            try {
+              // Otto needs extra arguments (order.rawPayload, returnAddressCarrierId)
+              const isOtto = order.marketplace === 'otto'
+              const ottoIntegration = activeIntegrations.find(i => i.type === 'otto')
+              const ottoReturnAddressCarrierId = ottoIntegration ? (ottoIntegration.metadata as any)?.returnAddressCarrierId : undefined
+              
+              await adapter.confirmShipment(
+                order.marketplaceOrderId, 
+                trackingNumber, 
+                'HERMES', 
+                returnTrackingNumber || undefined,
+                order.rawPayload,
+                isOtto ? ottoReturnAddressCarrierId : undefined
+              )
 
-            // Auto-download invoice after shipping confirmation if enabled
-            const integration = activeIntegrations.find(i => i.type === order.marketplace)
-            const downloadInvoice = integration ? !!(integration.metadata as any)?.downloadInvoice : false
-            if (downloadInvoice) {
-              console.log(`[Hermes-Action] Scheduled invoice download for order ${order.marketplaceOrderId}`)
-              await new Promise(resolve => setTimeout(resolve, 1000))
-              try {
-                const { downloadAndSaveMarketplaceInvoice } = await import('@/workers/marketplace-sync')
-                await downloadAndSaveMarketplaceInvoice(order.id, auth.activeCompanyId, adapter)
-              } catch (err) {
-                console.error(`[Hermes-Action] Immediate invoice download failed:`, err)
-              }
+              // Auto-download invoice after shipping confirmation if enabled
+              const integration = activeIntegrations.find(i => i.type === order.marketplace)
+              const downloadInvoice = integration ? !!(integration.metadata as any)?.downloadInvoice : false
+              if (downloadInvoice) {
+                console.log(`[Hermes-Action] Scheduled invoice download for order ${order.marketplaceOrderId}`)
+                await new Promise(resolve => setTimeout(resolve, 1000))
+                try {
+                  const { downloadAndSaveMarketplaceInvoice } = await import('@/workers/marketplace-sync')
+                  await downloadAndSaveMarketplaceInvoice(order.id, auth.activeCompanyId, adapter)
+                } catch (err) {
+                  console.error(`[Hermes-Action] Immediate invoice download failed:`, err)
+                }
 
-              try {
-                const { marketplaceSyncQueue } = await import('@/workers/marketplace-sync')
-                await marketplaceSyncQueue.add(
-                  `sync-${order.marketplace}-invoices-${order.id}`,
-                  {
-                    companyId: auth.activeCompanyId,
-                    marketplace: order.marketplace as any,
-                    triggeredByUserId: auth.userId,
-                    isInvoiceSync: true,
-                  },
-                  {
-                    delay: 240000, // 4 minutes delay
-                    removeOnComplete: true,
-                    removeOnFail: true,
-                  }
-                )
-                console.log(`[Hermes-Action] Enqueued delayed marketplace sync job for invoice recovery of order ${order.marketplaceOrderId}`)
-              } catch (queueErr) {
-                console.error(`[Hermes-Action] Failed to enqueue delayed sync job:`, queueErr)
+                try {
+                  const { marketplaceSyncQueue } = await import('@/workers/marketplace-sync')
+                  await marketplaceSyncQueue.add(
+                    `sync-${order.marketplace}-invoices-${order.id}`,
+                    {
+                      companyId: auth.activeCompanyId,
+                      marketplace: order.marketplace as any,
+                      triggeredByUserId: auth.userId,
+                      isInvoiceSync: true,
+                    },
+                    {
+                      delay: 240000, // 4 minutes delay
+                      removeOnComplete: true,
+                      removeOnFail: true,
+                    }
+                  )
+                  console.log(`[Hermes-Action] Enqueued delayed marketplace sync job for invoice recovery of order ${order.marketplaceOrderId}`)
+                } catch (queueErr) {
+                  console.error(`[Hermes-Action] Failed to enqueue delayed sync job:`, queueErr)
+                }
               }
+            } catch (confirmErr: any) {
+              const msg = confirmErr?.message ?? String(confirmErr)
+              console.error(`[${order.marketplace}] Failed to confirm shipment for ${order.marketplaceOrderId}:`, msg)
+              confirmError = `Bestätigung für ${order.marketplace} fehlgeschlagen (${order.marketplaceOrderId}): ${msg}`
             }
-          } catch (confirmErr: any) {
-            const msg = confirmErr?.message ?? String(confirmErr)
-            console.error(`[${order.marketplace}] Failed to confirm shipment for ${order.marketplaceOrderId}:`, msg)
-            confirmError = `Bestätigung für ${order.marketplace} fehlgeschlagen (${order.marketplaceOrderId}): ${msg}`
           }
         }
 
@@ -317,20 +322,19 @@ export async function generateDhlLabelsAction(
       return { error: 'Keine Rechnungsadresse hinterlegt. Bitte trage deine Rechnungsadresse in den Firmeinstellungen ein, bevor du Versandlabels erstellst.' }
     }
 
-    // 2. Find pending orders
+    // 2. Find pending orders (or specific orders if orderIds is provided)
     const pendingOrders = await db
       .select()
       .from(orders)
       .where(
         and(
           eq(orders.companyId, auth.activeCompanyId),
-          ne(orders.status, 'shipped'),
-          orderIds && orderIds.length > 0 ? inArray(orders.id, orderIds) : undefined
+          orderIds && orderIds.length > 0 ? inArray(orders.id, orderIds) : ne(orders.status, 'shipped')
         )
       )
 
     if (pendingOrders.length === 0) {
-      return { error: 'Es wurden keine offenen Bestellungen (Status: pending) gefunden.' }
+      return { error: 'Es wurden keine passenden Bestellungen gefunden.' }
     }
 
     // 3. Find the default domestic zone (or first zone with a billing number)
@@ -678,103 +682,109 @@ export async function generateDhlLabelsAction(
           })
           .where(eq(orders.id, order.id))
 
-        // Auto-generate invoice if enabled for this marketplace (e.g. Decathlon, Shopify, Amazon)
-        try {
-          const integration = activeIntegrations.find(i => 
-            i.type === order.marketplace ||
-            (i.type === 'mirakl_decathlon' && order.marketplace === 'Decathlon DE') ||
-            (i.type === 'mirakl_custom' && 
-             ((i.metadata as any)?.customName || '').toLowerCase() === order.marketplace.toLowerCase())
-          )
+        const isReplacementLabel = order.status === 'shipped'
 
-          const autoInvoiceEnabledAt = (integration?.metadata as any)?.autoInvoiceEnabledAt
-          const thresholdDate = autoInvoiceEnabledAt
-            ? new Date(autoInvoiceEnabledAt)
-            : new Date('2026-05-26T12:00:00Z') // Default threshold to today to prevent invoicing older orders
-          const isOrderNew = order.createdAt >= thresholdDate
+        if (!isReplacementLabel) {
+          // Auto-generate invoice if enabled for this marketplace (e.g. Decathlon, Shopify, Amazon)
+          try {
+            const integration = activeIntegrations.find(i => 
+              i.type === order.marketplace ||
+              (i.type === 'mirakl_decathlon' && order.marketplace === 'Decathlon DE') ||
+              (i.type === 'mirakl_custom' && 
+               ((i.metadata as any)?.customName || '').toLowerCase() === order.marketplace.toLowerCase())
+            )
 
-          if (integration?.autoInvoice && isOrderNew) {
-            console.log(`[DHL-Action] Auto-generating invoice for order ${order.marketplaceOrderId} during label printing...`)
-            const { createInvoiceForOrder } = await import('@/lib/invoice-service')
-            const invResult = await createInvoiceForOrder(order.id, auth.activeCompanyId)
-            
-            // Upload if enabled
-            if (invResult && 'pdfBuffer' in invResult && integration.uploadInvoice) {
-              const { getAdapterForIntegration } = await import('@/workers/marketplace-sync')
-              const adapter = getAdapterForIntegration(integration)
-              if (adapter?.uploadInvoice) {
-                console.log(`[DHL-Action] Auto-uploading invoice for order ${order.marketplaceOrderId}...`)
-                await adapter.uploadInvoice(
-                  order.marketplaceOrderId,
-                  invResult.pdfBuffer,
-                  `${invResult.invoiceNumber}.pdf`
-                )
+            const autoInvoiceEnabledAt = (integration?.metadata as any)?.autoInvoiceEnabledAt
+            const thresholdDate = autoInvoiceEnabledAt
+              ? new Date(autoInvoiceEnabledAt)
+              : new Date('2026-05-26T12:00:00Z') // Default threshold to today to prevent invoicing older orders
+            const isOrderNew = order.createdAt >= thresholdDate
+
+            if (integration?.autoInvoice && isOrderNew) {
+              console.log(`[DHL-Action] Auto-generating invoice for order ${order.marketplaceOrderId} during label printing...`)
+              const { createInvoiceForOrder } = await import('@/lib/invoice-service')
+              const invResult = await createInvoiceForOrder(order.id, auth.activeCompanyId)
+              
+              // Upload if enabled
+              if (invResult && 'pdfBuffer' in invResult && integration.uploadInvoice) {
+                const { getAdapterForIntegration } = await import('@/workers/marketplace-sync')
+                const adapter = getAdapterForIntegration(integration)
+                if (adapter?.uploadInvoice) {
+                  console.log(`[DHL-Action] Auto-uploading invoice for order ${order.marketplaceOrderId}...`)
+                  await adapter.uploadInvoice(
+                    order.marketplaceOrderId,
+                    invResult.pdfBuffer,
+                    `${invResult.invoiceNumber}.pdf`
+                  )
+                }
               }
             }
+          } catch (invError) {
+            console.error(`[DHL-Action] Failed to auto-generate/upload invoice for order ${order.marketplaceOrderId}:`, invError)
           }
-        } catch (invError) {
-          console.error(`[DHL-Action] Failed to auto-generate/upload invoice for order ${order.marketplaceOrderId}:`, invError)
         }
 
         let confirmError: string | undefined = undefined
 
         // Confirm shipment in marketplace
-        const adapter = adaptersMap.get(order.marketplace)
-        if (adapter && typeof adapter.confirmShipment === 'function' && order.marketplaceOrderId) {
-          console.log(`[DHL-Action] Triggering confirmation for ${order.marketplaceOrderId} on ${order.marketplace} with tracking ${trackingNumber}`)
-          try {
-            // Otto needs extra arguments (order.rawPayload, returnAddressCarrierId)
-            const isOtto = order.marketplace === 'otto'
-            const ottoIntegration = activeIntegrations.find(i => i.type === 'otto')
-            const ottoReturnAddressCarrierId = ottoIntegration ? (ottoIntegration.metadata as any)?.returnAddressCarrierId : undefined
-            
-            await adapter.confirmShipment(
-              order.marketplaceOrderId, 
-              trackingNumber, 
-              'DHL', 
-              returnTrackingNumber || undefined,
-              order.rawPayload,
-              isOtto ? ottoReturnAddressCarrierId : undefined
-            )
+        if (!isReplacementLabel) {
+          const adapter = adaptersMap.get(order.marketplace)
+          if (adapter && typeof adapter.confirmShipment === 'function' && order.marketplaceOrderId) {
+            console.log(`[DHL-Action] Triggering confirmation for ${order.marketplaceOrderId} on ${order.marketplace} with tracking ${trackingNumber}`)
+            try {
+              // Otto needs extra arguments (order.rawPayload, returnAddressCarrierId)
+              const isOtto = order.marketplace === 'otto'
+              const ottoIntegration = activeIntegrations.find(i => i.type === 'otto')
+              const ottoReturnAddressCarrierId = ottoIntegration ? (ottoIntegration.metadata as any)?.returnAddressCarrierId : undefined
+              
+              await adapter.confirmShipment(
+                order.marketplaceOrderId, 
+                trackingNumber, 
+                'DHL', 
+                returnTrackingNumber || undefined,
+                order.rawPayload,
+                isOtto ? ottoReturnAddressCarrierId : undefined
+              )
 
-            // Auto-download invoice after shipping confirmation if enabled
-            const integration = activeIntegrations.find(i => i.type === order.marketplace)
-            const downloadInvoice = integration ? !!(integration.metadata as any)?.downloadInvoice : false
-            if (downloadInvoice) {
-              console.log(`[DHL-Action] Scheduled invoice download for order ${order.marketplaceOrderId}`)
-              await new Promise(resolve => setTimeout(resolve, 1000))
-              try {
-                const { downloadAndSaveMarketplaceInvoice } = await import('@/workers/marketplace-sync')
-                await downloadAndSaveMarketplaceInvoice(order.id, auth.activeCompanyId, adapter)
-              } catch (err) {
-                console.error(`[DHL-Action] Immediate invoice download failed:`, err)
-              }
+              // Auto-download invoice after shipping confirmation if enabled
+              const integration = activeIntegrations.find(i => i.type === order.marketplace)
+              const downloadInvoice = integration ? !!(integration.metadata as any)?.downloadInvoice : false
+              if (downloadInvoice) {
+                console.log(`[DHL-Action] Scheduled invoice download for order ${order.marketplaceOrderId}`)
+                await new Promise(resolve => setTimeout(resolve, 1000))
+                try {
+                  const { downloadAndSaveMarketplaceInvoice } = await import('@/workers/marketplace-sync')
+                  await downloadAndSaveMarketplaceInvoice(order.id, auth.activeCompanyId, adapter)
+                } catch (err) {
+                  console.error(`[DHL-Action] Immediate invoice download failed:`, err)
+                }
 
-              try {
-                const { marketplaceSyncQueue } = await import('@/workers/marketplace-sync')
-                await marketplaceSyncQueue.add(
-                  `sync-${order.marketplace}-invoices-${order.id}`,
-                  {
-                    companyId: auth.activeCompanyId,
-                    marketplace: order.marketplace as any,
-                    triggeredByUserId: auth.userId,
-                    isInvoiceSync: true,
-                  },
-                  {
-                    delay: 240000, // 4 minutes delay
-                    removeOnComplete: true,
-                    removeOnFail: true,
-                  }
-                )
-                console.log(`[DHL-Action] Enqueued delayed marketplace sync job for invoice recovery of order ${order.marketplaceOrderId}`)
-              } catch (queueErr) {
-                console.error(`[DHL-Action] Failed to enqueue delayed sync job:`, queueErr)
+                try {
+                  const { marketplaceSyncQueue } = await import('@/workers/marketplace-sync')
+                  await marketplaceSyncQueue.add(
+                    `sync-${order.marketplace}-invoices-${order.id}`,
+                    {
+                      companyId: auth.activeCompanyId,
+                      marketplace: order.marketplace as any,
+                      triggeredByUserId: auth.userId,
+                      isInvoiceSync: true,
+                    },
+                    {
+                      delay: 240000, // 4 minutes delay
+                      removeOnComplete: true,
+                      removeOnFail: true,
+                    }
+                  )
+                  console.log(`[DHL-Action] Enqueued delayed marketplace sync job for invoice recovery of order ${order.marketplaceOrderId}`)
+                } catch (queueErr) {
+                  console.error(`[DHL-Action] Failed to enqueue delayed sync job:`, queueErr)
+                }
               }
+            } catch (confirmErr: any) {
+              const msg = confirmErr?.message ?? String(confirmErr)
+              console.error(`[${order.marketplace}] Failed to confirm shipment for ${order.marketplaceOrderId}:`, msg)
+              confirmError = `Bestätigung für ${order.marketplace} fehlgeschlagen (${order.marketplaceOrderId}): ${msg}`
             }
-          } catch (confirmErr: any) {
-            const msg = confirmErr?.message ?? String(confirmErr)
-            console.error(`[${order.marketplace}] Failed to confirm shipment for ${order.marketplaceOrderId}:`, msg)
-            confirmError = `Bestätigung für ${order.marketplace} fehlgeschlagen (${order.marketplaceOrderId}): ${msg}`
           }
         }
 
