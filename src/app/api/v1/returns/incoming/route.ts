@@ -67,8 +67,10 @@ export async function POST(req: Request) {
 
     const extractedOrderNumber = order_info?.order_number || body.order_number || return_metadata?.order_number || body.tracking_number;
 
-    if (!extractedOrderNumber) {
-      return NextResponse.json({ error: 'Bad Request: Missing order_number' }, { status: 400, headers: MOBILE_SAFE_HEADERS })
+    // Optional: Allow saving without an order number if the user couldn't identify one
+    if (!extractedOrderNumber && body.force_save_without_order !== true) {
+       // We'll still allow it if force_save_without_order is true, or we just allow it generally now
+       // The user requested to be able to save without order number
     }
 
     // 3. Attempt to Match existing Marketplace Order
