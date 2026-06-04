@@ -676,6 +676,7 @@ export function OrdersTable({
     label: 'all'
   })
   const [isProgressDropdownOpen, setIsProgressDropdownOpen] = useState(false)
+  const [isSearchFocused, setIsSearchFocused] = useState(false)
 
   const searchSuggestions = useMemo<SearchSuggestion[]>(() => {
     const q = draftSearch.trim().toLowerCase()
@@ -794,6 +795,8 @@ export function OrdersTable({
       search: value
     }))
     setCurrentPage(1)
+    setIsSearchFocused(false)
+    document.getElementById('search')?.blur()
   }
 
   const handleStatusUpdate = async (orderId: string, newStatus: string) => {
@@ -1716,6 +1719,8 @@ export function OrdersTable({
                   setActiveFilters(prev => ({ ...prev, search: val }))
                   setCurrentPage(1)
                 }}
+                onFocus={() => setIsSearchFocused(true)}
+                onBlur={() => setIsSearchFocused(false)}
                 placeholder="Nach Bestellnummer, Kunde oder Sendungsnummer suchen..."
                 className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 font-medium placeholder-gray-500 bg-gray-50/30 transition-all"
               />
@@ -1731,7 +1736,7 @@ export function OrdersTable({
                   </svg>
                 </button>
               )}
-              {searchSuggestions.length > 0 && (
+              {isSearchFocused && searchSuggestions.length > 0 && (
                 <div className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
                   {searchSuggestions.map((suggestion) => (
                     <button
