@@ -1,13 +1,31 @@
 import { requireAuth } from '@/lib/session'
+import { db } from '@/db/client'
+import { marketplaceIntegrations } from '@/db/schema/integrations'
+import { eq, and } from 'drizzle-orm'
 import Link from 'next/link'
-import { ArrowLeft, RefreshCw, Layers, Plus, Link as LinkIcon, Database } from 'lucide-react'
+import { ArrowLeft, Layers, Database } from 'lucide-react'
+import { ImportClient } from './import-client'
 
 export const metadata = {
   title: 'Import & Mapping - Produkte',
 }
 
 export default async function ProductImportPage() {
-  await requireAuth()
+  const auth = await requireAuth()
+
+  // Fetch active integrations
+  const integrations = await db
+    .select()
+    .from(marketplaceIntegrations)
+    .where(
+      and(
+        eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
+        eq(marketplaceIntegrations.isActive, true)
+      )
+    )
+
+  // Filter out shipping providers
+  const marketplaces = integrations.filter(i => i.type !== 'dhl' && i.type !== 'hermes')
 
   // Placeholder for unmapped products fetched from DB or directly from adapter
   const unmappedProducts = [
@@ -32,10 +50,7 @@ export default async function ProductImportPage() {
           <p className="text-slate-500 mt-2 font-medium">Verknüpfen Sie neue Marktplatz-Artikel mit Ihrem zentralen Bestand.</p>
         </div>
 
-        <button className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 text-white font-semibold hover:bg-slate-800 shadow-md hover:shadow-lg transition-all duration-300">
-          <RefreshCw className="w-4 h-4" />
-          Märkte synchronisieren
-        </button>
+        <ImportClient marketplaces={marketplaces} />
       </header>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -68,11 +83,9 @@ export default async function ProductImportPage() {
 
               <div className="flex gap-3 w-full lg:w-auto">
                 <button className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-all font-semibold shadow-sm">
-                  <LinkIcon className="w-4 h-4" />
                   Mappen
                 </button>
                 <button className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-lg hover:from-emerald-400 hover:to-teal-400 transition-all font-semibold shadow-sm">
-                  <Plus className="w-4 h-4" />
                   Als Neu anlegen
                 </button>
               </div>

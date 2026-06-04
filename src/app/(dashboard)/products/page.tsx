@@ -3,7 +3,7 @@ import { db } from '@/db/client'
 import { products } from '@/db/schema/products'
 import { eq, isNull } from 'drizzle-orm'
 import Link from 'next/link'
-import { Plus, DownloadCloud, Package, Search } from 'lucide-react'
+import { Plus, DownloadCloud, Package, Search, Settings } from 'lucide-react'
 
 export const metadata = {
   title: 'Produkte - TheOmniStack',
@@ -38,7 +38,14 @@ export default async function ProductsPage() {
           <p className="text-slate-500 mt-2 font-medium">Verwalten Sie Ihre Produkte und Marktplatz-Listings zentral.</p>
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
+          <Link
+            href="/products/settings"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-50 text-slate-700 font-semibold hover:bg-slate-100 transition-colors border border-slate-200 shadow-sm"
+          >
+            <Settings className="w-4 h-4" />
+            Einstellungen
+          </Link>
           <Link
             href="/products/import"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-50 text-slate-700 font-semibold hover:bg-slate-100 transition-colors border border-slate-200 shadow-sm"
