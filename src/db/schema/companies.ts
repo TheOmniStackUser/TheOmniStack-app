@@ -123,6 +123,10 @@ export const companies = pgTable('companies', {
   fetchOrdersTime: text('fetch_orders_time').notNull().default('03:00'),
   fetchOrdersMarketplaces: jsonb('fetch_orders_marketplaces').$type<string[]>().notNull().default([]),
 
+  // Features
+  featuresReturnsEnabled: boolean('features_returns_enabled').notNull().default(false),
+  featuresProductsEnabled: boolean('features_products_enabled').notNull().default(false),
+
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })

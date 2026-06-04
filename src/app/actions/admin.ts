@@ -33,3 +33,20 @@ export async function extendTrialAction(companyId: string, days: number) {
   
   return { success: true }
 }
+
+export async function toggleCompanyFeatureAction(companyId: string, feature: 'returns' | 'products', enabled: boolean) {
+  await requireSuperAdmin()
+
+  const updateData = feature === 'returns' 
+    ? { featuresReturnsEnabled: enabled }
+    : { featuresProductsEnabled: enabled }
+
+  await db
+    .update(companies)
+    .set(updateData)
+    .where(eq(companies.id, companyId))
+
+  revalidatePath(`/admin/merchants/${companyId}`)
+  
+  return { success: true }
+}

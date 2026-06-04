@@ -6,6 +6,7 @@ import { users } from '@/db/schema/auth'
 import { sql, count, gte, and, eq, lte } from 'drizzle-orm'
 import { notFound } from 'next/navigation'
 import { TrialManager } from './trial-manager'
+import { FeatureManager } from './feature-manager'
 
 export default async function AdminMerchantDetailPage({
   params,
@@ -137,6 +138,13 @@ export default async function AdminMerchantDetailPage({
             <p className="text-xs text-white/30 mb-1">Land</p>
             <p className="text-2xl font-bold text-white">{company.country}</p>
           </div>
+          <FeatureManager 
+            companyId={company.id} 
+            features={{ 
+              returns: company.featuresReturnsEnabled, 
+              products: company.featuresProductsEnabled 
+            }} 
+          />
         </div>
       </div>
 

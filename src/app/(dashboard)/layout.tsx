@@ -5,6 +5,7 @@ import { logoutAction } from '@/app/actions/auth'
 import { SidebarNav } from './sidebar-nav'
 import { db } from '@/db/client'
 import { users } from '@/db/schema/auth'
+import { companies } from '@/db/schema/companies'
 import { eq } from 'drizzle-orm'
 import { AutoRefresh } from '@/components/auto-refresh'
 
@@ -23,6 +24,15 @@ export default async function DashboardLayout({
     })
     .from(users)
     .where(eq(users.id, auth.userId))
+    .limit(1)
+
+  const [company] = await db
+    .select({
+      featuresReturnsEnabled: companies.featuresReturnsEnabled,
+      featuresProductsEnabled: companies.featuresProductsEnabled,
+    })
+    .from(companies)
+    .where(eq(companies.id, auth.activeCompanyId))
     .limit(1)
 
   const { headers } = await import('next/headers')
@@ -61,7 +71,13 @@ export default async function DashboardLayout({
           </Link>
         </div>
         <div className="flex-1">
-          <SidebarNav role={auth.role} />
+          <SidebarNav 
+            role={auth.role} 
+            features={{
+              returns: company?.featuresReturnsEnabled ?? false,
+              products: company?.featuresProductsEnabled ?? false
+            }}
+          />
         </div>
         <div className="p-6 pb-10 border-t border-slate-800/50 mt-auto bg-[#0F172A]/50">
           <div className="mb-4 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.1em]">

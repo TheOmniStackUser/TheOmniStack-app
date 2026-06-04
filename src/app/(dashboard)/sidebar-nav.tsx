@@ -3,7 +3,13 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-export function SidebarNav({ role }: { role: string }) {
+export function SidebarNav({ 
+  role,
+  features = { returns: false, products: false }
+}: { 
+  role: string
+  features?: { returns: boolean; products: boolean }
+}) {
   const pathname = usePathname()
 
   const links = [
@@ -12,9 +18,15 @@ export function SidebarNav({ role }: { role: string }) {
     { href: '/invoices', label: 'Rechnungen' },
     { href: '/delivery-notes', label: 'Lieferscheine' },
     { href: '/quotes', label: 'Angebote' },
-    { href: '/returns', label: 'Retouren' },
-    { href: '/products', label: 'Produkte' },
   ]
+
+  if (features.returns) {
+    links.push({ href: '/returns', label: 'Retouren' })
+  }
+  
+  if (features.products) {
+    links.push({ href: '/products', label: 'Produkte' })
+  }
 
 
   return (

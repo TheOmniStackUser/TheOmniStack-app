@@ -99,6 +99,13 @@
       "when": 1780582449393,
       "tag": "0013_rich_silver_sable",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1780586855992,
+      "tag": "0014_skinny_stingray",
+      "breakpoints": true
     }
   ]
 }
