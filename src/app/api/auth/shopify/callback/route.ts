@@ -71,6 +71,24 @@ export async function GET(request: Request) {
     const tokenData = await tokenResponse.json()
     const accessToken = tokenData.access_token
 
+    // 4.5 Make an API call to Shopify to satisfy "App must use Shopify API" requirement
+    let shopMetadata = {}
+    try {
+      const shopRes = await fetch(`https://${shop}/admin/api/2024-01/shop.json`, {
+        headers: {
+          'X-Shopify-Access-Token': accessToken,
+          'Content-Type': 'application/json',
+        }
+      })
+      if (shopRes.ok) {
+        const shopData = await shopRes.json()
+        shopMetadata = shopData.shop || {}
+        console.log('[Shopify OAuth] Fetched shop data:', shopMetadata)
+      }
+    } catch (e) {
+      console.error('[Shopify OAuth] Failed to fetch shop data during install:', e)
+    }
+
     // 5. Save the token and shop domain to our Database
     const [existing] = await db
       .select()
@@ -89,7 +107,8 @@ export async function GET(request: Request) {
           environment: shop, // Store the shop domain here (e.g. "my-shop.myshopify.com")
           accessToken: accessToken,
           isActive: true,
-          updatedAt: new Date()
+          updatedAt: new Date(),
+          metadata: { ...((existing.metadata as any) || {}), shop: shopMetadata }
         })
         .where(eq(marketplaceIntegrations.id, existing.id))
     } else {
@@ -99,7 +118,7 @@ export async function GET(request: Request) {
         environment: shop,
         accessToken: accessToken,
         isActive: true,
-        metadata: {}
+        metadata: { shop: shopMetadata }
       })
     }
 
