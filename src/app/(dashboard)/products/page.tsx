@@ -17,7 +17,7 @@ export default async function ProductsPage() {
     .select()
     .from(products)
     .where(
-      eq(products.companyId, auth.companyId)
+      eq(products.companyId, auth.activeCompanyId)
     )
     // In a real scenario, we might want to filter isNull(products.parentId) to only show top-level,
     // but for now we'll fetch all or just the top-level. Let's fetch all.

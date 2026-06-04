@@ -1,9 +1,9 @@
 import { db } from '@/db/client'
 import { companies } from '@/db/schema/companies'
-import { integrations } from '@/db/schema/integrations'
+import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { products, productMappings } from '@/db/schema/products'
 import { eq, and } from 'drizzle-orm'
-import { getAdapter } from '@/adapters/marketplace'
+import { getAdapterForIntegration } from '@/workers/marketplace-sync'
 
 /**
  * Syncs products from activated marketplaces to the central product catalog.
@@ -13,17 +13,17 @@ export async function syncProductsForCompany(companyId: string) {
   // 1. Fetch active integrations that support product fetching
   const activeIntegrations = await db
     .select()
-    .from(integrations)
+    .from(marketplaceIntegrations)
     .where(
       and(
-        eq(integrations.companyId, companyId),
-        eq(integrations.isActive, true)
+        eq(marketplaceIntegrations.companyId, companyId),
+        eq(marketplaceIntegrations.isActive, true)
       )
     )
 
   for (const integration of activeIntegrations) {
     try {
-      const adapter = getAdapter(integration.marketplace as any)
+      const adapter = getAdapterForIntegration(integration)
       if (!adapter || !adapter.fetchProducts) {
         continue
       }
@@ -34,10 +34,10 @@ export async function syncProductsForCompany(companyId: string) {
       // We would handle storing these in a staging area or directly into the DB
       // as "unmapped" or auto-mapped if SKUs match.
       // This is a placeholder for the actual sync logic.
-      console.log(`Fetched ${marketplaceProducts.length} products from ${integration.marketplace}`)
+      console.log(`Fetched ${marketplaceProducts.length} products from ${integration.type}`)
       
     } catch (error) {
-      console.error(`Failed to sync products for marketplace ${integration.marketplace}`, error)
+      console.error(`Failed to sync products for marketplace ${integration.type}`, error)
     }
   }
 }

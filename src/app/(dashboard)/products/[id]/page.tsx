@@ -21,7 +21,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
     .where(eq(products.id, id))
     .limit(1)
 
-  if (!product || product.companyId !== auth.companyId) {
+  if (!product || product.companyId !== auth.activeCompanyId) {
     notFound()
   }
 
