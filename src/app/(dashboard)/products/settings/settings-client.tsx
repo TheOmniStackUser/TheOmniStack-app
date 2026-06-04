@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { updateMarketplaceSyncSettings, MarketplaceSyncSettings } from '@/app/actions/products'
+import { updateMarketplaceSyncSettings } from '@/app/actions/products'
+import type { MarketplaceSyncSettings } from '@/app/actions/products'
 import { Save, Check, ServerCrash, CheckCircle2, AlertCircle, X } from 'lucide-react'
 
 function getMarketplaceName(type: string) {
