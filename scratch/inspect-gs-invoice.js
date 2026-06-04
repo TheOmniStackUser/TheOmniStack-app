@@ -1,5 +1,5 @@
 const postgres = require('postgres');
-const sql = postgres('postgresql://neondb_owner:npg_iYQt4xBdqH5l@ep-little-band-alr3isna-pooler.c-3.eu-central-1.aws.neon.tech/neondb?sslmode=require');
+const sql = postgres(process.env.DATABASE_URL);
 
 async function main() {
   try {
