@@ -5,7 +5,10 @@ import { updateMarketplaceSyncSettings } from '@/app/actions/products'
 import type { MarketplaceSyncSettings } from '@/app/actions/products'
 import { Save, Check, ServerCrash, CheckCircle2, AlertCircle, X } from 'lucide-react'
 
-function getMarketplaceName(type: string) {
+function getMarketplaceName(integration: any) {
+  if (integration.type === 'mirakl_custom' && integration.metadata?.customName) {
+    return integration.metadata.customName
+  }
   const names: Record<string, string> = {
     amazon: 'Amazon',
     otto: 'Otto Market',
@@ -20,7 +23,7 @@ function getMarketplaceName(type: string) {
     mirakl_mediamarkt: 'MediaMarkt',
     mirakl_custom: 'Custom Mirakl',
   }
-  return names[type] || type
+  return names[integration.type] || integration.type
 }
 
 function IntegrationCard({ integration, showNotification }: { integration: any, showNotification: any }) {
@@ -40,7 +43,7 @@ function IntegrationCard({ integration, showNotification }: { integration: any, 
     setIsSaving(true)
     try {
       await updateMarketplaceSyncSettings(integration.id, settings)
-      showNotification(`${getMarketplaceName(integration.type)} Einstellungen gespeichert.`, undefined, 'success')
+      showNotification(`${getMarketplaceName(integration)} Einstellungen gespeichert.`, undefined, 'success')
     } catch (err: any) {
       showNotification('Fehler beim Speichern', err.message, 'error')
     } finally {
@@ -51,7 +54,7 @@ function IntegrationCard({ integration, showNotification }: { integration: any, 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col">
       <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-        <h2 className="text-xl font-bold text-slate-900">{getMarketplaceName(integration.type)}</h2>
+        <h2 className="text-xl font-bold text-slate-900">{getMarketplaceName(integration)}</h2>
         
         <label className="flex items-center cursor-pointer gap-3">
           <span className="text-sm font-semibold text-slate-700">Sync Aktiv</span>
@@ -73,7 +76,7 @@ function IntegrationCard({ integration, showNotification }: { integration: any, 
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between">
             <div>
               <p className="font-bold text-slate-900">Bestandsabgleich</p>
-              <p className="text-xs text-slate-500 mt-1">Automatisch Lagerbestände an {getMarketplaceName(integration.type)} senden.</p>
+              <p className="text-xs text-slate-500 mt-1">Automatisch Lagerbestände an {getMarketplaceName(integration)} senden.</p>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
               <input 
@@ -89,7 +92,7 @@ function IntegrationCard({ integration, showNotification }: { integration: any, 
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between">
             <div>
               <p className="font-bold text-slate-900">Preisabgleich</p>
-              <p className="text-xs text-slate-500 mt-1">Automatisch Preise an {getMarketplaceName(integration.type)} senden.</p>
+              <p className="text-xs text-slate-500 mt-1">Automatisch Preise an {getMarketplaceName(integration)} senden.</p>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
               <input 

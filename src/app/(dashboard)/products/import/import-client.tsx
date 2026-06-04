@@ -3,6 +3,27 @@
 import { useState } from 'react'
 import { DownloadCloud, Play, Loader2, CheckCircle2, AlertCircle, X } from 'lucide-react'
 
+function getMarketplaceName(integration: any) {
+  if (integration.type === 'mirakl_custom' && integration.metadata?.customName) {
+    return integration.metadata.customName
+  }
+  const names: Record<string, string> = {
+    amazon: 'Amazon',
+    otto: 'Otto Market',
+    shopify: 'Shopify',
+    aboutyou: 'About You',
+    kaufland: 'Kaufland',
+    ebay: 'eBay',
+    woocommerce: 'WooCommerce',
+    shopware: 'Shopware',
+    mirakl_decathlon: 'Decathlon',
+    mirakl_decathlon_eu: 'Decathlon EU',
+    mirakl_mediamarkt: 'MediaMarkt',
+    mirakl_custom: 'Custom Mirakl',
+  }
+  return names[integration.type] || integration.type.charAt(0).toUpperCase() + integration.type.slice(1).replace('_', ' ')
+}
+
 export function ImportClient({ marketplaces }: { marketplaces: any[] }) {
   const [selectedMarketplace, setSelectedMarketplace] = useState<string>('')
   const [isImporting, setIsImporting] = useState(false)
@@ -19,7 +40,8 @@ export function ImportClient({ marketplaces }: { marketplaces: any[] }) {
     
     // Placeholder for actual manual import logic
     // Currently simulates calling the background worker for the specific integration
-    showNotification('Import gestartet', `Produkte werden im Hintergrund von ${marketplaces.find(m => m.id === selectedMarketplace)?.type} abgerufen.`, 'info')
+    const selected = marketplaces.find(m => m.id === selectedMarketplace)
+    showNotification('Import gestartet', `Produkte werden im Hintergrund von ${selected ? getMarketplaceName(selected) : 'dem Marktplatz'} abgerufen.`, 'info')
     
     setTimeout(() => {
       setIsImporting(false)
@@ -74,7 +96,7 @@ export function ImportClient({ marketplaces }: { marketplaces: any[] }) {
           <option value="" disabled>Marktplatz wählen...</option>
           {marketplaces.map(m => (
             <option key={m.id} value={m.id}>
-              {m.type.charAt(0).toUpperCase() + m.type.slice(1).replace('_', ' ')}
+              {getMarketplaceName(m)}
             </option>
           ))}
         </select>
