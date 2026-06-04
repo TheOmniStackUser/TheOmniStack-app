@@ -5,7 +5,7 @@ import { format } from 'date-fns'
 const styles = StyleSheet.create({
   page: { 
     padding: '40px 50px', 
-    fontSize: 10, 
+    fontSize: 9, 
     fontFamily: 'Helvetica', 
     color: '#000' 
   },
@@ -16,11 +16,11 @@ const styles = StyleSheet.create({
   
   leftCol: { width: '50%' },
   senderLine: { fontSize: 8, borderBottom: '1px solid #000', paddingBottom: 2, marginBottom: 15 },
-  recipientBlock: { fontSize: 11, lineHeight: 1.3 },
+  recipientBlock: { fontSize: 10, lineHeight: 1.3 },
   bold: { fontWeight: 'bold' },
   
   rightCol: { width: '40%' },
-  contactTitle: { fontSize: 11, fontWeight: 'bold', borderBottom: '1px solid #000', paddingBottom: 2, marginBottom: 10 },
+  contactTitle: { fontSize: 10, fontWeight: 'bold', borderBottom: '1px solid #000', paddingBottom: 2, marginBottom: 10 },
   row: { flexDirection: 'row', marginBottom: 3 },
   label: { width: 60, color: '#000' },
   value: { flex: 1 },
@@ -29,7 +29,7 @@ const styles = StyleSheet.create({
   infoSection: { marginTop: 20 },
   
   titleBlock: { marginBottom: 30 },
-  mainTitle: { fontSize: 14, fontWeight: 'bold', marginBottom: 5 },
+  mainTitle: { fontSize: 12, fontWeight: 'bold', marginBottom: 5 },
   
   table: { marginTop: 20 },
   tableHeader: { flexDirection: 'row', borderBottom: '2px solid #000', paddingBottom: 5, marginBottom: 5, fontWeight: 'bold' },
@@ -43,7 +43,7 @@ const styles = StyleSheet.create({
   summarySection: { marginTop: 30, flexDirection: 'row', justifyContent: 'flex-end' },
   summaryTable: { width: 200 },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderBottom: '1px solid #f1f5f9' },
-  totalRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, marginTop: 4, borderBottom: '2px solid #000', fontWeight: 'bold', fontSize: 12 },
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, marginTop: 4, borderBottom: '2px solid #000', fontWeight: 'bold', fontSize: 11 },
   
   taxReasonSection: { marginTop: 10, fontSize: 9, fontStyle: 'italic' },
   returnsNoteSection: { marginTop: 30, fontSize: 9, color: '#000', backgroundColor: '#f9fafb', padding: 12, borderRadius: 4, border: '1px solid #e5e7eb' },
@@ -414,7 +414,7 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
             </Text>
           )}
           
-          <View style={{ flexDirection: 'row', marginTop: 5, fontSize: 9 }}>
+          <View style={{ flexDirection: 'row', marginTop: 5, fontSize: 8 }}>
             {paymentMethod && !isCreditNote && (
               <Text style={{ marginRight: 15 }}>{t.paymentMethod}: {paymentMethod}</Text>
             )}
@@ -456,7 +456,7 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
 
         <View style={styles.summarySection} wrap={false}>
           <View style={{ flex: 1, marginRight: 20 }}>
-            <View style={{ fontSize: 9 }}>
+            <View style={{ fontSize: 8 }}>
               {cancelsInvoiceNumber ? null : (customText !== undefined ? (
                 customText.split('\n').map((line, i) => (
                   <Text key={i} style={{ marginBottom: 2 }}>{line}</Text>

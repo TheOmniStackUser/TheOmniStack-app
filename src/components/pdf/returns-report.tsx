@@ -3,8 +3,8 @@ import { Page, Text, View, Document, StyleSheet } from '@react-pdf/renderer'
 import { format } from 'date-fns'
 
 const styles = StyleSheet.create({
-  page: { padding: 40, fontSize: 10, fontFamily: 'Helvetica' },
-  title: { fontSize: 20, fontWeight: 'bold', marginBottom: 20 },
+  page: { padding: 40, fontSize: 9, fontFamily: 'Helvetica' },
+  title: { fontSize: 18, fontWeight: 'bold', marginBottom: 20 },
   meta: { marginBottom: 30 },
   table: { width: '100%' },
   tableHeader: {

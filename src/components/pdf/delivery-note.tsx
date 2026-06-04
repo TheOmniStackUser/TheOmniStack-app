@@ -8,7 +8,7 @@ const styles = StyleSheet.create({
   page: {
     padding: '40px 50px',
     fontFamily: 'Helvetica',
-    fontSize: 10,
+    fontSize: 9,
     color: '#000',
   },
   header: {
@@ -66,11 +66,11 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   titleLine: {
-    fontSize: 10,
+    fontSize: 9,
     marginBottom: 10,
   },
   mainTitle: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: 'Helvetica-Bold',
   },
   table: {
@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
   colPos: { width: '10%', textAlign: 'right' },
   footerTextSection: {
     marginTop: 30,
-    fontSize: 10,
+    fontSize: 9,
     lineHeight: 1.4,
   },
   pageNumber: {
