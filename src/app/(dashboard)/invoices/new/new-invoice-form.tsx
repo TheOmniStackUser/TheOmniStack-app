@@ -805,8 +805,6 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
               <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Name / Firma</label>
               <input 
                 required 
-                onInvalid={e => (e.target as HTMLInputElement).setCustomValidity('Bitte ausfüllen.')}
-                onInput={e => (e.target as HTMLInputElement).setCustomValidity('')}
                 className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-slate-900" 
                 value={customer.name} 
                 onChange={e => handleSearchCustomers(e.target.value)} 
@@ -895,8 +893,6 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
               <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Straße & Hausnummer</label>
               <input 
                 required 
-                onInvalid={e => (e.target as HTMLInputElement).setCustomValidity('Bitte ausfüllen.')}
-                onInput={e => (e.target as HTMLInputElement).setCustomValidity('')}
                 className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-slate-900" 
                 value={customer.street} 
                 onChange={e => setCustomer({ ...customer, street: e.target.value })} 
@@ -907,8 +903,6 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
               <label className="block text-xs font-bold text-slate-600 uppercase mb-2">PLZ</label>
               <input 
                 required 
-                onInvalid={e => (e.target as HTMLInputElement).setCustomValidity('Bitte ausfüllen.')}
-                onInput={e => (e.target as HTMLInputElement).setCustomValidity('')}
                 className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-slate-900" 
                 value={customer.zip} 
                 onChange={e => setCustomer({ ...customer, zip: e.target.value })} 
@@ -919,8 +913,6 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
               <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Ort</label>
               <input 
                 required 
-                onInvalid={e => (e.target as HTMLInputElement).setCustomValidity('Bitte ausfüllen.')}
-                onInput={e => (e.target as HTMLInputElement).setCustomValidity('')}
                 className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-slate-900" 
                 value={customer.city} 
                 onChange={e => setCustomer({ ...customer, city: e.target.value })} 
@@ -1045,8 +1037,6 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
               <label className="block text-xs font-black text-red-600 uppercase mb-2 tracking-widest">Interner Vermerk (Warum wurde die Rechnung bearbeitet?)</label>
               <textarea 
                 required
-                onInvalid={e => (e.target as HTMLTextAreaElement).setCustomValidity('Bitte ausfüllen.')}
-                onInput={e => (e.target as HTMLTextAreaElement).setCustomValidity('')}
                 className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl font-bold text-slate-900 outline-none bg-slate-50/30 focus:border-slate-400 focus:bg-slate-50/50 transition-all placeholder:text-slate-400/50"
                 value={internalNote}
                 onChange={e => setInternalNote(e.target.value)}
@@ -1095,8 +1085,6 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                 <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Bezeichnung</label>
                 <input 
                   required 
-                  onInvalid={e => (e.target as HTMLInputElement).setCustomValidity('Bitte ausfüllen.')}
-                  onInput={e => (e.target as HTMLInputElement).setCustomValidity('')}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-900 text-sm" 
                   value={item.title} 
                   onChange={e => updateItem(index, 'title', e.target.value)} 
@@ -1109,13 +1097,6 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   type="number" 
                   required 
                   min="1" 
-                  onInvalid={e => {
-                    const target = e.target as HTMLInputElement;
-                    if (target.validity.valueMissing) {
-                      target.setCustomValidity('Bitte ausfüllen.');
-                    }
-                  }}
-                  onInput={e => (e.target as HTMLInputElement).setCustomValidity('')}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-900 text-sm" 
                   value={item.quantity} 
                   onChange={e => updateItem(index, 'quantity', parseFloat(e.target.value))} 
@@ -1127,13 +1108,6 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   type="number" 
                   step="0.01" 
                   required 
-                  onInvalid={e => {
-                    const target = e.target as HTMLInputElement;
-                    if (target.validity.valueMissing) {
-                      target.setCustomValidity('Bitte ausfüllen.');
-                    }
-                  }}
-                  onInput={e => (e.target as HTMLInputElement).setCustomValidity('')}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-900 text-sm" 
                   value={item.unitPrice} 
                   onChange={e => updateItem(index, 'unitPrice', parseFloat(e.target.value))} 
