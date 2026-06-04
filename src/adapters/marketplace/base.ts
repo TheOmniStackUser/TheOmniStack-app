@@ -23,6 +23,15 @@ export type MarketplaceAddress = {
   country: string
 }
 
+export type MarketplaceProduct = {
+  marketplaceProductId?: string
+  sku: string
+  title: string
+  price?: number
+  stock?: number
+  rawPayload?: unknown
+}
+
 export type NormalizedOrder = {
   marketplaceOrderId: string
   marketplace: string
@@ -93,4 +102,17 @@ export interface MarketplaceAdapter {
     refundItems: { sku: string; quantity: number }[],
     rawOrderPayload?: unknown
   ): Promise<boolean>
+
+  /**
+   * Fetch products from the marketplace for inventory mapping.
+   */
+  fetchProducts?(companyId: string): Promise<MarketplaceProduct[]>
+
+  /**
+   * Sync inventory and/or prices back to the marketplace.
+   */
+  updateListings?(
+    companyId: string, 
+    updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number }[]
+  ): Promise<void>
 }

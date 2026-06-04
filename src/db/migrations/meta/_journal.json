@@ -92,6 +92,13 @@
       "when": 1780473055251,
       "tag": "0012_red_kylun",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1780582449393,
+      "tag": "0013_rich_silver_sable",
+      "breakpoints": true
     }
   ]
 }

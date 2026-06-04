@@ -13,6 +13,7 @@ export function SidebarNav({ role }: { role: string }) {
     { href: '/delivery-notes', label: 'Lieferscheine' },
     { href: '/quotes', label: 'Angebote' },
     { href: '/returns', label: 'Retouren' },
+    { href: '/products', label: 'Produkte' },
   ]
 
 
