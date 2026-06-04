@@ -91,7 +91,7 @@ export function ImportClient({ marketplaces }: { marketplaces: any[] }) {
         <select
           value={selectedMarketplace}
           onChange={(e) => setSelectedMarketplace(e.target.value)}
-          className="bg-white border border-slate-200 rounded-lg px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/50 outline-none w-48"
+          className={`bg-white border border-slate-200 rounded-lg px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/50 outline-none w-48 ${!selectedMarketplace ? 'text-slate-500' : 'text-slate-900'}`}
         >
           <option value="" disabled>Marktplatz wählen...</option>
           {marketplaces.map(m => (
