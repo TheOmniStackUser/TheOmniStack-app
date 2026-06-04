@@ -279,6 +279,11 @@ export class OttoAdapter implements MarketplaceAdapter {
       if (!response.ok) {
         const errText = await response.text()
         console.error(`[OttoAdapter] Failed to confirm shipment: ${response.status} - ${errText}`)
+        
+        if (errText.includes('POSITION_ITEM_INCLUDED_IN_OTHER_SHIPMENT')) {
+          throw new Error(`Bestellung wurde bereits auf Otto als versendet markiert.`)
+        }
+
         let message = `HTTP ${response.status}`
         try {
           const parsed = JSON.parse(errText)

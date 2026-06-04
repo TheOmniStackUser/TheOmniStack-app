@@ -11,7 +11,7 @@ import { orders, orderItems } from '@/db/schema/orders'
 import { companies } from '@/db/schema/companies'
 import { vatSettings } from '@/db/schema/vat-settings'
 import { auditLog } from '@/lib/audit'
-import { eq, and, desc, isNull, inArray, gte } from 'drizzle-orm'
+import { eq, and, desc, isNull, inArray, gte, sql } from 'drizzle-orm'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { invoices, invoiceItems, invoiceLogs } from '@/db/schema/invoices'
 import { returnsLog, returnedItems } from '@/db/schema/returns'
@@ -1145,12 +1145,35 @@ export async function persistOrders(
 
   for (const order of normalizedOrders) {
     // ── Step 1: Check if order already exists ──────────────────────────────
-    const existingOrder = await db.query.orders.findFirst({
+    let existingOrder = await db.query.orders.findFirst({
       where: and(
         eq(orders.companyId, companyId),
         eq(orders.marketplaceOrderId, order.marketplaceOrderId)
       )
     })
+
+    // Pre-flight check for Otto positionItems to avoid duplicates from v3 -> v4 migration
+    // or splitting anomalies where the same position item might be returned again.
+    if (!existingOrder && order.marketplace === 'otto' && (order.rawPayload as any)?.positionItems?.length > 0) {
+      const positionItems = (order.rawPayload as any).positionItems
+      for (const item of positionItems) {
+        if (!item.positionItemId) continue
+        
+        const duplicate = await db.query.orders.findFirst({
+          where: and(
+            eq(orders.companyId, companyId),
+            eq(orders.marketplace, 'otto'),
+            sql`${orders.rawPayload}->'positionItems' @> ${JSON.stringify([{ positionItemId: item.positionItemId }])}::jsonb`
+          )
+        })
+        
+        if (duplicate) {
+          console.log(`[Worker] Skipping order ${order.marketplaceOrderId} because positionItemId ${item.positionItemId} is already imported in order ${duplicate.marketplaceOrderId}.`)
+          existingOrder = duplicate
+          break
+        }
+      }
+    }
 
     if (existingOrder) {
       // Restore archived order if manual sync
