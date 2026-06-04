@@ -384,6 +384,8 @@ export function OrdersTable({
   const [showDhlModal, setShowDhlModal] = useState(false)
   const [dhlSelections, setDhlSelections] = useState<Record<string, { productCode: string; weight: number }>>({})
 
+  const [deleteModalConfig, setDeleteModalConfig] = useState<{ show: boolean, isBulk: boolean, orderId?: string }>({ show: false, isBulk: false })
+
   // Manual shipping states
   const [showManualShipModal, setShowManualShipModal] = useState<OrderWithItems | null>(null)
   const [manualTrackingNumber, setManualTrackingNumber] = useState('')
@@ -1408,42 +1410,50 @@ export function OrdersTable({
   }
 
   const handleDelete = async (orderId: string) => {
-    if (!confirm('Möchtest du diese Bestellung wirklich löschen?')) return
-    
-    try {
-      const result = await archiveOrderAction(orderId)
-      if (result.error) {
-        showToast(result.error, 'error')
-      } else {
-        showToast(result.message, 'success')
-        setSelectedIds(prev => {
-          const next = new Set(prev)
-          next.delete(orderId)
-          return next
-        })
-      }
-    } catch (e) {
-      showToast('Fehler beim Löschen.', 'error')
-    }
+    setDeleteModalConfig({ show: true, isBulk: false, orderId })
   }
 
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return
-    if (!confirm(`Möchtest du wirklich ${selectedIds.size} Bestellungen löschen?`)) return
-    
-    setIsDeletingBulk(true)
-    try {
-      const result = await archiveOrdersBulkAction(Array.from(selectedIds))
-      if (result.error) {
-        showToast(result.error, 'error')
-      } else {
-        showToast(result.message, 'success')
-        setSelectedIds(new Set())
+    setDeleteModalConfig({ show: true, isBulk: true })
+  }
+
+  const confirmDelete = async () => {
+    if (deleteModalConfig.isBulk) {
+      setIsDeletingBulk(true)
+      try {
+        const result = await archiveOrdersBulkAction(Array.from(selectedIds))
+        if (result.error) {
+          showToast(result.error, 'error')
+        } else {
+          showToast(result.message, 'success')
+          setSelectedIds(new Set())
+        }
+      } catch (e) {
+        showToast('Fehler: ' + (e instanceof Error ? e.message : String(e)), 'error')
+      } finally {
+        setIsDeletingBulk(false)
+        setDeleteModalConfig({ show: false, isBulk: false })
       }
-    } catch (e) {
-      showToast('Fehler: ' + (e instanceof Error ? e.message : String(e)), 'error')
-    } finally {
-      setIsDeletingBulk(false)
+    } else {
+      if (!deleteModalConfig.orderId) return
+      try {
+        const result = await archiveOrderAction(deleteModalConfig.orderId)
+        if (result.error) {
+          showToast(result.error, 'error')
+        } else {
+          showToast(result.message, 'success')
+          setSelectedIds(prev => {
+            const next = new Set(prev)
+            next.delete(deleteModalConfig.orderId!)
+            return next
+          })
+        }
+      } catch (e) {
+        showToast('Fehler beim Löschen.', 'error')
+      } finally {
+        setDeleteModalConfig({ show: false, isBulk: false })
+      }
     }
   }
 
@@ -2937,6 +2947,52 @@ export function OrdersTable({
                 className="flex-1 py-4 bg-blue-600 text-white font-black rounded-2xl hover:bg-blue-700 shadow-xl shadow-blue-600/30 transition-all transform active:scale-[0.98]"
               >
                 Labels erstellen ({Object.keys(hermesSelections).length})
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteModalConfig.show && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => !isDeletingBulk && setDeleteModalConfig({ show: false, isBulk: false })}></div>
+          <div className="relative bg-white rounded-2xl p-6 shadow-2xl w-full max-w-md border border-slate-200 flex flex-col">
+            <div className="mb-6 flex flex-col items-center text-center">
+              <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mb-4">
+                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-2">
+                Bestellung{deleteModalConfig.isBulk ? 'en' : ''} löschen?
+              </h3>
+              <p className="text-slate-500 text-sm">
+                Möchtest du wirklich {deleteModalConfig.isBulk ? `${selectedIds.size} Bestellungen` : 'diese Bestellung'} unwiderruflich löschen? Diese Aktion kann nicht rückgängig gemacht werden.
+              </p>
+            </div>
+            
+            <div className="flex gap-3 justify-end mt-4">
+              <button
+                onClick={() => setDeleteModalConfig({ show: false, isBulk: false })}
+                disabled={isDeletingBulk}
+                className="flex-1 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors disabled:opacity-50"
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={isDeletingBulk}
+                className="flex-1 flex justify-center items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-colors shadow-sm shadow-red-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isDeletingBulk ? (
+                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : (
+                  'Ja, löschen'
+                )}
               </button>
             </div>
           </div>
