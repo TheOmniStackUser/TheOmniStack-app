@@ -1340,7 +1340,7 @@ export async function persistOrders(
       // 2. Trigger pushUpdatesToMarketplaces for the updated stock
       const updates = order.items
         .filter(i => i.sku && i.sku !== 'N/A' && i.sku !== 'UNKNOWN')
-        .map(i => ({ sku: i.sku }))
+        .map(i => ({ sku: i.sku as string }))
 
       if (updates.length > 0) {
         // Fetch current stock from db to pass to pushUpdatesToMarketplaces
