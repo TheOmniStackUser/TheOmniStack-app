@@ -33,4 +33,16 @@ export class EbayAdapter implements MarketplaceAdapter {
     console.log(`[EbayAdapter] Simulating refund for order ${marketplaceOrderId}:`, refundItems)
     return true
   }
+
+  async fetchProducts(companyId: string): Promise<import('./base').MarketplaceProduct[]> {
+    console.log(`[EbayAdapter] Fetching products for company ${companyId}... (Stubbed)`)
+    return []
+  }
+
+  async updateListings(
+    companyId: string, 
+    updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number }[]
+  ): Promise<void> {
+    console.log(`[EbayAdapter] Simulating update listings for company ${companyId}:`, updates)
+  }
 }

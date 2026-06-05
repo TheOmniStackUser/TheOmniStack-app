@@ -12,6 +12,7 @@ export type MarketplaceSyncSettings = {
   syncPrice: boolean
   priceModifierType: 'none' | 'percentage' | 'fixed'
   priceModifierValue: number
+  syncIntervalHours?: number // Default is 1 if not provided
 }
 
 export async function updateMarketplaceSyncSettings(
@@ -49,5 +50,38 @@ export async function updateMarketplaceSyncSettings(
     .where(eq(marketplaceIntegrations.id, integrationId))
 
   revalidatePath('/products/settings')
+  return { success: true }
+}
+
+export async function triggerProductImport(integrationId: string) {
+  const auth = await requireAuth()
+
+  // Verify the integration belongs to the company
+  const [integration] = await db
+    .select()
+    .from(marketplaceIntegrations)
+    .where(
+      and(
+        eq(marketplaceIntegrations.id, integrationId),
+        eq(marketplaceIntegrations.companyId, auth.activeCompanyId)
+      )
+    )
+    .limit(1)
+
+  if (!integration) {
+    throw new Error('Integration nicht gefunden.')
+  }
+
+  // Import sync function dynamically or statically
+  const { syncProductsForCompany } = await import('@/workers/product-sync')
+  
+  // Fire and forget - don't await the full sync to avoid timeout on UI
+  syncProductsForCompany(auth.activeCompanyId, integrationId).catch(err => {
+    console.error(`[ProductsAction] Background sync failed for integration ${integrationId}:`, err)
+  })
+
+  // To let the user see new products, we revalidate the import page
+  revalidatePath('/products/import')
+
   return { success: true }
 }

@@ -170,4 +170,112 @@ export class AmazonAdapter implements MarketplaceAdapter {
       return false
     }
   }
+
+  /**
+   * Fetch products from Amazon SP-API
+   */
+  async fetchProducts(companyId: string): Promise<import('./base').MarketplaceProduct[]> {
+    try {
+      console.log(`[AmazonAdapter] Fetching access token...`)
+      const accessToken = await this.getAccessToken()
+
+      // SP-API doesn't have a simple "get all listings" endpoint without using Reports API.
+      // We'll simulate fetching from catalog/listings using the Catalog Items API v2022-04-01 
+      // with a generic search, or using the Reports API in a real scenario.
+      // For this implementation, we simulate fetching items via Catalog API.
+      const catalogUrl = `${this.baseUrl}/catalog/2022-04-01/items?marketplaceIds=${this.marketplaceId}&sellerId=${this.config.sellerId}`
+      
+      console.log(`[AmazonAdapter] Fetching products via GET ${catalogUrl}...`)
+      const response = await fetch(catalogUrl, {
+        headers: {
+          'x-amz-access-token': accessToken,
+          'Accept': 'application/json'
+        }
+      })
+
+      if (!response.ok) {
+        const err = await response.text()
+        console.error(`[AmazonAdapter] Amazon Catalog API Error: ${err}`)
+        // Return empty array for now instead of throwing if we don't have catalog access
+        return []
+      }
+
+      const data = await response.json()
+      const items = data.items || []
+
+      return items.map((item: any) => ({
+        marketplaceProductId: item.asin,
+        sku: item.identifiers?.[0]?.identifiers?.find((i: any) => i.identifierType === 'SKU')?.identifier || item.asin,
+        title: item.summaries?.[0]?.itemName || item.asin,
+        price: item.offers?.[0]?.price?.amount || 0,
+        stock: item.offers?.[0]?.quantity || 0,
+        rawPayload: item
+      }))
+    } catch (error: any) {
+      console.error(`[AmazonAdapter] Error fetching products:`, error)
+      throw error
+    }
+  }
+
+  /**
+   * Sync inventory and/or prices back to Amazon SP-API.
+   */
+  async updateListings(
+    companyId: string, 
+    updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number }[]
+  ): Promise<void> {
+    if (!updates || updates.length === 0) return
+
+    try {
+      const accessToken = await this.getAccessToken()
+
+      for (const update of updates) {
+        // Use Listings Items API v2021-08-01 for patching stock/price
+        const sku = encodeURIComponent(update.sku)
+        const patchUrl = `${this.baseUrl}/listings/2021-08-01/items/${this.config.sellerId}/${sku}?marketplaceIds=${this.marketplaceId}`
+        
+        const patches: any[] = []
+        if (update.stock !== undefined) {
+          patches.push({
+            op: 'replace',
+            path: '/attributes/fulfillment_availability',
+            value: [{ fulfillment_channel_code: 'DEFAULT', quantity: update.stock }]
+          })
+        }
+        if (update.price !== undefined) {
+          patches.push({
+            op: 'replace',
+            path: '/attributes/purchasable_offer',
+            value: [{ currency: 'EUR', our_price: [{ schedule: [{ value_with_tax: update.price }] }] }]
+          })
+        }
+
+        if (patches.length === 0) continue
+
+        console.log(`[AmazonAdapter] Patching listing ${sku} via PATCH ${patchUrl}...`)
+        const response = await fetch(patchUrl, {
+          method: 'PATCH',
+          headers: {
+            'x-amz-access-token': accessToken,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            productType: 'PRODUCT',
+            patches
+          })
+        })
+
+        if (!response.ok) {
+          const errText = await response.text()
+          console.error(`[AmazonAdapter] Update listing failed for ${sku}: ${errText}`)
+        } else {
+          console.log(`[AmazonAdapter] Successfully updated listing ${sku}.`)
+        }
+      }
+    } catch (error) {
+      console.error(`[AmazonAdapter] Error updating listings:`, error)
+      throw error
+    }
+  }
 }

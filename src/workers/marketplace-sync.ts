@@ -15,6 +15,8 @@ import { eq, and, desc, isNull, inArray, gte, sql } from 'drizzle-orm'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { invoices, invoiceItems, invoiceLogs } from '@/db/schema/invoices'
 import { returnsLog, returnedItems } from '@/db/schema/returns'
+import { products } from '@/db/schema/products'
+import { pushUpdatesToMarketplaces } from '@/workers/product-sync'
 import { buildInvoiceKey, buildDeliveryNoteKey, documentExists, uploadDocument } from '@/lib/storage'
 import { OttoAdapter } from '@/adapters/marketplace/otto'
 import { MiraklAdapter } from '@/adapters/marketplace/mirakl'
@@ -1315,6 +1317,17 @@ export async function persistOrders(
             }
           })
         )
+        
+        // Deduct stock for each item
+        for (const item of order.items) {
+          if (!item.sku || item.sku === 'N/A' || item.sku === 'UNKNOWN') continue;
+          
+          await tx.execute(sql`
+            UPDATE ${products}
+            SET current_stock = current_stock - ${item.quantity}
+            WHERE company_id = ${companyId} AND sku = ${item.sku}
+          `);
+        }
       }
     })
 
@@ -1323,6 +1336,31 @@ export async function persistOrders(
     if (newOrderId) {
       // 1. Always generate or download delivery note
       await generateOrDownloadDeliveryNote(newOrderId, companyId, adapter)
+      
+      // 2. Trigger pushUpdatesToMarketplaces for the updated stock
+      const updates = order.items
+        .filter(i => i.sku && i.sku !== 'N/A' && i.sku !== 'UNKNOWN')
+        .map(i => ({ sku: i.sku }))
+
+      if (updates.length > 0) {
+        // Fetch current stock from db to pass to pushUpdatesToMarketplaces
+        const skus = updates.map(u => u.sku)
+        const updatedProducts = await db
+          .select({ sku: products.sku, currentStock: products.currentStock })
+          .from(products)
+          .where(and(eq(products.companyId, companyId), inArray(products.sku, skus)))
+
+        const stockUpdates = updatedProducts.map(p => ({
+          sku: p.sku,
+          stock: parseFloat(p.currentStock?.toString() || '0')
+        }))
+
+        if (stockUpdates.length > 0) {
+          await pushUpdatesToMarketplaces(companyId, stockUpdates).catch(e => {
+            console.error(`[Worker] Failed to push stock updates after order ${newOrderId}:`, e)
+          })
+        }
+      }
     }
   }
 

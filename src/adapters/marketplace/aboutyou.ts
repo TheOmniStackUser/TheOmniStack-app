@@ -361,4 +361,16 @@ export class AboutYouAdapter implements MarketplaceAdapter {
       throw error
     }
   }
+
+  async fetchProducts(companyId: string): Promise<import('./base').MarketplaceProduct[]> {
+    console.log(`[AboutYouAdapter] Fetching products for company ${companyId}... (Stubbed)`)
+    return []
+  }
+
+  async updateListings(
+    companyId: string, 
+    updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number }[]
+  ): Promise<void> {
+    console.log(`[AboutYouAdapter] Simulating update listings for company ${companyId}:`, updates)
+  }
 }

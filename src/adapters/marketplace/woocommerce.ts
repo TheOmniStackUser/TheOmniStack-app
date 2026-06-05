@@ -298,4 +298,135 @@ export class WooCommerceAdapter implements MarketplaceAdapter {
       return false
     }
   }
+
+  async fetchProducts(companyId: string): Promise<import('./base').MarketplaceProduct[]> {
+    try {
+      console.log(`[WooCommerceAdapter] Fetching products...`)
+      const allProducts: any[] = []
+      let page = 1
+      let totalPages = 1
+
+      do {
+        const url = new URL(`${this.baseUrl}/wp-json/wc/v3/products`)
+        url.searchParams.set('per_page', '100')
+        url.searchParams.set('page', String(page))
+
+        console.log(`[WooCommerceAdapter] Fetching products page ${page}/${totalPages}...`)
+
+        const response = await fetch(url.toString(), {
+          method: 'GET',
+          headers: {
+            'Authorization': this.authHeader,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        })
+
+        if (!response.ok) {
+          const errText = await response.text()
+          throw new Error(`[WooCommerceAdapter] API error ${response.status}: ${errText}`)
+        }
+
+        const rawProducts: any[] = await response.json()
+        allProducts.push(...rawProducts)
+
+        const totalPagesHeader = response.headers.get('X-WP-TotalPages')
+        if (totalPagesHeader) {
+          totalPages = parseInt(totalPagesHeader, 10) || 1
+        }
+
+        page++
+      } while (page <= totalPages)
+
+      console.log(`[WooCommerceAdapter] Fetched ${allProducts.length} products total.`)
+
+      const results: import('./base').MarketplaceProduct[] = []
+      for (const p of allProducts) {
+        if (p.type === 'variable') {
+          // If variable, we might need to fetch variations, but WooCommerce v3 includes variations in separate endpoint.
+          // For simplicity, we just add the parent if it has a SKU, but usually variations have the SKUs.
+          // In a real app we'd fetch /wp-json/wc/v3/products/{id}/variations
+          if (p.sku) {
+            results.push({
+              marketplaceProductId: p.id.toString(),
+              sku: p.sku,
+              title: p.name,
+              price: parseFloat(p.price || '0'),
+              stock: p.stock_quantity || 0,
+              rawPayload: p
+            })
+          }
+        } else {
+          results.push({
+            marketplaceProductId: p.id.toString(),
+            sku: p.sku || p.id.toString(),
+            title: p.name,
+            price: parseFloat(p.price || '0'),
+            stock: p.stock_quantity || 0,
+            rawPayload: p
+          })
+        }
+      }
+
+      return results
+    } catch (error) {
+      console.error(`[WooCommerceAdapter] Error fetching products:`, error)
+      throw error
+    }
+  }
+
+  async updateListings(
+    companyId: string, 
+    updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number }[]
+  ): Promise<void> {
+    if (!updates || updates.length === 0) return
+
+    try {
+      // Use WooCommerce Batch API
+      const url = `${this.baseUrl}/wp-json/wc/v3/products/batch`
+      
+      const batchUpdates = updates.map(u => {
+        const updateObj: any = { id: parseInt(u.marketplaceProductId || '0', 10) }
+        if (u.stock !== undefined) {
+          updateObj.manage_stock = true
+          updateObj.stock_quantity = u.stock
+        }
+        if (u.price !== undefined) {
+          updateObj.regular_price = String(u.price)
+        }
+        return updateObj
+      }).filter(u => u.id > 0)
+
+      if (batchUpdates.length === 0) {
+        console.warn(`[WooCommerceAdapter] No valid product IDs provided for update.`)
+        return
+      }
+
+      console.log(`[WooCommerceAdapter] Updating ${batchUpdates.length} products via batch...`)
+
+      // API allows max 100 per batch
+      for (let i = 0; i < batchUpdates.length; i += 100) {
+        const chunk = batchUpdates.slice(i, i + 100)
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': this.authHeader,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify({ update: chunk })
+        })
+
+        if (!response.ok) {
+          const errText = await response.text()
+          console.error(`[WooCommerceAdapter] Update products batch failed: ${errText}`)
+        }
+      }
+
+      console.log(`[WooCommerceAdapter] Listings successfully updated.`)
+    } catch (error) {
+      console.error(`[WooCommerceAdapter] Error updating listings:`, error)
+      throw error
+    }
+  }
 }

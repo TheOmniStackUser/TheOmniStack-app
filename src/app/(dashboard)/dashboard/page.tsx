@@ -48,6 +48,26 @@ export default async function DashboardPage() {
       )
     )
 
+  // Orders status breakdown
+  const orderStats = await db
+    .select({
+      status: orders.status,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(orders)
+    .where(
+      and(
+        eq(orders.companyId, auth.activeCompanyId),
+        eq(orders.isArchived, false)
+      )
+    )
+    .groupBy(orders.status)
+
+  const pendingCount = orderStats.find(s => s.status === 'pending' || s.status === 'invoiced')?.count || 0
+  const laterShipmentCount = orderStats.find(s => s.status === 'later_shipment')?.count || 0
+  const shippedCount = orderStats.find(s => s.status === 'shipped')?.count || 0
+  const cancelledCount = orderStats.find(s => s.status === 'cancelled')?.count || 0
+
   const [invoicesStats] = await db
     .select({
       monthCount: sql<number>`count(case when coalesce(${invoices.issuedAt}, ${invoices.createdAt}) >= ${startOfMonth.toISOString()} then 1 end)::int`,
@@ -136,13 +156,42 @@ export default async function DashboardPage() {
         </div>
       </header>
 
+      {/* Orders Breakdown */}
+      <section className="space-y-6">
+        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2">
+          Bestellungen Übersicht
+        </h3>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <Link href="/orders" className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all">
+            <span className="text-sm font-medium text-gray-500">Gesamt</span>
+            <span className="text-2xl font-bold text-gray-900 mt-1">{totalOrdersCount}</span>
+          </Link>
+          <Link href="/orders" className="bg-white border border-yellow-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-yellow-300 hover:shadow-md transition-all">
+            <span className="text-sm font-medium text-yellow-700">Pending</span>
+            <span className="text-2xl font-bold text-yellow-600 mt-1">{pendingCount}</span>
+          </Link>
+          <Link href="/orders" className="bg-white border border-purple-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-purple-300 hover:shadow-md transition-all">
+            <span className="text-sm font-medium text-purple-700">Späterer Versand</span>
+            <span className="text-2xl font-bold text-purple-600 mt-1">{laterShipmentCount}</span>
+          </Link>
+          <Link href="/orders" className="bg-white border border-green-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-green-300 hover:shadow-md transition-all">
+            <span className="text-sm font-medium text-green-700">Versendet</span>
+            <span className="text-2xl font-bold text-green-600 mt-1">{shippedCount}</span>
+          </Link>
+          <Link href="/orders" className="bg-white border border-red-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-red-300 hover:shadow-md transition-all">
+            <span className="text-sm font-medium text-red-700">Storniert</span>
+            <span className="text-2xl font-bold text-red-600 mt-1">{cancelledCount}</span>
+          </Link>
+        </div>
+      </section>
+
       {/* Current Month & Active Section */}
       <section className="space-y-6">
         <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2">
-          Aktueller Monat & Offene Posten
+          Aktueller Monat & Finanzen
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
-          <Link href="/orders" className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all group flex flex-col justify-between">
+          <Link href="/orders" className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all group flex flex-col justify-between hidden">
             <div>
               <h3 className="text-gray-500 text-sm font-medium uppercase tracking-wider group-hover:text-blue-600 transition-colors">Offene Bestellungen</h3>
               <p className="text-4xl font-bold text-gray-900 mt-3">{openOrdersCount}</p>

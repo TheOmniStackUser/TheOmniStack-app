@@ -896,4 +896,145 @@ export class MiraklAdapter implements MarketplaceAdapter {
       return false
     }
   }
+
+  /**
+   * Fetch products/offers from the marketplace for inventory mapping.
+   * Uses OF21 endpoint: GET /api/offers
+   */
+  async fetchProducts(companyId: string): Promise<import('./base').MarketplaceProduct[]> {
+    try {
+      const token = await this.getAccessToken()
+      const headers: Record<string, string> = {
+        'Accept': 'application/json'
+      }
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      } else {
+        const apiKey = this.config.clientSecret === '' || !this.config.clientSecret 
+          ? this.config.clientId 
+          : this.config.apiKey
+        
+        if (apiKey) {
+          headers['Authorization'] = apiKey
+          headers['X-Mirakl-Api-Key'] = apiKey
+        }
+      }
+
+      const baseUrl = this.config.baseUrl.replace(/\/$/, '')
+      let url = `${baseUrl}/api/offers?max=100`
+      if (this.config.shopId) {
+        url += `&shop_id=${this.config.shopId}`
+      }
+
+      console.log(`[MiraklAdapter:${this.marketplace}] Fetching offers via GET ${url}...`)
+      
+      let allOffers: any[] = []
+      let offset = 0
+      let hasMore = true
+
+      while (hasMore) {
+        const pagedUrl = `${url}&offset=${offset}`
+        const response = await fetch(pagedUrl, { method: 'GET', headers })
+
+        if (!response.ok) {
+          const errText = await response.text()
+          console.error(`[MiraklAdapter:${this.marketplace}] Fetch offers failed (${response.status}): ${errText}`)
+          throw new Error(`Mirakl API offers failed with status ${response.status}`)
+        }
+
+        const data = await response.json()
+        const offers = data.offers || []
+        allOffers = allOffers.concat(offers)
+
+        if (offers.length < 100) {
+          hasMore = false
+        } else {
+          offset += 100
+        }
+      }
+
+      console.log(`[MiraklAdapter:${this.marketplace}] Fetched ${allOffers.length} offers total.`)
+
+      return allOffers.map(offer => ({
+        marketplaceProductId: offer.offer_id,
+        sku: offer.shop_sku,
+        title: offer.product_title || offer.shop_sku,
+        price: offer.price,
+        stock: offer.quantity,
+        rawPayload: offer
+      }))
+    } catch (error) {
+      console.error(`[MiraklAdapter:${this.marketplace}] Error fetching products:`, error)
+      throw error
+    }
+  }
+
+  /**
+   * Sync inventory and/or prices back to the marketplace.
+   * Uses OF01 endpoint: POST /api/offers
+   */
+  async updateListings(
+    companyId: string, 
+    updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number }[]
+  ): Promise<void> {
+    if (!updates || updates.length === 0) return
+
+    try {
+      const token = await this.getAccessToken()
+      const headers: Record<string, string> = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      } else {
+        const apiKey = this.config.clientSecret === '' || !this.config.clientSecret 
+          ? this.config.clientId 
+          : this.config.apiKey
+        
+        if (apiKey) {
+          headers['Authorization'] = apiKey
+          headers['X-Mirakl-Api-Key'] = apiKey
+        }
+      }
+
+      const baseUrl = this.config.baseUrl.replace(/\/$/, '')
+      let url = `${baseUrl}/api/offers`
+      if (this.config.shopId) {
+        url += `?shop_id=${this.config.shopId}`
+      }
+
+      // Format payload for Mirakl OF01
+      const offers = updates.map(update => {
+        const offer: any = {
+          shop_sku: update.sku,
+          update_delete: 'update'
+        }
+        if (update.stock !== undefined) offer.quantity = update.stock
+        if (update.price !== undefined) offer.price = update.price
+        return offer
+      })
+
+      console.log(`[MiraklAdapter:${this.marketplace}] Updating ${offers.length} offers via POST ${url}...`)
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ offers })
+      })
+
+      if (!response.ok) {
+        const errText = await response.text()
+        console.error(`[MiraklAdapter:${this.marketplace}] Update offers failed (${response.status}): ${errText}`)
+        throw new Error(`Mirakl API offer update failed: ${errText}`)
+      }
+
+      console.log(`[MiraklAdapter:${this.marketplace}] Offers successfully updated.`)
+    } catch (error) {
+      console.error(`[MiraklAdapter:${this.marketplace}] Error updating listings:`, error)
+      throw error
+    }
+  }
 }

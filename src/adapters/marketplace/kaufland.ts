@@ -392,4 +392,84 @@ export class KauflandAdapter implements MarketplaceAdapter {
       return false
     }
   }
+
+  async fetchProducts(companyId: string): Promise<import('./base').MarketplaceProduct[]> {
+    try {
+      console.log(`[KauflandAdapter] Fetching products...`)
+      
+      const allUnits: any[] = []
+      let offset = 0
+      const limit = 100
+      let hasMore = true
+
+      while (hasMore) {
+        console.log(`[KauflandAdapter] Fetching units with offset ${offset}...`)
+        
+        const response = await this.makeRequest('GET', '/units', '', {
+          limit: limit.toString(),
+          offset: offset.toString()
+        })
+        
+        const data = response.data || []
+        allUnits.push(...data)
+
+        const total = response.pagination?.total ?? 0
+        offset += limit
+
+        if (offset >= total || data.length === 0) {
+          hasMore = false
+        }
+      }
+
+      console.log(`[KauflandAdapter] Fetched ${allUnits.length} units total.`)
+
+      return allUnits.map(unit => ({
+        marketplaceProductId: String(unit.id_unit),
+        sku: unit.id_offer || String(unit.id_unit),
+        title: unit.item_title || unit.id_offer,
+        price: (unit.price || 0) / 100, // Price is in cents
+        stock: unit.amount || 0,
+        rawPayload: unit
+      }))
+    } catch (error) {
+      console.error(`[KauflandAdapter] Error fetching products:`, error)
+      throw error
+    }
+  }
+
+  async updateListings(
+    companyId: string, 
+    updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number }[]
+  ): Promise<void> {
+    if (!updates || updates.length === 0) return
+
+    try {
+      console.log(`[KauflandAdapter] Updating ${updates.length} products...`)
+
+      // Updates in Kaufland are typically done by patching the unit via /units/{id_unit}
+      for (const update of updates) {
+        if (!update.marketplaceProductId) continue
+
+        const idUnit = update.marketplaceProductId
+        const patchBody: any = {}
+
+        if (update.stock !== undefined) {
+          patchBody.amount = update.stock
+        }
+
+        if (update.price !== undefined) {
+          patchBody.price = Math.round(update.price * 100) // Price is in cents
+        }
+
+        if (Object.keys(patchBody).length === 0) continue
+
+        await this.makeRequest('PATCH', `/units/${idUnit}`, JSON.stringify(patchBody))
+      }
+
+      console.log(`[KauflandAdapter] Listings successfully updated.`)
+    } catch (error) {
+      console.error(`[KauflandAdapter] Error updating listings:`, error)
+      throw error
+    }
+  }
 }

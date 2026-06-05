@@ -451,4 +451,129 @@ export class OttoAdapter implements MarketplaceAdapter {
       return false
     }
   }
+
+  /**
+   * Fetch products from Otto Partner API
+   */
+  async fetchProducts(companyId: string): Promise<import('./base').MarketplaceProduct[]> {
+    try {
+      const accessToken = await this.getAccessToken()
+      const allProducts: any[] = []
+      
+      let nextUrl: string | null = `${this.baseUrl}/v3/products?limit=100`
+
+      while (nextUrl) {
+        console.log(`[OttoAdapter] Fetching products page: ${nextUrl}`)
+        const response: Response = await fetch(nextUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json'
+          }
+        })
+
+        if (!response.ok) {
+          const errText = await response.text()
+          throw new Error(`Otto API fetchProducts failed: ${response.status} - ${errText}`)
+        }
+
+        const data = await response.json()
+        const products = data.resources || []
+        allProducts.push(...products)
+
+        const nextLink = (data.links || []).find((l: any) => l.rel === 'next')
+        if (nextLink && nextLink.href) {
+          nextUrl = nextLink.href.startsWith('http') ? nextLink.href : `${this.baseUrl}${nextLink.href}`
+        } else {
+          nextUrl = null
+        }
+      }
+
+      // We might need to fetch quantities separately, but for unmapped listing, 
+      // just returning the SKU and title is enough for mapping.
+      // We will attempt to get price from standard price object.
+      return allProducts.map((p: any) => ({
+        marketplaceProductId: p.sku,
+        sku: p.sku,
+        title: p.productTitle || p.sku,
+        price: p.standardPrice?.amount,
+        rawPayload: p
+      }))
+    } catch (error) {
+      console.error(`[OttoAdapter] Error fetching products:`, error)
+      throw error
+    }
+  }
+
+  /**
+   * Sync inventory and/or prices back to Otto.
+   */
+  async updateListings(
+    companyId: string, 
+    updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number }[]
+  ): Promise<void> {
+    if (!updates || updates.length === 0) return
+
+    try {
+      const accessToken = await this.getAccessToken()
+
+      const stockUpdates = updates.filter(u => u.stock !== undefined).map(u => ({
+        sku: u.sku,
+        quantity: u.stock
+      }))
+
+      if (stockUpdates.length > 0) {
+        console.log(`[OttoAdapter] Updating ${stockUpdates.length} quantities via POST /v3/quantities...`)
+        const qRes = await fetch(`${this.baseUrl}/v3/quantities`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify(stockUpdates)
+        })
+
+        if (!qRes.ok) {
+          const errText = await qRes.text()
+          console.error(`[OttoAdapter] Update quantities failed: ${errText}`)
+        }
+      }
+
+      // Price updates on Otto are typically done via POST /v3/products
+      // But patching prices for existing active products can be complex.
+      // We will assume a basic structure. If it fails, the user needs
+      // to adjust mapping or use the Otto UI.
+      const priceUpdates = updates.filter(u => u.price !== undefined).map(u => ({
+        sku: u.sku,
+        standardPrice: {
+          amount: u.price,
+          currency: 'EUR'
+        }
+      }))
+
+      if (priceUpdates.length > 0) {
+        console.log(`[OttoAdapter] Updating ${priceUpdates.length} prices via POST /v3/products...`)
+        const pRes = await fetch(`${this.baseUrl}/v3/products`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify(priceUpdates)
+        })
+
+        if (!pRes.ok) {
+          const errText = await pRes.text()
+          console.error(`[OttoAdapter] Update prices failed: ${errText}`)
+        }
+      }
+
+      console.log(`[OttoAdapter] Listings successfully updated.`)
+    } catch (error) {
+      console.error(`[OttoAdapter] Error updating listings:`, error)
+      throw error
+    }
+  }
 }

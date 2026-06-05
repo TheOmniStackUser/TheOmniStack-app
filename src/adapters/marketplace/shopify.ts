@@ -384,4 +384,212 @@ export class ShopifyAdapter implements MarketplaceAdapter {
       return false
     }
   }
+
+  async fetchProducts(companyId: string): Promise<import('./base').MarketplaceProduct[]> {
+    try {
+      const [integration] = await db
+        .select()
+        .from(marketplaceIntegrations)
+        .where(
+          and(
+            eq(marketplaceIntegrations.companyId, companyId),
+            eq(marketplaceIntegrations.type, 'shopify'),
+            eq(marketplaceIntegrations.isActive, true)
+          )
+        )
+        .limit(1)
+
+      if (!integration || !integration.environment || !integration.clientId || !integration.clientSecret) {
+        console.warn(`[Shopify] No active credentials found for company ${companyId}`)
+        return []
+      }
+
+      let shopUrl = integration.environment
+      if (!shopUrl.startsWith('http')) shopUrl = `https://${shopUrl}`
+      shopUrl = shopUrl.replace(/\/$/, '')
+
+      const tokenRes = await fetch(`${shopUrl}/admin/oauth/access_token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_id: integration.clientId,
+          client_secret: integration.clientSecret,
+          grant_type: 'client_credentials'
+        })
+      })
+
+      let accessToken = ''
+      if (tokenRes.ok) {
+        const data = await tokenRes.json()
+        accessToken = data.access_token
+      } else if (integration.clientSecret.startsWith('shpat_')) {
+        accessToken = integration.clientSecret
+      } else {
+        const errText = await tokenRes.text()
+        throw new Error(`Shopify Auth Fehler: ${tokenRes.status} - ${errText}`)
+      }
+
+      const headers = {
+        'X-Shopify-Access-Token': accessToken,
+        'Content-Type': 'application/json',
+      }
+
+      let productsUrl: string | null = `${shopUrl}/admin/api/2024-01/products.json?limit=250`
+      const allProducts: any[] = []
+
+      while (productsUrl) {
+        console.log(`[Shopify] Fetching products via GET ${productsUrl}...`)
+        const response: Response = await fetch(productsUrl, { headers })
+
+        if (!response.ok) {
+          const errText = await response.text()
+          throw new Error(`Shopify API fetchProducts failed: ${response.status} - ${errText}`)
+        }
+
+        const data = await response.json()
+        allProducts.push(...(data.products || []))
+
+        const linkHeader = response.headers.get('link')
+        productsUrl = null
+        if (linkHeader) {
+          const links = linkHeader.split(',')
+          const nextLink = links.find(l => l.includes('rel="next"'))
+          if (nextLink) {
+            const match = nextLink.match(/<([^>]+)>/)
+            if (match) {
+              productsUrl = match[1]
+            }
+          }
+        }
+      }
+
+      const results: import('./base').MarketplaceProduct[] = []
+      for (const product of allProducts) {
+        for (const variant of product.variants || []) {
+          results.push({
+            marketplaceProductId: variant.id.toString(), // Shopify Variant ID
+            sku: variant.sku || variant.id.toString(),
+            title: `${product.title} ${variant.title !== 'Default Title' ? variant.title : ''}`.trim(),
+            price: parseFloat(variant.price || '0'),
+            stock: variant.inventory_quantity || 0,
+            rawPayload: { product, variant }
+          })
+        }
+      }
+
+      return results
+    } catch (error) {
+      console.error(`[Shopify] Error fetching products:`, error)
+      throw error
+    }
+  }
+
+  async updateListings(
+    companyId: string, 
+    updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number }[]
+  ): Promise<void> {
+    if (!updates || updates.length === 0) return
+
+    try {
+      const [integration] = await db
+        .select()
+        .from(marketplaceIntegrations)
+        .where(
+          and(
+            eq(marketplaceIntegrations.companyId, companyId),
+            eq(marketplaceIntegrations.type, 'shopify'),
+            eq(marketplaceIntegrations.isActive, true)
+          )
+        )
+        .limit(1)
+
+      if (!integration || !integration.environment || !integration.clientId || !integration.clientSecret) {
+        console.warn(`[Shopify] No active credentials found for company ${companyId}`)
+        return
+      }
+
+      let shopUrl = integration.environment
+      if (!shopUrl.startsWith('http')) shopUrl = `https://${shopUrl}`
+      shopUrl = shopUrl.replace(/\/$/, '')
+
+      const tokenRes = await fetch(`${shopUrl}/admin/oauth/access_token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_id: integration.clientId,
+          client_secret: integration.clientSecret,
+          grant_type: 'client_credentials'
+        })
+      })
+
+      let accessToken = ''
+      if (tokenRes.ok) {
+        const data = await tokenRes.json()
+        accessToken = data.access_token
+      } else if (integration.clientSecret.startsWith('shpat_')) {
+        accessToken = integration.clientSecret
+      } else {
+        const errText = await tokenRes.text()
+        throw new Error(`Shopify Auth Fehler: ${tokenRes.status} - ${errText}`)
+      }
+
+      const headers = {
+        'X-Shopify-Access-Token': accessToken,
+        'Content-Type': 'application/json',
+      }
+
+      // We need location_id for inventory updates
+      const locRes = await fetch(`${shopUrl}/admin/api/2024-01/locations.json`, { headers })
+      let locationId = ''
+      if (locRes.ok) {
+        const locData = await locRes.json()
+        locationId = locData.locations?.[0]?.id?.toString() || ''
+      }
+
+      for (const update of updates) {
+        // Find variant ID if not provided, though we expect it in marketplaceProductId
+        let variantId = update.marketplaceProductId
+        let inventoryItemId = ''
+
+        if (variantId) {
+          // Update Price
+          if (update.price !== undefined) {
+            const variantPayload = { variant: { id: variantId, price: update.price } }
+            await fetch(`${shopUrl}/admin/api/2024-01/variants/${variantId}.json`, {
+              method: 'PUT',
+              headers,
+              body: JSON.stringify(variantPayload)
+            })
+          }
+
+          // If we need to update stock, we need the inventory_item_id
+          if (update.stock !== undefined && locationId) {
+            const vRes = await fetch(`${shopUrl}/admin/api/2024-01/variants/${variantId}.json`, { headers })
+            if (vRes.ok) {
+              const vData = await vRes.json()
+              inventoryItemId = vData.variant?.inventory_item_id
+            }
+
+            if (inventoryItemId) {
+              const invPayload = {
+                location_id: locationId,
+                inventory_item_id: inventoryItemId,
+                available: update.stock
+              }
+              await fetch(`${shopUrl}/admin/api/2024-01/inventory_levels/set.json`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(invPayload)
+              })
+            }
+          }
+        }
+      }
+
+      console.log(`[Shopify] Listings successfully updated.`)
+    } catch (error) {
+      console.error(`[Shopify] Error updating listings:`, error)
+      throw error
+    }
+  }
 }

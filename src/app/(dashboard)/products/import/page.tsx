@@ -1,6 +1,7 @@
 import { requireAuth } from '@/lib/session'
 import { db } from '@/db/client'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
+import { unmappedMarketplaceProducts } from '@/db/schema/products'
 import { eq, and } from 'drizzle-orm'
 import Link from 'next/link'
 import { ArrowLeft, Layers, Database } from 'lucide-react'
@@ -27,9 +28,11 @@ export default async function ProductImportPage() {
   // Filter out shipping providers
   const marketplaces = integrations.filter(i => i.type !== 'dhl' && i.type !== 'hermes')
 
-  // Placeholder for unmapped products fetched from DB or directly from adapter
-  // Set to empty array for now until real import logic is implemented.
-  const unmappedProducts: any[] = []
+  // Fetch unmapped products
+  const unmappedProducts = await db
+    .select()
+    .from(unmappedMarketplaceProducts)
+    .where(eq(unmappedMarketplaceProducts.companyId, auth.activeCompanyId))
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">

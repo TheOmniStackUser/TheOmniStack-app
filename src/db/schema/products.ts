@@ -9,6 +9,7 @@ import {
   unique,
   pgEnum,
   AnyPgColumn,
+  jsonb,
 } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { companies } from './companies'
@@ -96,8 +97,35 @@ export const productMappingsRelations = relations(productMappings, ({ one }) => 
   company: one(companies, { fields: [productMappings.companyId], references: [companies.id] }),
 }))
 
+// ─── Unmapped Marketplace Products ─────────────────────────────────────────────
+// Stores products fetched from a marketplace that have not yet been mapped
+// to a central product or imported as a new central product.
+export const unmappedMarketplaceProducts = pgTable('unmapped_marketplace_products', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  companyId: uuid('company_id')
+    .notNull()
+    .references(() => companies.id, { onDelete: 'cascade' }),
+  
+  marketplace: marketplaceEnum('marketplace').notNull(),
+  marketplaceSku: text('marketplace_sku').notNull(),
+  marketplaceProductId: text('marketplace_product_id'),
+  
+  title: text('title').notNull(),
+  price: numeric('price', { precision: 12, scale: 2 }),
+  stock: numeric('stock', { precision: 10, scale: 0 }),
+  rawPayload: jsonb('raw_payload'),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  unqUnmappedListing: unique('unq_company_marketplace_unmapped_sku').on(t.companyId, t.marketplace, t.marketplaceSku),
+  companyUnmappedIdx: index('unmapped_company_idx').on(t.companyId),
+}))
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type Product = typeof products.$inferSelect
 export type NewProduct = typeof products.$inferInsert
 export type ProductMapping = typeof productMappings.$inferSelect
 export type NewProductMapping = typeof productMappings.$inferInsert
+export type UnmappedMarketplaceProduct = typeof unmappedMarketplaceProducts.$inferSelect
+export type NewUnmappedMarketplaceProduct = typeof unmappedMarketplaceProducts.$inferInsert

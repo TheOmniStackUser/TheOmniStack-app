@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { DownloadCloud, Play, Loader2, CheckCircle2, AlertCircle, X } from 'lucide-react'
 
+import { triggerProductImport } from '@/app/actions/products'
+
 function getMarketplaceName(integration: any) {
   if (integration.type === 'mirakl_custom' && integration.metadata?.customName) {
     return integration.metadata.customName
@@ -32,21 +34,21 @@ export function ImportClient({ marketplaces }: { marketplaces: any[] }) {
   const showNotification = (message: string, description?: string, type: 'success' | 'error' | 'info' = 'info') => {
     setNotification({ message, description, type })
     setTimeout(() => setNotification(null), 8000)
-  }
-
   const handleImport = async () => {
     if (!selectedMarketplace) return
     setIsImporting(true)
     
-    // Placeholder for actual manual import logic
-    // Currently simulates calling the background worker for the specific integration
     const selected = marketplaces.find(m => m.id === selectedMarketplace)
     showNotification('Import gestartet', `Produkte werden im Hintergrund von ${selected ? getMarketplaceName(selected) : 'dem Marktplatz'} abgerufen.`, 'info')
     
-    setTimeout(() => {
+    try {
+      await triggerProductImport(selectedMarketplace)
+      showNotification('Import erfolgreich', 'Der Import-Prozess wurde im Hintergrund gestartet.', 'success')
+    } catch (error: any) {
+      showNotification('Fehler beim Import', error.message || 'Ein unerwarteter Fehler ist aufgetreten.', 'error')
+    } finally {
       setIsImporting(false)
-      showNotification('Import abgeschlossen', 'Neue Produkte stehen nun zur Verfügung.', 'success')
-    }, 2000)
+    }
   }
 
   if (marketplaces.length === 0) {
