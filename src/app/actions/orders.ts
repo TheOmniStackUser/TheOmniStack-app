@@ -110,6 +110,7 @@ export async function updateOrderAddressAction(
     shippingCity: string
     shippingCountry: string
     buyerPhone?: string
+    buyerEmail?: string
   }
 ) {
   try {
@@ -126,6 +127,7 @@ export async function updateOrderAddressAction(
         shippingCity: address.shippingCity,
         shippingCountry: address.shippingCountry,
         buyerPhone: address.buyerPhone,
+        buyerEmail: address.buyerEmail,
         updatedAt: new Date()
       })
       .where(
@@ -460,6 +462,7 @@ export async function updateOrderBillingAddressAction(
     city: string
     country: string
     phone?: string
+    buyerEmail?: string
   }
 ) {
   try {
@@ -523,6 +526,7 @@ export async function updateOrderBillingAddressAction(
       .update(orders)
       .set({
         buyerName: address.buyerName,
+        buyerEmail: address.buyerEmail,
         rawPayload: updatedRaw,
         updatedAt: new Date()
       })

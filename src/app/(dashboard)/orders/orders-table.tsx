@@ -551,29 +551,41 @@ export function OrdersTable({
   // Address editing states
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
+  const [editCompany, setEditCompany] = useState('')
+  const [editAddressAddition, setEditAddressAddition] = useState('')
   const [editStreet, setEditStreet] = useState('')
   const [editZip, setEditZip] = useState('')
   const [editCity, setEditCity] = useState('')
   const [editCountry, setEditCountry] = useState('')
+  const [editEmail, setEditEmail] = useState('')
+  const [editPhone, setEditPhone] = useState('')
   const [isUpdatingAddress, setIsUpdatingAddress] = useState(false)
 
   // Billing Address editing states
   const [editingBillingAddressId, setEditingBillingAddressId] = useState<string | null>(null)
   const [editBillingName, setEditBillingName] = useState('')
+  const [editBillingCompany, setEditBillingCompany] = useState('')
+  const [editBillingAddressAddition, setEditBillingAddressAddition] = useState('')
   const [editBillingStreet, setEditBillingStreet] = useState('')
   const [editBillingZip, setEditBillingZip] = useState('')
   const [editBillingCity, setEditBillingCity] = useState('')
   const [editBillingCountry, setEditBillingCountry] = useState('')
+  const [editBillingEmail, setEditBillingEmail] = useState('')
+  const [editBillingPhone, setEditBillingPhone] = useState('')
   const [isUpdatingBillingAddress, setIsUpdatingBillingAddress] = useState(false)
 
   const startEditingBillingAddress = (order: OrderWithItems) => {
     const addr = getBillingAddress(order)
     setEditingBillingAddressId(order.id)
     setEditBillingName(order.buyerName || order.shippingName || '')
+    setEditBillingCompany(addr?.company || '')
+    setEditBillingAddressAddition(addr?.addressAddition || '')
     setEditBillingStreet(addr?.street || '')
     setEditBillingZip(addr?.zip || '')
     setEditBillingCity(addr?.city || '')
     setEditBillingCountry(addr?.country || 'DE')
+    setEditBillingEmail(order.buyerEmail || '')
+    setEditBillingPhone(addr?.phone || '')
   }
 
   const handleSaveBillingAddress = async (orderId: string) => {
@@ -581,10 +593,14 @@ export function OrdersTable({
     try {
       const result = await updateOrderBillingAddressAction(orderId, {
         buyerName: editBillingName,
+        company: editBillingCompany,
+        addressAddition: editBillingAddressAddition,
         street: editBillingStreet,
         zip: editBillingZip,
         city: editBillingCity,
         country: editBillingCountry,
+        buyerEmail: editBillingEmail,
+        phone: editBillingPhone,
       })
       if (result.error) {
         showToast(result.error, 'error')
@@ -613,10 +629,14 @@ export function OrdersTable({
   const startEditingAddress = (order: OrderWithItems) => {
     setEditingAddressId(order.id)
     setEditName(order.shippingName || '')
+    setEditCompany((order as any).shippingCompany || '')
+    setEditAddressAddition((order as any).shippingAddressAddition || '')
     setEditStreet(order.shippingStreet || '')
     setEditZip(order.shippingZip || '')
     setEditCity(order.shippingCity || '')
     setEditCountry(order.shippingCountry || 'DE')
+    setEditEmail(order.buyerEmail || '')
+    setEditPhone((order as any).buyerPhone || '')
   }
 
   const handleSaveAddress = async (orderId: string) => {
@@ -624,10 +644,14 @@ export function OrdersTable({
     try {
       const result = await updateOrderAddressAction(orderId, {
         shippingName: editName,
+        shippingCompany: editCompany,
+        shippingAddressAddition: editAddressAddition,
         shippingStreet: editStreet,
         shippingZip: editZip,
         shippingCity: editCity,
         shippingCountry: editCountry,
+        buyerEmail: editEmail,
+        buyerPhone: editPhone,
       })
       if (result.error) {
         showToast(result.error, 'error')
@@ -2554,6 +2578,26 @@ export function OrdersTable({
                                             className="w-full text-sm p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
                                           />
                                         </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                          <div>
+                                            <label className="block text-[10px] uppercase font-bold text-gray-400">Firma</label>
+                                            <input 
+                                              type="text" 
+                                              value={editBillingCompany} 
+                                              onChange={(e) => setEditBillingCompany(e.target.value)}
+                                              className="w-full text-sm p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-[10px] uppercase font-bold text-gray-400">Adresszusatz</label>
+                                            <input 
+                                              type="text" 
+                                              value={editBillingAddressAddition} 
+                                              onChange={(e) => setEditBillingAddressAddition(e.target.value)}
+                                              className="w-full text-sm p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                            />
+                                          </div>
+                                        </div>
                                         <div>
                                           <label className="block text-[10px] uppercase font-bold text-gray-400">Straße & Hausnummer</label>
                                           <input 
@@ -2592,6 +2636,26 @@ export function OrdersTable({
                                             maxLength={3}
                                             className="w-full text-sm p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
                                           />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                          <div>
+                                            <label className="block text-[10px] uppercase font-bold text-gray-400">E-Mail</label>
+                                            <input 
+                                              type="email" 
+                                              value={editBillingEmail} 
+                                              onChange={(e) => setEditBillingEmail(e.target.value)}
+                                              className="w-full text-sm p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-[10px] uppercase font-bold text-gray-400">Telefon</label>
+                                            <input 
+                                              type="text" 
+                                              value={editBillingPhone} 
+                                              onChange={(e) => setEditBillingPhone(e.target.value)}
+                                              className="w-full text-sm p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                            />
+                                          </div>
                                         </div>
                                         <div className="flex justify-end gap-2 pt-1">
                                           <button 
