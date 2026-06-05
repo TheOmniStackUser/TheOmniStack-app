@@ -2723,6 +2723,26 @@ export function OrdersTable({
                                           className="w-full text-sm p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
                                         />
                                       </div>
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                          <label className="block text-[10px] uppercase font-bold text-gray-400">Firma</label>
+                                          <input 
+                                            type="text" 
+                                            value={editCompany} 
+                                            onChange={(e) => setEditCompany(e.target.value)}
+                                            className="w-full text-sm p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-[10px] uppercase font-bold text-gray-400">Adresszusatz</label>
+                                          <input 
+                                            type="text" 
+                                            value={editAddressAddition} 
+                                            onChange={(e) => setEditAddressAddition(e.target.value)}
+                                            className="w-full text-sm p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                          />
+                                        </div>
+                                      </div>
                                       <div>
                                         <label className="block text-[10px] uppercase font-bold text-gray-400">Straße & Hausnummer</label>
                                         <input 
@@ -2761,6 +2781,26 @@ export function OrdersTable({
                                           maxLength={3}
                                           className="w-full text-sm p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
                                         />
+                                      </div>
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                          <label className="block text-[10px] uppercase font-bold text-gray-400">E-Mail</label>
+                                          <input 
+                                            type="email" 
+                                            value={editEmail} 
+                                            onChange={(e) => setEditEmail(e.target.value)}
+                                            className="w-full text-sm p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-[10px] uppercase font-bold text-gray-400">Telefon</label>
+                                          <input 
+                                            type="text" 
+                                            value={editPhone} 
+                                            onChange={(e) => setEditPhone(e.target.value)}
+                                            className="w-full text-sm p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                          />
+                                        </div>
                                       </div>
                                       <div className="flex justify-end gap-2 pt-1">
                                         <button 
