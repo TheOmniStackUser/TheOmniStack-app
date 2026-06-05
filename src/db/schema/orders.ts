@@ -38,6 +38,7 @@ export const marketplaceEnum = pgEnum('marketplace', [
   'ebay',
   'woocommerce',
   'shopware',
+  'mirakl_custom',
 ])
 
 // ─── Orders ───────────────────────────────────────────────────────────────────

@@ -46,7 +46,7 @@ export async function syncProductsForCompany(companyId: string, integrationId?: 
           .where(
             and(
               eq(productMappings.companyId, companyId),
-              eq(productMappings.marketplace, adapter.marketplace as any),
+              eq(productMappings.marketplace, integration.type as any),
               eq(productMappings.marketplaceSku, mpProduct.sku)
             )
           )
@@ -74,7 +74,7 @@ export async function syncProductsForCompany(companyId: string, integrationId?: 
             await db.insert(productMappings).values({
               companyId,
               productId: centralProduct.id,
-              marketplace: adapter.marketplace as any,
+              marketplace: integration.type as any,
               marketplaceSku: mpProduct.sku,
               marketplaceProductId: mpProduct.marketplaceProductId,
               syncStock: true,
@@ -85,7 +85,7 @@ export async function syncProductsForCompany(companyId: string, integrationId?: 
             // Upsert into unmapped
             await db.insert(unmappedMarketplaceProducts).values({
               companyId,
-              marketplace: adapter.marketplace as any,
+              marketplace: integration.type as any,
               marketplaceSku: mpProduct.sku,
               marketplaceProductId: mpProduct.marketplaceProductId,
               title: mpProduct.title,
