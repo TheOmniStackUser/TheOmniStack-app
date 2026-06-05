@@ -89,8 +89,8 @@ export async function syncProductsForCompany(companyId: string, integrationId?: 
               marketplaceSku: mpProduct.sku,
               marketplaceProductId: mpProduct.marketplaceProductId,
               title: mpProduct.title,
-              price: mpProduct.price.toString(),
-              stock: mpProduct.stock.toString(),
+              price: mpProduct.price?.toString() || '0',
+              stock: mpProduct.stock?.toString() || '0',
               rawPayload: mpProduct.rawPayload
             }).onConflictDoUpdate({
               target: [
@@ -100,8 +100,8 @@ export async function syncProductsForCompany(companyId: string, integrationId?: 
               ],
               set: {
                 title: mpProduct.title,
-                price: mpProduct.price.toString(),
-                stock: mpProduct.stock.toString(),
+                price: mpProduct.price?.toString() || '0',
+                stock: mpProduct.stock?.toString() || '0',
                 marketplaceProductId: mpProduct.marketplaceProductId,
                 rawPayload: mpProduct.rawPayload,
                 updatedAt: new Date()
