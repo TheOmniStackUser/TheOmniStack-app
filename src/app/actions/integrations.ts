@@ -843,6 +843,8 @@ export async function saveSyncSettingsAction(
             tz: 'Europe/Berlin',
           },
           removeOnComplete: true,
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 5000 },
         }
       )
     }

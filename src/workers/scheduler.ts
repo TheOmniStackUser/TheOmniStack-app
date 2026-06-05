@@ -98,6 +98,8 @@ export async function setupScheduledSyncs() {
           tz: 'Europe/Berlin',
         },
         removeOnComplete: true,
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
       }
     )
     console.log(`   - Scheduled daily sync at ${time} (Europe/Berlin) for company: ${company.name}`)
