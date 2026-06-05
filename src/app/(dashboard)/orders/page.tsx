@@ -120,6 +120,29 @@ export default async function OrdersPage() {
       <header className="mb-8">
         <h2 className="text-3xl font-bold text-gray-900">Bestellungen</h2>
         <p className="text-gray-500 mt-2">Alle importierten Bestellungen im Überblick.</p>
+        
+        <div className="mt-6 grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm">
+            <span className="text-sm font-medium text-gray-500">Gesamt</span>
+            <span className="text-2xl font-bold text-gray-900">{optimizedOrders.length}</span>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm">
+            <span className="text-sm font-medium text-gray-500">Pending</span>
+            <span className="text-2xl font-bold text-amber-600">{optimizedOrders.filter(o => o.status === 'pending').length}</span>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm">
+            <span className="text-sm font-medium text-gray-500">Later Shipment</span>
+            <span className="text-2xl font-bold text-blue-600">{optimizedOrders.filter(o => o.status === 'later_shipment').length}</span>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm">
+            <span className="text-sm font-medium text-gray-500">Versendet</span>
+            <span className="text-2xl font-bold text-emerald-600">{optimizedOrders.filter(o => o.status === 'shipped').length}</span>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm">
+            <span className="text-sm font-medium text-gray-500">Storniert</span>
+            <span className="text-2xl font-bold text-red-600">{optimizedOrders.filter(o => o.status === 'cancelled').length}</span>
+          </div>
+        </div>
       </header>
 
       <ManualImport 
