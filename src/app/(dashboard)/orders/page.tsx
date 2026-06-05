@@ -131,7 +131,7 @@ export default async function OrdersPage() {
             <span className="text-2xl font-bold text-amber-600">{optimizedOrders.filter(o => o.status === 'pending').length}</span>
           </div>
           <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm">
-            <span className="text-sm font-medium text-gray-500">Later Shipment</span>
+            <span className="text-sm font-medium text-gray-500">Späterer Versand</span>
             <span className="text-2xl font-bold text-blue-600">{optimizedOrders.filter(o => o.status === 'later_shipment').length}</span>
           </div>
           <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm">

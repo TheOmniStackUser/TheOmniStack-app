@@ -954,8 +954,8 @@ export function OrdersTable({
         valB = formatMarketplaceName(b.marketplace, b.shippingCountry).toLowerCase()
         break
       case 'status':
-        valA = (a.status === 'later_shipment' ? 'Later Shipment' : (a.status || '')).toLowerCase()
-        valB = (b.status === 'later_shipment' ? 'Later Shipment' : (b.status || '')).toLowerCase()
+        valA = (a.status === 'later_shipment' ? 'Späterer Versand' : (a.status || '')).toLowerCase()
+        valB = (b.status === 'later_shipment' ? 'Späterer Versand' : (b.status || '')).toLowerCase()
         break
       case 'orderNumber': {
         // @ts-ignore
@@ -1846,7 +1846,7 @@ export function OrdersTable({
           >
             <option value="all">Alle Status</option>
             <option value="pending">Pending</option>
-            <option value="later_shipment">Later Shipment</option>
+            <option value="later_shipment">Späterer Versand</option>
             <option value="shipped">Versendet</option>
             <option value="cancelled">Storniert</option>
           </select>
@@ -2117,7 +2117,7 @@ export function OrdersTable({
                           getDisplayStatus(order.status) === 'shipped' ? 'bg-green-100 text-green-800' :
                           'bg-gray-100 text-gray-800'
                         }`}>
-                          {getDisplayStatus(order.status) === 'later_shipment' ? 'Later Shipment' : getDisplayStatus(order.status)}
+                          {getDisplayStatus(order.status) === 'later_shipment' ? 'Späterer Versand' : getDisplayStatus(order.status)}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
