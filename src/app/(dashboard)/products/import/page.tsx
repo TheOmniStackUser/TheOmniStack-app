@@ -73,15 +73,35 @@ export default async function ProductImportPage() {
           ) : (
             unmappedProducts.map((p) => (
               <div key={p.id} className="p-6 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 hover:bg-slate-50/30 transition-colors">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className="px-2.5 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold rounded-md uppercase tracking-wider">
-                      {p.marketplace}
-                    </span>
-                    <span className="font-mono text-sm font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
-                      {p.marketplaceSku}
-                    </span>
-                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="px-2.5 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold rounded-md uppercase tracking-wider">
+                        {(() => {
+                          const integration = marketplaces.find(m => m.type === p.marketplace)
+                          if (integration && (integration.metadata as any)?.customName) {
+                            return (integration.metadata as any).customName
+                          }
+                          const displayMap: Record<string, string> = {
+                            mirakl_decathlon: 'Decathlon',
+                            mirakl_decathlon_eu: 'Decathlon EU',
+                            mirakl_mediamarkt: 'MediaMarkt',
+                            mirakl_custom: 'Custom Mirakl',
+                            aboutyou: 'About You',
+                            kaufland: 'Kaufland',
+                            otto: 'OTTO',
+                            amazon: 'Amazon',
+                            shopify: 'Shopify',
+                            woocommerce: 'WooCommerce',
+                            shopware: 'Shopware',
+                            ebay: 'eBay',
+                          }
+                          return displayMap[p.marketplace] || p.marketplace
+                        })()}
+                      </span>
+                      <span className="font-mono text-sm font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
+                        {p.marketplaceSku}
+                      </span>
+                    </div>
                   <h3 className="text-lg font-bold text-slate-900">{p.title}</h3>
                   <div className="flex gap-4 mt-2 text-sm text-slate-500 font-medium">
                     <span>Preis: {p.price} €</span>
