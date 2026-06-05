@@ -862,7 +862,7 @@ export class MiraklAdapter implements MarketplaceAdapter {
       if (shippingRefundIndex !== -1) {
         // We only care about the fact that shipping is refunded. If unitPrice is missing, we fall back to miraklOrder.shipping_price
         const originalShipping = miraklOrder.shipping_price || 0
-        shippingAmountToRefund = remainingRefundItems[shippingRefundIndex].unitPrice || originalShipping
+        shippingAmountToRefund = (remainingRefundItems[shippingRefundIndex] as any).unitPrice || originalShipping
         remainingRefundItems.splice(shippingRefundIndex, 1)
       }
 
