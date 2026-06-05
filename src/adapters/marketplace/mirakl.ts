@@ -252,6 +252,24 @@ export class MiraklAdapter implements MarketplaceAdapter {
       }
     })
 
+    const shippingPrice = raw.shipping_price || 0
+    if (shippingPrice > 0) {
+      // Find the first valid tax rate from items to apply to shipping, defaulting to 19%
+      const defaultTaxRate = items.length > 0 ? items[0].taxRate : 0.19
+      
+      // Calculate shipping tax if not explicitly provided in order_taxes
+      const shippingTaxAmount = shippingPrice - (shippingPrice / (1 + defaultTaxRate))
+      taxAmount += shippingTaxAmount
+      
+      items.push({
+        sku: 'SHIPPING',
+        title: 'Versandkosten',
+        quantity: 1,
+        unitPrice: shippingPrice,
+        taxRate: defaultTaxRate,
+      })
+    }
+
     return {
       marketplace: this.marketplace,
       marketplaceOrderId: raw.order_id,
@@ -838,6 +856,15 @@ export class MiraklAdapter implements MarketplaceAdapter {
       // 2. Map SKUs to order lines and build refund items
       const refunds: any[] = []
       const remainingRefundItems = refundItems.map(i => ({ ...i }))
+      
+      const shippingRefundIndex = remainingRefundItems.findIndex(ri => ri.sku?.toUpperCase() === 'SHIPPING')
+      let shippingAmountToRefund = 0
+      if (shippingRefundIndex !== -1) {
+        // We only care about the fact that shipping is refunded. If unitPrice is missing, we fall back to miraklOrder.shipping_price
+        const originalShipping = miraklOrder.shipping_price || 0
+        shippingAmountToRefund = remainingRefundItems[shippingRefundIndex].unitPrice || originalShipping
+        remainingRefundItems.splice(shippingRefundIndex, 1)
+      }
 
       for (const line of miraklOrder.order_lines) {
         const lineSku = line.offer_sku || line.product_sku
@@ -850,12 +877,19 @@ export class MiraklAdapter implements MarketplaceAdapter {
           // Get the base unit price
           const priceUnit = line.price_unit || (line.price / line.quantity) || 0
 
-          refunds.push({
+          const refundPayload: any = {
             order_line_id: lineId,
             amount: parseFloat((priceUnit * qtyToRefund).toFixed(2)),
             quantity: qtyToRefund,
             refund_reason_code: '15' // Default return code
-          })
+          }
+
+          if (shippingAmountToRefund > 0) {
+            refundPayload.shipping_amount = parseFloat(shippingAmountToRefund.toFixed(2))
+            shippingAmountToRefund = 0 // Only attach to the first line
+          }
+
+          refunds.push(refundPayload)
 
           remainingRefundItems[refundIndex].quantity -= qtyToRefund
           if (remainingRefundItems[refundIndex].quantity <= 0) {
