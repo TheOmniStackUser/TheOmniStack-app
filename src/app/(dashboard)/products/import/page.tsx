@@ -79,7 +79,7 @@ export default async function ProductImportPage() {
                       {p.marketplace}
                     </span>
                     <span className="font-mono text-sm font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
-                      {p.sku}
+                      {p.marketplaceSku}
                     </span>
                   </div>
                   <h3 className="text-lg font-bold text-slate-900">{p.title}</h3>
