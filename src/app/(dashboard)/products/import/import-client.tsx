@@ -34,6 +34,8 @@ export function ImportClient({ marketplaces }: { marketplaces: any[] }) {
   const showNotification = (message: string, description?: string, type: 'success' | 'error' | 'info' = 'info') => {
     setNotification({ message, description, type })
     setTimeout(() => setNotification(null), 8000)
+  }
+
   const handleImport = async () => {
     if (!selectedMarketplace) return
     setIsImporting(true)
