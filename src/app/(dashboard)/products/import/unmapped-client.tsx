@@ -95,6 +95,27 @@ const PayloadViewer = ({ payload }: { payload: any }) => {
   );
 };
 
+const getEanFromPayload = (payload: any) => {
+  if (!payload || typeof payload !== 'object') return null;
+  
+  if (Array.isArray(payload.product_references)) {
+    const eanRef = payload.product_references.find((r: any) => 
+      r.reference_type === 'UC_EAN' || r.reference_type === 'EAN' || r.reference_type === 'UPC'
+    );
+    if (eanRef && eanRef.reference) return eanRef.reference;
+  }
+  
+  if (payload.barcode) return payload.barcode;
+  if (payload.variants && Array.isArray(payload.variants) && payload.variants.length > 0 && payload.variants[0].barcode) {
+    return payload.variants[0].barcode;
+  }
+
+  if (payload.ean) return payload.ean;
+  if (payload.gtin) return payload.gtin;
+
+  return null;
+};
+
 export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClientProps) {
   const router = useRouter()
   const [search, setSearch] = useState('')
@@ -348,7 +369,9 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
         onClose={() => setDetailsProduct(null)} 
         title={detailsProduct ? `Produktdetails` : ''}
       >
-        {detailsProduct && (
+        {detailsProduct && (() => {
+          const ean = getEanFromPayload(detailsProduct.rawPayload);
+          return (
           <div className="space-y-6 text-sm">
             <div className="flex items-center gap-3">
                <span className="px-2.5 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold rounded-md uppercase tracking-wider">
@@ -362,6 +385,12 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
                  <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">SKU</p>
                  <p className="font-bold font-mono text-slate-900 text-base">{detailsProduct.marketplaceSku}</p>
                </div>
+               {ean && (
+                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col">
+                   <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">EAN</p>
+                   <p className="font-bold font-mono text-slate-900 text-base break-all">{ean}</p>
+                 </div>
+               )}
                {detailsProduct.marketplaceProductId && (
                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col">
                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Produkt ID</p>
@@ -386,7 +415,8 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
               <PayloadViewer payload={detailsProduct.rawPayload} />
             </div>
           </div>
-        )}
+          )
+        })}
       </Modal>
     </>
   )
