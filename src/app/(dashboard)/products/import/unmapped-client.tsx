@@ -37,6 +37,64 @@ function Modal({ isOpen, onClose, title, children }: { isOpen: boolean, onClose:
   )
 }
 
+const PayloadViewer = ({ payload }: { payload: any }) => {
+  if (!payload || typeof payload !== 'object') return <p className="text-slate-500 text-sm">Keine Daten verfügbar</p>
+
+  const renderValue = (val: any): React.ReactNode => {
+    if (val === null) return <span className="text-slate-400 italic text-xs bg-slate-100 px-2 py-0.5 rounded">null</span>;
+    if (typeof val === 'boolean') return <span className={`text-xs font-bold px-2 py-0.5 rounded ${val ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>{val ? 'Ja' : 'Nein'}</span>;
+    if (typeof val === 'number') return <span className="font-mono text-slate-700 font-medium">{val}</span>;
+    if (typeof val === 'string') return <span className="text-slate-700">{val}</span>;
+    
+    if (Array.isArray(val)) {
+      if (val.length === 0) return <span className="text-slate-400 text-xs">Leer</span>;
+      return (
+        <div className="flex flex-col gap-2 mt-1">
+          {val.map((item, i) => (
+            <div key={i} className="pl-3 border-l-2 border-indigo-100">
+              {renderValue(item)}
+            </div>
+          ))}
+        </div>
+      );
+    }
+    
+    if (typeof val === 'object') {
+      return (
+        <div className="flex flex-col gap-2 w-full mt-1">
+          {Object.entries(val).map(([k, v]) => (
+            <div key={k} className="bg-white rounded-lg p-3 border border-slate-100 shadow-sm">
+              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">{k.replace(/_/g, ' ')}</div>
+              <div>{renderValue(v)}</div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+    
+    return <span>{String(val)}</span>;
+  };
+
+  return (
+    <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+      <div className="divide-y divide-slate-200/60">
+        {Object.entries(payload).map(([key, value]) => (
+          <div key={key} className="flex flex-col md:flex-row md:items-start p-4 hover:bg-white transition-colors">
+            <div className="md:w-1/3 mb-2 md:mb-0">
+              <span className="inline-flex items-center text-[11px] font-bold text-slate-600 uppercase tracking-wider bg-slate-200/50 px-2.5 py-1 rounded-md">
+                {key.replace(/_/g, ' ')}
+              </span>
+            </div>
+            <div className="md:w-2/3 flex items-start break-words overflow-hidden text-sm">
+              {renderValue(value)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClientProps) {
   const router = useRouter()
   const [search, setSearch] = useState('')
@@ -323,13 +381,9 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
             <div>
               <h4 className="font-bold text-slate-900 mb-3 flex items-center gap-2 text-base">
                 <Info className="w-5 h-5 text-indigo-500" />
-                Importierte Rohdaten (Payload)
+                Strukturierte Rohdaten (Payload)
               </h4>
-              <div className="bg-slate-900 rounded-xl p-5 overflow-auto shadow-inner max-h-[400px] custom-scrollbar">
-                <pre className="text-emerald-400 font-mono text-xs leading-relaxed">
-                  {detailsProduct.rawPayload ? JSON.stringify(detailsProduct.rawPayload, null, 2) : 'Keine Rohdaten verfügbar'}
-                </pre>
-              </div>
+              <PayloadViewer payload={detailsProduct.rawPayload} />
             </div>
           </div>
         )}
