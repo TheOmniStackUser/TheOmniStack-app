@@ -23,8 +23,10 @@ function Modal({ isOpen, onClose, title, children }: { isOpen: boolean, onClose:
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="p-6 overflow-y-auto flex-1 min-h-0 custom-scrollbar">
-          {children}
+        <div className="overflow-y-auto flex-1 min-h-0 custom-scrollbar">
+          <div className="p-6">
+            {children}
+          </div>
         </div>
       </div>
     </div>
