@@ -108,6 +108,18 @@ const getEanFromPayload = (payload: any) => {
   return null;
 };
 
+const getDescriptionFromPayload = (payload: any) => {
+  if (!payload || typeof payload !== 'object') return null;
+
+  if (payload.product_description) return payload.product_description;
+  if (payload.body_html) return payload.body_html;
+  if (payload.short_description) return payload.short_description;
+  // Fallback to generic description, though for Mirakl this might be the offer condition
+  if (payload.description && typeof payload.description === 'string') return payload.description;
+
+  return null;
+};
+
 export async function bulkCreateProductsFromUnmapped(unmappedProductIds: string[]) {
   const auth = await requireAuth()
 
@@ -144,10 +156,12 @@ export async function bulkCreateProductsFromUnmapped(unmappedProductIds: string[
     if (!existing) {
       // Create new central product
       const ean = getEanFromPayload(unmapped.rawPayload);
+      const description = getDescriptionFromPayload(unmapped.rawPayload);
       const [newProduct] = await db.insert(products).values({
         companyId: auth.activeCompanyId,
         sku: unmapped.marketplaceSku,
         title: unmapped.title,
+        description: description || null,
         price: unmapped.price || '0',
         currentStock: unmapped.stock || '0',
         ean: ean || null,
