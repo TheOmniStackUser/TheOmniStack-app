@@ -416,7 +416,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
             </div>
           </div>
           )
-        })}
+        })()}
       </Modal>
     </>
   )
