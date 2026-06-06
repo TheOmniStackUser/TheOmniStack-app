@@ -6,7 +6,6 @@ import Link from 'next/link'
 import { ArrowLeft, Save, Package, Link as LinkIcon, Settings2, Trash2 } from 'lucide-react'
 import { notFound } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
-import { notFound } from 'next/navigation'
 
 export const metadata = {
   title: 'Produktdetails - TheOmniStack',
