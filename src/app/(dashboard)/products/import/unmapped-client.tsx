@@ -23,7 +23,7 @@ function Modal({ isOpen, onClose, title, children }: { isOpen: boolean, onClose:
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
+        <div className="p-6 overflow-y-auto flex-1 min-h-0 custom-scrollbar">
           {children}
         </div>
       </div>
@@ -319,7 +319,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
                 <Info className="w-5 h-5 text-indigo-500" />
                 Importierte Rohdaten (Payload)
               </h4>
-              <div className="bg-slate-900 rounded-xl p-5 overflow-x-auto shadow-inner">
+              <div className="bg-slate-900 rounded-xl p-5 overflow-auto shadow-inner max-h-[400px] custom-scrollbar">
                 <pre className="text-emerald-400 font-mono text-xs leading-relaxed">
                   {detailsProduct.rawPayload ? JSON.stringify(detailsProduct.rawPayload, null, 2) : 'Keine Rohdaten verfügbar'}
                 </pre>
