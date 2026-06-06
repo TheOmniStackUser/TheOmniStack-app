@@ -1,9 +1,11 @@
 import { requireAuth } from '@/lib/session'
 import { db } from '@/db/client'
 import { products, productMappings } from '@/db/schema/products'
-import { eq } from 'drizzle-orm'
+import { eq, and } from 'drizzle-orm'
 import Link from 'next/link'
 import { ArrowLeft, Save, Package, Link as LinkIcon, Settings2, Trash2 } from 'lucide-react'
+import { notFound } from 'next/navigation'
+import { revalidatePath } from 'next/cache'
 import { notFound } from 'next/navigation'
 
 export const metadata = {
@@ -31,8 +33,34 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
     .from(productMappings)
     .where(eq(productMappings.productId, product.id))
 
+  const saveProduct = async (formData: FormData) => {
+    "use server"
+    const auth = await requireAuth()
+    
+    await db.update(products).set({
+      title: formData.get('title') as string,
+      sku: formData.get('sku') as string,
+      ean: (formData.get('ean') as string) || null,
+      description: (formData.get('description') as string) || null,
+      price: (formData.get('price') as string) || '0',
+      purchasePrice: (formData.get('purchasePrice') as string) || null,
+      currentStock: (formData.get('currentStock') as string) || '0',
+      weight: (formData.get('weight') as string) || null,
+      storageLocation: (formData.get('storageLocation') as string) || null,
+      updatedAt: new Date()
+    }).where(
+      and(
+        eq(products.id, product.id),
+        eq(products.companyId, auth.activeCompanyId)
+      )
+    )
+    
+    revalidatePath(`/products/${product.id}`)
+    revalidatePath('/products')
+  }
+
   return (
-    <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500">
+    <form action={saveProduct} className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500">
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
         <div>
           <Link href="/products" className="inline-flex items-center text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors mb-2">
@@ -49,7 +77,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
           </div>
         </div>
 
-        <button className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold hover:from-cyan-400 hover:to-blue-400 shadow-md transition-all duration-300">
+        <button type="submit" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold hover:from-cyan-400 hover:to-blue-400 shadow-md transition-all duration-300">
           <Save className="w-4 h-4" />
           Speichern
         </button>
@@ -67,21 +95,21 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-slate-700">Titel</label>
-                  <input type="text" defaultValue={product.title} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all" />
+                  <input type="text" name="title" defaultValue={product.title} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 placeholder:text-slate-500" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-slate-700">SKU</label>
-                  <input type="text" defaultValue={product.sku} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all" />
+                  <input type="text" name="sku" defaultValue={product.sku} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 placeholder:text-slate-500" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-slate-700">EAN / Barcode</label>
-                  <input type="text" defaultValue={product.ean || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all" />
+                  <input type="text" name="ean" defaultValue={product.ean || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 placeholder:text-slate-500" />
                 </div>
               </div>
               
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700">Beschreibung</label>
-                <textarea rows={4} defaultValue={product.description || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all resize-none" />
+                <textarea name="description" rows={4} defaultValue={product.description || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all resize-none text-slate-900 placeholder:text-slate-500" />
               </div>
             </div>
           </section>
@@ -95,23 +123,23 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700">Zentraler Preis (€)</label>
-                <input type="number" step="0.01" defaultValue={Number(product.price)} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all" />
+                <input type="number" name="price" step="0.01" defaultValue={Number(product.price)} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 placeholder:text-slate-500" />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700">Einkaufspreis (€)</label>
-                <input type="number" step="0.01" defaultValue={product.purchasePrice ? Number(product.purchasePrice) : ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all" />
+                <input type="number" name="purchasePrice" step="0.01" defaultValue={product.purchasePrice ? Number(product.purchasePrice) : ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 placeholder:text-slate-500" />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700">Lagerbestand</label>
-                <input type="number" defaultValue={Number(product.currentStock)} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all font-bold text-lg" />
+                <input type="number" name="currentStock" defaultValue={Number(product.currentStock)} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all font-bold text-lg text-slate-900 placeholder:text-slate-500" />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700">Gewicht (kg)</label>
-                <input type="number" step="0.001" defaultValue={product.weight ? Number(product.weight) : ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all" />
+                <input type="number" name="weight" step="0.001" defaultValue={product.weight ? Number(product.weight) : ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 placeholder:text-slate-500" />
               </div>
               <div className="space-y-2 lg:col-span-2">
                 <label className="text-sm font-semibold text-slate-700">Lagerort</label>
-                <input type="text" defaultValue={product.storageLocation || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all" />
+                <input type="text" name="storageLocation" defaultValue={product.storageLocation || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 placeholder:text-slate-500" />
               </div>
             </div>
           </section>
@@ -163,13 +191,13 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                       
                       {mapping.syncPrice && (
                         <div className="flex items-center gap-2 pl-7">
-                          <select defaultValue={mapping.priceModifierType} className="text-sm border-slate-200 rounded-lg py-1.5 focus:ring-cyan-500 outline-none">
+                          <select defaultValue={mapping.priceModifierType} className="text-sm border-slate-200 rounded-lg py-1.5 focus:ring-cyan-500 outline-none text-slate-900 bg-white">
                             <option value="none">Kein Aufschlag</option>
                             <option value="percentage">% Aufschlag</option>
                             <option value="fixed">Fixer Aufschlag (€)</option>
                           </select>
                           {mapping.priceModifierType !== 'none' && (
-                            <input type="number" defaultValue={Number(mapping.priceModifierValue)} className="w-20 text-sm border-slate-200 rounded-lg py-1.5 focus:ring-cyan-500 outline-none" />
+                            <input type="number" defaultValue={Number(mapping.priceModifierValue)} className="w-20 text-sm border-slate-200 rounded-lg py-1.5 focus:ring-cyan-500 outline-none text-slate-900 placeholder:text-slate-500" />
                           )}
                         </div>
                       )}
@@ -187,6 +215,6 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
           </section>
         </div>
       </div>
-    </div>
+    </form>
   )
 }
