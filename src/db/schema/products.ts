@@ -41,6 +41,8 @@ export const products = pgTable('products', {
   // Pricing
   price: numeric('price', { precision: 12, scale: 2 }).notNull().default('0'),
   purchasePrice: numeric('purchase_price', { precision: 12, scale: 2 }),
+  msrp: numeric('msrp', { precision: 12, scale: 2 }),
+  reducedPrice: numeric('reduced_price', { precision: 12, scale: 2 }),
   
   // Optional Fields
   weight: numeric('weight', { precision: 8, scale: 3 }), // kg

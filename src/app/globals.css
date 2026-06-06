@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+@layer base {
+  input, select, textarea {
+    @apply text-slate-900 placeholder:text-slate-500;
+  }
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -16,6 +22,12 @@
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+  }
+  
+  @layer base {
+    input, select, textarea {
+      @apply text-slate-100 placeholder:text-slate-400;
+    }
   }
 }
 

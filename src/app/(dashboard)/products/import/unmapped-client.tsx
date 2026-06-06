@@ -1,14 +1,34 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Database, Search, Filter, Loader2, CheckSquare, Square } from 'lucide-react'
+import { Database, Search, Filter, Loader2, CheckSquare, Square, X, Info, AlertTriangle } from 'lucide-react'
 import { bulkCreateProductsFromUnmapped } from '@/app/actions/products'
 import { useRouter } from 'next/navigation'
 import { UnmappedMarketplaceProduct } from '@/db/schema/products'
+import { AlertModal } from '@/components/alert-modal'
 
 interface UnmappedClientProps {
   unmappedProducts: UnmappedMarketplaceProduct[]
   marketplaces: any[]
+}
+
+function Modal({ isOpen, onClose, title, children }: { isOpen: boolean, onClose: () => void, title: string, children: React.ReactNode }) {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+          <h3 className="font-bold text-slate-900 text-lg">{title}</h3>
+          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
+          {children}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClientProps) {
@@ -17,6 +37,16 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
   const [marketplaceFilter, setMarketplaceFilter] = useState<string>('all')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [detailsProduct, setDetailsProduct] = useState<UnmappedMarketplaceProduct | null>(null)
+  const [alertState, setAlertState] = useState<{ isOpen: boolean; title?: string; message: string }>({ isOpen: false, message: '' })
+
+  const showAlert = (message: string, title?: string) => {
+    setAlertState({ isOpen: true, message, title })
+  }
+
+  const hideAlert = () => {
+    setAlertState(prev => ({ ...prev, isOpen: false }))
+  }
 
   const getMarketplaceDisplayName = (type: string) => {
     const integration = marketplaces.find(m => m.type === type)
@@ -92,7 +122,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
       router.refresh()
     } catch (error) {
       console.error(error)
-      alert('Fehler beim Anlegen der Produkte')
+      showAlert('Fehler beim Anlegen der Produkte', 'Fehler')
     } finally {
       setIsSubmitting(false)
     }
@@ -105,17 +135,18 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
       router.refresh()
     } catch (error) {
       console.error(error)
-      alert('Fehler beim Anlegen des Produkts')
+      showAlert('Fehler beim Anlegen des Produkts', 'Fehler')
     } finally {
       setIsSubmitting(false)
     }
   }
 
   const handleMapSingle = (id: string) => {
-    alert('Die Mappen-Funktion (Suche nach bestehenden Produkten) wird in Kürze hinzugefügt. Bitte lege das Produkt vorerst neu an oder warte auf das Update.')
+    showAlert('Die Mappen-Funktion (Suche nach bestehenden Produkten) wird in Kürze hinzugefügt. Bitte lege das Produkt vorerst neu an oder warte auf das Update.', 'Hinweis')
   }
 
   return (
+    <>
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mt-8">
       <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col gap-4">
         <div>
@@ -135,7 +166,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
             <input
               type="text"
               placeholder="Suche nach Name oder SKU..."
-              className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+              className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-900 placeholder:text-slate-500 bg-white"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -144,7 +175,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <Filter className="w-4 h-4 text-slate-400" />
             <select
-              className="w-full sm:w-auto border border-slate-200 rounded-lg text-sm py-2 pl-3 pr-8 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+              className="w-full sm:w-auto border border-slate-200 rounded-lg text-sm py-2 pl-3 pr-8 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900 bg-white"
               value={marketplaceFilter}
               onChange={(e) => setMarketplaceFilter(e.target.value)}
             >
@@ -198,10 +229,10 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
               <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Alle auswählen</span>
             </div>
             {filteredProducts.map((p) => (
-              <div key={p.id} className={`p-6 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 transition-colors ${selectedIds.has(p.id) ? 'bg-indigo-50/30' : 'hover:bg-slate-50/30'}`}>
+              <div key={p.id} onClick={() => setDetailsProduct(p)} className={`p-6 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 transition-colors cursor-pointer ${selectedIds.has(p.id) ? 'bg-indigo-50/30' : 'hover:bg-slate-50/30'}`}>
                 
                 <div className="flex items-start gap-4 flex-1">
-                  <button onClick={() => toggleSelect(p.id)} className="mt-1 focus:outline-none">
+                  <button onClick={(e) => { e.stopPropagation(); toggleSelect(p.id); }} className="mt-1 focus:outline-none">
                     {selectedIds.has(p.id) ? (
                       <CheckSquare className="w-5 h-5 text-indigo-600" />
                     ) : (
@@ -227,10 +258,10 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
                 </div>
 
                 <div className="flex gap-3 w-full lg:w-auto lg:pl-10">
-                  <button onClick={() => handleMapSingle(p.id)} className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-all font-semibold shadow-sm text-sm">
+                  <button onClick={(e) => { e.stopPropagation(); handleMapSingle(p.id); }} className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-all font-semibold shadow-sm text-sm">
                     Mappen
                   </button>
-                  <button disabled={isSubmitting} onClick={() => handleCreateSingle(p.id)} className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-lg hover:from-emerald-400 hover:to-teal-400 transition-all font-semibold shadow-sm text-sm disabled:opacity-50">
+                  <button disabled={isSubmitting} onClick={(e) => { e.stopPropagation(); handleCreateSingle(p.id); }} className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-lg hover:from-emerald-400 hover:to-teal-400 transition-all font-semibold shadow-sm text-sm disabled:opacity-50">
                     Als Neu anlegen
                   </button>
                 </div>
@@ -239,6 +270,64 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
           </div>
         )}
       </div>
+      <AlertModal
+        isOpen={alertState.isOpen}
+        onClose={hideAlert}
+        title={alertState.title}
+        message={alertState.message}
+      />
     </div>
+
+      {/* Product Details Modal */}
+      <Modal 
+        isOpen={!!detailsProduct} 
+        onClose={() => setDetailsProduct(null)} 
+        title={detailsProduct ? `Produktdetails` : ''}
+      >
+        {detailsProduct && (
+          <div className="space-y-6 text-sm">
+            <div className="flex items-center gap-3">
+               <span className="px-2.5 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold rounded-md uppercase tracking-wider">
+                 {getMarketplaceDisplayName(detailsProduct.marketplace)}
+               </span>
+               <h2 className="text-xl font-bold text-slate-900">{detailsProduct.title}</h2>
+            </div>
+            
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+               <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col">
+                 <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">SKU</p>
+                 <p className="font-bold font-mono text-slate-900 text-base">{detailsProduct.marketplaceSku}</p>
+               </div>
+               {detailsProduct.marketplaceProductId && (
+                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col">
+                   <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Produkt ID</p>
+                   <p className="font-bold font-mono text-slate-900 text-base">{detailsProduct.marketplaceProductId}</p>
+                 </div>
+               )}
+               <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col">
+                 <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Preis</p>
+                 <p className="font-bold text-slate-900 text-base">{detailsProduct.price} €</p>
+               </div>
+               <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col">
+                 <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Bestand</p>
+                 <p className="font-bold text-slate-900 text-base">{detailsProduct.stock}</p>
+               </div>
+            </div>
+            
+            <div>
+              <h4 className="font-bold text-slate-900 mb-3 flex items-center gap-2 text-base">
+                <Info className="w-5 h-5 text-indigo-500" />
+                Importierte Rohdaten (Payload)
+              </h4>
+              <div className="bg-slate-900 rounded-xl p-5 overflow-x-auto shadow-inner">
+                <pre className="text-emerald-400 font-mono text-xs leading-relaxed">
+                  {detailsProduct.rawPayload ? JSON.stringify(detailsProduct.rawPayload, null, 2) : 'Keine Rohdaten verfügbar'}
+                </pre>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+    </>
   )
 }
