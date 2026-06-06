@@ -192,3 +192,17 @@ export async function bulkCreateProductsFromUnmapped(unmappedProductIds: string[
   
   return { success: true }
 }
+
+export async function deleteProduct(productId: string) {
+  const auth = await requireAuth()
+
+  await db.delete(products).where(
+    and(
+      eq(products.id, productId),
+      eq(products.companyId, auth.activeCompanyId)
+    )
+  )
+
+  revalidatePath('/products')
+  return { success: true }
+}

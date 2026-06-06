@@ -3,7 +3,9 @@ import { db } from '@/db/client'
 import { products } from '@/db/schema/products'
 import { eq, isNull } from 'drizzle-orm'
 import Link from 'next/link'
-import { Plus, DownloadCloud, Package, Search, Settings } from 'lucide-react'
+import { Plus, Package, Search, Settings, ServerCrash } from 'lucide-react'
+import { CsvActions } from './csv-actions'
+import { DeleteProductButton } from './delete-button'
 
 export const metadata = {
   title: 'Produkte - TheOmniStack',
@@ -50,9 +52,10 @@ export default async function ProductsPage() {
             href="/products/import"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-50 text-slate-700 font-semibold hover:bg-slate-100 transition-colors border border-slate-200 shadow-sm"
           >
-            <DownloadCloud className="w-4 h-4" />
-            Import / Mapping
+            <ServerCrash className="w-4 h-4" />
+            Marketplace Import
           </Link>
+          <CsvActions />
           <button className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold hover:from-cyan-400 hover:to-blue-400 shadow-md hover:shadow-lg transition-all duration-300">
             <Plus className="w-4 h-4" />
             Neues Produkt
@@ -122,12 +125,15 @@ export default async function ProductsPage() {
                       {new Date(product.updatedAt).toLocaleDateString('de-DE')}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <Link 
-                        href={`/products/${product.id}`}
-                        className="text-sm font-semibold text-cyan-600 hover:text-cyan-700 transition-colors opacity-0 group-hover:opacity-100"
-                      >
-                        Details &rarr;
-                      </Link>
+                      <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Link 
+                          href={`/products/${product.id}`}
+                          className="text-sm font-semibold text-cyan-600 hover:text-cyan-700 transition-colors"
+                        >
+                          Details &rarr;
+                        </Link>
+                        <DeleteProductButton productId={product.id} productTitle={product.title} />
+                      </div>
                     </td>
                   </tr>
                 ))
