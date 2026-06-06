@@ -87,6 +87,27 @@ export async function triggerProductImport(integrationId: string) {
   return { success: true }
 }
 
+const getEanFromPayload = (payload: any) => {
+  if (!payload || typeof payload !== 'object') return null;
+  
+  if (Array.isArray(payload.product_references)) {
+    const eanRef = payload.product_references.find((r: any) => 
+      r.reference_type === 'UC_EAN' || r.reference_type === 'EAN' || r.reference_type === 'UPC'
+    );
+    if (eanRef && eanRef.reference) return eanRef.reference;
+  }
+  
+  if (payload.barcode) return payload.barcode;
+  if (payload.variants && Array.isArray(payload.variants) && payload.variants.length > 0 && payload.variants[0].barcode) {
+    return payload.variants[0].barcode;
+  }
+
+  if (payload.ean) return payload.ean;
+  if (payload.gtin) return payload.gtin;
+
+  return null;
+};
+
 export async function bulkCreateProductsFromUnmapped(unmappedProductIds: string[]) {
   const auth = await requireAuth()
 
@@ -122,12 +143,14 @@ export async function bulkCreateProductsFromUnmapped(unmappedProductIds: string[
 
     if (!existing) {
       // Create new central product
+      const ean = getEanFromPayload(unmapped.rawPayload);
       const [newProduct] = await db.insert(products).values({
         companyId: auth.activeCompanyId,
         sku: unmapped.marketplaceSku,
         title: unmapped.title,
         price: unmapped.price || '0',
         currentStock: unmapped.stock || '0',
+        ean: ean || null,
       }).returning({ id: products.id })
       productId = newProduct.id
     }
