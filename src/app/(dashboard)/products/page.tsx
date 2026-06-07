@@ -3,9 +3,9 @@ import { db } from '@/db/client'
 import { products } from '@/db/schema/products'
 import { eq, isNull } from 'drizzle-orm'
 import Link from 'next/link'
-import { Plus, Package, Search, Settings, ServerCrash } from 'lucide-react'
+import { Plus, Package, Settings, ServerCrash } from 'lucide-react'
 import { CsvActions } from './csv-actions'
-import { DeleteProductButton } from './delete-button'
+import { ProductsClient } from './products-client'
 
 export const metadata = {
   title: 'Produkte - TheOmniStack',
@@ -63,85 +63,7 @@ export default async function ProductsPage() {
         </div>
       </header>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <div className="p-4 border-b border-slate-100 flex gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input 
-              type="text"
-              placeholder="SKU, Titel oder EAN suchen..." 
-              className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all"
-            />
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50/50 border-b border-slate-100">
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">SKU</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Titel</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Bestand</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Preis (Netto)</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Letzte Änderung</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Aktion</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {productList.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
-                    <div className="flex flex-col items-center justify-center">
-                      <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-                        <Package className="w-8 h-8 text-slate-300" />
-                      </div>
-                      <p className="text-base font-semibold text-slate-900">Keine Produkte gefunden</p>
-                      <p className="text-sm mt-1">Importieren Sie Produkte oder legen Sie manuell welche an.</p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                productList.map((product) => (
-                  <tr key={product.id} className="hover:bg-slate-50/50 transition-colors group">
-                    <td className="px-6 py-4">
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 text-xs font-mono font-bold">
-                        {product.sku}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="font-semibold text-slate-900">{product.title}</div>
-                      {product.ean && <div className="text-xs text-slate-500 mt-0.5">EAN: {product.ean}</div>}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${Number(product.currentStock) > 0 ? 'bg-emerald-400' : 'bg-rose-400'}`} />
-                        <span className="font-semibold text-slate-700">{product.currentStock}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-slate-700 font-medium">
-                      {Number(product.price).toFixed(2)} €
-                    </td>
-                    <td className="px-6 py-4 text-slate-500 text-sm">
-                      {new Date(product.updatedAt).toLocaleDateString('de-DE')}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Link 
-                          href={`/products/${product.id}`}
-                          className="text-sm font-semibold text-cyan-600 hover:text-cyan-700 transition-colors"
-                        >
-                          Details &rarr;
-                        </Link>
-                        <DeleteProductButton productId={product.id} productTitle={product.title} />
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <ProductsClient initialProducts={productList} />
     </div>
   )
 }
