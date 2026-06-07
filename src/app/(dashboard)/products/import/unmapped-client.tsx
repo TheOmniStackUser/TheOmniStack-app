@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Database, Search, Filter, Loader2, CheckSquare, Square, X, Info, AlertTriangle } from 'lucide-react'
-import { bulkCreateProductsFromUnmapped } from '@/app/actions/products'
+import { Database, Search, Filter, Loader2, CheckSquare, Square, X, Info, AlertTriangle, Trash2 } from 'lucide-react'
+import { bulkCreateProductsFromUnmapped, deleteUnmappedProducts } from '@/app/actions/products'
 import { useRouter } from 'next/navigation'
 import { UnmappedMarketplaceProduct } from '@/db/schema/products'
 import { AlertModal } from '@/components/alert-modal'
@@ -124,6 +124,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [detailsProduct, setDetailsProduct] = useState<UnmappedMarketplaceProduct | null>(null)
   const [alertState, setAlertState] = useState<{ isOpen: boolean; title?: string; message: string }>({ isOpen: false, message: '' })
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{ isOpen: boolean, type: 'single' | 'bulk', id?: string }>({ isOpen: false, type: 'single' })
 
   const showAlert = (message: string, title?: string) => {
     setAlertState({ isOpen: true, message, title })
@@ -213,6 +214,36 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
     }
   }
 
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return
+    setIsSubmitting(true)
+    try {
+      await deleteUnmappedProducts(Array.from(selectedIds))
+      setSelectedIds(new Set())
+      setDeleteConfirmation({ isOpen: false, type: 'single' })
+      router.refresh()
+    } catch (error) {
+      console.error(error)
+      showAlert('Fehler beim Löschen der Produkte', 'Fehler')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleDeleteSingle = async (id: string) => {
+    setIsSubmitting(true)
+    try {
+      await deleteUnmappedProducts([id])
+      setDeleteConfirmation({ isOpen: false, type: 'single' })
+      router.refresh()
+    } catch (error) {
+      console.error(error)
+      showAlert('Fehler beim Löschen des Produkts', 'Fehler')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   const handleCreateSingle = async (id: string) => {
     setIsSubmitting(true)
     try {
@@ -277,14 +308,23 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
             <span className="text-indigo-800 text-sm font-semibold">
               {selectedIds.size} Produkte ausgewählt
             </span>
-            <button
-              onClick={handleBulkCreate}
-              disabled={isSubmitting}
-              className="inline-flex items-center gap-2 px-4 py-1.5 bg-indigo-600 text-white text-sm font-semibold rounded-md hover:bg-indigo-700 transition-all disabled:opacity-50"
-            >
-              {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-              Ausgewählte als Neu anlegen
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setDeleteConfirmation({ isOpen: true, type: 'bulk' })}
+                disabled={isSubmitting}
+                className="inline-flex items-center gap-2 px-4 py-1.5 bg-white border border-rose-200 text-rose-600 text-sm font-semibold rounded-md hover:bg-rose-50 transition-all disabled:opacity-50 shadow-sm"
+              >
+                Löschen
+              </button>
+              <button
+                onClick={handleBulkCreate}
+                disabled={isSubmitting}
+                className="inline-flex items-center gap-2 px-4 py-1.5 bg-indigo-600 text-white text-sm font-semibold rounded-md hover:bg-indigo-700 transition-all disabled:opacity-50 shadow-sm"
+              >
+                {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                Ausgewählte als Neu anlegen
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -342,7 +382,10 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
                   </div>
                 </div>
 
-                <div className="flex gap-3 w-full lg:w-auto lg:pl-10">
+                <div className="flex gap-3 w-full lg:w-auto lg:pl-10 items-center">
+                  <button onClick={(e) => { e.stopPropagation(); setDeleteConfirmation({ isOpen: true, type: 'single', id: p.id }); }} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors focus:outline-none" title="Eintrag verwerfen">
+                    <Trash2 className="w-5 h-5" />
+                  </button>
                   <button onClick={(e) => { e.stopPropagation(); handleMapSingle(p.id); }} className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-all font-semibold shadow-sm text-sm">
                     Mappen
                   </button>
@@ -417,6 +460,28 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
           </div>
           )
         })()}
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal isOpen={deleteConfirmation.isOpen} onClose={() => setDeleteConfirmation({ isOpen: false, type: 'single' })} title="Einträge löschen?">
+        <div className="space-y-6 text-sm">
+          <div className="flex items-center justify-center p-4">
+            <div className="w-16 h-16 rounded-full bg-rose-100 flex items-center justify-center">
+              <AlertTriangle className="w-8 h-8 text-rose-600" />
+            </div>
+          </div>
+          <p className="text-center text-slate-600 text-base">
+            Möchtest du {deleteConfirmation.type === 'bulk' ? `die ${selectedIds.size} ausgewählten Einträge` : 'diesen Eintrag'} wirklich löschen? Du kannst sie später durch einen erneuten Import wieder abrufen.
+          </p>
+          <div className="flex justify-center gap-3 pt-4 border-t border-slate-100">
+            <button onClick={() => setDeleteConfirmation({ isOpen: false, type: 'single' })} className="px-6 py-2.5 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 transition-colors" disabled={isSubmitting}>
+              Abbrechen
+            </button>
+            <button onClick={() => deleteConfirmation.type === 'bulk' ? handleBulkDelete() : deleteConfirmation.id && handleDeleteSingle(deleteConfirmation.id)} className="px-6 py-2.5 text-sm font-semibold text-white bg-rose-600 rounded-xl hover:bg-rose-700 shadow-sm shadow-rose-600/20 transition-all flex items-center gap-2" disabled={isSubmitting}>
+              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Löschen'}
+            </button>
+          </div>
+        </div>
       </Modal>
     </>
   )

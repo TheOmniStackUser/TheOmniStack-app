@@ -206,3 +206,19 @@ export async function deleteProduct(productId: string) {
   revalidatePath('/products')
   return { success: true }
 }
+
+export async function deleteUnmappedProducts(unmappedProductIds: string[]) {
+  const auth = await requireAuth()
+
+  if (!unmappedProductIds || unmappedProductIds.length === 0) return { success: true }
+
+  await db.delete(unmappedMarketplaceProducts).where(
+    and(
+      eq(unmappedMarketplaceProducts.companyId, auth.activeCompanyId),
+      inArray(unmappedMarketplaceProducts.id, unmappedProductIds)
+    )
+  )
+
+  revalidatePath('/products/import')
+  return { success: true }
+}
