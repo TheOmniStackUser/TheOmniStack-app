@@ -27,8 +27,24 @@ export function ManualImport({
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [isSyncing, setIsSyncing] = useState(false)
-  const [syncProgress, setSyncProgress] = useState<{ current: number; total: number; label: string } | null>(null)
+  const [syncProgress, setSyncProgress] = useState<{ current: number; total: number; label: string; simulatedProgress: number } | null>(null)
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+
+  // Simulate progress while waiting for the server
+  import { useEffect } from 'react'
+  useEffect(() => {
+    if (isSyncing && syncProgress && syncProgress.current < syncProgress.total) {
+      const timer = setInterval(() => {
+        setSyncProgress(prev => {
+          if (!prev) return prev;
+          const diff = 90 - prev.simulatedProgress;
+          const increment = Math.max(0.5, diff * 0.1);
+          return { ...prev, simulatedProgress: Math.min(90, prev.simulatedProgress + increment) };
+        });
+      }, 500);
+      return () => clearInterval(timer);
+    }
+  }, [isSyncing, syncProgress?.current, syncProgress?.total]);
 
   // Build and sort marketplace categories
   const groupedMarketplaces = (() => {
@@ -108,7 +124,7 @@ export function ManualImport({
 
     setIsSyncing(true)
     setNotification(null)
-    setSyncProgress({ current: 0, total: selectedToSync.length, label: selectedToSync[0].label })
+    setSyncProgress({ current: 0, total: selectedToSync.length, label: selectedToSync[0].label, simulatedProgress: 0 })
 
     let totalAffected = 0
     let hasError = false
@@ -116,7 +132,7 @@ export function ManualImport({
     try {
       for (let i = 0; i < selectedToSync.length; i++) {
         const currentMarketplace = selectedToSync[i]
-        setSyncProgress({ current: i, total: selectedToSync.length, label: currentMarketplace.label })
+        setSyncProgress({ current: i, total: selectedToSync.length, label: currentMarketplace.label, simulatedProgress: 0 })
         
         const result = await triggerManualSyncAction({
           marketplace: currentMarketplace.value,
@@ -136,7 +152,7 @@ export function ManualImport({
       }
 
       if (!hasError) {
-        setSyncProgress({ current: selectedToSync.length, total: selectedToSync.length, label: 'Abgeschlossen' })
+        setSyncProgress({ current: selectedToSync.length, total: selectedToSync.length, label: 'Abgeschlossen', simulatedProgress: 100 })
         setNotification({ 
           message: totalAffected > 0 
             ? `Import erfolgreich! ${totalAffected} neue Bestellung(en) wurden hinzugefügt.` 
@@ -266,17 +282,21 @@ export function ManualImport({
               {syncProgress.current < syncProgress.total ? `Importiere ${syncProgress.label}...` : 'Import abgeschlossen'}
             </span>
             <span className="text-sm font-bold text-blue-600">
-              {Math.round((syncProgress.current / syncProgress.total) * 100)}%
+              {syncProgress.current < syncProgress.total 
+                ? Math.min(99, Math.round(((syncProgress.current / syncProgress.total) * 100) + ((syncProgress.simulatedProgress / 100) * (100 / syncProgress.total))))
+                : 100}%
             </span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
             <div 
-              className="bg-blue-600 h-2.5 rounded-full transition-all duration-500 ease-in-out" 
-              style={{ width: `${Math.round((syncProgress.current / syncProgress.total) * 100)}%` }}
+              className="bg-blue-600 h-2.5 rounded-full transition-all duration-500 ease-out" 
+              style={{ width: `${syncProgress.current < syncProgress.total 
+                ? Math.min(99, Math.round(((syncProgress.current / syncProgress.total) * 100) + ((syncProgress.simulatedProgress / 100) * (100 / syncProgress.total))))
+                : 100}%` }}
             ></div>
           </div>
           <div className="mt-2 text-xs text-gray-500 text-right">
-            Marktplatz {syncProgress.current} von {syncProgress.total}
+            Marktplatz {Math.min(syncProgress.current + 1, syncProgress.total)} von {syncProgress.total}
           </div>
         </div>
       )}
