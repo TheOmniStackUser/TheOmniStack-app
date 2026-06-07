@@ -1,6 +1,8 @@
 import { requireAuth } from '@/lib/session'
 import { db } from '@/db/client'
 import { products, productMappings } from '@/db/schema/products'
+import { marketplaceIntegrations } from '@/db/schema/integrations'
+import { MappingSyncRules } from './mapping-sync-rules'
 import { eq, and } from 'drizzle-orm'
 import Link from 'next/link'
 import { ArrowLeft, Save, Package, Link as LinkIcon, Settings2, Trash2 } from 'lucide-react'
@@ -32,6 +34,37 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
     .from(productMappings)
     .where(eq(productMappings.productId, product.id))
 
+  // Fetch Integrations
+  const integrations = await db
+    .select()
+    .from(marketplaceIntegrations)
+    .where(eq(marketplaceIntegrations.companyId, auth.activeCompanyId))
+
+  const getMarketplaceName = (marketplace: string) => {
+    const lower = marketplace.toLowerCase()
+    if (lower === 'mirakl_custom') {
+      const customInt = integrations.find(i => i.type === 'mirakl_custom')
+      if (customInt?.metadata && typeof customInt.metadata === 'object' && 'customName' in customInt.metadata) {
+        return customInt.metadata.customName as string
+      }
+      return 'Mirakl Custom'
+    }
+    const map: Record<string, string> = {
+      amazon: 'Amazon',
+      otto: 'Otto',
+      mirakl_decathlon: 'Decathlon',
+      mirakl_decathlon_eu: 'Decathlon EU',
+      mirakl_mediamarkt: 'MediaMarkt',
+      shopify: 'Shopify',
+      aboutyou: 'About You',
+      kaufland: 'Kaufland',
+      ebay: 'eBay',
+      woocommerce: 'WooCommerce',
+      shopware: 'Shopware',
+    }
+    return map[lower] || marketplace
+  }
+
   const saveProduct = async (formData: FormData) => {
     "use server"
     const auth = await requireAuth()
@@ -53,6 +86,26 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
         eq(products.companyId, auth.activeCompanyId)
       )
     )
+
+    for (const mapping of mappings) {
+      const syncStock = formData.get(`mapping_${mapping.id}_syncStock`) === 'on'
+      const syncPrice = formData.get(`mapping_${mapping.id}_syncPrice`) === 'on'
+      const modifierType = formData.get(`mapping_${mapping.id}_priceModifierType`) as any || 'none'
+      const modifierValue = formData.get(`mapping_${mapping.id}_priceModifierValue`) as string || '0'
+      
+      await db.update(productMappings).set({
+        syncStock,
+        syncPrice,
+        priceModifierType: modifierType,
+        priceModifierValue: modifierValue,
+        updatedAt: new Date()
+      }).where(
+        and(
+          eq(productMappings.id, mapping.id),
+          eq(productMappings.companyId, auth.activeCompanyId)
+        )
+      )
+    }
     
     revalidatePath(`/products/${product.id}`)
     revalidatePath('/products')
@@ -168,7 +221,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                     <div className="flex justify-between items-start mb-3">
                       <div>
                         <span className="uppercase text-xs font-bold tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
-                          {mapping.marketplace}
+                          {getMarketplaceName(mapping.marketplace)}
                         </span>
                         <p className="font-mono text-sm font-bold text-slate-700 mt-1">{mapping.marketplaceSku}</p>
                       </div>
@@ -178,29 +231,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                     </div>
 
                     {/* Sync Rules */}
-                    <div className="space-y-3 mt-4 pt-4 border-t border-slate-100">
-                      <label className="flex items-center gap-3 cursor-pointer">
-                        <input type="checkbox" defaultChecked={mapping.syncStock} className="w-4 h-4 rounded border-slate-300 text-cyan-500 focus:ring-cyan-500" />
-                        <span className="text-sm font-medium text-slate-700">Bestand synchronisieren</span>
-                      </label>
-                      <label className="flex items-center gap-3 cursor-pointer">
-                        <input type="checkbox" defaultChecked={mapping.syncPrice} className="w-4 h-4 rounded border-slate-300 text-cyan-500 focus:ring-cyan-500" />
-                        <span className="text-sm font-medium text-slate-700">Preis synchronisieren</span>
-                      </label>
-                      
-                      {mapping.syncPrice && (
-                        <div className="flex items-center gap-2 pl-7">
-                          <select defaultValue={mapping.priceModifierType} className="text-sm border-slate-200 rounded-lg py-1.5 focus:ring-cyan-500 outline-none text-slate-900 bg-white">
-                            <option value="none">Kein Aufschlag</option>
-                            <option value="percentage">% Aufschlag</option>
-                            <option value="fixed">Fixer Aufschlag (€)</option>
-                          </select>
-                          {mapping.priceModifierType !== 'none' && (
-                            <input type="number" defaultValue={Number(mapping.priceModifierValue)} className="w-20 text-sm border-slate-200 rounded-lg py-1.5 focus:ring-cyan-500 outline-none text-slate-900 placeholder:text-slate-500" />
-                          )}
-                        </div>
-                      )}
-                    </div>
+                    <MappingSyncRules mapping={mapping} />
                   </div>
                 ))
               )}

@@ -27,6 +27,7 @@ export function ManualImport({
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [isSyncing, setIsSyncing] = useState(false)
+  const [syncProgress, setSyncProgress] = useState<{ current: number; total: number; label: string } | null>(null)
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
 
   // Build and sort marketplace categories
@@ -72,26 +73,83 @@ export function ManualImport({
   })()
 
   const handleSync = async () => {
+    let selectedToSync: { value: string; label: string }[] = []
+    
+    if (marketplace === 'all') {
+      selectedToSync = [
+        ...groupedMarketplaces.direct,
+        ...groupedMarketplaces.decathlon,
+        ...groupedMarketplaces.secretSales,
+        ...groupedMarketplaces.other
+      ]
+    } else if (marketplace === 'group_direct') {
+      selectedToSync = [...groupedMarketplaces.direct]
+    } else if (marketplace === 'group_decathlon') {
+      selectedToSync = [...groupedMarketplaces.decathlon]
+    } else if (marketplace === 'group_secret_sales') {
+      selectedToSync = [...groupedMarketplaces.secretSales]
+    } else if (marketplace === 'group_other') {
+      selectedToSync = [...groupedMarketplaces.other]
+    } else {
+      const all = [
+        ...groupedMarketplaces.direct,
+        ...groupedMarketplaces.decathlon,
+        ...groupedMarketplaces.secretSales,
+        ...groupedMarketplaces.other
+      ]
+      const found = all.find((m) => m.value === marketplace)
+      if (found) selectedToSync.push(found)
+    }
+
+    if (selectedToSync.length === 0) {
+      setNotification({ message: 'Bitte wählen Sie mindestens einen Marktplatz aus.', type: 'error' })
+      return
+    }
+
     setIsSyncing(true)
     setNotification(null)
-    try {
-      const result = await triggerManualSyncAction({
-        marketplace,
-        fromDate: fromDate || undefined,
-        toDate: toDate || undefined
-      })
+    setSyncProgress({ current: 0, total: selectedToSync.length, label: selectedToSync[0].label })
 
-      if (result.error) {
-        setNotification({ message: result.error, type: 'error' })
-      } else {
-        setNotification({ message: result.message || 'Import abgeschlossen', type: 'success' })
-        // Auto-close after 10 seconds if it's a success
+    let totalAffected = 0
+    let hasError = false
+
+    try {
+      for (let i = 0; i < selectedToSync.length; i++) {
+        const currentMarketplace = selectedToSync[i]
+        setSyncProgress({ current: i, total: selectedToSync.length, label: currentMarketplace.label })
+        
+        const result = await triggerManualSyncAction({
+          marketplace: currentMarketplace.value,
+          fromDate: fromDate || undefined,
+          toDate: toDate || undefined
+        })
+
+        if (result.error) {
+          hasError = true
+          setNotification({ message: result.error, type: 'error' })
+          break
+        }
+        
+        if (result.affected !== undefined) {
+          totalAffected += result.affected
+        }
+      }
+
+      if (!hasError) {
+        setSyncProgress({ current: selectedToSync.length, total: selectedToSync.length, label: 'Abgeschlossen' })
+        setNotification({ 
+          message: totalAffected > 0 
+            ? `Import erfolgreich! ${totalAffected} neue Bestellung(en) wurden hinzugefügt.` 
+            : 'Import abgeschlossen! Es wurden keine neuen Bestellungen gefunden.', 
+          type: 'success' 
+        })
         setTimeout(() => setNotification(null), 10000)
       }
     } catch (e) {
       setNotification({ message: 'Ein unerwarteter Fehler ist aufgetreten.', type: 'error' })
     } finally {
       setIsSyncing(false)
+      setTimeout(() => setSyncProgress(null), 2000)
     }
   }
 
@@ -199,6 +257,29 @@ export function ManualImport({
       <p className="text-xs text-gray-500 mt-3">
         Tipp: Wird für Mirakl als Versanddatum (start_date) und für Otto als Bestelldatum (fromOrderDate) interpretiert.
       </p>
+
+      {/* Progress UI */}
+      {syncProgress && (
+        <div className="mt-4 animate-in fade-in slide-in-from-top-2 duration-300 bg-gray-50 p-4 rounded-lg border border-gray-200">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm font-medium text-gray-700">
+              {syncProgress.current < syncProgress.total ? `Importiere ${syncProgress.label}...` : 'Import abgeschlossen'}
+            </span>
+            <span className="text-sm font-bold text-blue-600">
+              {Math.round((syncProgress.current / syncProgress.total) * 100)}%
+            </span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+            <div 
+              className="bg-blue-600 h-2.5 rounded-full transition-all duration-500 ease-in-out" 
+              style={{ width: `${Math.round((syncProgress.current / syncProgress.total) * 100)}%` }}
+            ></div>
+          </div>
+          <div className="mt-2 text-xs text-gray-500 text-right">
+            Marktplatz {syncProgress.current} von {syncProgress.total}
+          </div>
+        </div>
+      )}
 
       {/* Modern Notification UI */}
       {notification && (

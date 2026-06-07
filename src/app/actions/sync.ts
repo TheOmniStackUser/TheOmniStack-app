@@ -275,8 +275,8 @@ export async function triggerManualSyncAction(data: { marketplace: string, fromD
   revalidatePath('/orders')
   
   if (totalAffected === 0) {
-    return { success: true, message: `Import abgeschlossen! Es wurden keine neuen Bestellungen gefunden.` }
+    return { success: true, message: `Import abgeschlossen! Es wurden keine neuen Bestellungen gefunden.`, affected: 0 }
   }
 
-  return { success: true, message: `Import erfolgreich! ${totalAffected} neue Bestellung(en) wurden hinzugefügt.` }
+  return { success: true, message: `Import erfolgreich! ${totalAffected} neue Bestellung(en) wurden hinzugefügt.`, affected: totalAffected }
 }
