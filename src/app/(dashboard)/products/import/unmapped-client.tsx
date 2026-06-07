@@ -444,6 +444,31 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
                  <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Preis</p>
                  <p className="font-bold text-slate-900 text-base">{detailsProduct.price} €</p>
                </div>
+               
+               {/* Extract UVP & Category from raw payload for display */}
+               {(() => {
+                 const raw = detailsProduct.rawPayload as any;
+                 const uvp = raw?.discount?.origin_price || raw?.origin_price || raw?.msrp;
+                 const category = raw?.category_label || raw?.category || raw?.product_type;
+                 
+                 return (
+                   <>
+                     {uvp && (
+                       <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col">
+                         <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">UVP</p>
+                         <p className="font-bold text-slate-900 text-base">{uvp} €</p>
+                       </div>
+                     )}
+                     {category && (
+                       <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col">
+                         <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Kategorie</p>
+                         <p className="font-bold text-slate-900 text-base">{category}</p>
+                       </div>
+                     )}
+                   </>
+                 );
+               })()}
+
                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col">
                  <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Bestand</p>
                  <p className="font-bold text-slate-900 text-base">{detailsProduct.stock}</p>

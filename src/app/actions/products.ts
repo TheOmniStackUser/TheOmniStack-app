@@ -120,6 +120,34 @@ const getDescriptionFromPayload = (payload: any) => {
   return null;
 };
 
+const getOriginPriceFromPayload = (payload: any) => {
+  if (!payload || typeof payload !== 'object') return null;
+
+  if (payload.discount && payload.discount.origin_price !== undefined && payload.discount.origin_price !== null) {
+    return String(payload.discount.origin_price);
+  }
+  
+  if (payload.origin_price !== undefined && payload.origin_price !== null) {
+    return String(payload.origin_price);
+  }
+  
+  if (payload.msrp !== undefined && payload.msrp !== null) {
+    return String(payload.msrp);
+  }
+
+  return null;
+};
+
+const getCategoryFromPayload = (payload: any) => {
+  if (!payload || typeof payload !== 'object') return null;
+
+  if (payload.category_label) return payload.category_label;
+  if (payload.category) return payload.category;
+  if (payload.product_type) return payload.product_type;
+  
+  return null;
+};
+
 export async function bulkCreateProductsFromUnmapped(unmappedProductIds: string[]) {
   const auth = await requireAuth()
 
@@ -157,6 +185,9 @@ export async function bulkCreateProductsFromUnmapped(unmappedProductIds: string[
       // Create new central product
       const ean = getEanFromPayload(unmapped.rawPayload);
       const description = getDescriptionFromPayload(unmapped.rawPayload);
+      const originPrice = getOriginPriceFromPayload(unmapped.rawPayload);
+      const category = getCategoryFromPayload(unmapped.rawPayload);
+      
       const [newProduct] = await db.insert(products).values({
         companyId: auth.activeCompanyId,
         sku: unmapped.marketplaceSku,
@@ -165,6 +196,8 @@ export async function bulkCreateProductsFromUnmapped(unmappedProductIds: string[
         price: unmapped.price || '0',
         currentStock: unmapped.stock || '0',
         ean: ean || null,
+        msrp: originPrice || null,
+        category: category || null,
       }).returning({ id: products.id })
       productId = newProduct.id
     }

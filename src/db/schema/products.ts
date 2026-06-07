@@ -34,6 +34,7 @@ export const products = pgTable('products', {
   title: text('title').notNull(),
   description: text('description'),
   ean: text('ean'),
+  category: text('category'),
   
   // Inventory
   currentStock: numeric('current_stock', { precision: 10, scale: 0 }).notNull().default('0'),
