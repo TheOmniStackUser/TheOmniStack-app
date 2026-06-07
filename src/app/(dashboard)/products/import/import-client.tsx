@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { DownloadCloud, Play, Loader2, CheckCircle2, AlertCircle, X } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 
-import { triggerProductImport } from '@/app/actions/products'
+import { triggerProductImport, getImportSyncStatus } from '@/app/actions/products'
 
 function getMarketplaceName(integration: any) {
   if (integration.type === 'mirakl_custom' && integration.metadata?.customName) {
@@ -27,14 +28,40 @@ function getMarketplaceName(integration: any) {
 }
 
 export function ImportClient({ marketplaces }: { marketplaces: any[] }) {
+  const router = useRouter()
   const [selectedMarketplace, setSelectedMarketplace] = useState<string>('')
   const [isImporting, setIsImporting] = useState(false)
   const [notification, setNotification] = useState<{ message: string; description?: string; type: 'success' | 'error' | 'info' } | null>(null)
+  const [syncStatus, setSyncStatus] = useState<any>(null)
+  const wasRunningRef = useRef(false)
 
   const showNotification = (message: string, description?: string, type: 'success' | 'error' | 'info' = 'info') => {
     setNotification({ message, description, type })
     setTimeout(() => setNotification(null), 8000)
   }
+
+  useEffect(() => {
+    if (!selectedMarketplace) {
+      setSyncStatus(null)
+      return
+    }
+    const checkStatus = async () => {
+      try {
+        const status = await getImportSyncStatus(selectedMarketplace)
+        setSyncStatus(status)
+        if (status?.isRunning) {
+          wasRunningRef.current = true
+        } else if (!status?.isRunning && wasRunningRef.current) {
+          wasRunningRef.current = false
+          router.refresh()
+          showNotification('Import abgeschlossen', 'Die Produktliste wurde aktualisiert.', 'success')
+        }
+      } catch (e) {}
+    }
+    checkStatus()
+    const intervalId = setInterval(checkStatus, 2000)
+    return () => clearInterval(intervalId)
+  }, [selectedMarketplace, router])
 
   const handleImport = async () => {
     if (!selectedMarketplace) return
@@ -45,7 +72,7 @@ export function ImportClient({ marketplaces }: { marketplaces: any[] }) {
     
     try {
       await triggerProductImport(selectedMarketplace)
-      showNotification('Import erfolgreich', 'Der Import-Prozess wurde im Hintergrund gestartet.', 'success')
+      wasRunningRef.current = true
     } catch (error: any) {
       showNotification('Fehler beim Import', error.message || 'Ein unerwarteter Fehler ist aufgetreten.', 'error')
     } finally {
@@ -91,7 +118,7 @@ export function ImportClient({ marketplaces }: { marketplaces: any[] }) {
         </div>
       )}
 
-      <div className="flex items-center gap-3 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
+      <div className="relative flex items-center gap-3 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
         <select
           value={selectedMarketplace}
           onChange={(e) => setSelectedMarketplace(e.target.value)}
@@ -106,13 +133,35 @@ export function ImportClient({ marketplaces }: { marketplaces: any[] }) {
         </select>
 
         <button 
-          disabled={!selectedMarketplace || isImporting}
+          disabled={!selectedMarketplace || isImporting || syncStatus?.isRunning}
           onClick={handleImport}
           className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 shadow-md transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+          {(isImporting || syncStatus?.isRunning) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
           Import starten
         </button>
+
+        {syncStatus?.isRunning && (
+          <div className="absolute top-full left-0 right-0 mt-3 p-4 bg-white rounded-xl border border-indigo-100 shadow-xl z-20 animate-in slide-in-from-top-2">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm font-semibold text-indigo-900 flex items-center gap-2">
+                <Loader2 className="w-4 h-4 text-indigo-500 animate-spin" />
+                {syncStatus.message || 'Import läuft...'}
+              </span>
+              <span className="text-sm font-bold text-indigo-600">
+                {syncStatus.total > 0 ? Math.round((syncStatus.progress / syncStatus.total) * 100) : 0}%
+              </span>
+            </div>
+            <div className="w-full bg-indigo-50 rounded-full h-2.5 overflow-hidden">
+              <div 
+                className="bg-indigo-600 h-full rounded-full transition-all duration-500 ease-out relative" 
+                style={{ width: `${syncStatus.total > 0 ? (syncStatus.progress / syncStatus.total) * 100 : 0}%` }}
+              >
+                <div className="absolute inset-0 bg-white/20 w-full h-full animate-[shimmer_2s_infinite]" style={{ backgroundImage: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)' }}></div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </>
   )

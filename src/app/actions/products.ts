@@ -222,3 +222,23 @@ export async function deleteUnmappedProducts(unmappedProductIds: string[]) {
   revalidatePath('/products/import')
   return { success: true }
 }
+
+export async function getImportSyncStatus(integrationId: string) {
+  const auth = await requireAuth()
+
+  const [integration] = await db
+    .select()
+    .from(marketplaceIntegrations)
+    .where(
+      and(
+        eq(marketplaceIntegrations.id, integrationId),
+        eq(marketplaceIntegrations.companyId, auth.activeCompanyId)
+      )
+    )
+    .limit(1)
+
+  if (!integration) return null
+
+  const metadata = (integration.metadata as any) || {}
+  return metadata.syncStatus || null
+}

@@ -2,15 +2,27 @@ import { db } from '@/db/client'
 import { companies } from '@/db/schema/companies'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { products, productMappings, unmappedMarketplaceProducts } from '@/db/schema/products'
-import { eq, and, inArray } from 'drizzle-orm'
+import { eq, and, inArray, sql } from 'drizzle-orm'
 import { getAdapterForIntegration } from '@/workers/marketplace-sync'
 
 /**
  * Syncs products from activated marketplaces to the central product catalog.
  * This function can be called by a cron job or manual trigger.
  */
+async function updateSyncStatus(integrationId: string, status: { isRunning: boolean, status: string, message: string, progress: number, total: number }) {
+  try {
+    const [integration] = await db.select().from(marketplaceIntegrations).where(eq(marketplaceIntegrations.id, integrationId)).limit(1)
+    if (integration) {
+      const metadata = (integration.metadata as any) || {}
+      metadata.syncStatus = status
+      await db.update(marketplaceIntegrations).set({ metadata }).where(eq(marketplaceIntegrations.id, integrationId))
+    }
+  } catch (err) {
+    console.error(`[ProductSync] Failed to update sync status for ${integrationId}`, err)
+  }
+}
+
 export async function syncProductsForCompany(companyId: string, integrationId?: string) {
-  // 1. Fetch active integrations that support product fetching
   let query: any = and(
     eq(marketplaceIntegrations.companyId, companyId),
     eq(marketplaceIntegrations.isActive, true)
@@ -33,45 +45,31 @@ export async function syncProductsForCompany(companyId: string, integrationId?: 
       }
 
       console.log(`[ProductSync] Fetching products from ${integration.type} for company ${companyId}...`)
-      const marketplaceProducts = await adapter.fetchProducts(companyId)
       
-      let mappedCount = 0
-      let unmappedCount = 0
+      await updateSyncStatus(integration.id, { isRunning: true, status: 'fetching', message: 'Lade Daten vom Marktplatz...', progress: 0, total: 0 })
 
-      for (const mpProduct of marketplaceProducts) {
-        // Check if a mapping already exists
-        const [existingMapping] = await db
-          .select()
-          .from(productMappings)
-          .where(
-            and(
-              eq(productMappings.companyId, companyId),
-              eq(productMappings.marketplace, integration.type as any),
-              eq(productMappings.marketplaceSku, mpProduct.sku)
-            )
-          )
-          .limit(1)
+      const marketplaceProducts = await adapter.fetchProducts(companyId)
+      const totalCount = marketplaceProducts.length
+      
+      await updateSyncStatus(integration.id, { isRunning: true, status: 'processing', message: `Bereite ${totalCount} Produkte vor...`, progress: 0, total: totalCount })
 
-        if (existingMapping) {
-          mappedCount++
-          // We can optionally sync stock/price back to central catalog if marketplace is source of truth,
-          // but typically central catalog is source of truth. We just log for now.
-        } else {
-          // Check if there is a central product with this SKU to auto-map
-          const [centralProduct] = await db
-            .select()
-            .from(products)
-            .where(
-              and(
-                eq(products.companyId, companyId),
-                eq(products.sku, mpProduct.sku)
-              )
-            )
-            .limit(1)
+      // Bulk Load existing data
+      const existingMappings = await db.select().from(productMappings).where(and(eq(productMappings.companyId, companyId), eq(productMappings.marketplace, integration.type as any)))
+      const existingProducts = await db.select().from(products).where(eq(products.companyId, companyId))
 
+      const mappedSkus = new Set(existingMappings.map(m => m.marketplaceSku))
+      const centralProductMap = new Map(existingProducts.map(p => [p.sku, p]))
+
+      const toAutoMap: any[] = []
+      const toUpsertUnmapped: any[] = []
+
+      for (let i = 0; i < marketplaceProducts.length; i++) {
+        const mpProduct = marketplaceProducts[i]
+
+        if (!mappedSkus.has(mpProduct.sku)) {
+          const centralProduct = centralProductMap.get(mpProduct.sku)
           if (centralProduct) {
-            // Auto-map
-            await db.insert(productMappings).values({
+            toAutoMap.push({
               companyId,
               productId: centralProduct.id,
               marketplace: integration.type as any,
@@ -80,10 +78,8 @@ export async function syncProductsForCompany(companyId: string, integrationId?: 
               syncStock: true,
               syncPrice: false
             })
-            mappedCount++
           } else {
-            // Upsert into unmapped
-            await db.insert(unmappedMarketplaceProducts).values({
+            toUpsertUnmapped.push({
               companyId,
               marketplace: integration.type as any,
               marketplaceSku: mpProduct.sku,
@@ -92,30 +88,60 @@ export async function syncProductsForCompany(companyId: string, integrationId?: 
               price: mpProduct.price?.toString() || '0',
               stock: mpProduct.stock?.toString() || '0',
               rawPayload: mpProduct.rawPayload
-            }).onConflictDoUpdate({
-              target: [
-                unmappedMarketplaceProducts.companyId,
-                unmappedMarketplaceProducts.marketplace,
-                unmappedMarketplaceProducts.marketplaceSku
-              ],
-              set: {
-                title: mpProduct.title,
-                price: mpProduct.price?.toString() || '0',
-                stock: mpProduct.stock?.toString() || '0',
-                marketplaceProductId: mpProduct.marketplaceProductId,
-                rawPayload: mpProduct.rawPayload,
-                updatedAt: new Date()
-              }
             })
-            unmappedCount++
           }
         }
+
+        // Update progress in DB every 50 items to not overload DB
+        if ((i + 1) % 50 === 0 || i === marketplaceProducts.length - 1) {
+          await updateSyncStatus(integration.id, { 
+            isRunning: true, 
+            status: 'processing', 
+            message: `Verarbeite ${i + 1} von ${totalCount} Produkten...`, 
+            progress: i + 1, 
+            total: totalCount 
+          })
+        }
       }
-      
-      console.log(`[ProductSync] Completed ${integration.type}: ${mappedCount} mapped/auto-mapped, ${unmappedCount} unmapped.`)
+
+      await updateSyncStatus(integration.id, { isRunning: true, status: 'saving', message: `Speichere ${toUpsertUnmapped.length} ungemappte Produkte in die Datenbank...`, progress: totalCount, total: totalCount })
+
+      // Batch Inserts for AutoMap
+      if (toAutoMap.length > 0) {
+        for (let i = 0; i < toAutoMap.length; i += 100) {
+          const chunk = toAutoMap.slice(i, i + 100)
+          await db.insert(productMappings).values(chunk).onConflictDoNothing()
+        }
+      }
+
+      // Batch Inserts for Unmapped
+      if (toUpsertUnmapped.length > 0) {
+        for (let i = 0; i < toUpsertUnmapped.length; i += 100) {
+          const chunk = toUpsertUnmapped.slice(i, i + 100)
+          await db.insert(unmappedMarketplaceProducts).values(chunk).onConflictDoUpdate({
+            target: [
+              unmappedMarketplaceProducts.companyId,
+              unmappedMarketplaceProducts.marketplace,
+              unmappedMarketplaceProducts.marketplaceSku
+            ],
+            set: {
+              title: sql`EXCLUDED.title`,
+              price: sql`EXCLUDED.price`,
+              stock: sql`EXCLUDED.stock`,
+              marketplaceProductId: sql`EXCLUDED.marketplace_product_id`,
+              rawPayload: sql`EXCLUDED.raw_payload`,
+              updatedAt: new Date()
+            }
+          })
+        }
+      }
+
+      await updateSyncStatus(integration.id, { isRunning: false, status: 'done', message: `Import erfolgreich abgeschlossen.`, progress: totalCount, total: totalCount })
+      console.log(`[ProductSync] Completed ${integration.type}: ${toAutoMap.length} auto-mapped, ${toUpsertUnmapped.length} unmapped.`)
       
     } catch (error) {
       console.error(`[ProductSync] Failed to sync products for marketplace ${integration.type}`, error)
+      await updateSyncStatus(integration.id, { isRunning: false, status: 'error', message: `Ein Fehler ist aufgetreten.`, progress: 0, total: 0 })
     }
   }
 }
