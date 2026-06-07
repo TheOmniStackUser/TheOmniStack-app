@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { triggerManualSyncAction } from '@/app/actions/sync'
 import { useRouter } from 'next/navigation'
 
@@ -31,7 +31,6 @@ export function ManualImport({
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
 
   // Simulate progress while waiting for the server
-  import { useEffect } from 'react'
   useEffect(() => {
     if (isSyncing && syncProgress && syncProgress.current < syncProgress.total) {
       const timer = setInterval(() => {
