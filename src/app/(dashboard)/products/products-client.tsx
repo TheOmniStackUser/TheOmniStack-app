@@ -2,16 +2,21 @@
 
 import React, { useState, useMemo } from 'react'
 import Link from 'next/link'
-import { Package, Search, ChevronUp, ChevronDown, ChevronRight, Scale, MapPin, Tag, FileText, Barcode, ExternalLink } from 'lucide-react'
+import { Package, Search, ChevronUp, ChevronDown, ChevronRight, Scale, MapPin, Tag, FileText, Barcode, ExternalLink, Trash2 } from 'lucide-react'
 import { DeleteProductButton } from './delete-button'
+import { useRouter } from 'next/navigation'
 
 type Product = any
 
 export function ProductsClient({ initialProducts }: { initialProducts: Product[] }) {
+  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
   const [sortColumn, setSortColumn] = useState<string>('createdAt')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
+  const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set())
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false)
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
 
   const toggleSort = (column: string) => {
     if (sortColumn === column) {
@@ -30,6 +35,39 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
       newExpanded.add(id)
     }
     setExpandedRows(newExpanded)
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedProductIds.size === filteredAndSortedProducts.length && filteredAndSortedProducts.length > 0) {
+      setSelectedProductIds(new Set())
+    } else {
+      setSelectedProductIds(new Set(filteredAndSortedProducts.map(p => p.id)))
+    }
+  }
+
+  const toggleSelectProduct = (id: string) => {
+    const newSelected = new Set(selectedProductIds)
+    if (newSelected.has(id)) {
+      newSelected.delete(id)
+    } else {
+      newSelected.add(id)
+    }
+    setSelectedProductIds(newSelected)
+  }
+
+  const handleBulkDelete = async () => {
+    setIsBulkDeleting(true)
+    try {
+      const { bulkDeleteProducts } = await import('@/app/actions/products')
+      await bulkDeleteProducts(Array.from(selectedProductIds))
+      setSelectedProductIds(new Set())
+      setShowBulkDeleteConfirm(false)
+      router.refresh()
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setIsBulkDeleting(false)
+    }
   }
 
   const filteredAndSortedProducts = useMemo(() => {
@@ -86,7 +124,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-      <div className="p-4 border-b border-slate-100 flex gap-4">
+      <div className="p-4 border-b border-slate-100 flex gap-4 items-center">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input 
@@ -97,12 +135,40 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
             className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all text-slate-900 placeholder:text-slate-500"
           />
         </div>
+        
+        {selectedProductIds.size > 0 && (
+          <div className="flex items-center gap-3 animate-in fade-in slide-in-from-left-4">
+            <span className="text-sm font-medium text-slate-500">
+              {selectedProductIds.size} ausgewählt
+            </span>
+            <button
+              onClick={() => setShowBulkDeleteConfirm(true)}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors text-sm font-semibold border border-rose-200"
+            >
+              <Trash2 className="w-4 h-4" />
+              Löschen
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-slate-50/50 border-b border-slate-100">
+              <th className="w-12 px-4 text-center">
+                <input
+                  type="checkbox"
+                  checked={selectedProductIds.size > 0 && selectedProductIds.size === filteredAndSortedProducts.length}
+                  ref={input => {
+                    if (input) {
+                      input.indeterminate = selectedProductIds.size > 0 && selectedProductIds.size < filteredAndSortedProducts.length
+                    }
+                  }}
+                  onChange={toggleSelectAll}
+                  className="w-4 h-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-600 focus:ring-offset-0 bg-white cursor-pointer"
+                />
+              </th>
               <th className="w-10 px-4"></th>
               <Th column="sku">SKU</Th>
               <Th column="title">Titel</Th>
@@ -115,7 +181,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
           <tbody className="divide-y divide-slate-100">
             {filteredAndSortedProducts.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
+                <td colSpan={8} className="px-6 py-12 text-center text-slate-500">
                   <div className="flex flex-col items-center justify-center">
                     <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
                       <Package className="w-8 h-8 text-slate-300" />
@@ -128,12 +194,21 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
             ) : (
               filteredAndSortedProducts.map((product) => {
                 const isExpanded = expandedRows.has(product.id)
+                const isSelected = selectedProductIds.has(product.id)
                 return (
                   <React.Fragment key={product.id}>
                     <tr 
-                      className={`hover:bg-slate-50/50 transition-colors group cursor-pointer ${isExpanded ? 'bg-slate-50/50' : ''}`}
+                      className={`hover:bg-slate-50/50 transition-colors group cursor-pointer ${isExpanded ? 'bg-slate-50/50' : ''} ${isSelected ? 'bg-cyan-50/30' : ''}`}
                       onClick={() => toggleRow(product.id)}
                     >
+                      <td className="px-4 py-4 text-center" onClick={e => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelectProduct(product.id)}
+                          className="w-4 h-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-600 focus:ring-offset-0 bg-white cursor-pointer"
+                        />
+                      </td>
                       <td className="px-4 py-4 text-slate-400">
                         <ChevronRight className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-90 text-cyan-600' : ''}`} />
                       </td>
@@ -172,7 +247,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                     </tr>
                     {isExpanded && (
                       <tr className="bg-slate-50/30 border-b border-slate-100">
-                        <td colSpan={7} className="p-0">
+                        <td colSpan={8} className="p-0">
                           <div className="px-14 py-6 animate-in slide-in-from-top-2 fade-in duration-200">
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                               <div className="space-y-4">
@@ -235,6 +310,41 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
           </tbody>
         </table>
       </div>
+
+      {showBulkDeleteConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowBulkDeleteConfirm(false)}>
+          <div 
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col animate-in zoom-in-95 duration-200 relative overflow-hidden text-left" 
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <div className="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center mb-4">
+                <Trash2 className="w-6 h-6 text-rose-600" />
+              </div>
+              <h3 className="font-bold text-slate-900 text-xl mb-2">{selectedProductIds.size} {selectedProductIds.size === 1 ? 'Produkt' : 'Produkte'} löschen?</h3>
+              <p className="text-slate-500 text-sm">
+                Möchten Sie die {selectedProductIds.size} ausgewählten Produkte wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden und entfernt auch alle zugehörigen Marktplatz-Mappings.
+              </p>
+            </div>
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+              <button 
+                onClick={() => setShowBulkDeleteConfirm(false)}
+                className="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 transition-colors"
+                disabled={isBulkDeleting}
+              >
+                Abbrechen
+              </button>
+              <button 
+                onClick={handleBulkDelete}
+                className="px-4 py-2 text-sm font-semibold text-white bg-rose-600 rounded-xl hover:bg-rose-700 shadow-sm shadow-rose-600/20 transition-all flex items-center gap-2"
+                disabled={isBulkDeleting}
+              >
+                {isBulkDeleting ? 'Lösche...' : 'Endgültig löschen'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

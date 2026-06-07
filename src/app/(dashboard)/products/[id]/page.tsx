@@ -74,8 +74,10 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       sku: formData.get('sku') as string,
       ean: (formData.get('ean') as string) || null,
       description: (formData.get('description') as string) || null,
+      category: (formData.get('category') as string) || null,
       price: (formData.get('price') as string) || '0',
       purchasePrice: (formData.get('purchasePrice') as string) || null,
+      msrp: (formData.get('msrp') as string) || null,
       currentStock: (formData.get('currentStock') as string) || '0',
       weight: (formData.get('weight') as string) || null,
       storageLocation: (formData.get('storageLocation') as string) || null,
@@ -157,6 +159,10 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                   <label className="text-sm font-semibold text-slate-700">EAN / Barcode</label>
                   <input type="text" name="ean" defaultValue={product.ean || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 placeholder:text-slate-500" />
                 </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700">Kategorie</label>
+                  <input type="text" name="category" defaultValue={product.category || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 placeholder:text-slate-500" />
+                </div>
               </div>
               
               <div className="space-y-2">
@@ -176,6 +182,10 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700">Zentraler Preis (€)</label>
                 <input type="number" name="price" step="0.01" defaultValue={Number(product.price)} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 placeholder:text-slate-500" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700">UVP (€)</label>
+                <input type="number" name="msrp" step="0.01" defaultValue={product.msrp ? Number(product.msrp) : ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 placeholder:text-slate-500" />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700">Einkaufspreis (€)</label>

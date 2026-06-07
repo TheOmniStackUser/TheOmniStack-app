@@ -240,6 +240,22 @@ export async function deleteProduct(productId: string) {
   return { success: true }
 }
 
+export async function bulkDeleteProducts(productIds: string[]) {
+  const auth = await requireAuth()
+
+  if (!productIds || productIds.length === 0) return { success: true }
+
+  await db.delete(products).where(
+    and(
+      eq(products.companyId, auth.activeCompanyId),
+      inArray(products.id, productIds)
+    )
+  )
+
+  revalidatePath('/products')
+  return { success: true }
+}
+
 export async function deleteUnmappedProducts(unmappedProductIds: string[]) {
   const auth = await requireAuth()
 
