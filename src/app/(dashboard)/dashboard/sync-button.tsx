@@ -1,13 +1,14 @@
 'use client'
 
-import { useTransition, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { triggerManualSyncAction } from '@/app/actions/sync'
+import { triggerManualSyncAction, getActiveIntegrationsList } from '@/app/actions/sync'
 import { AlertCircle, CheckCircle2, X, Loader2 } from 'lucide-react'
 
 export function SyncButton() {
   const router = useRouter()
-  const [isPending, startTransition] = useTransition()
+  const [isPending, setIsPending] = useState(false)
+  const [syncProgress, setSyncProgress] = useState<{ current: number; total: number; label: string; simulatedProgress: number } | null>(null)
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
 
   const showNotification = (message: string, type: 'success' | 'error') => {
@@ -16,27 +17,73 @@ export function SyncButton() {
     setTimeout(() => setNotification(null), 8000)
   }
 
-  const handleSync = () => {
-    startTransition(async () => {
-      try {
-        // We use triggerManualSyncAction instead of triggerSyncAction 
-        // to get immediate feedback and wait for the results.
-        const result = await triggerManualSyncAction({ marketplace: 'all' })
+  // Simulate progress
+  useEffect(() => {
+    if (isPending && syncProgress && syncProgress.current < syncProgress.total) {
+      const timer = setInterval(() => {
+        setSyncProgress(prev => {
+          if (!prev) return prev;
+          const diff = 90 - prev.simulatedProgress;
+          const increment = Math.max(0.5, diff * 0.1);
+          return { ...prev, simulatedProgress: Math.min(90, prev.simulatedProgress + increment) };
+        });
+      }, 500);
+      return () => clearInterval(timer);
+    }
+  }, [isPending, syncProgress?.current, syncProgress?.total]);
+
+  const handleSync = async () => {
+    setIsPending(true)
+    setNotification(null)
+
+    try {
+      const integrations = await getActiveIntegrationsList()
+      
+      if (integrations.length === 0) {
+        showNotification('Es sind keine aktiven Marktplätze verknüpft.', 'error')
+        setIsPending(false)
+        return
+      }
+
+      setSyncProgress({ current: 0, total: integrations.length, label: integrations[0].label, simulatedProgress: 0 })
+
+      let totalAffected = 0
+      let hasError = false
+
+      for (let i = 0; i < integrations.length; i++) {
+        const currentMarketplace = integrations[i]
+        setSyncProgress({ current: i, total: integrations.length, label: currentMarketplace.label, simulatedProgress: 0 })
+        
+        const result = await triggerManualSyncAction({ marketplace: currentMarketplace.value })
         
         if (result?.error) {
+          hasError = true
           showNotification(result.error, 'error')
-        } else {
-          showNotification(result?.message || 'Import erfolgreich abgeschlossen.', 'success')
-          router.refresh()
+          break
         }
-      } catch (e) {
-        showNotification('Ein unerwarteter Fehler ist beim Import aufgetreten.', 'error')
+
+        if (result?.affected !== undefined) {
+          totalAffected += result.affected
+        }
       }
-    })
+
+      if (!hasError) {
+        setSyncProgress({ current: integrations.length, total: integrations.length, label: 'Abgeschlossen', simulatedProgress: 100 })
+        showNotification(totalAffected > 0 
+          ? `Import erfolgreich! ${totalAffected} neue Bestellung(en) wurden hinzugefügt.` 
+          : 'Import abgeschlossen! Es wurden keine neuen Bestellungen gefunden.', 'success')
+        router.refresh()
+      }
+    } catch (e) {
+      showNotification('Ein unerwarteter Fehler ist beim Import aufgetreten.', 'error')
+    } finally {
+      setIsPending(false)
+      setTimeout(() => setSyncProgress(null), 3000)
+    }
   }
 
   return (
-    <>
+    <div className="relative inline-block">
       {/* Toast Notification */}
       {notification && (
         <div className="fixed top-6 right-6 z-[9999] animate-in fade-in slide-in-from-top-4 duration-300">
@@ -89,6 +136,33 @@ export function SyncButton() {
           </>
         )}
       </button>
-    </>
+
+      {/* Dropdown Progress UI */}
+      {syncProgress && (
+        <div className="absolute top-full right-0 mt-3 w-72 animate-in fade-in slide-in-from-top-2 duration-300 bg-white p-4 rounded-xl shadow-xl border border-slate-200 z-[90]">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm font-medium text-slate-800">
+              {syncProgress.current < syncProgress.total ? `Importiere ${syncProgress.label}...` : 'Import abgeschlossen'}
+            </span>
+            <span className="text-sm font-bold text-slate-900">
+              {syncProgress.current < syncProgress.total 
+                ? Math.min(99, Math.round(((syncProgress.current / syncProgress.total) * 100) + ((syncProgress.simulatedProgress / 100) * (100 / syncProgress.total))))
+                : 100}%
+            </span>
+          </div>
+          <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+            <div 
+              className="bg-slate-900 h-2 rounded-full transition-all duration-500 ease-out" 
+              style={{ width: `${syncProgress.current < syncProgress.total 
+                ? Math.min(99, Math.round(((syncProgress.current / syncProgress.total) * 100) + ((syncProgress.simulatedProgress / 100) * (100 / syncProgress.total))))
+                : 100}%` }}
+            ></div>
+          </div>
+          <div className="mt-2 text-xs text-slate-500 text-right">
+            Marktplatz {Math.min(syncProgress.current + 1, syncProgress.total)} von {syncProgress.total}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }

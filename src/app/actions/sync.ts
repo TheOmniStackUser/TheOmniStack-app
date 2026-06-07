@@ -13,6 +13,47 @@ import { AboutYouAdapter } from '@/adapters/marketplace/aboutyou'
 import { persistOrders } from '@/workers/marketplace-sync'
 import type { NormalizedOrder } from '@/adapters/marketplace/base'
 
+export async function getActiveIntegrationsList() {
+  const auth = await requireAuth()
+
+  const activeIntegrations = await db
+    .select({ id: marketplaceIntegrations.id, type: marketplaceIntegrations.type, metadata: marketplaceIntegrations.metadata })
+    .from(marketplaceIntegrations)
+    .where(
+      and(
+        eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
+        eq(marketplaceIntegrations.isActive, true),
+        sql`${marketplaceIntegrations.type} NOT IN ('dhl', 'hermes')`
+      )
+    )
+
+  return activeIntegrations.map(integration => {
+    let label = integration.type as string
+    let value: string = integration.type
+
+    if (integration.type === 'mirakl_custom') {
+      label = (integration.metadata as any)?.customName || 'Custom Mirakl'
+      value = `mirakl_custom_${integration.id}`
+    } else if (integration.type === 'mirakl_decathlon' || integration.type === 'mirakl_decathlon_eu') {
+      label = 'Decathlon'
+    } else if (integration.type === 'otto') {
+      label = 'Otto'
+    } else if (integration.type === 'aboutyou') {
+      label = 'About You'
+    } else if (integration.type === 'kaufland') {
+      label = 'Kaufland'
+    } else if (integration.type === 'ebay') {
+      label = 'eBay'
+    } else if (integration.type === 'amazon') {
+      label = 'Amazon'
+    } else if (integration.type === 'shopify') {
+      label = 'Shopify'
+    }
+
+    return { label, value }
+  })
+}
+
 export async function triggerSyncAction() {
   const auth = await requireAuth()
 
