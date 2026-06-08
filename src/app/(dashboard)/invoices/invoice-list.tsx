@@ -1909,7 +1909,7 @@ export function InvoiceList({
                                Entwurf löschen
                              </button>
                            )}
-                           {invoice.status !== 'draft' && invoice.status !== 'cancelled' && !invoice.isCreditNote && (
+                           {invoice.status !== 'draft' && invoice.status !== 'cancelled' && (
                              <button
                                type="button"
                                onClick={() => { handleCreateStorno(invoice.id); setActiveRowMenuId(null); }}
@@ -1918,10 +1918,10 @@ export function InvoiceList({
                                <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                </svg>
-                               Storno erstellen
+                               {invoice.isCreditNote ? 'Gutschrift stornieren' : 'Storno erstellen'}
                              </button>
                            )}
-                           {invoice.status !== 'draft' && (
+                           {invoice.status !== 'draft' && !invoice.isCreditNote && (
                              <Link
                                href={`/invoices/new?clone=${invoice.id}&isCreditNote=true`}
                                onClick={() => setActiveRowMenuId(null)}
@@ -2428,7 +2428,7 @@ export function InvoiceList({
                                   </svg>
                                   XML herunterladen
                                 </button>
-                                {details.invoice.documentType === 'invoice' && !details.invoice.isCreditNote && details.invoice.status !== 'cancelled' && (
+                                {details.invoice.documentType === 'invoice' && details.invoice.status !== 'cancelled' && (
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -2440,10 +2440,10 @@ export function InvoiceList({
                                     <svg className="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
-                                    Storno erstellen
+                                    {details.invoice.isCreditNote ? 'Gutschrift stornieren' : 'Storno erstellen'}
                                   </button>
                                 )}
-                                {details.invoice.documentType === 'invoice' && details.invoice.status !== 'cancelled' && (
+                                {details.invoice.documentType === 'invoice' && !details.invoice.isCreditNote && details.invoice.status !== 'cancelled' && (
                                   <a
                                     href={`/invoices/new?clone=${details.invoice.id}&isCreditNote=true`}
                                     onClick={() => setShowMoreMenu(false)}

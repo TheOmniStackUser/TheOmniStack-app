@@ -495,7 +495,7 @@ export async function cancelInvoiceAction(invoiceId: string) {
       if (!invoice) throw new Error('Rechnung nicht gefunden')
       if (invoice.status === 'cancelled') throw new Error('Rechnung ist bereits storniert')
       if (invoice.documentType !== 'invoice') throw new Error('Nur Rechnungen können storniert werden')
-      if (invoice.isCreditNote) throw new Error('Gutschriften können nicht storniert werden')
+      // Removed restriction on cancelling credit notes so users can cancel Gutschriften too
 
       // 2. Fetch company document settings
       const [company] = await tx
