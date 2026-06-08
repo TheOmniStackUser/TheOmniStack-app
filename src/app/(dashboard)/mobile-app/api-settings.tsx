@@ -56,7 +56,7 @@ export function ApiSettings() {
         </div>
       }
       headerClassName="p-6 flex items-center justify-between cursor-pointer hover:bg-gray-50/50 bg-gray-50/50 transition-colors select-none"
-      defaultOpen={false}
+      defaultOpen={true}
     >
       <div className="p-6 space-y-6">
         <div className="space-y-2">

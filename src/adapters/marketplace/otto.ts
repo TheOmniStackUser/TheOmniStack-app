@@ -496,7 +496,7 @@ export class OttoAdapter implements MarketplaceAdapter {
         let quantitiesUrl: string | null = `${this.baseUrl}/v3/quantities?limit=100`
         while (quantitiesUrl) {
           console.log(`[OttoAdapter] Fetching quantities page: ${quantitiesUrl}`)
-          const qRes = await fetch(quantitiesUrl, {
+          const qRes: Response = await fetch(quantitiesUrl, {
             method: 'GET',
             headers: {
               'Authorization': `Bearer ${accessToken}`,

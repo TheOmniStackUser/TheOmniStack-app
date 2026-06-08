@@ -7,7 +7,6 @@ import { DocumentNumbersForm } from './document-numbers-form'
 import { VatSettings } from './vat-settings'
 import { MarketplaceAutomation } from './marketplace-automation'
 import { TwoFactorSettings } from './two-factor-settings'
-import { ApiSettings } from './api-settings'
 import { SmtpSettings } from './smtp-settings'
 import { DunningSettings } from './dunning-settings'
 import { vatSettings } from '@/db/schema/vat-settings'
@@ -87,8 +86,6 @@ export default async function SettingsPage(props: {
       <TwoFactorSettings initialEnabled={user?.twoFactorEnabled ?? false} />
 
       <MarketplaceAutomation integrations={integrations} />
-
-      <ApiSettings />
 
       <SmtpSettings company={company} />
 
