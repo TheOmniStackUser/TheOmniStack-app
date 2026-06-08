@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // Find matching Otto integration for the given company and environment
-    const integration = await db.query.marketplaceIntegrations.findFirst({
+    let integration = await db.query.marketplaceIntegrations.findFirst({
       where: and(
         eq(marketplaceIntegrations.companyId, state),
         eq(marketplaceIntegrations.type, 'otto'),
@@ -38,8 +38,15 @@ export async function GET(request: NextRequest) {
     })
 
     if (!integration) {
-      console.error(`[Otto OAuth Callback] No matching ${environment} integration found for company: ${state}`)
-      return NextResponse.json({ error: 'No matching integration configuration found' }, { status: 400 })
+      console.log(`[Otto OAuth Callback] No existing integration found. Creating new one for company: ${state}`)
+      const [newIntegration] = await db.insert(marketplaceIntegrations).values({
+        companyId: state,
+        type: 'otto',
+        environment: environment,
+        isActive: true,
+        metadata: {},
+      }).returning()
+      integration = newIntegration
     }
 
     const appClientId = process.env.OTTO_APP_CLIENT_ID || '9c74d78a-cc67-412f-8d25-7652b43ac41b'
