@@ -2576,7 +2576,7 @@ export function OrdersTable({
                                             type="text" 
                                             value={editBillingName} 
                                             onChange={(e) => setEditBillingName(e.target.value)}
-                                            className="w-full text-sm text-slate-900 placeholder:text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                            className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
                                           />
                                         </div>
                                         <div className="grid grid-cols-2 gap-2">
@@ -2586,7 +2586,7 @@ export function OrdersTable({
                                               type="text" 
                                               value={editBillingCompany} 
                                               onChange={(e) => setEditBillingCompany(e.target.value)}
-                                              className="w-full text-sm text-slate-900 placeholder:text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                              className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
                                             />
                                           </div>
                                           <div>
@@ -2595,7 +2595,7 @@ export function OrdersTable({
                                               type="text" 
                                               value={editBillingAddressAddition} 
                                               onChange={(e) => setEditBillingAddressAddition(e.target.value)}
-                                              className="w-full text-sm text-slate-900 placeholder:text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                              className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
                                             />
                                           </div>
                                         </div>
@@ -2605,7 +2605,7 @@ export function OrdersTable({
                                             type="text" 
                                             value={editBillingStreet} 
                                             onChange={(e) => setEditBillingStreet(e.target.value)}
-                                            className="w-full text-sm text-slate-900 placeholder:text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                            className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
                                           />
                                         </div>
                                         <div className="grid grid-cols-2 gap-2">
@@ -2615,7 +2615,7 @@ export function OrdersTable({
                                               type="text" 
                                               value={editBillingZip} 
                                               onChange={(e) => setEditBillingZip(e.target.value)}
-                                              className="w-full text-sm text-slate-900 placeholder:text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                              className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
                                             />
                                           </div>
                                           <div>
@@ -2624,7 +2624,7 @@ export function OrdersTable({
                                               type="text" 
                                               value={editBillingCity} 
                                               onChange={(e) => setEditBillingCity(e.target.value)}
-                                              className="w-full text-sm text-slate-900 placeholder:text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                              className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
                                             />
                                           </div>
                                         </div>
@@ -2635,7 +2635,7 @@ export function OrdersTable({
                                             value={editBillingCountry} 
                                             onChange={(e) => setEditBillingCountry(e.target.value)}
                                             maxLength={3}
-                                            className="w-full text-sm text-slate-900 placeholder:text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                            className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
                                           />
                                         </div>
                                         <div className="grid grid-cols-2 gap-2">
@@ -2645,7 +2645,7 @@ export function OrdersTable({
                                               type="email" 
                                               value={editBillingEmail} 
                                               onChange={(e) => setEditBillingEmail(e.target.value)}
-                                              className="w-full text-sm text-slate-900 placeholder:text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                              className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
                                             />
                                           </div>
                                           <div>
@@ -2654,7 +2654,7 @@ export function OrdersTable({
                                               type="text" 
                                               value={editBillingPhone} 
                                               onChange={(e) => setEditBillingPhone(e.target.value)}
-                                              className="w-full text-sm text-slate-900 placeholder:text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                              className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
                                             />
                                           </div>
                                         </div>
@@ -2721,7 +2721,7 @@ export function OrdersTable({
                                           type="text" 
                                           value={editName} 
                                           onChange={(e) => setEditName(e.target.value)}
-                                          className="w-full text-sm text-slate-900 placeholder:text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                          className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
                                         />
                                       </div>
                                       <div className="grid grid-cols-2 gap-2">
@@ -2731,7 +2731,7 @@ export function OrdersTable({
                                             type="text" 
                                             value={editCompany} 
                                             onChange={(e) => setEditCompany(e.target.value)}
-                                            className="w-full text-sm text-slate-900 placeholder:text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                            className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
                                           />
                                         </div>
                                         <div>
@@ -2740,7 +2740,7 @@ export function OrdersTable({
                                             type="text" 
                                             value={editAddressAddition} 
                                             onChange={(e) => setEditAddressAddition(e.target.value)}
-                                            className="w-full text-sm text-slate-900 placeholder:text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                            className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
                                           />
                                         </div>
                                       </div>
@@ -2750,7 +2750,7 @@ export function OrdersTable({
                                           type="text" 
                                           value={editStreet} 
                                           onChange={(e) => setEditStreet(e.target.value)}
-                                          className="w-full text-sm text-slate-900 placeholder:text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                          className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
                                         />
                                       </div>
                                       <div className="grid grid-cols-2 gap-2">
@@ -2760,7 +2760,7 @@ export function OrdersTable({
                                             type="text" 
                                             value={editZip} 
                                             onChange={(e) => setEditZip(e.target.value)}
-                                            className="w-full text-sm text-slate-900 placeholder:text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                            className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
                                           />
                                         </div>
                                         <div>
@@ -2769,7 +2769,7 @@ export function OrdersTable({
                                             type="text" 
                                             value={editCity} 
                                             onChange={(e) => setEditCity(e.target.value)}
-                                            className="w-full text-sm text-slate-900 placeholder:text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                            className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
                                           />
                                         </div>
                                       </div>
@@ -2780,7 +2780,7 @@ export function OrdersTable({
                                           value={editCountry} 
                                           onChange={(e) => setEditCountry(e.target.value)}
                                           maxLength={3}
-                                          className="w-full text-sm text-slate-900 placeholder:text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                          className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
                                         />
                                       </div>
                                       <div className="grid grid-cols-2 gap-2">
@@ -2790,7 +2790,7 @@ export function OrdersTable({
                                             type="email" 
                                             value={editEmail} 
                                             onChange={(e) => setEditEmail(e.target.value)}
-                                            className="w-full text-sm text-slate-900 placeholder:text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                            className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
                                           />
                                         </div>
                                         <div>
@@ -2799,7 +2799,7 @@ export function OrdersTable({
                                             type="text" 
                                             value={editPhone} 
                                             onChange={(e) => setEditPhone(e.target.value)}
-                                            className="w-full text-sm text-slate-900 placeholder:text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                            className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" 
                                           />
                                         </div>
                                       </div>
