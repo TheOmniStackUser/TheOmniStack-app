@@ -4,7 +4,8 @@ import {
   GetObjectCommand, 
   HeadBucketCommand, 
   CreateBucketCommand,
-  HeadObjectCommand
+  HeadObjectCommand,
+  DeleteObjectCommand
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
@@ -134,6 +135,24 @@ export async function documentExists(key: string): Promise<boolean> {
       return false
     }
     throw error
+  }
+}
+
+/**
+ * Delete a document from S3.
+ */
+export async function deleteDocument(key: string): Promise<boolean> {
+  try {
+    await ensureBucketExists()
+    await s3UploadClient.send(
+      new DeleteObjectCommand({
+        Bucket: BUCKET,
+        Key: key,
+      })
+    )
+    return true
+  } catch (error: any) {
+    return false
   }
 }
 

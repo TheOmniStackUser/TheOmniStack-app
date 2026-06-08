@@ -52,6 +52,8 @@ services:
     container_name: easybill_app
     ports:
       - "3000:3000"
+    environment:
+      - NODE_ENV=production
     env_file:
       - .env.local
     depends_on:
@@ -66,6 +68,8 @@ services:
     working_dir: /app
     volumes:
       - ./:/app
+    environment:
+      - NODE_ENV=production
     env_file:
       - .env.local
     command: npm run worker

@@ -501,6 +501,8 @@ export class MiraklAdapter implements MarketplaceAdapter {
           else if (isGb) resolvedCarrier = 'DHL_UK'
           else if (isEs) resolvedCarrier = 'DHL_SP'
           else resolvedCarrier = 'dhl'
+        } else if (isLimango) {
+          resolvedCarrier = 'dhl'
         } else {
           if (isDe) resolvedCarrier = 'DHLDE'
           else if (isNl) resolvedCarrier = 'DHL (NL)'
@@ -522,7 +524,7 @@ export class MiraklAdapter implements MarketplaceAdapter {
           else if (isGb) resolvedCarrier = 'Hermes'
           else resolvedCarrier = 'Hermes'
         } else if (isLimango) {
-          resolvedCarrier = 'Hermes'
+          resolvedCarrier = 'hermes'
         } else {
           if (isGb) resolvedCarrier = 'HermesUK'
           else resolvedCarrier = 'HermesGER' // Default to Germany Hermes
@@ -535,7 +537,7 @@ export class MiraklAdapter implements MarketplaceAdapter {
           else if (isBe) resolvedCarrier = 'dpd_be'
           else resolvedCarrier = 'DPD'
         } else if (isLimango) {
-          resolvedCarrier = 'DPD'
+          resolvedCarrier = 'dpd'
         }
       }
 

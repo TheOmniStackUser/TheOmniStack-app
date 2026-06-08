@@ -1,24 +1,38 @@
-import { marketplaceSyncQueue } from '../src/workers/marketplace-sync'
+import { marketplaceSyncQueue } from '../src/workers/marketplace-sync';
+import { db } from '../src/db/client';
+import { companies } from '../src/db/schema';
+import { eq } from 'drizzle-orm';
 
-const companyId = 'abe0132f-18e4-41a8-92f7-e65005cfa6aa'
-const userId = '00000000-0000-0000-0000-000000000000'
+async function main() {
+  const activeSyncCompanies = await db
+    .select({
+      id: companies.id,
+      name: companies.name,
+      fetchOrdersDaily: companies.fetchOrdersDaily,
+      fetchOrdersTime: companies.fetchOrdersTime,
+      fetchOrdersMarketplaces: companies.fetchOrdersMarketplaces,
+    })
+    .from(companies)
+    .where(eq(companies.fetchOrdersDaily, true));
 
-async function trigger() {
-  const marketplaces = ['otto', 'aboutyou', 'mirakl_decathlon']
-  
-  for (const mp of marketplaces) {
-    console.log(`Enqueuing sync for ${mp}...`)
+  for (const company of activeSyncCompanies) {
+    if (!company.fetchOrdersMarketplaces || company.fetchOrdersMarketplaces.length === 0) {
+      continue;
+    }
+    
+    console.log(`Triggering manual 'daily' sync for ${company.name}...`);
     await marketplaceSyncQueue.add(
-      `manual-sync-${mp}-${Date.now()}`,
+      'daily-marketplace-sync',
+      { companyId: company.id },
       {
-        companyId,
-        marketplace: mp as any,
-        triggeredByUserId: userId,
+        jobId: `manual-trigger-daily-${company.id}-${Date.now()}`,
+        removeOnComplete: true,
       }
-    )
+    );
   }
-  console.log('Done!')
-  process.exit(0)
+
+  console.log('Successfully added jobs to queue.');
+  process.exit(0);
 }
 
-trigger().catch(console.error)
+main().catch(console.error);

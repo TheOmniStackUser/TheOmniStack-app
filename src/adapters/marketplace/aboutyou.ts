@@ -393,7 +393,7 @@ export class AboutYouAdapter implements MarketplaceAdapter {
           if (data.pagination.next) {
             nextUrl = data.pagination.next.startsWith('http') 
               ? data.pagination.next 
-              : `${this.baseUrl}${data.pagination.next.startsWith('/') ? '' : '/'}${data.pagination.next}`
+              : new URL(data.pagination.next, this.baseUrl).toString()
           } else if (data.pagination.next_cursor) {
             nextUrl = `${this.baseUrl}/products?per_page=100&cursor=${data.pagination.next_cursor}`
           } else {

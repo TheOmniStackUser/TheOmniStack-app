@@ -32,7 +32,7 @@ import { createInvoiceForOrder, formatDocumentNumber, getDefaultSettings, extrac
 import { get2LetterCountryCode } from '@/lib/countries'
 
 // ─── Queue Name Constants ─────────────────────────────────────────────────────
-export const QUEUE_MARKETPLACE_SYNC = 'marketplace-sync'
+export const QUEUE_MARKETPLACE_SYNC = process.env.NODE_ENV === 'production' ? 'marketplace-sync' : 'marketplace-sync-dev'
 
 export type MarketplaceSyncJobData = {
   companyId: string
@@ -428,7 +428,10 @@ export async function syncShippedOrdersInvoices(
       const autoInvoiceEnabledAt = (integration.metadata as any)?.autoInvoiceEnabledAt
       const thresholdDate = autoInvoiceEnabledAt
         ? new Date(autoInvoiceEnabledAt)
-        : new Date('2026-05-26T12:00:00Z') // Default threshold to today to prevent invoicing older orders
+        : new Date('2026-05-01T00:00:00Z') // Default threshold to May 1st to prevent invoicing very old orders
+
+      console.log(`[Worker Debug] Querying candidateOrders for company=${companyId}, marketplace=${integration.type}`)
+      console.log(`[Worker Debug] thresholdDate=${thresholdDate.toISOString()}, autoInvoice=${autoInvoice}`)
 
       const candidateOrders = await db
         .select()
@@ -449,6 +452,22 @@ export async function syncShippedOrdersInvoices(
         )
 
       if (candidateOrders.length === 0) {
+        // Log to help debug why there are no candidates
+        const rawShippedOrdersCount = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(orders)
+          .where(
+            and(
+              eq(orders.companyId, companyId),
+              integration.type === 'mirakl_custom'
+                ? eq(orders.marketplace, ((integration.metadata as any)?.customName || 'mirakl_custom').toLowerCase())
+                : eq(orders.marketplace, integration.type),
+              eq(orders.status, 'shipped')
+            )
+          )
+        
+        console.log(`[Worker Debug] No candidateOrders found. Total shipped orders for marketplace: ${rawShippedOrdersCount[0]?.count}`)
+        
         continue
       }
 
