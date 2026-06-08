@@ -109,17 +109,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to retrieve installation details from Otto', details: errors, tokenData: tokenData }, { status: 400 })
     }
 
-    // Save installationId and appId to the integration record's metadata
+    // Save installationId, appId, access_token and refresh_token
+    // Save installationId, appId, access_token and refresh_token
     const metadata = {
       ...(integration.metadata as any || {}),
       installationId,
-      appId: finalAppId
+      appId: finalAppId,
+      tempTokenData: tokenData
     }
 
     await db
       .update(marketplaceIntegrations)
       .set({
         metadata,
+        accessToken: userAccessToken,
+        refreshToken: tokenData.refresh_token,
         updatedAt: new Date()
       })
       .where(eq(marketplaceIntegrations.id, integration.id))
@@ -127,9 +131,9 @@ export async function GET(request: NextRequest) {
     console.log(`[Otto OAuth Callback] Integration successfully updated in database!`)
 
     // Redirect the user back to the integrations settings page with a success message
-    const requestHost = request.headers.get('x-forwarded-host') || request.headers.get('host') || 'localhost:3000'
-    const proto = request.headers.get('x-forwarded-proto') || 'http'
-    const targetUrl = new URL('/integrations', `${proto}://${requestHost}`)
+    const targetHost = request.headers.get('x-forwarded-host') || request.headers.get('host') || 'localhost:3000'
+    const targetProto = request.headers.get('x-forwarded-proto') || 'http'
+    const targetUrl = new URL('/integrations', `${targetProto}://${targetHost}`)
     targetUrl.searchParams.set('status', 'otto_success')
     return NextResponse.redirect(targetUrl)
 
