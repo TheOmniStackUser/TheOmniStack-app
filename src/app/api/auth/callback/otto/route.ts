@@ -9,9 +9,9 @@ export async function GET(request: NextRequest) {
   let state = searchParams.get('state')
   const iss = searchParams.get('iss') || ''
 
-  // Fallback for Sandbox Installation without state
+  // Fallback if the invitation link dropped the state parameter
   if (!state) {
-    state = 'abe0132f-18e4-41a8-92f7-e65005cfa6aa'
+    state = request.cookies.get('otto_oauth_company_id')?.value || ''
   }
 
   console.log(`[Otto OAuth Callback] Received callback with code: ${code ? 'PRESENT' : 'MISSING'}, state: ${state}, iss: ${iss}`)

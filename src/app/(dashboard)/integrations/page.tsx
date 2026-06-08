@@ -195,6 +195,7 @@ export default async function IntegrationsPage(props: {
             >
               <div className="p-6 bg-gray-50">
                 <OttoIntegrationForm 
+                  companyId={companyId}
                   initialClientId={ottoIntegration?.clientId || ''} 
                   initialEnvironment={ottoIntegration?.environment || 'production'}
                   initialReturnAddressCarrierId={(ottoIntegration?.metadata as any)?.returnAddressCarrierId || ''}

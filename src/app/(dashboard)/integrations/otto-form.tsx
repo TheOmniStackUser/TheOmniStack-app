@@ -6,11 +6,13 @@ import { saveOttoIntegrationAction } from '@/app/actions/integrations'
 import { HelpCircle } from 'lucide-react'
 
 export function OttoIntegrationForm({ 
+  companyId,
   initialClientId, 
   initialEnvironment = 'production',
   initialReturnAddressCarrierId = '',
   initialConnectionType = 'service_partner'
 }: { 
+  companyId: string,
   initialClientId: string, 
   initialEnvironment?: string,
   initialReturnAddressCarrierId?: string,
@@ -18,6 +20,17 @@ export function OttoIntegrationForm({
 }) {
   const [state, action, pending] = useActionState(saveOttoIntegrationAction, undefined)
   const [connectionType, setConnectionType] = useState(initialConnectionType)
+  const [inviteLink, setInviteLink] = useState('')
+
+  const handleConnectOtto = () => {
+    if (!inviteLink) return
+    // Set cookie for fallback state mapping
+    document.cookie = `otto_oauth_company_id=${companyId}; path=/; max-age=3600`
+    
+    // Check if link already has query params
+    const separator = inviteLink.includes('?') ? '&' : '?'
+    window.location.href = `${inviteLink}${separator}state=${companyId}`
+  }
 
   return (
     <form action={action} className="space-y-6 max-w-xl">
@@ -117,11 +130,34 @@ export function OttoIntegrationForm({
           </div>
         </>
       ) : (
-        <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl text-blue-800 text-sm">
-          <p className="font-medium mb-2">Du nutzt die zentrale TheOmniStack App.</p>
-          <p className="leading-relaxed text-blue-700">
-            Klicke auf "Speichern", um die Grundeinstellungen zu sichern. Danach kannst du den Einladungslink verwenden, um die Verbindung mit OTTO herzustellen. Es müssen hier keine Zugangsdaten eingetragen werden.
-          </p>
+        <div className="p-5 bg-blue-50 border border-blue-200 rounded-xl space-y-4">
+          <div>
+            <p className="font-semibold text-blue-900 mb-1">Du nutzt die zentrale TheOmniStack App.</p>
+            <p className="text-sm text-blue-800 leading-relaxed">
+              Füge unten den Einladungslink ein, den du vom Support erhalten hast, um die Verbindung mit OTTO herzustellen.
+            </p>
+          </div>
+          
+          <div className="space-y-2">
+            <label htmlFor="inviteLink" className="block text-sm font-semibold text-blue-900">OTTO Einladungslink</label>
+            <input
+              type="text"
+              id="inviteLink"
+              value={inviteLink}
+              onChange={(e) => setInviteLink(e.target.value)}
+              className="w-full px-4 py-2 bg-white border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm text-slate-900 placeholder:text-slate-400"
+              placeholder="https://portal.otto.market/apps/..."
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={handleConnectOtto}
+            disabled={!inviteLink}
+            className="w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-medium rounded-xl transition-colors shadow-sm"
+          >
+            Jetzt mit OTTO verbinden
+          </button>
         </div>
       )}
 
