@@ -73,8 +73,8 @@ export async function syncProductsForCompany(companyId: string, integrationId?: 
               companyId,
               productId: centralProduct.id,
               marketplace: integration.type as any,
-              marketplaceSku: mpProduct.sku,
-              marketplaceProductId: mpProduct.marketplaceProductId,
+              marketplaceSku: String(mpProduct.sku),
+              marketplaceProductId: String(mpProduct.marketplaceProductId),
               syncStock: true,
               syncPrice: false
             })
@@ -82,8 +82,8 @@ export async function syncProductsForCompany(companyId: string, integrationId?: 
             toUpsertUnmapped.push({
               companyId,
               marketplace: integration.type as any,
-              marketplaceSku: mpProduct.sku,
-              marketplaceProductId: mpProduct.marketplaceProductId,
+              marketplaceSku: String(mpProduct.sku),
+              marketplaceProductId: String(mpProduct.marketplaceProductId),
               title: mpProduct.title,
               price: mpProduct.price?.toString() || '0',
               stock: mpProduct.stock?.toString() || '0',

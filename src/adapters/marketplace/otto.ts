@@ -44,7 +44,7 @@ export class OttoAdapter implements MarketplaceAdapter {
       },
       body: new URLSearchParams({
         grant_type: 'client_credentials',
-        scope: this.config.environment === 'sandbox' ? 'developer' : 'orders receipts shipments returns',
+        scope: this.config.environment === 'sandbox' ? 'developer' : 'orders receipts shipments returns products',
       }).toString(),
     })
 
@@ -460,7 +460,7 @@ export class OttoAdapter implements MarketplaceAdapter {
       const accessToken = await this.getAccessToken()
       const allProducts: any[] = []
       
-      let nextUrl: string | null = `${this.baseUrl}/v3/products?limit=100`
+      let nextUrl: string | null = `${this.baseUrl}/v4/products?limit=100`
 
       while (nextUrl) {
         console.log(`[OttoAdapter] Fetching products page: ${nextUrl}`)
@@ -478,7 +478,7 @@ export class OttoAdapter implements MarketplaceAdapter {
         }
 
         const data = await response.json()
-        const products = data.resources || []
+        const products = data.resources || data.productVariations || data.items || data.products || (Array.isArray(data) ? data : [])
         allProducts.push(...products)
 
         const nextLink = (data.links || []).find((l: any) => l.rel === 'next')
@@ -495,8 +495,8 @@ export class OttoAdapter implements MarketplaceAdapter {
       return allProducts.map((p: any) => ({
         marketplaceProductId: p.sku,
         sku: p.sku,
-        title: p.productTitle || p.sku,
-        price: p.standardPrice?.amount,
+        title: p.productTitle || p.title || p.productReference || p.sku,
+        price: p.standardPrice?.amount || p.price?.amount || p.pricing?.standardPrice?.amount,
         rawPayload: p
       }))
     } catch (error) {
