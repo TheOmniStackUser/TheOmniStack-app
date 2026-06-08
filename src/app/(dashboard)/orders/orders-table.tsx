@@ -232,8 +232,9 @@ const Tooltip = ({ title, subtitle, children }: { title: string; subtitle: strin
   )
 }
 
-const getOrderProgressStates = (order: OrderWithItems) => {
-  const isMarketplacePrepaid = ['otto', 'amazon', 'mirakl_decathlon', 'mirakl_decathlon_eu', 'mirakl_mediamarkt', 'aboutyou', 'kaufland', 'ebay'].includes(order.marketplace)
+const getOrderProgressStates = (order: OrderWithItems, customMiraklIntegrations: any[] = []) => {
+  const customMpNames = customMiraklIntegrations.map((i: any) => (i.metadata?.customName || '').toLowerCase())
+  const isMarketplacePrepaid = ['otto', 'amazon', 'mirakl_decathlon', 'mirakl_decathlon_eu', 'mirakl_mediamarkt', 'aboutyou', 'kaufland', 'ebay'].includes(order.marketplace?.toLowerCase() || '') || customMpNames.includes(order.marketplace?.toLowerCase() || '')
   const isShopifyPaid = order.marketplace === 'shopify' && ((order.rawPayload as any)?.financial_status === 'paid' || (order.rawPayload as any)?.financial_status === undefined)
   const paymentLog = order.invoice?.logs?.find((l: any) => l.action === 'payment')
   const isInvoicePaid = !!paymentLog
@@ -248,8 +249,8 @@ const getOrderProgressStates = (order: OrderWithItems) => {
   }
 }
 
-const renderOrderProgress = (order: OrderWithItems) => {
-  const states = getOrderProgressStates(order)
+const renderOrderProgress = (order: OrderWithItems, customMiraklIntegrations: any[] = []) => {
+  const states = getOrderProgressStates(order, customMiraklIntegrations)
   
   // 1. Ordered (Bestellt)
   const orderedDate = order.marketplacePurchaseDate || order.createdAt
@@ -264,7 +265,7 @@ const renderOrderProgress = (order: OrderWithItems) => {
     if (paymentLog) {
       const paymentDate = paymentLog.createdAt ? format(new Date(paymentLog.createdAt), 'dd.MM.yyyy HH:mm', { locale: de }) : ''
       paidTooltipSubtitle = `Zahlung erfasst am ${paymentDate}`
-    } else if (['otto', 'amazon', 'mirakl_decathlon', 'mirakl_decathlon_eu', 'mirakl_mediamarkt', 'aboutyou', 'kaufland', 'ebay'].includes(order.marketplace)) {
+    } else if (['otto', 'amazon', 'mirakl_decathlon', 'mirakl_decathlon_eu', 'mirakl_mediamarkt', 'aboutyou', 'kaufland', 'ebay'].includes(order.marketplace) || customMiraklIntegrations.map((i: any) => (i.metadata?.customName || '').toLowerCase()).includes(order.marketplace?.toLowerCase() || '')) {
       paidTooltipSubtitle = `Zahlung über ${formatMarketplaceName(order.marketplace, order.shippingCountry)}`
     } else if (order.marketplace === 'shopify') {
       paidTooltipSubtitle = "Zahlung über Shopify abgewickelt"
@@ -888,7 +889,7 @@ export function OrdersTable({
     }
     // Filter by Progress Status
     if (activeFilters.progress) {
-      const states = getOrderProgressStates(order)
+      const states = getOrderProgressStates(order, customMiraklIntegrations)
       for (const [key, value] of Object.entries(activeFilters.progress)) {
         const orderHasState = states[key as keyof typeof states]
         if (value === 'yes' && !orderHasState) return false
@@ -2193,7 +2194,7 @@ export function OrdersTable({
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {renderOrderProgress(order)}
+                        {renderOrderProgress(order, customMiraklIntegrations)}
                       </td>
                       <td className={`px-6 py-4 whitespace-nowrap text-right text-sm font-medium sticky right-0 transition-colors shadow-[-4px_0_4px_-2px_rgba(0,0,0,0.05)] ${
                         openMenuOrderId === order.id ? 'z-50 shadow-2xl' : 'z-10'
