@@ -6,8 +6,13 @@ import { eq, and } from 'drizzle-orm'
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const code = searchParams.get('code')
-  const state = searchParams.get('state')
+  let state = searchParams.get('state')
   const iss = searchParams.get('iss') || ''
+
+  // Fallback for Sandbox Installation without state
+  if (!state) {
+    state = 'abe0132f-18e4-41a8-92f7-e65005cfa6aa'
+  }
 
   console.log(`[Otto OAuth Callback] Received callback with code: ${code ? 'PRESENT' : 'MISSING'}, state: ${state}, iss: ${iss}`)
 
