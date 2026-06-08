@@ -490,6 +490,44 @@ export class OttoAdapter implements MarketplaceAdapter {
         }
       }
 
+      // Fetch quantities to map stock
+      const stockMap = new Map<string, number>()
+      try {
+        let quantitiesUrl: string | null = `${this.baseUrl}/v3/quantities?limit=100`
+        while (quantitiesUrl) {
+          console.log(`[OttoAdapter] Fetching quantities page: ${quantitiesUrl}`)
+          const qRes = await fetch(quantitiesUrl, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Accept': 'application/json'
+            }
+          })
+
+          if (qRes.ok) {
+            const qData = await qRes.json()
+            const resources = Array.isArray(qData) ? qData : (qData.resources || qData.items || [])
+            for (const item of resources) {
+              if (item.sku && item.quantity !== undefined) {
+                stockMap.set(item.sku, item.quantity)
+              }
+            }
+
+            const nextLink = (qData.links || []).find((l: any) => l.rel === 'next')
+            if (nextLink && nextLink.href) {
+              quantitiesUrl = nextLink.href.startsWith('http') ? nextLink.href : `${this.baseUrl}${nextLink.href}`
+            } else {
+              quantitiesUrl = null
+            }
+          } else {
+            console.warn(`[OttoAdapter] Failed to fetch quantities: ${qRes.status}`)
+            break
+          }
+        }
+      } catch (err) {
+        console.error(`[OttoAdapter] Error fetching quantities:`, err)
+      }
+
       // We might need to fetch quantities separately, but for unmapped listing, 
       // just returning the SKU and title is enough for mapping.
       // We will attempt to get price from standard price object.
@@ -498,6 +536,7 @@ export class OttoAdapter implements MarketplaceAdapter {
         sku: p.sku,
         title: p.productTitle || p.title || p.productReference || p.sku,
         price: p.standardPrice?.amount || p.price?.amount || p.pricing?.standardPrice?.amount,
+        stock: stockMap.get(p.sku),
         rawPayload: p
       }))
     } catch (error) {
