@@ -10,10 +10,10 @@ import { revalidatePath } from 'next/cache'
 import { marketplaceSyncQueue } from '@/workers/marketplace-sync'
 
 const OttoIntegrationSchema = z.object({
-  clientId: z.string().trim().optional(),
-  clientSecret: z.string().trim().optional(),
+  clientId: z.union([z.string(), z.null()]).optional().transform(v => v || ''),
+  clientSecret: z.union([z.string(), z.null()]).optional().transform(v => v || ''),
   environment: z.enum(['production', 'sandbox']).default('production'),
-  returnAddressCarrierId: z.string().trim().optional(),
+  returnAddressCarrierId: z.union([z.string(), z.null()]).optional().transform(v => v || ''),
   connectionType: z.enum(['service_partner', 'private']).default('service_partner'),
 }).superRefine((data, ctx) => {
   if (data.connectionType === 'private') {
