@@ -88,9 +88,13 @@ export async function executeRefund({
     if (!order.invoiceId) {
       console.log(`[RefundService] Order ${order.marketplaceOrderId} has no linked invoice. Creating invoice first...`)
       const invoiceResult = await createInvoiceForOrder(order.id, companyId, { txContext: undefined })
-      if (!invoiceResult || invoiceResult.skipped) {
+      if (!invoiceResult) {
         throw new Error(`Rechnung für Bestellung ${order.marketplaceOrderId} konnte nicht automatisch erzeugt werden.`)
       }
+      if (invoiceResult.skipped && invoiceResult.reason !== 'Invoice already exists') {
+        throw new Error(`Rechnung für Bestellung ${order.marketplaceOrderId} konnte nicht automatisch erzeugt werden. Grund: ${invoiceResult.reason}`)
+      }
+      
       // Reload order to obtain invoiceId
       const reloaded = await db.query.orders.findFirst({
         where: eq(orders.id, order.id)
