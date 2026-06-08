@@ -422,6 +422,7 @@ export class AboutYouAdapter implements MarketplaceAdapter {
           sku: p.sku || p.ean || p.id?.toString() || 'UNKNOWN',
           title: p.name || p.sku || p.ean || 'About You Product',
           price: priceValue,
+          stock: p.quantity ?? p.quantity_fbm ?? undefined,
           rawPayload: p
         }
       })
