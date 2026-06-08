@@ -363,8 +363,72 @@ export class AboutYouAdapter implements MarketplaceAdapter {
   }
 
   async fetchProducts(companyId: string): Promise<import('./base').MarketplaceProduct[]> {
-    console.log(`[AboutYouAdapter] Fetching products for company ${companyId}... (Stubbed)`)
-    return []
+    console.log(`[AboutYouAdapter] Fetching products for company ${companyId}...`)
+    try {
+      const allProducts: any[] = []
+      let nextUrl: string | null = `${this.baseUrl}/products?per_page=100`
+
+      while (nextUrl) {
+        console.log(`[AboutYouAdapter] Fetching products page: ${nextUrl}`)
+        const response: Response = await fetch(nextUrl, {
+          method: 'GET',
+          headers: {
+            'X-API-Key': this.config.apiKey,
+            'Accept': 'application/json'
+          }
+        })
+
+        if (!response.ok) {
+          const errText = await response.text()
+          throw new Error(`[AboutYouAdapter] Failed to fetch products: ${response.status} - ${errText}`)
+        }
+
+        const data = await response.json()
+        const items = data.items || []
+        allProducts.push(...items)
+        console.log(`[AboutYouAdapter] Fetched ${items.length} raw products in this page (total so far: ${allProducts.length}).`)
+
+        // Pagination for AboutYou API is typically cursor-based
+        if (data.pagination) {
+          if (data.pagination.next) {
+            nextUrl = data.pagination.next.startsWith('http') 
+              ? data.pagination.next 
+              : `${this.baseUrl}${data.pagination.next.startsWith('/') ? '' : '/'}${data.pagination.next}`
+          } else if (data.pagination.next_cursor) {
+            nextUrl = `${this.baseUrl}/products?per_page=100&cursor=${data.pagination.next_cursor}`
+          } else {
+            nextUrl = null
+          }
+        } else {
+          nextUrl = null
+        }
+      }
+
+      return allProducts.map((p: any) => {
+        let priceValue: number | undefined = undefined
+        if (p.prices && p.prices.length > 0) {
+          // Find DE price if exists, otherwise first price
+          const priceObj = p.prices.find((pr: any) => pr.country_code === 'DE') || p.prices[0]
+          if (priceObj) {
+            const currentPrice = priceObj.sale_price || priceObj.retail_price
+            if (currentPrice) {
+              priceValue = currentPrice / 100 // Convert cents to EUR
+            }
+          }
+        }
+
+        return {
+          marketplaceProductId: p.sku || p.ean || p.id?.toString(),
+          sku: p.sku || p.ean || p.id?.toString() || 'UNKNOWN',
+          title: p.name || p.sku || p.ean || 'About You Product',
+          price: priceValue,
+          rawPayload: p
+        }
+      })
+    } catch (error) {
+      console.error(`[AboutYouAdapter] Error fetching products:`, error)
+      throw error
+    }
   }
 
   async updateListings(
