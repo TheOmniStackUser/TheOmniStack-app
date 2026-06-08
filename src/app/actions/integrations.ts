@@ -10,11 +10,28 @@ import { revalidatePath } from 'next/cache'
 import { marketplaceSyncQueue } from '@/workers/marketplace-sync'
 
 const OttoIntegrationSchema = z.object({
-  clientId: z.string().min(1, { message: 'Client ID ist erforderlich.' }).trim(),
-  clientSecret: z.string().min(1, { message: 'Client Secret ist erforderlich.' }).trim(),
+  clientId: z.string().trim().optional(),
+  clientSecret: z.string().trim().optional(),
   environment: z.enum(['production', 'sandbox']).default('production'),
   returnAddressCarrierId: z.string().trim().optional(),
   connectionType: z.enum(['service_partner', 'private']).default('service_partner'),
+}).superRefine((data, ctx) => {
+  if (data.connectionType === 'private') {
+    if (!data.clientId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['clientId'],
+        message: 'Client ID ist für eine Private App erforderlich.',
+      })
+    }
+    if (!data.clientSecret) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['clientSecret'],
+        message: 'Client Secret ist für eine Private App erforderlich.',
+      })
+    }
+  }
 })
 
 export type IntegrationFormState =

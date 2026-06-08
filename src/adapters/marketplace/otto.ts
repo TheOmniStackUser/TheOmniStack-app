@@ -35,18 +35,21 @@ export class OttoAdapter implements MarketplaceAdapter {
    * Exchanges the Client ID and Secret for a short-lived Access Token
    */
   private async getAccessToken(): Promise<string> {
-    const basicAuth = Buffer.from(`${this.config.clientId}:${this.config.clientSecret}`).toString('base64')
+    const isPrivate = this.config.connectionType === 'private'
+    const tokenClientId = isPrivate ? this.config.clientId : (process.env.OTTO_APP_CLIENT_ID || '9c74d78a-cc67-412f-8d25-7652b43ac41b')
+    const tokenClientSecret = isPrivate ? this.config.clientSecret : (process.env.OTTO_APP_CLIENT_SECRET || 'f9600fd0-6cc2-4b77-a692-b472d65d331c')
+
+    const basicAuth = Buffer.from(`${tokenClientId}:${tokenClientSecret}`).toString('base64')
     
     const response = await fetch(this.tokenUrl, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Basic ${basicAuth}`,
       },
       body: new URLSearchParams({
         grant_type: 'client_credentials',
-        client_id: this.config.clientId,
-        client_secret: this.config.clientSecret,
-        scope: this.config.environment === 'sandbox' ? 'developer' : 'orders receipts shipments returns products',
+        scope: isPrivate ? 'orders products shipments returns receipts availability price-reduction' : 'developer',
       }).toString(),
     })
 

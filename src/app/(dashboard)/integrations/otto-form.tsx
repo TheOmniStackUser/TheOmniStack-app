@@ -61,63 +61,69 @@ export function OttoIntegrationForm({
             Private App (API-Benutzer)
           </button>
         </div>
-      </div>
-
-      <div className="space-y-1">
-        <div className="flex items-center gap-2">
-          <label htmlFor="clientId" className="block text-sm font-semibold text-gray-700">Client ID (API User)</label>
-          <div className="group relative">
-            <HelpCircle size={14} className="text-gray-400 cursor-help hover:text-blue-500 transition-colors" />
-            <div className="absolute left-6 top-0 w-64 p-3 bg-slate-900 text-white text-xs rounded-xl shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 transform -translate-y-1/4">
-              <p className="font-bold mb-1">Wo finde ich das?</p>
-              <p className="leading-relaxed text-slate-300">
-                {connectionType === 'private' 
-                  ? 'Erstelle in Otto Partner Connect unter Konfiguration > API-Zugriff einen neuen "API-Benutzer" oder eine "Private App".' 
-                  : 'Trage hier die Client ID deiner konfigurierten Service Partner App ein.'}
-              </p>
-              <div className="absolute left-0 top-3 -translate-x-full border-8 border-transparent border-r-slate-900"></div>
+      </div>      {connectionType === 'private' ? (
+        <>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <label htmlFor="clientId" className="block text-sm font-semibold text-gray-700">Client ID (API User)</label>
+              <div className="group relative">
+                <HelpCircle className="w-4 h-4 text-slate-400 cursor-help hover:text-slate-600 transition-colors" />
+                <div className="absolute left-6 top-0 w-64 p-3 bg-slate-900 text-white text-xs rounded-xl shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 transform -translate-y-1/4">
+                  <p className="font-bold mb-1">Wo finde ich das?</p>
+                  <p className="leading-relaxed text-slate-300">
+                    Erstelle in Otto Partner Connect unter Konfiguration &gt; API-Zugriff einen neuen "API-Benutzer" oder eine "Private App".
+                  </p>
+                  <div className="absolute left-0 top-3 -translate-x-full border-8 border-transparent border-r-slate-900"></div>
+                </div>
+              </div>
             </div>
+            <input
+              type="text"
+              id="clientId"
+              name="clientId"
+              defaultValue={initialClientId}
+              className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm text-slate-900 placeholder:text-slate-500"
+              placeholder="e.g. 8f72..."
+            />
+            {state?.errors?.clientId && (
+              <p className="text-sm text-red-600 font-medium animate-in slide-in-from-top-1">{state.errors.clientId[0]}</p>
+            )}
           </div>
-        </div>
-        <input
-          id="clientId"
-          name="clientId"
-          type="text"
-          defaultValue={initialClientId}
-          required
-          placeholder="z.B. user_abc123"
-          className="block w-full px-4 py-2.5 border border-gray-300 rounded-xl shadow-sm text-black focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all bg-white"
-        />
-        {state?.errors?.clientId && <p className="mt-1 text-sm text-red-600">{state.errors.clientId}</p>}
-      </div>
 
-      <div className="space-y-1">
-        <div className="flex items-center gap-2">
-          <label htmlFor="clientSecret" className="block text-sm font-semibold text-gray-700">Client Secret (Passwort)</label>
-          <div className="group relative">
-            <HelpCircle size={14} className="text-gray-400 cursor-help hover:text-blue-500 transition-colors" />
-            <div className="absolute left-6 top-0 w-64 p-3 bg-slate-900 text-white text-xs rounded-xl shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 transform -translate-y-1/4">
-              <p className="font-bold mb-1">Wichtig beim Secret</p>
-              <p className="leading-relaxed text-slate-300">
-                Das Client Secret wird nur einmalig bei der Erstellung des {connectionType === 'private' ? 'API-Benutzers' : 'Service Partner Apps'} im Otto Portal angezeigt. Falls du es verloren hast, musst du im Portal ein neues Secret generieren.
-              </p>
-              <div className="absolute left-0 top-3 -translate-x-full border-8 border-transparent border-r-slate-900"></div>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <label htmlFor="clientSecret" className="block text-sm font-semibold text-gray-700">Client Secret (Passwort)</label>
+              <div className="group relative">
+                <HelpCircle className="w-4 h-4 text-slate-400 cursor-help hover:text-slate-600 transition-colors" />
+                <div className="absolute left-6 top-0 w-64 p-3 bg-slate-900 text-white text-xs rounded-xl shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 transform -translate-y-1/4">
+                  <p className="font-bold mb-1">Wichtig beim Secret</p>
+                  <p className="leading-relaxed text-slate-300">
+                    Das Client Secret wird nur einmalig bei der Erstellung des API-Benutzers im Otto Portal angezeigt. Falls du es verloren hast, musst du im Portal ein neues Secret generieren.
+                  </p>
+                  <div className="absolute left-0 top-3 -translate-x-full border-8 border-transparent border-r-slate-900"></div>
+                </div>
+              </div>
             </div>
+            <input
+              type="password"
+              id="clientSecret"
+              name="clientSecret"
+              className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm text-slate-900 placeholder:text-slate-500"
+              placeholder="••••••••••••••••"
+            />
+            {state?.errors?.clientSecret && (
+              <p className="text-sm text-red-600 font-medium animate-in slide-in-from-top-1">{state.errors.clientSecret[0]}</p>
+            )}
           </div>
+        </>
+      ) : (
+        <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl text-blue-800 text-sm">
+          <p className="font-medium mb-2">Du nutzt die zentrale TheOmniStack App.</p>
+          <p className="leading-relaxed text-blue-700">
+            Klicke auf "Speichern", um die Grundeinstellungen zu sichern. Danach kannst du den Einladungslink verwenden, um die Verbindung mit OTTO herzustellen. Es müssen hier keine Zugangsdaten eingetragen werden.
+          </p>
         </div>
-        <input
-          id="clientSecret"
-          name="clientSecret"
-          type="password"
-          required={!initialClientId}
-          placeholder={initialClientId ? '••••••••••••••••' : 'Dein Otto.de API Passwort'}
-          className="block w-full px-4 py-2.5 border border-gray-300 rounded-xl shadow-sm text-black focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all bg-white"
-        />
-        {state?.errors?.clientSecret && <p className="mt-1 text-sm text-red-600">{state.errors.clientSecret}</p>}
-        <p className="text-[11px] text-gray-500 italic mt-1 px-1">
-          Dein Client Secret wird sicher verschlüsselt gespeichert.
-        </p>
-      </div>
+      )}
 
       <div>
         <label htmlFor="returnAddressCarrierId" className="block text-sm font-medium text-gray-700">Return Address Carrier ID (Optional)</label>

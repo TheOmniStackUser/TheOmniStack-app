@@ -37,12 +37,15 @@ export async function GET(request: NextRequest) {
       )
     })
 
-    if (!integration || !integration.clientId || !integration.clientSecret) {
+    if (!integration) {
       console.error(`[Otto OAuth Callback] No matching ${environment} integration found for company: ${state}`)
       return NextResponse.json({ error: 'No matching integration configuration found' }, { status: 400 })
     }
 
-    console.log(`[Otto OAuth Callback] Exchanging code for token using Client ID: ${integration.clientId}...`)
+    const appClientId = process.env.OTTO_APP_CLIENT_ID || '9c74d78a-cc67-412f-8d25-7652b43ac41b'
+    const appClientSecret = process.env.OTTO_APP_CLIENT_SECRET || 'f9600fd0-6cc2-4b77-a692-b472d65d331c'
+
+    console.log(`[Otto OAuth Callback] Exchanging code for token using Global App Client ID: ${appClientId}...`)
     const tokenResponse = await fetch(`${baseUrl}/oauth2/token`, {
       method: 'POST',
       headers: {
@@ -52,8 +55,8 @@ export async function GET(request: NextRequest) {
         grant_type: 'authorization_code',
         code: code,
         redirect_uri: redirectUri,
-        client_id: integration.clientId,
-        client_secret: integration.clientSecret,
+        client_id: appClientId,
+        client_secret: appClientSecret,
       }).toString(),
     })
 
@@ -77,7 +80,7 @@ export async function GET(request: NextRequest) {
           'b979c7bd-7e50-4b0e-bae2-d41d5fd2c1d7', 
           '69eb5ed304bb0234c14c27b5'
         ]
-      : ['6a0c0a71102c6f4203615ea3', '69eb5ed304bb0234c14c27b5']
+      : ['fb5f4e1a-5a8f-4eb3-89b1-237f359d4709', '6a0c0a71102c6f4203615ea3', '69eb5ed304bb0234c14c27b5']
 
     let installationId = ''
     let finalAppId = ''
