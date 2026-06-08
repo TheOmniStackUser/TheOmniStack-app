@@ -460,7 +460,7 @@ export class OttoAdapter implements MarketplaceAdapter {
       const accessToken = await this.getAccessToken()
       const allProducts: any[] = []
       
-      let nextUrl: string | null = `${this.baseUrl}/v4/products?limit=100`
+      let nextUrl: string | null = `${this.baseUrl}/v5/products?limit=100`
 
       while (nextUrl) {
         console.log(`[OttoAdapter] Fetching products page: ${nextUrl}`)
