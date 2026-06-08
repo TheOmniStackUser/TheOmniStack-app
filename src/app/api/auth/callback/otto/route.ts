@@ -80,6 +80,7 @@ export async function GET(request: NextRequest) {
 
     let installationId = ''
     let finalAppId = ''
+    const errors: any[] = []
 
     for (const appId of appIdsToTry) {
       console.log(`[Otto OAuth Callback] Fetching installation ID with App ID: ${appId}...`)
@@ -99,12 +100,13 @@ export async function GET(request: NextRequest) {
       } else {
         const errText = await installResponse.text()
         console.warn(`[Otto OAuth Callback] App ID ${appId} failed: ${installResponse.status} - ${errText}`)
+        errors.push({ appId, status: installResponse.status, error: errText })
       }
     }
 
     if (!installationId) {
-      console.error('[Otto OAuth Callback] Could not retrieve installation ID with any of the configured App IDs')
-      return NextResponse.json({ error: 'Failed to retrieve installation details from Otto' }, { status: 400 })
+      console.error('[Otto OAuth Callback] Could not retrieve installation ID with any of the configured App IDs', errors)
+      return NextResponse.json({ error: 'Failed to retrieve installation details from Otto', details: errors }, { status: 400 })
     }
 
     // Save installationId and appId to the integration record's metadata
