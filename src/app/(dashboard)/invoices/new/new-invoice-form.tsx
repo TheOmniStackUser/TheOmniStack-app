@@ -6,7 +6,7 @@ import { createManualInvoiceAction, editManualInvoiceAction, previewInvoiceActio
 import { getInvoiceSettingsAction, saveInvoiceTemplateAction } from '@/app/actions/invoice-settings'
 import { searchCustomersAction, validateVatAction } from '@/app/actions/customers'
 import { getInvoiceDetailsForCloneAction } from '@/app/actions/invoices'
-import { WORLD_COUNTRIES, EU_COUNTRIES } from '@/lib/countries'
+import { WORLD_COUNTRIES, EU_COUNTRIES, get2LetterCountryCode } from '@/lib/countries'
 
 export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'invoice' | 'quote' | 'delivery_note' }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -173,7 +173,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
         street: invoice.recipientStreet || '',
         zip: invoice.recipientZip || '',
         city: invoice.recipientCity || '',
-        country: invoice.recipientCountry || 'DE',
+        country: get2LetterCountryCode(invoice.recipientCountry),
         email: invoice.recipientEmail || '',
         vatId: '',
         customerNumber: (invoice as any).customerNumber || ''
@@ -193,9 +193,9 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
         discount: (invoice as any).discountRate || 0,
         skontoPercent: (invoice as any).skontoRate || 0,
         skontoDays: (invoice as any).skontoDays || 7,
-        shippingCountry: (invoice as any).shippingCountry || 'DE',
-        destinationCountry: (invoice as any).destinationCountry || 'DE',
-        taxCountry: (invoice as any).taxCountry || 'DE',
+        shippingCountry: get2LetterCountryCode((invoice as any).shippingCountry),
+        destinationCountry: get2LetterCountryCode((invoice as any).destinationCountry),
+        taxCountry: get2LetterCountryCode((invoice as any).taxCountry),
         orderNumber: (invoice as any).orderNumber || '',
         orderDate: (invoice as any).orderDate || '',
         buyerReference: (invoice as any).buyerReference || '',
@@ -223,7 +223,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
         street: invoice.recipientStreet || '',
         zip: invoice.recipientZip || '',
         city: invoice.recipientCity || '',
-        country: invoice.recipientCountry || 'DE',
+        country: get2LetterCountryCode(invoice.recipientCountry),
         email: invoice.recipientEmail || '',
         vatId: '',
         customerNumber: (invoice as any).customerNumber || ''
@@ -242,9 +242,9 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
         discount: invoice.discountRate || 0,
         skontoPercent: invoice.skontoRate || 0,
         skontoDays: invoice.skontoDays || 7,
-        shippingCountry: invoice.shippingCountry || 'DE',
-        destinationCountry: invoice.destinationCountry || 'DE',
-        taxCountry: invoice.taxCountry || 'DE',
+        shippingCountry: get2LetterCountryCode(invoice.shippingCountry),
+        destinationCountry: get2LetterCountryCode(invoice.destinationCountry),
+        taxCountry: get2LetterCountryCode(invoice.taxCountry),
         orderNumber: invoice.orderNumber || '',
         orderDate: isCreditNoteParam === 'true' ? new Date().toISOString().split('T')[0] : (invoice.orderDate || ''),
         buyerReference: invoice.buyerReference || '',

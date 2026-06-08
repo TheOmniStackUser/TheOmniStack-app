@@ -119,6 +119,12 @@ export function get2LetterCountryCode(country: string | null | undefined): strin
     IDN: 'ID',
   };
 
-  return mapping[clean] || clean;
+  if (mapping[clean]) return mapping[clean];
+
+  // Try to find by name if it wasn't a 3-letter code
+  const foundByName = WORLD_COUNTRIES.find(c => c.name.toUpperCase() === clean);
+  if (foundByName) return foundByName.code;
+
+  return clean;
 }
 
