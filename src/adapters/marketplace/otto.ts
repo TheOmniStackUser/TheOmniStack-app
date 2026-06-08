@@ -493,7 +493,7 @@ export class OttoAdapter implements MarketplaceAdapter {
       // Fetch quantities to map stock
       const stockMap = new Map<string, number>()
       try {
-        let quantitiesUrl: string | null = `${this.baseUrl}/v3/quantities?limit=100`
+        let quantitiesUrl: string | null = `${this.baseUrl}/v1/availability/quantities?limit=100`
         while (quantitiesUrl) {
           console.log(`[OttoAdapter] Fetching quantities page: ${quantitiesUrl}`)
           const qRes: Response = await fetch(quantitiesUrl, {
