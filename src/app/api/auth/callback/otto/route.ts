@@ -70,6 +70,7 @@ export async function GET(request: NextRequest) {
     // For sandbox, we try the V2, V3, and V4 App IDs
     const appIdsToTry = environment === 'sandbox' 
       ? [
+          '058cc42c-8af7-4e48-8ca7-25437c08f5a8', // New App ID
           '6a26b8f2905ebc23fd43ad87', // V4 App ID
           'b5761696-72b1-4193-9995-0006d62e85ee', // V4 Public App ID
           '6a0c0a71102c6f4203615ea3', 
