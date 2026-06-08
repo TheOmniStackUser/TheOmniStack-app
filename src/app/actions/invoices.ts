@@ -159,7 +159,15 @@ export async function generateMissingInvoicesAction() {
         (i.type === 'mirakl_custom' && 
          ((i.metadata as any)?.customName || '').toLowerCase() === (order.marketplace || '').toLowerCase())
       )
-      const downloadInvoice = !!(integration?.metadata as any)?.downloadInvoice
+      
+      let downloadInvoice = !!(integration?.metadata as any)?.downloadInvoice
+      if (integration && !downloadInvoice && !integration.autoInvoice) {
+        const cannotCreateInvoice = integration.type === 'otto' || integration.type === 'aboutyou'
+        const isMirakl = integration.type.startsWith('mirakl_') || integration.type === 'mirakl_custom'
+        if (cannotCreateInvoice || isMirakl) {
+          downloadInvoice = true
+        }
+      }
 
       if (downloadInvoice && integration) {
         // Skip downloading invoice if the order has not been shipped yet

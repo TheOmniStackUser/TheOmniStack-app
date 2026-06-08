@@ -203,13 +203,20 @@ export async function generateOrDownloadInvoicesBulkAction(orderIds: string[]) {
         continue
       }
 
-      const downloadInvoice = !!(integration.metadata as any)?.downloadInvoice
-      const autoInvoice = !!integration.autoInvoice
+      let downloadInvoice = !!(integration.metadata as any)?.downloadInvoice
+      let autoInvoice = !!integration.autoInvoice
 
+      // Allow manual override: If the user clicked the button, they want to generate/download invoices
+      // regardless of the automation settings.
       if (!downloadInvoice && !autoInvoice) {
-        errorsList.push({ orderNumber: order.marketplaceOrderId, error: `Weder 'Auto-Rechnung' noch 'Auto-Download' ist für '${order.marketplace}' aktiv.` })
-        errorCount++
-        continue
+        const cannotCreateInvoice = integration.type === 'otto' || integration.type === 'aboutyou'
+        const isMirakl = integration.type.startsWith('mirakl_') || integration.type === 'mirakl_custom'
+        
+        if (cannotCreateInvoice || isMirakl) {
+          downloadInvoice = true
+        } else {
+          autoInvoice = true
+        }
       }
 
       const adapter = getAdapterForIntegration(integration)
@@ -217,8 +224,13 @@ export async function generateOrDownloadInvoicesBulkAction(orderIds: string[]) {
       try {
         if (downloadInvoice) {
           if (adapter) {
-            await downloadAndSaveMarketplaceInvoice(order.id, order.companyId, adapter)
-            successCount++
+            const downloaded = await downloadAndSaveMarketplaceInvoice(order.id, order.companyId, adapter)
+            if (downloaded) {
+              successCount++
+            }
+            // If not downloaded, we intentionally skip adding an error here because 
+            // the background worker will automatically retry downloading it later once 
+            // the marketplace generates the invoice.
           } else {
             errorsList.push({ orderNumber: order.marketplaceOrderId, error: 'Marktplatz-Schnittstelle (Adapter) konnte nicht initialisiert werden.' })
             errorCount++

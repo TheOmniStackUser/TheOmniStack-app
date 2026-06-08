@@ -97,8 +97,9 @@ export class OttoAdapter implements MarketplaceAdapter {
       const accessToken = await this.getAccessToken()
       
       let nextUrl: string | null = `${this.baseUrl}/v4/orders?fulfillmentStatus=PROCESSABLE&limit=50`
-      if (options?.fromDate) nextUrl += `&fromOrderDate=${options.fromDate}T00:00:00Z`
-      if (options?.toDate) nextUrl += `&toOrderDate=${options.toDate}T23:59:59Z`
+      // We intentionally ignore options.fromDate and options.toDate for PROCESSABLE orders
+      // because we want to fetch ALL unshipped orders. Otherwise users selecting "Today" 
+      // will miss orders from yesterday evening or due to UTC timezone offsets.
 
       const allRawOrders: any[] = []
 

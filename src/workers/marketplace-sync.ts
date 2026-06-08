@@ -459,11 +459,11 @@ export async function syncShippedOrdersInvoices(
       for (const order of candidateOrders) {
         try {
           if (downloadInvoice) {
-            if (!adapter) {
+            if (adapter) {
+              await downloadAndSaveMarketplaceInvoice(order.id, companyId, adapter)
+            } else {
               console.error(`[Worker] Failed to initialize adapter for ${integration.type} during syncShippedOrdersInvoices download`)
-              continue
             }
-            await downloadAndSaveMarketplaceInvoice(order.id, companyId, adapter)
           } else if (autoInvoice) {
             console.log(`[Worker] Recovery: Auto-generating invoice for order ${order.marketplaceOrderId}...`)
             const invResult = await createInvoiceForOrder(order.id, companyId)
@@ -572,10 +572,10 @@ export async function downloadAndSaveMarketplaceInvoice(
   orderId: string,
   companyId: string,
   adapter?: MarketplaceAdapter | null
-) {
+): Promise<boolean> {
   if (!adapter || !adapter.getInvoice) {
     console.log(`[Worker] Adapter does not support getInvoice for order ${orderId}`)
-    return
+    return false
   }
 
   // Load order and items
@@ -586,12 +586,12 @@ export async function downloadAndSaveMarketplaceInvoice(
 
   if (!order) {
     console.error(`[Worker] Order ${orderId} not found when downloading invoice.`)
-    return
+    return false
   }
 
   if (order.invoiceId) {
     console.log(`[Worker] Order ${orderId} already has an invoice ${order.invoiceId}, skipping.`)
-    return
+    return true
   }
 
   console.log(`[Worker] Downloading marketplace invoice for order ${order.marketplaceOrderId}...`)
@@ -599,7 +599,7 @@ export async function downloadAndSaveMarketplaceInvoice(
     const result = await adapter.getInvoice(order.marketplaceOrderId, order.rawPayload)
     if (!result) {
       console.log(`[Worker] Adapter returned no invoice for order ${order.marketplaceOrderId}`)
-      return
+      return false
     }
 
     let pdfBuffer: Buffer
@@ -617,7 +617,7 @@ export async function downloadAndSaveMarketplaceInvoice(
 
       if (!company) {
         console.error(`[Worker] Company ${companyId} not found when generating invoice number.`)
-        return
+        return false
       }
 
       const dbSettings = company.documentNumberSettings as any
@@ -761,8 +761,10 @@ export async function downloadAndSaveMarketplaceInvoice(
     })
 
     console.log(`[Worker] Saved downloaded invoice ${invoiceNumber} for order ${order.marketplaceOrderId}`)
+    return true
   } catch (err) {
     console.error(`[Worker] Error downloading and saving invoice for order ${order.marketplaceOrderId}:`, err)
+    return false
   }
 }
 
