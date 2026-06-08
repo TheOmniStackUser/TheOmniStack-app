@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation'
 import { ReturnsList } from './returns-list'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 120
 
 export default async function ReturnsPage() {
   const auth = await requireAuth()
