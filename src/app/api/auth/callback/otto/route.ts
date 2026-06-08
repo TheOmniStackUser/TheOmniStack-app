@@ -106,7 +106,7 @@ export async function GET(request: NextRequest) {
 
     if (!installationId) {
       console.error('[Otto OAuth Callback] Could not retrieve installation ID with any of the configured App IDs', errors)
-      return NextResponse.json({ error: 'Failed to retrieve installation details from Otto', details: errors }, { status: 400 })
+      return NextResponse.json({ error: 'Failed to retrieve installation details from Otto', details: errors, tokenData: tokenData }, { status: 400 })
     }
 
     // Save installationId and appId to the integration record's metadata
