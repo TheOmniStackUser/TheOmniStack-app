@@ -4,7 +4,7 @@ import { useState, Fragment, ReactNode, useEffect, useMemo } from 'react'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
 import { generateHermesLabelsAction, generateDhlLabelsAction } from '@/app/actions/shipping'
-import { archiveOrderAction, archiveOrdersBulkAction, updateOrderStatusAction, updateOrderAddressAction, updateOrderBillingAddressAction, generateOrDownloadInvoicesBulkAction, markOrderAsShippedManuallyAction, getOrderLabelsAction } from '@/app/actions/orders'
+import { archiveOrderAction, archiveOrdersBulkAction, updateOrderStatusAction, updateOrderAddressAction, updateOrderBillingAddressAction, generateOrDownloadInvoicesBulkAction, markOrderAsShippedManuallyAction, getOrderLabelsAction, updateOrderNotesAction } from '@/app/actions/orders'
 import { getInvoiceDownloadUrl } from '@/app/actions/invoices'
 import type { Order, OrderItem } from '@/db/schema/orders'
 import type { Invoice, InvoiceLog } from '@/db/schema/invoices'
@@ -574,6 +574,26 @@ export function OrdersTable({
   const [editBillingEmail, setEditBillingEmail] = useState('')
   const [editBillingPhone, setEditBillingPhone] = useState('')
   const [isUpdatingBillingAddress, setIsUpdatingBillingAddress] = useState(false)
+
+  const [editNotes, setEditNotes] = useState<Record<string, string>>({})
+  const handleNoteBlur = async (orderId: string) => {
+    const note = editNotes[orderId] ?? ''
+    const result = await updateOrderNotesAction(orderId, note)
+    if (result.success) {
+      setToast({ message: 'Notiz gespeichert', type: 'success' })
+    } else {
+      setToast({ message: result.error || 'Fehler beim Speichern der Notiz', type: 'error' })
+    }
+  }
+
+  // Effect to initialize editNotes when orders expand or load
+  useEffect(() => {
+    const initialNotes: Record<string, string> = {}
+    orders.forEach(o => {
+      if (o.notes) initialNotes[o.id] = o.notes
+    })
+    setEditNotes(prev => ({ ...initialNotes, ...prev }))
+  }, [orders])
 
   const startEditingBillingAddress = (order: OrderWithItems) => {
     const addr = getBillingAddress(order)
@@ -2565,6 +2585,16 @@ export function OrdersTable({
                                     </button>
                                   </div>
                                 )}
+                                <div className="pt-2">
+                                  <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1">Interne Notiz zur Bestellung</label>
+                                  <textarea
+                                    className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 bg-amber-50/30 min-h-[60px]"
+                                    placeholder="Z.B. Achtung nicht erstatten Umtausch versendet..."
+                                    value={editNotes[order.id] ?? ''}
+                                    onChange={(e) => setEditNotes(prev => ({ ...prev, [order.id]: e.target.value }))}
+                                    onBlur={() => handleNoteBlur(order.id)}
+                                  />
+                                </div>
                                 <div>
                                   {editingBillingAddressId === order.id ? (
                                     <div>

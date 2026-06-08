@@ -12,6 +12,7 @@ export type OttoAdapterConfig = {
   environment?: 'sandbox' | 'production'
   installationId?: string
   appId?: string
+  connectionType?: 'service_partner' | 'private'
 }
 
 export class OttoAdapter implements MarketplaceAdapter {
@@ -26,8 +27,8 @@ export class OttoAdapter implements MarketplaceAdapter {
       : 'https://api.otto.market'
       
     this.tokenUrl = config.environment === 'sandbox'
-      ? 'https://sandbox.api.otto.market/v1/token'
-      : 'https://api.otto.market/v1/token'
+      ? 'https://sandbox.api.otto.market/oauth2/token'
+      : 'https://api.otto.market/oauth2/token'
   }
 
   /**
@@ -39,11 +40,12 @@ export class OttoAdapter implements MarketplaceAdapter {
     const response = await fetch(this.tokenUrl, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': `Basic ${basicAuth}`
+        'Content-Type': 'application/x-www-form-urlencoded'
       },
       body: new URLSearchParams({
         grant_type: 'client_credentials',
+        client_id: this.config.clientId,
+        client_secret: this.config.clientSecret,
         scope: this.config.environment === 'sandbox' ? 'developer' : 'orders receipts shipments returns products',
       }).toString(),
     })
@@ -55,6 +57,12 @@ export class OttoAdapter implements MarketplaceAdapter {
 
     const data = await response.json()
     const developerToken = data.access_token
+
+    // If this is a Private App, the developer token is all we need
+    if (this.config.connectionType === 'private') {
+      console.log(`[OttoAdapter] Using Private App flow. Dev Token is fully authorized.`)
+      return developerToken
+    }
 
     // If sandbox and we have installation details, exchange developer token for installation access token
     if (this.config.environment === 'sandbox' && this.config.installationId && this.config.appId) {
@@ -70,7 +78,7 @@ export class OttoAdapter implements MarketplaceAdapter {
         },
         body: new URLSearchParams({
           grant_type: 'client_credentials',
-          scope: 'orders receipts shipments returns'
+          scope: 'orders products shipments returns receipts availability price-reduction'
         }).toString()
       })
 

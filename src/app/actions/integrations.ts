@@ -14,6 +14,7 @@ const OttoIntegrationSchema = z.object({
   clientSecret: z.string().min(1, { message: 'Client Secret ist erforderlich.' }).trim(),
   environment: z.enum(['production', 'sandbox']).default('production'),
   returnAddressCarrierId: z.string().trim().optional(),
+  connectionType: z.enum(['service_partner', 'private']).default('service_partner'),
 })
 
 export type IntegrationFormState =
@@ -31,15 +32,19 @@ export async function saveOttoIntegrationAction(
     clientSecret: formData.get('clientSecret'),
     environment: formData.get('environment'),
     returnAddressCarrierId: formData.get('returnAddressCarrierId'),
+    connectionType: formData.get('connectionType'),
   })
 
   if (!validated.success) {
     return { errors: validated.error.flatten().fieldErrors }
   }
 
-  const { clientId, clientSecret, environment, returnAddressCarrierId } = validated.data
+  const { clientId, clientSecret, environment, returnAddressCarrierId, connectionType } = validated.data
 
-  const metadata = returnAddressCarrierId ? { returnAddressCarrierId } : null
+  const metadata = {
+    ...(returnAddressCarrierId ? { returnAddressCarrierId } : {}),
+    connectionType,
+  }
 
   // Check if integration already exists
   const [existing] = await db
@@ -54,9 +59,16 @@ export async function saveOttoIntegrationAction(
     .limit(1)
 
   if (existing) {
+    const existingMetadata = (existing as any).metadata || {}
     await db
       .update(marketplaceIntegrations)
-      .set({ clientId, clientSecret, environment, metadata, updatedAt: new Date() })
+      .set({ 
+        clientId, 
+        clientSecret, 
+        environment, 
+        metadata: { ...existingMetadata, ...metadata }, 
+        updatedAt: new Date() 
+      })
       .where(eq(marketplaceIntegrations.id, existing.id))
   } else {
     await db

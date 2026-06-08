@@ -578,3 +578,27 @@ export async function getOrderLabelsAction(orderId: string) {
   }
 }
 
+export async function updateOrderNotesAction(orderId: string, notes: string | null) {
+  try {
+    const auth = await requireAuth()
+
+    await db
+      .update(orders)
+      .set({ 
+        notes,
+        updatedAt: new Date()
+      })
+      .where(
+        and(
+          eq(orders.id, orderId),
+          eq(orders.companyId, auth.activeCompanyId)
+        )
+      )
+
+    revalidatePath('/orders')
+    return { success: true, message: 'Notiz wurde erfolgreich gespeichert.' }
+  } catch (error) {
+    console.error('Error updating order notes:', error)
+    return { error: 'Fehler beim Speichern der Notiz.' }
+  }
+}

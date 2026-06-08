@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useState } from 'react'
 import { saveOttoIntegrationAction } from '@/app/actions/integrations'
 
 import { HelpCircle } from 'lucide-react'
@@ -8,13 +8,16 @@ import { HelpCircle } from 'lucide-react'
 export function OttoIntegrationForm({ 
   initialClientId, 
   initialEnvironment = 'production',
-  initialReturnAddressCarrierId = ''
+  initialReturnAddressCarrierId = '',
+  initialConnectionType = 'service_partner'
 }: { 
   initialClientId: string, 
   initialEnvironment?: string,
-  initialReturnAddressCarrierId?: string
+  initialReturnAddressCarrierId?: string,
+  initialConnectionType?: string
 }) {
   const [state, action, pending] = useActionState(saveOttoIntegrationAction, undefined)
+  const [connectionType, setConnectionType] = useState(initialConnectionType)
 
   return (
     <form action={action} className="space-y-6 max-w-xl">
@@ -30,6 +33,36 @@ export function OttoIntegrationForm({
         </div>
       )}
 
+      {/* VERBINDUNGSTYP TOGGLE */}
+      <div>
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Verbindungstyp</label>
+        <input type="hidden" name="connectionType" value={connectionType} />
+        <div className="flex bg-slate-100 p-1 rounded-xl">
+          <button
+            type="button"
+            onClick={() => setConnectionType('service_partner')}
+            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${
+              connectionType === 'service_partner' 
+                ? 'bg-white shadow-sm text-blue-600 border border-slate-200' 
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Service Partner App (OAuth)
+          </button>
+          <button
+            type="button"
+            onClick={() => setConnectionType('private')}
+            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${
+              connectionType === 'private' 
+                ? 'bg-white shadow-sm text-blue-600 border border-slate-200' 
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Private App (API-Benutzer)
+          </button>
+        </div>
+      </div>
+
       <div className="space-y-1">
         <div className="flex items-center gap-2">
           <label htmlFor="clientId" className="block text-sm font-semibold text-gray-700">Client ID (API User)</label>
@@ -38,7 +71,9 @@ export function OttoIntegrationForm({
             <div className="absolute left-6 top-0 w-64 p-3 bg-slate-900 text-white text-xs rounded-xl shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 transform -translate-y-1/4">
               <p className="font-bold mb-1">Wo finde ich das?</p>
               <p className="leading-relaxed text-slate-300">
-                Logge dich im <strong>Otto Partner Connect</strong> ein. Gehe zu <strong>Konfiguration &gt; API-Zugriff</strong>. Dort kannst du einen neuen API-Benutzer erstellen oder einen bestehenden einsehen.
+                {connectionType === 'private' 
+                  ? 'Erstelle in Otto Partner Connect unter Konfiguration > API-Zugriff einen neuen "API-Benutzer" oder eine "Private App".' 
+                  : 'Trage hier die Client ID deiner konfigurierten Service Partner App ein.'}
               </p>
               <div className="absolute left-0 top-3 -translate-x-full border-8 border-transparent border-r-slate-900"></div>
             </div>
@@ -64,7 +99,7 @@ export function OttoIntegrationForm({
             <div className="absolute left-6 top-0 w-64 p-3 bg-slate-900 text-white text-xs rounded-xl shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 transform -translate-y-1/4">
               <p className="font-bold mb-1">Wichtig beim Secret</p>
               <p className="leading-relaxed text-slate-300">
-                Das Client Secret wird nur einmalig bei der Erstellung des API-Benutzers im Otto Portal angezeigt. Falls du es verloren hast, musst du im Portal ein neues Secret generieren.
+                Das Client Secret wird nur einmalig bei der Erstellung des {connectionType === 'private' ? 'API-Benutzers' : 'Service Partner Apps'} im Otto Portal angezeigt. Falls du es verloren hast, musst du im Portal ein neues Secret generieren.
               </p>
               <div className="absolute left-0 top-3 -translate-x-full border-8 border-transparent border-r-slate-900"></div>
             </div>

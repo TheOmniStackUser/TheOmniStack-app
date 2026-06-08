@@ -209,9 +209,10 @@ export async function triggerManualSyncAction(data: { marketplace: string, fromD
         const ottoAdapter = new OttoAdapter({
           clientId: integration.clientId!,
           clientSecret: integration.clientSecret!,
-          environment: (integration.environment as 'sandbox' | 'production') || 'production',
+          environment: integration.environment as 'sandbox' | 'production',
           installationId: (integration.metadata as any)?.installationId,
-          appId: (integration.metadata as any)?.appId
+          appId: (integration.metadata as any)?.appId,
+          connectionType: (integration.metadata as any)?.connectionType || 'service_partner'
         })
         adapter = ottoAdapter
         rawOrders = await adapter.fetchUnshippedOrders(auth.activeCompanyId, {

@@ -852,7 +852,21 @@ export class MiraklAdapter implements MarketplaceAdapter {
       let miraklOrder = (rawOrderPayload as any)
       if (!miraklOrder || !miraklOrder.order_lines) {
         const baseUrl = this.config.baseUrl.replace(/\/$/, '')
-        let orderUrl = `${baseUrl}/api/orders/${marketplaceOrderId}`
+        let orderUrl = ''
+        if (baseUrl.includes('miraklconnect.com')) {
+          if (baseUrl.endsWith('/v1')) {
+            orderUrl = `${baseUrl}/orders/${marketplaceOrderId}`
+          } else {
+            orderUrl = `${baseUrl}/api/v1/orders/${marketplaceOrderId}`
+          }
+        } else {
+          if (baseUrl.endsWith('/api')) {
+            orderUrl = `${baseUrl}/orders/${marketplaceOrderId}`
+          } else {
+            orderUrl = `${baseUrl}/api/orders/${marketplaceOrderId}`
+          }
+        }
+
         if (this.config.shopId) {
           orderUrl += `?shop_id=${this.config.shopId}`
         }
@@ -905,7 +919,8 @@ export class MiraklAdapter implements MarketplaceAdapter {
             order_line_id: lineId,
             amount: parseFloat((priceUnit * qtyToRefund).toFixed(2)),
             quantity: qtyToRefund,
-            refund_reason_code: '15' // Default return code
+            refund_reason_code: '15', // Default return code
+            currency_iso_code: miraklOrder.currency_iso_code || 'EUR'
           }
 
           if (shippingAmountToRefund > 0) {
@@ -929,7 +944,21 @@ export class MiraklAdapter implements MarketplaceAdapter {
 
       // 3. Put Refund
       const baseUrl = this.config.baseUrl.replace(/\/$/, '')
-      let refundUrl = `${baseUrl}/api/orders/${marketplaceOrderId}/refund`
+      let refundUrl = ''
+      if (baseUrl.includes('miraklconnect.com')) {
+        if (baseUrl.endsWith('/v1')) {
+          refundUrl = `${baseUrl}/orders/${marketplaceOrderId}/refund`
+        } else {
+          refundUrl = `${baseUrl}/api/v1/orders/${marketplaceOrderId}/refund`
+        }
+      } else {
+        if (baseUrl.endsWith('/api')) {
+          refundUrl = `${baseUrl}/orders/${marketplaceOrderId}/refund`
+        } else {
+          refundUrl = `${baseUrl}/api/orders/${marketplaceOrderId}/refund`
+        }
+      }
+      
       if (this.config.shopId) {
         refundUrl += `?shop_id=${this.config.shopId}`
       }

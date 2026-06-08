@@ -320,7 +320,8 @@ export function getAdapterForIntegration(
       clientSecret: integration.clientSecret,
       environment: (integration.environment as 'sandbox' | 'production') || 'production',
       installationId: (integration.metadata as any)?.installationId,
-      appId: (integration.metadata as any)?.appId
+      appId: (integration.metadata as any)?.appId,
+      connectionType: (integration.metadata as any)?.connectionType || 'service_partner'
     })
   }
   if (
