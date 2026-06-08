@@ -491,6 +491,7 @@ export class MiraklAdapter implements MarketplaceAdapter {
       const isGb = ['GB', 'GBR'].includes(upperCountry)
 
       const isSecretSales = this.marketplace.toLowerCase().includes('secret sales') || baseUrl.includes('miraklconnect.com')
+      const isLimango = this.marketplace.toLowerCase().includes('limango') || baseUrl.includes('limango.mirakl.net')
 
       let resolvedCarrier = carrier
       if (carrier.toLowerCase() === 'dhl') {
@@ -520,6 +521,8 @@ export class MiraklAdapter implements MarketplaceAdapter {
           if (isDe) resolvedCarrier = 'hermes-de'
           else if (isGb) resolvedCarrier = 'Hermes'
           else resolvedCarrier = 'Hermes'
+        } else if (isLimango) {
+          resolvedCarrier = 'Hermes'
         } else {
           if (isGb) resolvedCarrier = 'HermesUK'
           else resolvedCarrier = 'HermesGER' // Default to Germany Hermes
@@ -531,13 +534,28 @@ export class MiraklAdapter implements MarketplaceAdapter {
           else if (isNl) resolvedCarrier = 'dpd_nl'
           else if (isBe) resolvedCarrier = 'dpd_be'
           else resolvedCarrier = 'DPD'
+        } else if (isLimango) {
+          resolvedCarrier = 'DPD'
         }
       }
 
-      const trackingPayload = {
+      let packageTrackingUrl = ''
+      if (carrier.toLowerCase() === 'dhl') {
+        packageTrackingUrl = `https://www.dhl.de/de/privatkunden/pakete-empfangen/verfolgen.html?piececode=${trackingNumber}`
+      } else if (carrier.toLowerCase() === 'hermes') {
+        packageTrackingUrl = `https://www.myhermes.de/empfangen/sendungsverfolgung/sendungsinformation#${trackingNumber}`
+      } else if (carrier.toLowerCase() === 'dpd') {
+        packageTrackingUrl = `https://tracking.dpd.de/status/de_DE/parcel/${trackingNumber}`
+      }
+
+      const trackingPayload: Record<string, any> = {
         carrier_code: resolvedCarrier,
         carrier_name: resolvedCarrier,
         tracking_number: trackingNumber
+      }
+
+      if (packageTrackingUrl) {
+        trackingPayload.tracking_url = packageTrackingUrl
       }
 
       console.log(`[MiraklAdapter:${this.marketplace}] Updating tracking info for order ${marketplaceOrderId} via PUT ${trackingUrl}...`)
@@ -594,6 +612,10 @@ export class MiraklAdapter implements MarketplaceAdapter {
         carrier_name: resolvedCarrier,
         tracking_number: trackingNumber,
         shipping_date: new Date().toISOString(),
+      }
+
+      if (packageTrackingUrl) {
+        shipBody.tracking_url = packageTrackingUrl
       }
       if (shipOrderLines && shipOrderLines.length > 0) {
         shipBody.order_lines = shipOrderLines
