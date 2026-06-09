@@ -54,7 +54,11 @@ export function ImportClient({ marketplaces }: { marketplaces: any[] }) {
         } else if (!status?.isRunning && wasRunningRef.current) {
           wasRunningRef.current = false
           router.refresh()
-          showNotification('Import abgeschlossen', 'Die Produktliste wurde aktualisiert.', 'success')
+          if (status?.status === 'error') {
+            showNotification('Fehler beim Import', status.message || 'Ein Fehler ist aufgetreten.', 'error')
+          } else {
+            showNotification('Import abgeschlossen', 'Die Produktliste wurde aktualisiert.', 'success')
+          }
         }
       } catch (e) {}
     }

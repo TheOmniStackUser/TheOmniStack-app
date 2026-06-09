@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Database, Search, Filter, Loader2, CheckSquare, Square, X, Info, AlertTriangle, Trash2 } from 'lucide-react'
+import { Database, Search, Filter, Loader2, CheckSquare, Square, X, Info, AlertTriangle, Trash2, Download } from 'lucide-react'
 import { bulkCreateProductsFromUnmapped, deleteUnmappedProducts } from '@/app/actions/products'
 import { useRouter } from 'next/navigation'
 import { UnmappedMarketplaceProduct } from '@/db/schema/products'
@@ -261,6 +261,32 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
     showAlert('Die Mappen-Funktion (Suche nach bestehenden Produkten) wird in Kürze hinzugefügt. Bitte lege das Produkt vorerst neu an oder warte auf das Update.', 'Hinweis')
   }
 
+  const handleExportCsv = () => {
+    if (filteredProducts.length === 0) {
+      showAlert('Es gibt keine Produkte zum Exportieren.', 'Hinweis')
+      return
+    }
+
+    const headers = ['Marktplatz', 'SKU', 'Titel', 'Preis', 'Bestand']
+    const csvContent = [
+      headers.join(';'),
+      ...filteredProducts.map(p => {
+        const title = p.title ? `"${p.title.replace(/"/g, '""')}"` : '""'
+        return `${getMarketplaceDisplayName(p.marketplace)};${p.marketplaceSku};${title};${p.price || 0};${p.stock || 0}`
+      })
+    ].join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', `ungemappte_produkte_${new Date().toISOString().split('T')[0]}.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
   return (
     <>
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mt-8">
@@ -301,6 +327,14 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
               ))}
             </select>
           </div>
+          
+          <button
+            onClick={handleExportCsv}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-all font-semibold shadow-sm text-sm ml-auto"
+          >
+            <Download className="w-4 h-4" />
+            CSV Export
+          </button>
         </div>
 
         {selectedIds.size > 0 && (

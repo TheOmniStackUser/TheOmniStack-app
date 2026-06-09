@@ -512,7 +512,7 @@ export class OttoAdapter implements MarketplaceAdapter {
         const nextLink = (data.links || []).find((l: any) => l.rel === 'next')
         let proposedNextUrl = null
         if (nextLink && nextLink.href && nextLink.href.trim() !== '') {
-          proposedNextUrl = nextLink.href.startsWith('http') ? nextLink.href : `${this.baseUrl}${nextLink.href.startsWith('/') ? '' : '/'}${nextLink.href}`
+          proposedNextUrl = new URL(nextLink.href, nextUrl).toString()
         }
         
         if (!proposedNextUrl || proposedNextUrl === nextUrl) {
@@ -568,7 +568,7 @@ export class OttoAdapter implements MarketplaceAdapter {
             const nextLink = (qData.links || []).find((l: any) => l.rel === 'next')
             let proposedNextUrl = null
             if (nextLink && nextLink.href && nextLink.href.trim() !== '') {
-              proposedNextUrl = nextLink.href.startsWith('http') ? nextLink.href : `${this.baseUrl}${nextLink.href.startsWith('/') ? '' : '/'}${nextLink.href}`
+              proposedNextUrl = new URL(nextLink.href, quantitiesUrl).toString()
             }
             
             if (!proposedNextUrl || proposedNextUrl === quantitiesUrl) {
@@ -635,8 +635,8 @@ export class OttoAdapter implements MarketplaceAdapter {
       }))
 
       if (stockUpdates.length > 0) {
-        console.log(`[OttoAdapter] Updating ${stockUpdates.length} quantities via POST /v3/quantities...`)
-        const qRes = await fetch(`${this.baseUrl}/v3/quantities`, {
+        console.log(`[OttoAdapter] Updating ${stockUpdates.length} quantities via POST /v1/availability/quantities...`)
+        const qRes = await fetch(`${this.baseUrl}/v1/availability/quantities`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${accessToken}`,
