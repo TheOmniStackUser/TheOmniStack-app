@@ -919,7 +919,8 @@ export class MiraklAdapter implements MarketplaceAdapter {
             order_line_id: lineId,
             amount: parseFloat((priceUnit * qtyToRefund).toFixed(2)),
             quantity: qtyToRefund,
-            refund_reason_code: '15', // Default return code
+            reason_code: '15', // Default return code
+            shipping_amount: 0,
             currency_iso_code: miraklOrder.currency_iso_code || 'EUR'
           }
 
@@ -947,15 +948,15 @@ export class MiraklAdapter implements MarketplaceAdapter {
       let refundUrl = ''
       if (baseUrl.includes('miraklconnect.com')) {
         if (baseUrl.endsWith('/v1')) {
-          refundUrl = `${baseUrl}/orders/${marketplaceOrderId}/refund`
+          refundUrl = `${baseUrl}/orders/refund`
         } else {
-          refundUrl = `${baseUrl}/api/v1/orders/${marketplaceOrderId}/refund`
+          refundUrl = `${baseUrl}/api/v1/orders/refund`
         }
       } else {
         if (baseUrl.endsWith('/api')) {
-          refundUrl = `${baseUrl}/orders/${marketplaceOrderId}/refund`
+          refundUrl = `${baseUrl}/orders/refund`
         } else {
-          refundUrl = `${baseUrl}/api/orders/${marketplaceOrderId}/refund`
+          refundUrl = `${baseUrl}/api/orders/refund`
         }
       }
       
