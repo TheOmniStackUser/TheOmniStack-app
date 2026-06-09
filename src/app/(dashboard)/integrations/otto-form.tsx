@@ -143,8 +143,20 @@ export function OttoIntegrationForm({
             className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-semibold rounded-xl transition-colors shadow-sm"
           >
             <ExternalLink className="w-4 h-4" />
-            Jetzt mit OTTO verbinden
+            1. Schritt: Jetzt mit OTTO verbinden (App installieren)
           </button>
+          
+          <div className="pt-4 border-t border-blue-200">
+            <p className="text-sm text-blue-800 leading-relaxed mb-2">
+              <strong>WICHTIG:</strong> Nachdem du bei OTTO auf "Installieren" geklickt hast und hierher zurückgeleitet wurdest, klicke auf diesen Button, um den Autorisierungs-Token abzurufen:
+            </p>
+            <a
+              href={`/api/auth/otto?environment=${environment}`}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-colors shadow-sm"
+            >
+              2. Schritt: Autorisierung abschließen (Token abrufen)
+            </a>
+          </div>
         </div>
       )}
 
