@@ -41,7 +41,9 @@ export class OttoAdapter implements MarketplaceAdapter {
 
     const basicAuth = Buffer.from(`${tokenClientId}:${tokenClientSecret}`).toString('base64')
     
-    const response = await fetch(this.tokenUrl, {
+    let scope = isPrivate ? 'orders products shipments returns receipts availability' : 'developer'
+
+    const doFetch = async (currentScope: string) => fetch(this.tokenUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -49,13 +51,29 @@ export class OttoAdapter implements MarketplaceAdapter {
       },
       body: new URLSearchParams({
         grant_type: 'client_credentials',
-        scope: isPrivate ? 'orders products shipments returns receipts availability price-reduction' : 'developer',
+        scope: currentScope,
       }).toString(),
     })
 
+    let response = await doFetch(scope)
+
     if (!response.ok) {
-      const err = await response.text()
-      throw new Error(`[OttoAdapter] Failed to fetch access token: ${response.status} ${err}`)
+      const errText = await response.text()
+      // If the user misconfigured private vs service_partner, try fallback
+      if (response.status === 400 && errText.includes('invalid_scope')) {
+         console.warn(`[OttoAdapter] Invalid scope '${scope}', attempting fallback...`)
+         const fallbackScope = isPrivate ? 'developer' : 'orders products shipments returns receipts availability'
+         response = await doFetch(fallbackScope)
+         if (!response.ok) {
+             const fallbackErr = await response.text()
+             throw new Error(`[OttoAdapter] Failed to fetch access token after fallback: ${response.status} ${fallbackErr}`)
+         }
+         // If fallback worked, they misconfigured connectionType. We adjust it in memory for this session
+         console.warn(`[OttoAdapter] Fallback succeeded. Adjusting connectionType for this session.`)
+         this.config.connectionType = isPrivate ? 'service_partner' : 'private'
+      } else {
+         throw new Error(`[OttoAdapter] Failed to fetch access token: ${response.status} ${errText}`)
+      }
     }
 
     const data = await response.json()
@@ -67,8 +85,8 @@ export class OttoAdapter implements MarketplaceAdapter {
       return developerToken
     }
 
-    // If sandbox and we have installation details, exchange developer token for installation access token
-    if (this.config.environment === 'sandbox' && this.config.installationId && this.config.appId) {
+    // If we have installation details, exchange developer token for installation access token
+    if (this.config.installationId && this.config.appId) {
       console.log(`[OttoAdapter] Exchanging developer token for installation access token (appId: ${this.config.appId}, installationId: ${this.config.installationId})...`)
       
       const installTokenUrl = `${this.baseUrl}/v1/apps/${this.config.appId}/installations/${this.config.installationId}/accessToken`
@@ -80,8 +98,7 @@ export class OttoAdapter implements MarketplaceAdapter {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: new URLSearchParams({
-          grant_type: 'client_credentials',
-          scope: 'orders products shipments returns receipts availability price-reduction'
+          grant_type: 'client_credentials'
         }).toString()
       })
 
@@ -385,8 +402,10 @@ export class OttoAdapter implements MarketplaceAdapter {
       // 1. Fetch order details from Otto v4 to get positionItems
       let ottoOrder = (rawOrderPayload as any)
       const salesOrderId = ottoOrder?.salesOrderId || marketplaceOrderId
-      if (!ottoOrder || !ottoOrder.positionItems) {
-        console.log(`[OttoAdapter] Fetching order details from Otto v4 API...`)
+      
+      const hasPositionItems = ottoOrder && Array.isArray(ottoOrder.positionItems)
+      if (!hasPositionItems) {
+        console.log(`[OttoAdapter] Fetching order details from Otto v4 API for ${salesOrderId}...`)
         const response = await fetch(`${this.baseUrl}/v4/orders/${salesOrderId}`, {
           method: 'GET',
           headers: {
@@ -398,7 +417,8 @@ export class OttoAdapter implements MarketplaceAdapter {
           const errText = await response.text()
           throw new Error(`Failed to fetch order from Otto: ${response.status} - ${errText}`)
         }
-        ottoOrder = await response.json()
+        const data = await response.json()
+        ottoOrder = data.resources ? data.resources[0] : data
       }
 
       if (!ottoOrder || !ottoOrder.positionItems) {
@@ -434,21 +454,39 @@ export class OttoAdapter implements MarketplaceAdapter {
 
       if (returnsPayload.length === 0) {
         console.warn(`[OttoAdapter] No matching positionItems found for refunded SKUs.`)
-        return false
+        throw new Error('Keine passenden Artikel in der Otto-Bestellung gefunden.')
       }
 
       // 3. Post returns to Otto returns endpoint (v3/returns/acceptance)
-      const requestBody = JSON.stringify({ positionItems: returnsPayload })
+      // Otto v3 acceptance can be an array directly or { positionItems: [...] } 
+      // The official docs often say "positionItems: An array of objects"
+      const requestBody = JSON.stringify(returnsPayload)
       console.log(`[OttoAdapter] Sending return confirmation to Otto:`, requestBody)
-      const response = await fetch(`${this.baseUrl}/v3/returns/acceptance`, {
+      let response = await fetch(`${this.baseUrl}/v3/returns/acceptance`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: requestBody
+        body: JSON.stringify({ positionItems: returnsPayload })
       })
+
+      if (!response.ok) {
+        // Fallback: If { positionItems: [] } is wrong, try array directly
+        if (response.status === 400) {
+          console.log(`[OttoAdapter] Retrying with direct array payload...`)
+          response = await fetch(`${this.baseUrl}/v3/returns/acceptance`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify(returnsPayload)
+          })
+        }
+      }
 
       if (!response.ok) {
         const errText = await response.text()
@@ -460,7 +498,7 @@ export class OttoAdapter implements MarketplaceAdapter {
       return true
     } catch (error) {
       console.error(`[OttoAdapter] Error refunding order:`, error)
-      return false
+      throw error
     }
   }
 
