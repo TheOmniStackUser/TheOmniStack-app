@@ -28,10 +28,14 @@ export async function GET(request: NextRequest) {
   oauthUrl.searchParams.set('state', companyId)
   
   // WICHTIG: OTTO verlangt, dass alle Scopes explizit angefordert werden!
+  // WICHTIG: OTTO verlangt, dass alle Scopes explizit angefordert werden!
   const scopes = 'installation partnerId developer products orders receipts returns price-reduction shipments shipping-profiles availability returns-warehouse-read returns-warehouse-write'
   oauthUrl.searchParams.set('scope', scopes)
   
-  console.log(`[Otto OAuth Initiate] Redirecting user to OTTO Authorization page: ${oauthUrl.toString()}`)
+  // Some strict OAuth servers don't accept '+' for spaces in the query string, they need '%20'
+  const finalUrl = oauthUrl.toString().replace(/\+/g, '%20')
   
-  return NextResponse.redirect(oauthUrl)
+  console.log(`[Otto OAuth Initiate] Redirecting user to OTTO Authorization page: ${finalUrl}`)
+  
+  return NextResponse.redirect(finalUrl)
 }
