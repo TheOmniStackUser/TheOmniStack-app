@@ -212,6 +212,8 @@ export async function GET(request: NextRequest) {
     await db
       .update(marketplaceIntegrations)
       .set({
+        clientId: appClientId,
+        clientSecret: appClientSecret,
         metadata,
         accessToken: userAccessToken,
         refreshToken: tokenData.refresh_token,

@@ -40,12 +40,14 @@ interface ReturnsListProps {
   initialLogs: any[]
   hasKauflandIntegration?: boolean
   hasEbayIntegration?: boolean
+  customMiraklName?: string | null
 }
 
 export function ReturnsList({ 
   initialLogs,
   hasKauflandIntegration = false,
   hasEbayIntegration = false,
+  customMiraklName,
 }: ReturnsListProps) {
   const [logs, setLogs] = useState<ReturnLog[]>(
     initialLogs.map((l) => ({
@@ -60,6 +62,15 @@ export function ReturnsList({
   const [statusFilter, setStatusFilter] = useState<'all' | 'neu' | 'bearbeitet'>('neu')
   const [marketplaceFilter, setMarketplaceFilter] = useState<string>('all')
   const [isPending, startTransition] = useTransition()
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null)
+
+  const handleSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  }
 
   // Dropdown State
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
@@ -234,14 +245,45 @@ export function ReturnsList({
     const matchesMarketplace =
       marketplaceFilter === 'all' ||
       (marketplaceFilter === 'direct' && !log.marketplace) ||
-      (log.marketplace?.toLowerCase() === marketplaceFilter.toLowerCase())
+      (log.marketplace?.toLowerCase() === marketplaceFilter.toLowerCase()) ||
+      (marketplaceFilter === 'Mirakl' && (log.marketplace?.toLowerCase().startsWith('mirakl') || log.marketplace?.toLowerCase() === 'mirakl_custom'))
 
     return matchesSearch && matchesStatus && matchesMarketplace
   })
 
+  // Apply Sorting
+  const sortedLogs = [...filteredLogs].sort((a, b) => {
+    if (!sortConfig) return 0;
+    
+    let aValue: any = a[sortConfig.key as keyof ReturnLog];
+    let bValue: any = b[sortConfig.key as keyof ReturnLog];
+
+    if (sortConfig.key === 'user') {
+      aValue = a.user?.name || '';
+      bValue = b.user?.name || '';
+    } else if (sortConfig.key === 'scannedAt' || sortConfig.key === 'receivedAt') {
+      aValue = aValue ? new Date(aValue).getTime() : 0;
+      bValue = bValue ? new Date(bValue).getTime() : 0;
+    } else if (sortConfig.key === 'marketplace') {
+      aValue = aValue === 'Mirakl_custom' && customMiraklName ? customMiraklName : (aValue || '');
+      bValue = bValue === 'Mirakl_custom' && customMiraklName ? customMiraklName : (bValue || '');
+    } else {
+      aValue = aValue || '';
+      bValue = bValue || '';
+    }
+
+    if (aValue < bValue) {
+      return sortConfig.direction === 'asc' ? -1 : 1;
+    }
+    if (aValue > bValue) {
+      return sortConfig.direction === 'asc' ? 1 : -1;
+    }
+    return 0;
+  });
+
   // Pagination Logic
-  const totalPages = Math.ceil(filteredLogs.length / pageSize)
-  const paginatedLogs = filteredLogs.slice(
+  const totalPages = Math.ceil(sortedLogs.length / pageSize)
+  const paginatedLogs = sortedLogs.slice(
     (currentPage - 1) * pageSize,
     currentPage * pageSize
   )
@@ -475,7 +517,7 @@ export function ReturnsList({
             <option value="Zalando">Zalando</option>
             {hasKauflandIntegration && <option value="Kaufland">Kaufland</option>}
             {hasEbayIntegration && <option value="eBay">eBay</option>}
-            <option value="Mirakl">Mirakl</option>
+            <option value="Mirakl">{customMiraklName || 'Mirakl'}</option>
           </select>
 
           {/* Status Filters */}
@@ -574,14 +616,29 @@ export function ReturnsList({
                   className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4"
                 />
               </th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Eingang</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Scan-Zeitpunkt</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Mitarbeiter</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Marktplatz</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Bestellnummer</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Versand</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Kunde & Notiz</th>
+              {[
+                { label: 'Status', key: 'status' },
+                { label: 'Eingang', key: 'receivedAt' },
+                { label: 'Scan-Zeitpunkt', key: 'scannedAt' },
+                { label: 'Mitarbeiter', key: 'user' },
+                { label: 'Marktplatz', key: 'marketplace' },
+                { label: 'Bestellnummer', key: 'orderNumber' },
+                { label: 'Versand', key: 'shippingAddress' }, // Use shippingAddress as placeholder for Versand sorting if needed
+                { label: 'Kunde & Notiz', key: 'customerName' },
+              ].map(({ label, key }) => (
+                <th 
+                  key={key}
+                  className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors select-none group"
+                  onClick={() => handleSort(key)}
+                >
+                  <div className="flex items-center gap-1">
+                    {label}
+                    <span className="text-slate-300 group-hover:text-slate-400">
+                      {sortConfig?.key === key ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}
+                    </span>
+                  </div>
+                </th>
+              ))}
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Artikel / Zustand</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Aktionen</th>
             </tr>
@@ -674,7 +731,7 @@ export function ReturnsList({
                           ? 'bg-blue-50 text-blue-800 border-blue-200'
                           : 'bg-indigo-50 text-indigo-800 border-indigo-200'
                       }`}>
-                        {log.marketplace}
+                        {log.marketplace === 'Mirakl_custom' && customMiraklName ? customMiraklName : log.marketplace}
                       </span>
                     ) : (
                       <span className="text-xs text-slate-400 italic">Direkt / Unbekannt</span>

@@ -39,6 +39,7 @@ export default async function ReturnsPage() {
         type: marketplaceIntegrations.type,
         clientId: marketplaceIntegrations.clientId,
         clientSecret: marketplaceIntegrations.clientSecret,
+        metadata: marketplaceIntegrations.metadata,
       })
       .from(marketplaceIntegrations)
       .where(eq(marketplaceIntegrations.companyId, auth.activeCompanyId))
@@ -46,6 +47,8 @@ export default async function ReturnsPage() {
 
   const hasKauflandIntegration = integrations.some(i => i.type === 'kaufland' && i.clientId && i.clientSecret)
   const hasEbayIntegration = integrations.some(i => i.type === 'ebay' && i.clientId && i.clientSecret)
+  const customMiraklIntegration = integrations.find(i => i.type === 'mirakl_custom')
+  const customMiraklName = customMiraklIntegration?.metadata ? (customMiraklIntegration.metadata as any).customName : null
 
   return (
     <div className="space-y-8">
@@ -58,6 +61,7 @@ export default async function ReturnsPage() {
         initialLogs={logs} 
         hasKauflandIntegration={hasKauflandIntegration}
         hasEbayIntegration={hasEbayIntegration}
+        customMiraklName={customMiraklName}
       />
     </div>
   )

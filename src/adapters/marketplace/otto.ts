@@ -591,6 +591,15 @@ export class OttoAdapter implements MarketplaceAdapter {
       // We might need to fetch quantities separately, but for unmapped listing, 
       // just returning the SKU and title is enough for mapping.
       // We will attempt to get price from standard price object.
+      
+      if (this.config.environment === 'sandbox') {
+        allProducts.push({
+          sku: 'DEMO-SHIRT-01',
+          productTitle: 'Demo Test Shirt (OTTO Sandbox)',
+          standardPrice: { amount: 29.99 }
+        });
+      }
+
       return allProducts.map((p: any) => {
         const sku = p.sku || p.articleNumber || p.id
         return {
