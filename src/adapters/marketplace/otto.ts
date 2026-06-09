@@ -36,8 +36,8 @@ export class OttoAdapter implements MarketplaceAdapter {
    */
   private async getAccessToken(): Promise<string> {
     const isPrivate = this.config.connectionType === 'private'
-    const tokenClientId = isPrivate ? this.config.clientId : (process.env.OTTO_APP_CLIENT_ID || '9c74d78a-cc67-412f-8d25-7652b43ac41b')
-    const tokenClientSecret = isPrivate ? this.config.clientSecret : (process.env.OTTO_APP_CLIENT_SECRET || 'f9600fd0-6cc2-4b77-a692-b472d65d331c')
+    const tokenClientId = this.config.clientId
+    const tokenClientSecret = this.config.clientSecret
 
     const basicAuth = Buffer.from(`${tokenClientId}:${tokenClientSecret}`).toString('base64')
     
