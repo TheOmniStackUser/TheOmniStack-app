@@ -473,9 +473,11 @@ export class OttoAdapter implements MarketplaceAdapter {
       const allProducts: any[] = []
       
       let nextUrl: string | null = `${this.baseUrl}/v5/products?limit=100`
+      let pagesFetched = 0
 
-      while (nextUrl) {
-        console.log(`[OttoAdapter] Fetching products page: ${nextUrl}`)
+      while (nextUrl && pagesFetched < 500) {
+        pagesFetched++
+        console.log(`[OttoAdapter] Fetching products page ${pagesFetched}: ${nextUrl}`)
         const response: Response = await fetch(nextUrl, {
           method: 'GET',
           headers: {
@@ -490,23 +492,36 @@ export class OttoAdapter implements MarketplaceAdapter {
         }
 
         const data = await response.json()
-        const products = data.resources || data.productVariations || data.items || data.products || (Array.isArray(data) ? data : [])
+        const products = data.resources || data.productVariations || data.items || data.products || data.results || (Array.isArray(data) ? data : [])
         allProducts.push(...products)
+        
+        if (products.length === 0) {
+          console.log(`[OttoAdapter] Reached empty products page, breaking.`)
+          break
+        }
 
         const nextLink = (data.links || []).find((l: any) => l.rel === 'next')
+        let proposedNextUrl = null
         if (nextLink && nextLink.href) {
-          nextUrl = nextLink.href.startsWith('http') ? nextLink.href : `${this.baseUrl}${nextLink.href}`
-        } else {
-          nextUrl = null
+          proposedNextUrl = nextLink.href.startsWith('http') ? nextLink.href : `${this.baseUrl}${nextLink.href.startsWith('/') ? '' : '/'}${nextLink.href}`
         }
+        
+        if (proposedNextUrl === nextUrl) {
+          console.warn(`[OttoAdapter] Infinite loop detected (nextUrl is same as current). Breaking.`)
+          break
+        }
+        
+        nextUrl = proposedNextUrl
       }
 
       // Fetch quantities to map stock
       const stockMap = new Map<string, number>()
       try {
         let quantitiesUrl: string | null = `${this.baseUrl}/v1/availability/quantities?limit=100`
-        while (quantitiesUrl) {
-          console.log(`[OttoAdapter] Fetching quantities page: ${quantitiesUrl}`)
+        let qPagesFetched = 0
+        while (quantitiesUrl && qPagesFetched < 500) {
+          qPagesFetched++
+          console.log(`[OttoAdapter] Fetching quantities page ${qPagesFetched}: ${quantitiesUrl}`)
           const qRes: Response = await fetch(quantitiesUrl, {
             method: 'GET',
             headers: {
@@ -517,19 +532,33 @@ export class OttoAdapter implements MarketplaceAdapter {
 
           if (qRes.ok) {
             const qData = await qRes.json()
-            const resources = Array.isArray(qData) ? qData : (qData.resources || qData.items || [])
+            const resources = Array.isArray(qData) ? qData : (qData.resources || qData.results || qData.items || [])
             for (const item of resources) {
               if (item.sku && item.quantity !== undefined) {
                 stockMap.set(item.sku, item.quantity)
+              } else if (item.sku && item.availableQuantity !== undefined) {
+                // In case Otto changed the key to availableQuantity
+                stockMap.set(item.sku, item.availableQuantity)
               }
             }
 
-            const nextLink = (qData.links || []).find((l: any) => l.rel === 'next')
-            if (nextLink && nextLink.href) {
-              quantitiesUrl = nextLink.href.startsWith('http') ? nextLink.href : `${this.baseUrl}${nextLink.href}`
-            } else {
-              quantitiesUrl = null
+            if (resources.length === 0) {
+              console.log(`[OttoAdapter] Reached empty quantities page, breaking.`)
+              break
             }
+
+            const nextLink = (qData.links || []).find((l: any) => l.rel === 'next')
+            let proposedNextUrl = null
+            if (nextLink && nextLink.href) {
+              proposedNextUrl = nextLink.href.startsWith('http') ? nextLink.href : `${this.baseUrl}${nextLink.href.startsWith('/') ? '' : '/'}${nextLink.href}`
+            }
+            
+            if (proposedNextUrl === quantitiesUrl) {
+              console.warn(`[OttoAdapter] Infinite loop detected for quantities (nextUrl is same as current). Breaking.`)
+              break
+            }
+            
+            quantitiesUrl = proposedNextUrl
           } else {
             console.warn(`[OttoAdapter] Failed to fetch quantities: ${qRes.status}`)
             break
@@ -542,14 +571,17 @@ export class OttoAdapter implements MarketplaceAdapter {
       // We might need to fetch quantities separately, but for unmapped listing, 
       // just returning the SKU and title is enough for mapping.
       // We will attempt to get price from standard price object.
-      return allProducts.map((p: any) => ({
-        marketplaceProductId: p.sku,
-        sku: p.sku,
-        title: p.productTitle || p.title || p.productReference || p.sku,
-        price: p.standardPrice?.amount || p.price?.amount || p.pricing?.standardPrice?.amount,
-        stock: stockMap.get(p.sku),
-        rawPayload: p
-      }))
+      return allProducts.map((p: any) => {
+        const sku = p.sku || p.articleNumber || p.id
+        return {
+          marketplaceProductId: sku,
+          sku: sku,
+          title: p.productTitle || p.title || p.productReference || sku,
+          price: p.standardPrice?.amount || p.price?.amount || p.pricing?.standardPrice?.amount,
+          stock: stockMap.get(sku),
+          rawPayload: p
+        }
+      })
     } catch (error) {
       console.error(`[OttoAdapter] Error fetching products:`, error)
       throw error
