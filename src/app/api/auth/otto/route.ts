@@ -25,8 +25,8 @@ export async function GET(request: NextRequest) {
   oauthUrl.searchParams.set('client_id', appClientId)
   oauthUrl.searchParams.set('response_type', 'code')
   oauthUrl.searchParams.set('redirect_uri', redirectUri)
-  // Request only the installation scope first, this is mandatory for step 1!
-  const scopes = 'installation'
+  // Request 'installation' and 'developer' scopes - these are allowed in the initial OAuth step!
+  const scopes = 'installation developer'
   oauthUrl.searchParams.set('scope', scopes)
   
   // Some strict OAuth servers don't accept '+' for spaces in the query string, they need '%20'

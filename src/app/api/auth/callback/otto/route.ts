@@ -145,6 +145,19 @@ export async function GET(request: NextRequest) {
         const installData = await installResponse.json()
         installationId = installData.id || installData.installationId
         finalAppId = appId
+        
+        const fullScopes = 'shipments availability orders returns products price-reduction receipts'
+
+        // Step 3: Get final Installation Access Token
+        await fetch(`${baseUrl}/v1/apps/${finalAppId}/installations/${installationId}/accessToken`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${userAccessToken}`,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: `scope=${fullScopes.replace(/ /g, '%20')}`
+        })
+        
         console.log(`[Otto OAuth Callback] Successfully retrieved installationId: ${installationId}`)
         break
       } else {
