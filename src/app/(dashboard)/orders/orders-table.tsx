@@ -2586,14 +2586,23 @@ export function OrdersTable({
                                   </div>
                                 )}
                                 <div className="pt-2">
-                                  <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1">Interne Notiz zur Bestellung</label>
-                                  <textarea
-                                    className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 bg-amber-50/30 min-h-[60px]"
-                                    placeholder="Z.B. Achtung nicht erstatten Umtausch versendet..."
-                                    value={editNotes[order.id] ?? ''}
-                                    onChange={(e) => setEditNotes(prev => ({ ...prev, [order.id]: e.target.value }))}
-                                    onBlur={() => handleNoteBlur(order.id)}
-                                  />
+                                  <span className="font-medium block mb-1">Interne Notiz zur Bestellung:</span>
+                                  <div className="relative">
+                                    <textarea
+                                      className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-2 pb-9 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 bg-amber-50/30 min-h-[70px]"
+                                      placeholder="Z.B. Achtung nicht erstatten Umtausch versendet..."
+                                      value={editNotes[order.id] ?? ''}
+                                      onChange={(e) => setEditNotes(prev => ({ ...prev, [order.id]: e.target.value }))}
+                                      onBlur={() => handleNoteBlur(order.id)}
+                                    />
+                                    <button 
+                                      onClick={() => handleNoteBlur(order.id)}
+                                      className="absolute bottom-2 right-2 px-2.5 py-1 bg-white border border-gray-300 rounded text-xs font-bold text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-all shadow-sm flex items-center gap-1"
+                                    >
+                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
+                                      Speichern
+                                    </button>
+                                  </div>
                                 </div>
                                 <div>
                                   {editingBillingAddressId === order.id ? (
