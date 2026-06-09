@@ -622,10 +622,21 @@ export class OttoAdapter implements MarketplaceAdapter {
               proposedNextUrl = new URL(nextLink.href, quantitiesUrl).toString()
             }
             
+            const extractCursor = (u: string) => {
+              try { return new URL(u).searchParams.get('cursor') } catch { return null }
+            }
+
             if (!proposedNextUrl || proposedNextUrl === quantitiesUrl) {
               if (proposedNextUrl === quantitiesUrl) {
-                console.warn(`[OttoAdapter] Infinite loop detected for quantities. Breaking.`)
+                console.warn(`[OttoAdapter] Infinite loop detected for quantities (identical URL). Breaking.`)
               }
+              break
+            }
+            
+            const nextCursor = extractCursor(proposedNextUrl)
+            const currentCursor = extractCursor(quantitiesUrl)
+            if (nextCursor && currentCursor && nextCursor === currentCursor) {
+              console.warn(`[OttoAdapter] Infinite loop detected (cursor did not change: ${nextCursor}). Breaking.`)
               break
             }
             

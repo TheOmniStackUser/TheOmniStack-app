@@ -287,6 +287,41 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
     document.body.removeChild(link)
   }
 
+  const handleExportSingleProductCsv = (product: UnmappedMarketplaceProduct) => {
+    const flattenObject = (obj: any, prefix = ''): Record<string, string> => {
+      if (!obj || typeof obj !== 'object') return {}
+      return Object.keys(obj).reduce((acc: any, k: string) => {
+        const pre = prefix.length ? prefix + '.' : ''
+        if (typeof obj[k] === 'object' && obj[k] !== null && !Array.isArray(obj[k])) {
+          Object.assign(acc, flattenObject(obj[k], pre + k))
+        } else {
+          acc[pre + k] = Array.isArray(obj[k]) ? JSON.stringify(obj[k]) : String(obj[k] ?? '')
+        }
+        return acc
+      }, {})
+    }
+    
+    const flatRaw = flattenObject(product.rawPayload || {})
+    
+    const csvContent = [
+      ['Feld', 'Wert'].join(','),
+      `"Marktplatz","${(product.marketplace || '').replace(/"/g, '""')}"`,
+      `"SKU","${(product.marketplaceSku || '').replace(/"/g, '""')}"`,
+      `"Titel","${(product.title || '').replace(/"/g, '""')}"`,
+      `"Preis","${product.price ?? ''}"`,
+      `"Bestand","${product.stock ?? ''}"`,
+      ...Object.entries(flatRaw).map(([k, v]) => `"${k.replace(/"/g, '""')}","${v.replace(/"/g, '""')}"`)
+    ].join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.setAttribute('download', `produkt_${product.marketplaceSku || 'export'}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
   return (
     <>
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mt-8">
@@ -510,10 +545,19 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
             </div>
             
             <div>
-              <h4 className="font-bold text-slate-900 mb-3 flex items-center gap-2 text-base">
-                <Info className="w-5 h-5 text-indigo-500" />
-                Strukturierte Rohdaten (Payload)
-              </h4>
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-bold text-slate-900 flex items-center gap-2 text-base">
+                  <Info className="w-5 h-5 text-indigo-500" />
+                  Strukturierte Rohdaten (Payload)
+                </h4>
+                <button
+                  onClick={() => handleExportSingleProductCsv(detailsProduct)}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  CSV Export
+                </button>
+              </div>
               <PayloadViewer payload={detailsProduct.rawPayload} />
             </div>
           </div>
