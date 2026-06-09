@@ -27,6 +27,10 @@ export async function GET(request: NextRequest) {
   oauthUrl.searchParams.set('redirect_uri', redirectUri)
   oauthUrl.searchParams.set('state', companyId)
   
+  // WICHTIG: OTTO verlangt, dass alle Scopes explizit angefordert werden!
+  const scopes = 'installation partnerId developer products orders receipts returns price-reduction shipments shipping-profiles availability returns-warehouse-read returns-warehouse-write'
+  oauthUrl.searchParams.set('scope', scopes)
+  
   console.log(`[Otto OAuth Initiate] Redirecting user to OTTO Authorization page: ${oauthUrl.toString()}`)
   
   return NextResponse.redirect(oauthUrl)
