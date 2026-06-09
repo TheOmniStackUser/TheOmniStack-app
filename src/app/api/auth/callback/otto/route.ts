@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
         redirect_uri: redirectUri,
         client_id: appClientId,
         client_secret: appClientSecret,
-        scope: 'installation partnerId developer products orders receipts returns price-reduction shipments shipping-profiles availability returns-warehouse-read returns-warehouse-write'
+        scope: 'installation'
       }).toString().replace(/\+/g, '%20'),
     })
 

@@ -28,8 +28,7 @@ export async function GET(request: NextRequest) {
   oauthUrl.searchParams.set('state', companyId)
   
   // WICHTIG: OTTO verlangt, dass alle Scopes explizit angefordert werden!
-  // WICHTIG: OTTO verlangt, dass alle Scopes explizit angefordert werden!
-  const scopes = 'installation partnerId developer products orders receipts returns price-reduction shipments shipping-profiles availability returns-warehouse-read returns-warehouse-write'
+  const scopes = 'installation'
   oauthUrl.searchParams.set('scope', scopes)
   
   // Some strict OAuth servers don't accept '+' for spaces in the query string, they need '%20'
