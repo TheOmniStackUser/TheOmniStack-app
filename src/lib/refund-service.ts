@@ -368,7 +368,11 @@ export async function executeRefund({
         }
       } catch (err: any) {
         console.error(`[RefundService] Failed to trigger API refund on marketplace:`, err)
-        throw new Error(`Fehler bei der Kommunikation mit ${order.marketplace}: ${err?.message || 'Unbekannter Fehler'}`)
+        const prefix = autoCreditNote ? `Gutschrift ${creditNoteNumber} erstellt, ABER ` : ''
+        return { 
+          success: false, 
+          error: `${prefix}Fehler bei der Kommunikation mit ${order.marketplace}: ${err?.message || 'Unbekannter Fehler'}`
+        }
       }
     } else {
       console.log(`[RefundService] Adapter for ${order.marketplace} does not support refundOrder.`)
