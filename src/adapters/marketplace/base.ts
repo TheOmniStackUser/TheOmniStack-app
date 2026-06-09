@@ -106,7 +106,10 @@ export interface MarketplaceAdapter {
   /**
    * Fetch products from the marketplace for inventory mapping.
    */
-  fetchProducts?(companyId: string): Promise<MarketplaceProduct[]>
+  fetchProducts?(
+    companyId: string,
+    onProgress?: (progress: number, total: number, message: string) => Promise<void>
+  ): Promise<MarketplaceProduct[]>
 
   /**
    * Sync inventory and/or prices back to the marketplace.

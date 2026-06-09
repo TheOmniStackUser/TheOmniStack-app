@@ -505,7 +505,10 @@ export class OttoAdapter implements MarketplaceAdapter {
   /**
    * Fetch products from Otto Partner API
    */
-  async fetchProducts(companyId: string): Promise<import('./base').MarketplaceProduct[]> {
+  async fetchProducts(
+    companyId: string,
+    onProgress?: (progress: number, total: number, message: string) => Promise<void>
+  ): Promise<import('./base').MarketplaceProduct[]> {
     try {
       const accessToken = await this.getAccessToken()
       const allProducts: any[] = []
@@ -516,6 +519,11 @@ export class OttoAdapter implements MarketplaceAdapter {
       while (nextUrl && pagesFetched < 500) {
         pagesFetched++
         console.log(`[OttoAdapter] Fetching products page ${pagesFetched}: ${nextUrl}`)
+        
+        if (onProgress) {
+          await onProgress(pagesFetched, 0, `Lade Produktdaten von OTTO (Seite ${pagesFetched})...`)
+        }
+
         const response: Response = await fetch(nextUrl, {
           method: 'GET',
           headers: {
@@ -571,6 +579,11 @@ export class OttoAdapter implements MarketplaceAdapter {
         while (quantitiesUrl && qPagesFetched < 500) {
           qPagesFetched++
           console.log(`[OttoAdapter] Fetching quantities page ${qPagesFetched}: ${quantitiesUrl}`)
+          
+          if (onProgress) {
+            await onProgress(pagesFetched + qPagesFetched, 0, `Lade Bestände von OTTO (Seite ${qPagesFetched})...`)
+          }
+
           const qRes: Response = await fetch(quantitiesUrl, {
             method: 'GET',
             headers: {

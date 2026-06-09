@@ -48,7 +48,11 @@ export async function syncProductsForCompany(companyId: string, integrationId?: 
       
       await updateSyncStatus(integration.id, { isRunning: true, status: 'fetching', message: 'Lade Daten vom Marktplatz...', progress: 0, total: 0 })
 
-      const marketplaceProducts = await adapter.fetchProducts(companyId)
+      const onProgress = async (progress: number, total: number, message: string) => {
+        await updateSyncStatus(integration.id, { isRunning: true, status: 'fetching', message, progress, total })
+      }
+
+      const marketplaceProducts = await adapter.fetchProducts!(companyId, onProgress)
       const totalCount = marketplaceProducts.length
       
       await updateSyncStatus(integration.id, { isRunning: true, status: 'processing', message: `Bereite ${totalCount} Produkte vor...`, progress: 0, total: totalCount })
