@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
     }
 
     const tokenData = await tokenResponse.json()
-    const userAccessToken = tokenData.access_token
+    let userAccessToken = tokenData.access_token
 
     // Attempt to query the installation ID using potential App IDs
     // For sandbox, we try the V2, V3, and V4 App IDs
@@ -148,17 +148,48 @@ export async function GET(request: NextRequest) {
         
         const fullScopes = 'shipments availability orders returns products price-reduction receipts'
 
-        // Step 3: Get final Installation Access Token
-        await fetch(`${baseUrl}/v1/apps/${finalAppId}/installations/${installationId}/accessToken`, {
+        console.log(`[Otto OAuth Callback] Fetching Developer Token via client_credentials...`)
+        const devTokenResponse = await fetch(`${baseUrl}/sec-api/auth/realms/deepsea-${environment}/protocol/openid-connect/token`, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${userAccessToken}`,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: new URLSearchParams({
+            grant_type: 'client_credentials',
+            client_id: appClientId,
+            client_secret: appClientSecret,
+            scope: 'installation developer'
+          }).toString()
+        })
+        
+        if (!devTokenResponse.ok) {
+          throw new Error(`Failed to fetch developer token: ${await devTokenResponse.text()}`)
+        }
+        
+        const devTokenData = await devTokenResponse.json()
+        const developerToken = devTokenData.access_token
+
+        // Step 3: Get final Installation Access Token
+        console.log(`[Otto OAuth Callback] Fetching final Installation Access Token...`)
+        const installAccessTokenResponse = await fetch(`${baseUrl}/v1/apps/${finalAppId}/installations/${installationId}/accessToken`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${developerToken}`,
             'Content-Type': 'application/x-www-form-urlencoded'
           },
           body: `scope=${fullScopes.replace(/ /g, '%20')}`
         })
         
-        console.log(`[Otto OAuth Callback] Successfully retrieved installationId: ${installationId}`)
+        if (!installAccessTokenResponse.ok) {
+           throw new Error(`Failed to fetch final installation access token: ${await installAccessTokenResponse.text()}`)
+        }
+        
+        const finalTokenData = await installAccessTokenResponse.json()
+        
+        // Save the final token
+        userAccessToken = finalTokenData.access_token
+        
+        console.log(`[Otto OAuth Callback] Successfully retrieved final token for installationId: ${installationId}`)
         break
       } else {
         const errText = await installResponse.text()
