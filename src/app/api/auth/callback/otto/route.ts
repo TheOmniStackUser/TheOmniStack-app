@@ -85,8 +85,8 @@ export async function GET(request: NextRequest) {
     
     // Override with Sandbox credentials if in sandbox environment
     if (environment === 'sandbox') {
-      appClientId = process.env.OTTO_SANDBOX_APP_CLIENT_ID || '2edf221b-9fc4-489a-8eed-66e3d48e8c39'
-      appClientSecret = process.env.OTTO_SANDBOX_APP_CLIENT_SECRET || 'b8b86119-7411-4505-9d04-defee363909e'
+      appClientId = process.env.OTTO_SANDBOX_APP_CLIENT_ID || '0bf6d71a-ed4b-4fb7-a7a1-445878d75912'
+      appClientSecret = process.env.OTTO_SANDBOX_APP_CLIENT_SECRET || '5d40460c-bec7-4c8c-9586-6ff3ba2e2f6d'
     }
 
     console.log(`[Otto OAuth Callback] Exchanging code for token using Global App Client ID: ${appClientId}...`)
@@ -118,7 +118,8 @@ export async function GET(request: NextRequest) {
     // For sandbox, we try the V2, V3, and V4 App IDs
     const appIdsToTry = environment === 'sandbox' 
       ? [
-          '058cc42c-8af7-4e48-8ca7-25437c08f5a8', // New App ID
+          '507227cf-0da3-47a6-8180-a97642e792b0', // NEW App ID from Alexander
+          '058cc42c-8af7-4e48-8ca7-25437c08f5a8', // Old App ID
           '6a26b8f2905ebc23fd43ad87', // V4 App ID
           'b5761696-72b1-4193-9995-0006d62e85ee', // V4 Public App ID
           '6a0c0a71102c6f4203615ea3', 

@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
   let appClientId = process.env.OTTO_APP_CLIENT_ID || '9c74d78a-cc67-412f-8d25-7652b43ac41b'
   if (environment === 'sandbox') {
-    appClientId = process.env.OTTO_SANDBOX_APP_CLIENT_ID || '2edf221b-9fc4-489a-8eed-66e3d48e8c39'
+    appClientId = process.env.OTTO_SANDBOX_APP_CLIENT_ID || '0bf6d71a-ed4b-4fb7-a7a1-445878d75912'
   }
 
   const oauthUrl = new URL(authUrl)
