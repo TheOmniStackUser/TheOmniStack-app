@@ -118,4 +118,13 @@ export interface MarketplaceAdapter {
     companyId: string, 
     updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number }[]
   ): Promise<void>
+
+  /**
+   * Marks a return as received on the marketplace if applicable.
+   */
+  receiveReturnItems?(
+    marketplaceOrderId: string,
+    refundItems: { sku: string; quantity: number }[],
+    rawOrderPayload?: unknown
+  ): Promise<boolean>
 }

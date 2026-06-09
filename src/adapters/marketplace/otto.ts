@@ -98,7 +98,8 @@ export class OttoAdapter implements MarketplaceAdapter {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: new URLSearchParams({
-          grant_type: 'client_credentials'
+          grant_type: 'client_credentials',
+          scope: 'orders products shipments returns receipts availability price-reduction'
         }).toString()
       })
 

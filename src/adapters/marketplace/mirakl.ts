@@ -986,6 +986,89 @@ export class MiraklAdapter implements MarketplaceAdapter {
   }
 
   /**
+   * Marks a return as received on the marketplace if applicable.
+   * Finds the latest open return matching the order ID and calls the RT25 receive endpoint.
+   */
+  async receiveReturnItems(
+    marketplaceOrderId: string,
+    refundItems: { sku: string; quantity: number }[],
+    rawOrderPayload?: unknown
+  ): Promise<boolean> {
+    try {
+      const token = await this.getAccessToken()
+      const headers: Record<string, string> = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      } else {
+        const apiKey = this.config.clientSecret === '' || !this.config.clientSecret 
+          ? this.config.clientId 
+          : this.config.apiKey
+        
+        if (apiKey) {
+          headers['Authorization'] = apiKey
+          headers['X-Mirakl-Api-Key'] = apiKey
+        }
+      }
+
+      const baseUrl = this.config.baseUrl.replace(/\/$/, '')
+      let url = `${baseUrl}/api/returns?max=100&sort=date_created,DESC`
+      if (this.config.shopId) url += `&shop_id=${this.config.shopId}`
+
+      // We fetch recent open returns to find the one matching the order
+      const states = ['IN_PROGRESS', 'WAITING_RECEPTION', 'PENDING_RECEPTION', 'CREATED']
+      let returnIdToReceive: string | null = null
+
+      console.log(`[MiraklAdapter:${this.marketplace}] Fetching recent returns to find RMA for order ${marketplaceOrderId}...`)
+      const res = await fetch(url, { method: 'GET', headers })
+      
+      if (res.ok) {
+        const data = await res.json()
+        const returns = data.returns || []
+        
+        for (const r of returns) {
+          if (!states.includes(r.state)) continue
+          if (r.order_id?.includes(marketplaceOrderId) || r.order_commercial_id?.includes(marketplaceOrderId)) {
+            returnIdToReceive = r.id
+            break
+          }
+        }
+      }
+
+      if (!returnIdToReceive) {
+        console.log(`[MiraklAdapter:${this.marketplace}] No open return found for order ${marketplaceOrderId}. Skipping receive step.`)
+        return false // Not necessarily an error, just no return found
+      }
+
+      console.log(`[MiraklAdapter:${this.marketplace}] Marking return ${returnIdToReceive} as received...`)
+      
+      const receiveUrl = `${baseUrl}/api/returns/${returnIdToReceive}/receive`
+      const receiveRes = await fetch(receiveUrl, { method: 'PUT', headers, body: JSON.stringify({}) })
+
+      if (!receiveRes.ok) {
+        const errText = await receiveRes.text()
+        console.warn(`[MiraklAdapter:${this.marketplace}] Failed to mark return ${returnIdToReceive} as received: ${receiveRes.status} - ${errText}`)
+        // Fallback to V1 endpoint format if needed
+        const fallbackUrl = `${baseUrl}/api/v1/returns/${returnIdToReceive}/receive`
+        const fallbackRes = await fetch(fallbackUrl, { method: 'PUT', headers, body: JSON.stringify({}) })
+        if (!fallbackRes.ok) {
+           console.error(`[MiraklAdapter:${this.marketplace}] Fallback also failed: ${fallbackRes.status}`)
+           return false
+        }
+      }
+
+      console.log(`[MiraklAdapter:${this.marketplace}] Return ${returnIdToReceive} successfully marked as received.`)
+      return true
+    } catch (error) {
+      console.error(`[MiraklAdapter:${this.marketplace}] Error receiving return items:`, error)
+      return false
+    }
+  }
+
+  /**
    * Fetch products/offers from the marketplace for inventory mapping.
    * Uses OF21 endpoint: GET /api/offers
    */

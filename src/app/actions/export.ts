@@ -44,11 +44,14 @@ export async function exportInvoiceJournalAction(filters: {
 
   // Fetch linked orders for these invoices
   const invoiceIds = results.map(r => r.id)
-  const linkedOrders = invoiceIds.length > 0 
+  const cancelsInvoiceIds = results.map(r => r.cancelsInvoiceId).filter(Boolean) as string[]
+  const allTargetInvoiceIds = Array.from(new Set([...invoiceIds, ...cancelsInvoiceIds]))
+
+  const linkedOrders = allTargetInvoiceIds.length > 0 
     ? await db.query.orders.findMany({
         where: and(
           eq(orders.companyId, companyId), 
-          inArray(orders.invoiceId, invoiceIds)
+          inArray(orders.invoiceId, allTargetInvoiceIds)
         )
       })
     : []
@@ -58,7 +61,8 @@ export async function exportInvoiceJournalAction(filters: {
   // Filter by marketplace if needed
   const filteredResults = results.filter(r => {
     if (!filters.marketplace || filters.marketplace === 'all') return true
-    const order = orderMap.get(r.id)
+    const targetId = r.cancelsInvoiceId || r.id
+    const order = orderMap.get(targetId)
     if (!order) return false
     const orderMp = (order.marketplace || 'manual').toLowerCase()
     const targetMp = filters.marketplace.toLowerCase()
@@ -96,7 +100,8 @@ export async function exportInvoiceJournalAction(filters: {
   ].join(';')
 
   const rows = filteredResults.map(inv => {
-    const order = orderMap.get(inv.id)
+    const targetId = inv.cancelsInvoiceId || inv.id
+    const order = orderMap.get(targetId)
     const items = inv.items || []
     const rawPayload = (order?.rawPayload as any) || {}
     const manualMetadata = rawPayload.manualMetadata || {}

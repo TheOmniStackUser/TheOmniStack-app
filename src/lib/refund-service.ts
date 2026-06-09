@@ -355,6 +355,11 @@ export async function executeRefund({
     const adapter = getAdapterForIntegration(integration)
     if (adapter && adapter.refundOrder) {
       try {
+        if (adapter.receiveReturnItems) {
+          console.log(`[RefundService] Attempting to mark return items as received on marketplace...`)
+          await adapter.receiveReturnItems(order.marketplaceOrderId, itemsToRefund, order.rawPayload)
+        }
+
         console.log(`[RefundService] Triggering API refund for marketplace ${order.marketplace}...`)
         apiSuccess = await adapter.refundOrder(
           order.marketplaceOrderId,

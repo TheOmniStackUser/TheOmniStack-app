@@ -352,8 +352,9 @@ export async function getInvoiceDetailsAction(invoiceId: string) {
   })
 
   if (invoice) {
+    const targetInvoiceId = invoice.cancelsInvoiceId || invoiceId;
     const linkedOrder = await db.query.orders.findFirst({
-      where: eq(orders.invoiceId, invoiceId)
+      where: eq(orders.invoiceId, targetInvoiceId)
     })
 
     return {

@@ -2,7 +2,7 @@ import { requireAuth } from '@/lib/session'
 import { db } from '@/db/client'
 import { invoices } from '@/db/schema/invoices'
 import { orders } from '@/db/schema/orders'
-import { eq, desc, and, ne } from 'drizzle-orm'
+import { eq, desc, and, ne, or } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import Link from 'next/link'
 import { InvoiceList } from './invoice-list'
@@ -45,7 +45,7 @@ export default async function InvoicesPage() {
         draftName: invoices.draftName,
       })
       .from(invoices)
-      .leftJoin(orders, eq(invoices.id, orders.invoiceId))
+      .leftJoin(orders, or(eq(invoices.id, orders.invoiceId), eq(invoices.cancelsInvoiceId, orders.invoiceId)))
       .leftJoin(originalInvoice, eq(invoices.cancelsInvoiceId, originalInvoice.id))
       .where(and(
         eq(invoices.companyId, auth.activeCompanyId),
