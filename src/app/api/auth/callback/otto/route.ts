@@ -80,8 +80,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Could not identify company for this OAuth callback. Please try connecting again from the integrations page.' }, { status: 400 })
     }
 
-    const appClientId = process.env.OTTO_APP_CLIENT_ID || '9c74d78a-cc67-412f-8d25-7652b43ac41b'
-    const appClientSecret = process.env.OTTO_APP_CLIENT_SECRET || 'f9600fd0-6cc2-4b77-a692-b472d65d331c'
+    let appClientId = process.env.OTTO_APP_CLIENT_ID || '9c74d78a-cc67-412f-8d25-7652b43ac41b'
+    let appClientSecret = process.env.OTTO_APP_CLIENT_SECRET || 'f9600fd0-6cc2-4b77-a692-b472d65d331c'
+    
+    // Override with Sandbox credentials if in sandbox environment
+    if (environment === 'sandbox') {
+      appClientId = process.env.OTTO_SANDBOX_APP_CLIENT_ID || '2edf221b-9fc4-489a-8eed-66e3d48e8c39'
+      appClientSecret = process.env.OTTO_SANDBOX_APP_CLIENT_SECRET || 'b8b86119-7411-4505-9d04-defee363909e'
+    }
 
     console.log(`[Otto OAuth Callback] Exchanging code for token using Global App Client ID: ${appClientId}...`)
     const tokenResponse = await fetch(`${baseUrl}/oauth2/token`, {
