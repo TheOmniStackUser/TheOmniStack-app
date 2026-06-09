@@ -71,11 +71,11 @@ export default async function DashboardPage() {
   const [invoicesStats] = await db
     .select({
       monthCount: sql<number>`count(case when coalesce(${invoices.issuedAt}, ${invoices.createdAt}) >= ${startOfMonth.toISOString()} then 1 end)::int`,
-      monthRevenue: sql<number>`COALESCE(sum(case when coalesce(${invoices.issuedAt}, ${invoices.createdAt}) >= ${startOfMonth.toISOString()} then (case when ${invoices.isCreditNote} then -abs(${invoices.subtotalAmount}::numeric) else abs(${invoices.subtotalAmount}::numeric) end) * (case ${invoices.currency} when 'CHF' then 1.03 when 'USD' then 0.92 when 'GBP' then 1.17 when 'PLN' then 0.23 when 'SEK' then 0.087 when 'DKK' then 0.13 else 1.0 end) end), 0)::float`,
-      monthTax: sql<number>`COALESCE(sum(case when coalesce(${invoices.issuedAt}, ${invoices.createdAt}) >= ${startOfMonth.toISOString()} then (case when ${invoices.isCreditNote} then -abs(${invoices.taxAmount}::numeric) else abs(${invoices.taxAmount}::numeric) end) * (case ${invoices.currency} when 'CHF' then 1.03 when 'USD' then 0.92 when 'GBP' then 1.17 when 'PLN' then 0.23 when 'SEK' then 0.087 when 'DKK' then 0.13 else 1.0 end) end), 0)::float`,
+      monthRevenue: sql<number>`COALESCE(sum(case when coalesce(${invoices.issuedAt}, ${invoices.createdAt}) >= ${startOfMonth.toISOString()} then (case when ${invoices.isCreditNote} and ${invoices.subtotalAmount}::numeric > 0 then -${invoices.subtotalAmount}::numeric else ${invoices.subtotalAmount}::numeric end) * (case ${invoices.currency} when 'CHF' then 1.03 when 'USD' then 0.92 when 'GBP' then 1.17 when 'PLN' then 0.23 when 'SEK' then 0.087 when 'DKK' then 0.13 else 1.0 end) end), 0)::float`,
+      monthTax: sql<number>`COALESCE(sum(case when coalesce(${invoices.issuedAt}, ${invoices.createdAt}) >= ${startOfMonth.toISOString()} then (case when ${invoices.isCreditNote} and ${invoices.taxAmount}::numeric > 0 then -${invoices.taxAmount}::numeric else ${invoices.taxAmount}::numeric end) * (case ${invoices.currency} when 'CHF' then 1.03 when 'USD' then 0.92 when 'GBP' then 1.17 when 'PLN' then 0.23 when 'SEK' then 0.087 when 'DKK' then 0.13 else 1.0 end) end), 0)::float`,
       totalCount: sql<number>`count(*)::int`,
-      totalRevenue: sql<number>`COALESCE(sum((case when ${invoices.isCreditNote} then -abs(${invoices.subtotalAmount}::numeric) else abs(${invoices.subtotalAmount}::numeric) end) * (case ${invoices.currency} when 'CHF' then 1.03 when 'USD' then 0.92 when 'GBP' then 1.17 when 'PLN' then 0.23 when 'SEK' then 0.087 when 'DKK' then 0.13 else 1.0 end)), 0)::float`,
-      totalTax: sql<number>`COALESCE(sum((case when ${invoices.isCreditNote} then -abs(${invoices.taxAmount}::numeric) else abs(${invoices.taxAmount}::numeric) end) * (case ${invoices.currency} when 'CHF' then 1.03 when 'USD' then 0.92 when 'GBP' then 1.17 when 'PLN' then 0.23 when 'SEK' then 0.087 when 'DKK' then 0.13 else 1.0 end)), 0)::float`,
+      totalRevenue: sql<number>`COALESCE(sum((case when ${invoices.isCreditNote} and ${invoices.subtotalAmount}::numeric > 0 then -${invoices.subtotalAmount}::numeric else ${invoices.subtotalAmount}::numeric end) * (case ${invoices.currency} when 'CHF' then 1.03 when 'USD' then 0.92 when 'GBP' then 1.17 when 'PLN' then 0.23 when 'SEK' then 0.087 when 'DKK' then 0.13 else 1.0 end)), 0)::float`,
+      totalTax: sql<number>`COALESCE(sum((case when ${invoices.isCreditNote} and ${invoices.taxAmount}::numeric > 0 then -${invoices.taxAmount}::numeric else ${invoices.taxAmount}::numeric end) * (case ${invoices.currency} when 'CHF' then 1.03 when 'USD' then 0.92 when 'GBP' then 1.17 when 'PLN' then 0.23 when 'SEK' then 0.087 when 'DKK' then 0.13 else 1.0 end)), 0)::float`,
     })
     .from(invoices)
     .where(
@@ -89,7 +89,7 @@ export default async function DashboardPage() {
   const [openInvoicesStats] = await db
     .select({
       count: sql<number>`count(*)::int`,
-      revenue: sql<number>`COALESCE(sum(abs(${invoices.totalAmount}::numeric) * (case ${invoices.currency} when 'CHF' then 1.03 when 'USD' then 0.92 when 'GBP' then 1.17 when 'PLN' then 0.23 when 'SEK' then 0.087 when 'DKK' then 0.13 else 1.0 end)), 0)::float`,
+      revenue: sql<number>`COALESCE(sum(${invoices.totalAmount}::numeric * (case ${invoices.currency} when 'CHF' then 1.03 when 'USD' then 0.92 when 'GBP' then 1.17 when 'PLN' then 0.23 when 'SEK' then 0.087 when 'DKK' then 0.13 else 1.0 end)), 0)::float`,
     })
     .from(invoices)
     .leftJoin(orders, eq(invoices.id, orders.invoiceId))
@@ -110,7 +110,7 @@ export default async function DashboardPage() {
   const [overdueInvoicesStats] = await db
     .select({
       count: sql<number>`count(*)::int`,
-      revenue: sql<number>`COALESCE(sum(abs(${invoices.totalAmount}::numeric) * (case ${invoices.currency} when 'CHF' then 1.03 when 'USD' then 0.92 when 'GBP' then 1.17 when 'PLN' then 0.23 when 'SEK' then 0.087 when 'DKK' then 0.13 else 1.0 end)), 0)::float`,
+      revenue: sql<number>`COALESCE(sum(${invoices.totalAmount}::numeric * (case ${invoices.currency} when 'CHF' then 1.03 when 'USD' then 0.92 when 'GBP' then 1.17 when 'PLN' then 0.23 when 'SEK' then 0.087 when 'DKK' then 0.13 else 1.0 end)), 0)::float`,
     })
     .from(invoices)
     .leftJoin(orders, eq(invoices.id, orders.invoiceId))
