@@ -492,7 +492,16 @@ export class OttoAdapter implements MarketplaceAdapter {
         }
 
         const data = await response.json()
-        const products = data.resources || data.productVariations || data.items || data.products || data.results || (Array.isArray(data) ? data : [])
+        // Otto v5 products API returns { productVariations: [...], links: [...] }
+        // resources may also be present but as an object – prefer productVariations array
+        const products = (
+          (Array.isArray(data.productVariations) && data.productVariations) ||
+          (Array.isArray(data.resources) && data.resources) ||
+          (Array.isArray(data.items) && data.items) ||
+          (Array.isArray(data.products) && data.products) ||
+          (Array.isArray(data.results) && data.results) ||
+          (Array.isArray(data) ? data : [])
+        )
         allProducts.push(...products)
         
         if (products.length === 0) {
@@ -502,12 +511,14 @@ export class OttoAdapter implements MarketplaceAdapter {
 
         const nextLink = (data.links || []).find((l: any) => l.rel === 'next')
         let proposedNextUrl = null
-        if (nextLink && nextLink.href) {
+        if (nextLink && nextLink.href && nextLink.href.trim() !== '') {
           proposedNextUrl = nextLink.href.startsWith('http') ? nextLink.href : `${this.baseUrl}${nextLink.href.startsWith('/') ? '' : '/'}${nextLink.href}`
         }
         
-        if (proposedNextUrl === nextUrl) {
-          console.warn(`[OttoAdapter] Infinite loop detected (nextUrl is same as current). Breaking.`)
+        if (!proposedNextUrl || proposedNextUrl === nextUrl) {
+          if (proposedNextUrl === nextUrl) {
+            console.warn(`[OttoAdapter] Infinite loop detected (nextUrl is same as current). Breaking.`)
+          }
           break
         }
         
@@ -532,12 +543,19 @@ export class OttoAdapter implements MarketplaceAdapter {
 
           if (qRes.ok) {
             const qData = await qRes.json()
-            const resources = Array.isArray(qData) ? qData : (qData.resources || qData.results || qData.items || [])
+            // Otto Availability API returns { resources: { variations: [...] }, links: [...] }
+            const resources = (
+              Array.isArray(qData) ? qData :
+              Array.isArray(qData.resources) ? qData.resources :
+              Array.isArray(qData.resources?.variations) ? qData.resources.variations :
+              Array.isArray(qData.results) ? qData.results :
+              Array.isArray(qData.items) ? qData.items :
+              []
+            )
             for (const item of resources) {
               if (item.sku && item.quantity !== undefined) {
-                stockMap.set(item.sku, item.quantity)
+                stockMap.set(item.sku, typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity)
               } else if (item.sku && item.availableQuantity !== undefined) {
-                // In case Otto changed the key to availableQuantity
                 stockMap.set(item.sku, item.availableQuantity)
               }
             }
@@ -549,12 +567,14 @@ export class OttoAdapter implements MarketplaceAdapter {
 
             const nextLink = (qData.links || []).find((l: any) => l.rel === 'next')
             let proposedNextUrl = null
-            if (nextLink && nextLink.href) {
+            if (nextLink && nextLink.href && nextLink.href.trim() !== '') {
               proposedNextUrl = nextLink.href.startsWith('http') ? nextLink.href : `${this.baseUrl}${nextLink.href.startsWith('/') ? '' : '/'}${nextLink.href}`
             }
             
-            if (proposedNextUrl === quantitiesUrl) {
-              console.warn(`[OttoAdapter] Infinite loop detected for quantities (nextUrl is same as current). Breaking.`)
+            if (!proposedNextUrl || proposedNextUrl === quantitiesUrl) {
+              if (proposedNextUrl === quantitiesUrl) {
+                console.warn(`[OttoAdapter] Infinite loop detected for quantities. Breaking.`)
+              }
               break
             }
             
