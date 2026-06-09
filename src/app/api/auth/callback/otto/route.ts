@@ -9,15 +9,18 @@ export async function GET(request: NextRequest) {
   let state = searchParams.get('state')
   const iss = searchParams.get('iss') || ''
 
-  // Fallback if the invitation link dropped the state parameter
+  // Fallback 1: Cookie set by our form before redirecting to OTTO
   if (!state) {
     state = request.cookies.get('otto_oauth_company_id')?.value || ''
+    if (state) {
+      console.log(`[Otto OAuth Callback] Recovered company ID from cookie: ${state}`)
+    }
   }
 
   console.log(`[Otto OAuth Callback] Received callback with code: ${code ? 'PRESENT' : 'MISSING'}, state: ${state}, iss: ${iss}`)
 
-  if (!code || !state) {
-    return NextResponse.json({ error: 'Missing code or state parameter' }, { status: 400 })
+  if (!code) {
+    return NextResponse.json({ error: 'Missing code parameter' }, { status: 400 })
   }
 
   // Determine environment based on issuer URL
@@ -29,15 +32,32 @@ export async function GET(request: NextRequest) {
 
   try {
     // Find matching Otto integration for the given company and environment
-    let integration = await db.query.marketplaceIntegrations.findFirst({
+    let integration = state ? await db.query.marketplaceIntegrations.findFirst({
       where: and(
         eq(marketplaceIntegrations.companyId, state),
         eq(marketplaceIntegrations.type, 'otto'),
         eq(marketplaceIntegrations.environment, environment)
       )
-    })
+    }) : null
 
-    if (!integration) {
+    // Fallback 2: If state is missing, find the most recently updated integration
+    // for this environment that doesn't have an installation token yet
+    if (!integration && !state) {
+      console.warn(`[Otto OAuth Callback] No state parameter. Searching for a pending ${environment} integration...`)
+      integration = await db.query.marketplaceIntegrations.findFirst({
+        where: and(
+          eq(marketplaceIntegrations.type, 'otto'),
+          eq(marketplaceIntegrations.environment, environment)
+        ),
+        orderBy: (t, { desc }) => [desc(t.updatedAt)]
+      })
+      if (integration) {
+        console.log(`[Otto OAuth Callback] Found fallback integration for company: ${integration.companyId}`)
+        state = integration.companyId
+      }
+    }
+
+    if (!integration && state) {
       console.log(`[Otto OAuth Callback] No existing integration found. Creating new one for company: ${state}`)
       const [newIntegration] = await db.insert(marketplaceIntegrations).values({
         companyId: state,
@@ -47,6 +67,10 @@ export async function GET(request: NextRequest) {
         metadata: {},
       }).returning()
       integration = newIntegration
+    }
+
+    if (!integration) {
+      return NextResponse.json({ error: 'Could not identify company for this OAuth callback. Please try connecting again from the integrations page.' }, { status: 400 })
     }
 
     const appClientId = process.env.OTTO_APP_CLIENT_ID || '9c74d78a-cc67-412f-8d25-7652b43ac41b'

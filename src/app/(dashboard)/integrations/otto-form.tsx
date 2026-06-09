@@ -2,15 +2,7 @@
 
 import { useActionState, useState } from 'react'
 import { saveOttoIntegrationAction } from '@/app/actions/integrations'
-import { HelpCircle, ExternalLink, CheckCircle2 } from 'lucide-react'
-
-// App Client IDs per environment
-const OTTO_CLIENT_IDS = {
-  production: '9c74d78a-cc67-412f-8d25-7652b43ac41b',
-  sandbox: '2edf221b-9fc4-489a-8eed-66e3d48e8c39',
-}
-
-const REDIRECT_URI = 'https://app.theomnistack.de/api/auth/callback/otto'
+import { HelpCircle, ExternalLink } from 'lucide-react'
 
 export function OttoIntegrationForm({ 
   companyId,
@@ -28,26 +20,17 @@ export function OttoIntegrationForm({
   const [state, action, pending] = useActionState(saveOttoIntegrationAction, undefined)
   const [connectionType, setConnectionType] = useState(initialConnectionType)
   const [environment, setEnvironment] = useState(initialEnvironment)
+  const [inviteLink, setInviteLink] = useState('')
 
   const handleConnectOtto = () => {
-    const env = environment as 'production' | 'sandbox'
-    const appClientId = OTTO_CLIENT_IDS[env]
-    const baseUrl = env === 'sandbox'
-      ? 'https://sandbox.api.otto.market'
-      : 'https://api.otto.market'
+    if (!inviteLink.trim()) return
 
-    // Set cookie as fallback in case OTTO drops the state param
+    // Store company ID in cookie BEFORE navigating away.
+    // SameSite=Lax means the cookie IS sent on GET-redirects back to our domain.
     document.cookie = `otto_oauth_company_id=${companyId}; path=/; max-age=3600; SameSite=Lax`
 
-    const params = new URLSearchParams({
-      response_type: 'code',
-      client_id: appClientId,
-      redirect_uri: REDIRECT_URI,
-      state: companyId,
-      scope: 'openid',
-    })
-
-    window.location.href = `${baseUrl}/oauth2/authorize?${params.toString()}`
+    // Open in same tab so cookies are preserved
+    window.location.href = inviteLink.trim()
   }
 
   return (
@@ -63,7 +46,7 @@ export function OttoIntegrationForm({
         </div>
       )}
 
-      {/* VERBINDUNGSTYP TOGGLE */}
+      {/* VERBINDUNGSTYP */}
       <div>
         <label className="block text-sm font-semibold text-gray-700 mb-2">Verbindungstyp</label>
         <input type="hidden" name="connectionType" value={connectionType} />
@@ -93,7 +76,7 @@ export function OttoIntegrationForm({
         </div>
       </div>
 
-      {/* PRIVATE APP CREDENTIALS */}
+      {/* PRIVATE APP */}
       {connectionType === 'private' ? (
         <>
           <div className="space-y-1">
@@ -103,9 +86,7 @@ export function OttoIntegrationForm({
                 <HelpCircle className="w-4 h-4 text-slate-400 cursor-help hover:text-slate-600 transition-colors" />
                 <div className="absolute left-6 top-0 w-64 p-3 bg-slate-900 text-white text-xs rounded-xl shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 transform -translate-y-1/4">
                   <p className="font-bold mb-1">Wo finde ich das?</p>
-                  <p className="leading-relaxed text-slate-300">
-                    Erstelle in Otto Partner Connect unter Konfiguration &gt; API-Zugriff einen neuen &quot;API-Benutzer&quot; oder eine &quot;Private App&quot;.
-                  </p>
+                  <p className="leading-relaxed text-slate-300">Erstelle in Otto Partner Connect unter Konfiguration &gt; API-Zugriff einen neuen &quot;API-Benutzer&quot;.</p>
                   <div className="absolute left-0 top-3 -translate-x-full border-8 border-transparent border-r-slate-900"></div>
                 </div>
               </div>
@@ -118,24 +99,9 @@ export function OttoIntegrationForm({
               className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm text-slate-900 placeholder:text-slate-500"
               placeholder="e.g. 8f72..."
             />
-            {state?.errors?.clientId && (
-              <p className="text-sm text-red-600 font-medium animate-in slide-in-from-top-1">{state.errors.clientId[0]}</p>
-            )}
           </div>
           <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <label htmlFor="clientSecret" className="block text-sm font-semibold text-gray-700">Client Secret (Passwort)</label>
-              <div className="group relative">
-                <HelpCircle className="w-4 h-4 text-slate-400 cursor-help hover:text-slate-600 transition-colors" />
-                <div className="absolute left-6 top-0 w-64 p-3 bg-slate-900 text-white text-xs rounded-xl shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 transform -translate-y-1/4">
-                  <p className="font-bold mb-1">Wichtig beim Secret</p>
-                  <p className="leading-relaxed text-slate-300">
-                    Das Client Secret wird nur einmalig angezeigt. Falls du es verloren hast, musst du im Portal ein neues generieren.
-                  </p>
-                  <div className="absolute left-0 top-3 -translate-x-full border-8 border-transparent border-r-slate-900"></div>
-                </div>
-              </div>
-            </div>
+            <label htmlFor="clientSecret" className="block text-sm font-semibold text-gray-700">Client Secret (Passwort)</label>
             <input
               type="password"
               id="clientSecret"
@@ -143,37 +109,42 @@ export function OttoIntegrationForm({
               className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm text-slate-900 placeholder:text-slate-500"
               placeholder="••••••••••••••••"
             />
-            {state?.errors?.clientSecret && (
-              <p className="text-sm text-red-600 font-medium animate-in slide-in-from-top-1">{state.errors.clientSecret[0]}</p>
-            )}
           </div>
         </>
       ) : (
-        /* SERVICE PARTNER: Direct OAuth button – no invitation link needed */
+        /* SERVICE PARTNER: Invitation link → sets cookie first */
         <div className="p-5 bg-blue-50 border border-blue-200 rounded-xl space-y-4">
           <div>
             <p className="font-semibold text-blue-900 mb-1">Verbindung via TheOmniStack App</p>
             <p className="text-sm text-blue-800 leading-relaxed">
-              Klicke auf den Button, um dich direkt bei OTTO anzumelden und die Verbindung herzustellen.
-              Kein Einladungslink nötig – der OAuth-Flow läuft vollautomatisch.
+              Füge den Einladungslink ein, den du im OTTO Developer Portal generiert hast, und klicke dann auf den Button.
+              Öffne den Link <strong>nicht</strong> direkt – nur über diesen Button wird die Verbindung korrekt erkannt.
             </p>
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="inviteLink" className="block text-sm font-semibold text-blue-900">
+              OTTO Einladungslink
+            </label>
+            <input
+              type="url"
+              id="inviteLink"
+              value={inviteLink}
+              onChange={(e) => setInviteLink(e.target.value)}
+              className="w-full px-4 py-2 bg-white border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm text-slate-900 placeholder:text-slate-400"
+              placeholder="https://portal.otto.market/apps/..."
+            />
           </div>
 
           <button
             type="button"
             onClick={handleConnectOtto}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors shadow-sm"
+            disabled={!inviteLink.trim()}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-semibold rounded-xl transition-colors shadow-sm"
           >
             <ExternalLink className="w-4 h-4" />
-            Jetzt mit OTTO {environment === 'sandbox' ? '(Sandbox) ' : ''}verbinden
+            Jetzt mit OTTO verbinden
           </button>
-
-          {state?.success && (
-            <div className="flex items-center gap-2 text-sm text-green-700 font-medium">
-              <CheckCircle2 className="w-4 h-4" />
-              Verbindung erfolgreich hergestellt!
-            </div>
-          )}
         </div>
       )}
 
@@ -188,7 +159,6 @@ export function OttoIntegrationForm({
           placeholder="z.B. 7423afd2-e7ab-4bae-ac30-048b7c0346c1"
           className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-black focus:outline-none focus:ring-blue-500 focus:border-blue-500"
         />
-        {state?.errors?.returnAddressCarrierId && <p className="mt-1 text-sm text-red-600">{state.errors.returnAddressCarrierId}</p>}
         <p className="mt-2 text-xs text-gray-500">
           Nur erforderlich, wenn du im Otto Partner Connect mehrere Retourenlager konfiguriert hast.
         </p>
@@ -198,7 +168,6 @@ export function OttoIntegrationForm({
       <div>
         <label htmlFor="environment" className="block text-sm font-medium text-gray-700">Umgebung</label>
         <select
-          key={initialEnvironment}
           id="environment"
           name="environment"
           value={environment}
