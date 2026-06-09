@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const environment = searchParams.get('environment') || 'sandbox'
-  const companyId = request.cookies.get('otto_oauth_company_id')?.value
+  const companyId = searchParams.get('companyId') || request.cookies.get('otto_oauth_company_id')?.value
 
   if (!companyId) {
     return NextResponse.json({ error: 'Missing company ID in cookies. Please start the connection flow from TheOmniStack integrations page.' }, { status: 400 })

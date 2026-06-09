@@ -151,7 +151,7 @@ export function OttoIntegrationForm({
               <strong>WICHTIG:</strong> Nachdem du bei OTTO auf "Installieren" geklickt hast und hierher zurückgeleitet wurdest, klicke auf diesen Button, um den Autorisierungs-Token abzurufen:
             </p>
             <a
-              href={`/api/auth/otto?environment=${environment}`}
+              href={`/api/auth/otto?environment=${environment}&companyId=${companyId}`}
               className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-colors shadow-sm"
             >
               2. Schritt: Autorisierung abschließen (Token abrufen)
