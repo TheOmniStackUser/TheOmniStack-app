@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
         redirect_uri: redirectUri,
         client_id: appClientId,
         client_secret: appClientSecret,
-        scope: 'installation'
+        scope: 'shipments availability orders returns products price-reduction receipts'
       }).toString().replace(/\+/g, '%20'),
     })
 
@@ -165,40 +165,12 @@ export async function GET(request: NextRequest) {
       appId: finalAppId
     }
 
-    // --- NEW: Exchange Developer Access Token for Installation Access Token ---
-    console.log(`[Otto OAuth Callback] Exchanging Developer Token for Installation Token for App: ${finalAppId}, Installation: ${installationId}`)
-    const fullScopes = 'installation partnerId developer products orders receipts returns price-reduction shipments shipping-profiles availability returns-warehouse-read returns-warehouse-write'
-    
-    const installTokenResponse = await fetch(`${baseUrl}/v1/apps/${finalAppId}/installations/${installationId}/accessToken`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${userAccessToken}`,
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: `scope=${fullScopes.replace(/\+/g, '%20')}`
-    })
-
-    if (!installTokenResponse.ok) {
-      const errText = await installTokenResponse.text()
-      console.error(`[Otto OAuth Callback] Failed to get Installation Access Token: ${installTokenResponse.status} - ${errText}`)
-      return NextResponse.json({ error: 'Failed to get Installation Access Token', details: errText }, { status: 400 })
-    }
-
-    const installTokenData = await installTokenResponse.json()
-    const finalAccessToken = installTokenData.access_token
-    // NOTE: Installation access token doesn't provide a refresh_token, you have to use the developer refresh_token
-    // to get a new developer access token, and then get a new installation access token.
-    // For simplicity right now, we store both.
-
     await db
       .update(marketplaceIntegrations)
       .set({
-        metadata: {
-          ...metadata,
-          developerTokenData: tokenData // Save original developer token data
-        },
-        accessToken: finalAccessToken,
-        refreshToken: tokenData.refresh_token, // The refresh token is from the developer token
+        metadata,
+        accessToken: userAccessToken,
+        refreshToken: tokenData.refresh_token,
         updatedAt: new Date()
       })
       .where(eq(marketplaceIntegrations.id, integration.id))

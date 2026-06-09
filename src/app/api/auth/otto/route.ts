@@ -27,8 +27,8 @@ export async function GET(request: NextRequest) {
   oauthUrl.searchParams.set('redirect_uri', redirectUri)
   oauthUrl.searchParams.set('state', companyId)
   
-  // WICHTIG: OTTO verlangt, dass alle Scopes explizit angefordert werden!
-  const scopes = 'installation'
+  // Request only the exact scopes that are connected to the app in the OTTO Partner Connect Portal!
+  const scopes = 'shipments availability orders returns products price-reduction receipts'
   oauthUrl.searchParams.set('scope', scopes)
   
   // Some strict OAuth servers don't accept '+' for spaces in the query string, they need '%20'
