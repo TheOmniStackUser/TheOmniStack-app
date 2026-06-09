@@ -9,6 +9,9 @@ export async function GET(request: NextRequest) {
   let state = searchParams.get('state')
   const iss = searchParams.get('iss') || ''
 
+  // Log IMMEDIATELY so we always see it in Vercel, even if something fails later
+  console.log(`[Otto OAuth Callback] *** CALLBACK RECEIVED *** code=${code ? 'YES' : 'NO'} state=${state || 'MISSING'} iss=${iss}`)
+
   // Fallback 1: Cookie set by our form before redirecting to OTTO
   if (!state) {
     state = request.cookies.get('otto_oauth_company_id')?.value || ''
@@ -41,16 +44,20 @@ export async function GET(request: NextRequest) {
     }) : null
 
     // Fallback 2: If state is missing, find the most recently updated integration
-    // for this environment that doesn't have an installation token yet
     if (!integration && !state) {
       console.warn(`[Otto OAuth Callback] No state parameter. Searching for a pending ${environment} integration...`)
-      integration = await db.query.marketplaceIntegrations.findFirst({
+      // Use simple query without orderBy to avoid potential type errors
+      const allIntegrations = await db.query.marketplaceIntegrations.findMany({
         where: and(
           eq(marketplaceIntegrations.type, 'otto'),
           eq(marketplaceIntegrations.environment, environment)
-        ),
-        orderBy: (t, { desc }) => [desc(t.updatedAt)]
+        )
       })
+      // Sort in JS to avoid Drizzle orderBy syntax issues
+      const sorted = allIntegrations.sort((a, b) => 
+        new Date(b.updatedAt ?? 0).getTime() - new Date(a.updatedAt ?? 0).getTime()
+      )
+      integration = sorted[0] || null
       if (integration) {
         console.log(`[Otto OAuth Callback] Found fallback integration for company: ${integration.companyId}`)
         state = integration.companyId
