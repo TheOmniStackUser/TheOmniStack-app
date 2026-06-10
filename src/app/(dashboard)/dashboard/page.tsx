@@ -67,6 +67,20 @@ export default async function DashboardPage() {
       )
     )
 
+  const [{ monthOrdersCount }] = await db
+    .select({
+      monthOrdersCount: sql<number>`count(*)::int`,
+    })
+    .from(orders)
+    .where(
+      and(
+        eq(orders.companyId, auth.activeCompanyId),
+        eq(orders.isArchived, false),
+        ne(orders.status, 'draft'),
+        sql`coalesce(${orders.marketplacePurchaseDate}, ${orders.createdAt}) >= ${startOfMonth.toISOString()}`
+      )
+    )
+
   // Orders status breakdown
   const orderStats = await db
     .select({
@@ -236,6 +250,17 @@ export default async function DashboardPage() {
             </div>
             <div className="mt-4 text-xs text-green-600 font-medium flex items-center gap-1">
               Marktplätze synchronisiert
+              <svg className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+            </div>
+          </Link>
+          
+          <Link href="/orders" className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all group flex flex-col justify-between">
+            <div>
+              <h3 className="text-gray-500 text-sm font-medium uppercase tracking-wider group-hover:text-blue-600 transition-colors">Bestellungen (Monat)</h3>
+              <p className="text-4xl font-bold text-gray-900 mt-3">{monthOrdersCount}</p>
+            </div>
+            <div className="mt-4 text-xs text-gray-500 font-medium flex items-center gap-1">
+              Im aktuellen Kalendermonat
               <svg className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
             </div>
           </Link>
