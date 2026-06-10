@@ -80,8 +80,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Could not identify company for this OAuth callback. Please try connecting again from the integrations page.' }, { status: 400 })
     }
 
-    let appClientId = process.env.OTTO_APP_CLIENT_ID || '9c74d78a-cc67-412f-8d25-7652b43ac41b'
-    let appClientSecret = process.env.OTTO_APP_CLIENT_SECRET || 'f9600fd0-6cc2-4b77-a692-b472d65d331c'
+    let appClientId = process.env.OTTO_APP_CLIENT_ID || '7dad7649-bdee-4593-8a65-c74f28693507'
+    let appClientSecret = process.env.OTTO_APP_CLIENT_SECRET || '9d8f8b8f-6ee7-4f78-b844-15332634b760'
     
     // Override with Sandbox credentials if in sandbox environment
     if (environment === 'sandbox') {
@@ -126,7 +126,7 @@ export async function GET(request: NextRequest) {
           'b979c7bd-7e50-4b0e-bae2-d41d5fd2c1d7', 
           '69eb5ed304bb0234c14c27b5'
         ]
-      : ['fb5f4e1a-5a8f-4eb3-89b1-237f359d4709', '6a0c0a71102c6f4203615ea3', '69eb5ed304bb0234c14c27b5']
+      : ['ee1fc586-b339-47fb-80a7-22e239d575cd', 'fb5f4e1a-5a8f-4eb3-89b1-237f359d4709', '6a0c0a71102c6f4203615ea3', '69eb5ed304bb0234c14c27b5']
 
     let installationId = ''
     let finalAppId = ''

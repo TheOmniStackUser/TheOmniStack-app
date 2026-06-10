@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
   const proto = request.headers.get('x-forwarded-proto') || 'https'
   const redirectUri = `${proto}://${requestHost}/api/auth/callback/otto`
 
-  let appClientId = process.env.OTTO_APP_CLIENT_ID || '9c74d78a-cc67-412f-8d25-7652b43ac41b'
+  let appClientId = process.env.OTTO_APP_CLIENT_ID || '7dad7649-bdee-4593-8a65-c74f28693507'
   if (environment === 'sandbox') {
     appClientId = process.env.OTTO_SANDBOX_APP_CLIENT_ID || '0bf6d71a-ed4b-4fb7-a7a1-445878d75912'
   }
