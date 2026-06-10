@@ -3,7 +3,7 @@
 import { db } from '@/db/client'
 import { returnsLog, returnedItems } from '@/db/schema/returns'
 import { orders } from '@/db/schema/orders'
-import { eq, and, inArray } from 'drizzle-orm'
+import { eq, and, inArray, or } from 'drizzle-orm'
 import { requireAuth } from '@/lib/session'
 import { revalidatePath } from 'next/cache'
 import { executeRefund } from '@/lib/refund-service'
@@ -85,11 +85,31 @@ export async function updateReturnAction(
 ) {
   const session = await checkAuth()
 
+  // Attempt to match an order based on the new orderNumber
+  let foundOrderId = null
+  if (data.orderNumber) {
+    const scanInput = data.orderNumber.trim()
+    const matchedOrder = await db.query.orders.findFirst({
+      where: and(
+        eq(orders.companyId, session.activeCompanyId),
+        or(
+          eq(orders.marketplaceOrderId, scanInput),
+          eq(orders.trackingNumber, scanInput),
+          eq(orders.returnTrackingNumber, scanInput)
+        )
+      )
+    })
+    if (matchedOrder) {
+      foundOrderId = matchedOrder.id
+    }
+  }
+
   // 1. Update Return Log
   await db
     .update(returnsLog)
     .set({
       orderNumber: data.orderNumber,
+      orderId: foundOrderId,
       customerName: data.customerName,
       shippingAddress: data.shippingAddress || null,
       status: data.status,
@@ -146,7 +166,7 @@ export async function updateReturnAction(
   }
 
   revalidatePath('/returns')
-  return { success: true }
+  return { success: true, orderId: foundOrderId }
 }
 
 export async function refundReturnAction(

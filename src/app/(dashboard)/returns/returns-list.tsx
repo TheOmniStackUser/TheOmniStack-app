@@ -445,7 +445,7 @@ export function ReturnsList({
           }))
         }
 
-        await updateReturnAction(editingLog.id, payload)
+        const res = await updateReturnAction(editingLog.id, payload)
 
         // Update local state
         setLogs((prev) =>
@@ -454,6 +454,7 @@ export function ReturnsList({
               return {
                 ...l,
                 orderNumber: payload.orderNumber,
+                orderId: res.orderId,
                 customerName: payload.customerName,
                 shippingAddress: payload.shippingAddress,
                 status: payload.status,
