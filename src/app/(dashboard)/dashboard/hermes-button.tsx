@@ -16,8 +16,12 @@ export function HermesButton() {
         alert(result.error)
       } else if (result) {
         alert(result.message)
-        if (result.labels && result.labels.length > 0) {
-          result.labels.forEach((url: string) => window.open(url, '_blank'))
+        if (result.generatedIds && result.generatedIds.length > 0) {
+          const url = `/api/orders/bulk/shipping-labels?ids=${result.generatedIds.join(',')}`
+          const newTab = window.open(url, '_blank')
+          if (!newTab || newTab.closed || typeof newTab.closed === 'undefined') {
+            window.location.href = url
+          }
         }
       }
     })

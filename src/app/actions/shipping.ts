@@ -79,7 +79,7 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
 
     interface ShippingTaskResult {
       success: boolean;
-      labels?: string[];
+      orderId?: string;
       error?: string;
     }
 
@@ -216,7 +216,7 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
 
         return {
           success: true,
-          labels: orderLabels,
+          orderId: order.id,
           error: confirmError
         }
       } catch (err: any) {
@@ -232,14 +232,14 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
     const results = await runWithLimit(tasks, 3)
 
     let successCount = 0
-    let labels: string[] = []
+    const generatedIds: string[] = []
     const errors: string[] = []
 
     for (const res of results) {
       if (res.success) {
         successCount++
-        if (res.labels) {
-          labels.push(...res.labels)
+        if (res.orderId) {
+          generatedIds.push(res.orderId)
         }
       }
       if (res.error) {
@@ -260,11 +260,11 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
         success: true,
         message: `${successCount} Versandetiketten wurden über Hermes generiert!`,
         warning: `Erfolgreich: ${successCount} Hermes-Etikett(en) erstellt.\n\nFolgende Bestellungen konnten nicht versendet werden. Bitte die Lieferadresse prüfen:\n- ${errors.join('\n- ')}`,
-        labels
+        generatedIds
       }
     }
 
-    return { success: true, message: `${successCount} Versandetiketten wurden über Hermes generiert!`, labels }
+    return { success: true, message: `${successCount} Versandetiketten wurden über Hermes generiert!`, generatedIds }
 
   } catch (error) {
     console.error('[Hermes Action] Error:', error)
@@ -441,7 +441,7 @@ export async function generateDhlLabelsAction(
 
     interface ShippingTaskResult {
       success: boolean;
-      labels?: string[];
+      orderId?: string;
       error?: string;
     }
 
@@ -794,7 +794,7 @@ export async function generateDhlLabelsAction(
 
         return {
           success: true,
-          labels: orderLabels,
+          orderId: order.id,
           error: confirmError
         }
       } catch (err: any) {
@@ -807,14 +807,14 @@ export async function generateDhlLabelsAction(
     const results = await runWithLimit(tasks, 3)
 
     let successCount = 0
-    const labels: string[] = []
+    const generatedIds: string[] = []
     const errors: string[] = []
 
     for (const res of results) {
       if (res.success) {
         successCount++
-        if (res.labels) {
-          labels.push(...res.labels)
+        if (res.orderId) {
+          generatedIds.push(res.orderId)
         }
       }
       if (res.error) {
@@ -836,14 +836,14 @@ export async function generateDhlLabelsAction(
         success: true,
         message: `${successCount} DHL-Versandetikett${successCount === 1 ? '' : 'en'} erstellt!`,
         warning: `Erfolgreich: ${successCount} DHL-Etikett(en) erstellt.\n\nFolgende Bestellungen konnten nicht versendet werden. Bitte die Lieferadresse prüfen:\n- ${errors.join('\n- ')}`,
-        labels,
+        generatedIds,
       }
     }
 
     return {
       success: true,
       message: `${successCount} DHL-Versandetikett${successCount === 1 ? '' : 'en'} erstellt!`,
-      labels,
+      generatedIds,
     }
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Fehler bei der DHL API Kommunikation.' }
