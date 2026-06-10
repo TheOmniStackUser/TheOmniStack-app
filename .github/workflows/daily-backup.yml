@@ -18,6 +18,13 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Install PostgreSQL 16 client
+        run: |
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          wget -qO- https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo tee /etc/apt/trusted.gpg.d/pgdg.asc &>/dev/null
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-16
+
       - name: Run Backup Script
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -26,18 +33,23 @@ jobs:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
         run: |
-          set -e -o pipefail
+          # Sanitize inputs (remove any invisible trailing spaces/newlines from secrets)
+          ADMIN_EMAIL=$(echo "$ADMIN_EMAIL" | tr -d '\r\n ')
+          DATABASE_URL=$(echo "$DATABASE_URL" | tr -d '\r\n ')
+          
           TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
           BACKUP_DIR="/tmp/theomnistack_backup_$TIMESTAMP"
-          DB_DUMP_FILE="$BACKUP_DIR/database_$TIMESTAMP.sql.gz"
+          DB_DUMP_FILE="$BACKUP_DIR/database_$TIMESTAMP.sql"
           
           echo "Starting backup process at $TIMESTAMP..."
           mkdir -p "$BACKUP_DIR"
           
-          # 1. PostgreSQL Backup (Using Postgres 16 Docker Image)
+          # 1. PostgreSQL Backup
           echo "Dumping PostgreSQL database..."
-          if docker run --rm postgres:16-alpine pg_dump "$DATABASE_URL" | gzip > "$DB_DUMP_FILE"; then
+          if pg_dump "$DATABASE_URL" > "$DB_DUMP_FILE"; then
               echo "Database dump successful."
+              gzip "$DB_DUMP_FILE"
+              DB_DUMP_FILE="$DB_DUMP_FILE.gz"
           else
               echo "Error: Database dump failed!"
               curl -s -X POST https://api.resend.com/emails \
@@ -71,8 +83,8 @@ jobs:
           fi
           
           # 4. Send Success Notification
-          echo "Sending success notification..."
-          curl -s -X POST https://api.resend.com/emails \
+          echo "Sending success notification to $ADMIN_EMAIL..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST https://api.resend.com/emails \
             -H "Authorization: Bearer $RESEND_API_KEY" \
             -H "Content-Type: application/json" \
             -d '{
@@ -80,4 +92,5 @@ jobs:
               "to": "'"$ADMIN_EMAIL"'",
               "subject": "✅ TheOmniStack Backup Successful",
               "html": "<p>The automated system backup completed successfully at '"$TIMESTAMP"'.</p>"
-            }'
+            }')
+          echo "Resend API Response: $RESPONSE"
