@@ -131,9 +131,11 @@ export class OttoAdapter implements MarketplaceAdapter {
       // will miss orders from yesterday evening or due to UTC timezone offsets.
 
       const allRawOrders: any[] = []
+      let pagesFetched = 0
 
-      while (nextUrl) {
-        console.log(`[OttoAdapter] Fetching page: ${nextUrl}`)
+      while (nextUrl && pagesFetched < 500) {
+        pagesFetched++
+        console.log(`[OttoAdapter] Fetching page ${pagesFetched}: ${nextUrl}`)
         const res: Response = await fetch(nextUrl, {
           method: 'GET',
           headers: {
@@ -157,11 +159,19 @@ export class OttoAdapter implements MarketplaceAdapter {
         const nextLink = links.find((l: any) => l.rel === 'next')
         const rawNextUrl = nextLink && nextLink.href ? nextLink.href : null
         if (rawNextUrl) {
+          let proposedNextUrl = null
           if (rawNextUrl.startsWith('http')) {
-            nextUrl = rawNextUrl
+            proposedNextUrl = rawNextUrl
           } else {
             const separator = rawNextUrl.startsWith('/') ? '' : '/'
-            nextUrl = `${this.baseUrl}${separator}${rawNextUrl}`
+            proposedNextUrl = `${this.baseUrl}${separator}${rawNextUrl}`
+          }
+          
+          if (proposedNextUrl === nextUrl) {
+            console.warn(`[OttoAdapter] Infinite loop detected (nextUrl is same as current). Breaking.`)
+            nextUrl = null
+          } else {
+            nextUrl = proposedNextUrl
           }
         } else {
           nextUrl = null
@@ -387,6 +397,54 @@ export class OttoAdapter implements MarketplaceAdapter {
       }
     } catch (error) {
       console.error('[OttoAdapter] Error getting invoice:', error)
+      throw error
+    }
+  }
+
+  
+
+  /**
+   * Apply a price reduction (partial refund) to a specific position item
+   */
+  async applyPriceReduction(
+    salesOrderId: string,
+    positionItemId: string,
+    amount: number,
+    reason: string = 'CUSTOMER_DISSATISFACTION'
+  ): Promise<void> {
+    console.log(`[OttoAdapter] Applying price reduction of ${amount} to item ${positionItemId} in order ${salesOrderId}...`)
+    try {
+      const accessToken = await this.getAccessToken()
+
+      const payload = {
+        salesOrderId,
+        positionItemId,
+        priceReduction: {
+          amount,
+          currency: 'EUR'
+        },
+        reason
+      }
+
+      const response = await fetch(`${this.baseUrl}/v1/price-reductions`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      })
+
+      if (!response.ok) {
+        const errText = await response.text()
+        console.error(`[OttoAdapter] Price reduction failed: ${errText}`)
+        throw new Error(`Price reduction failed: ${response.status} - ${errText}`)
+      }
+
+      console.log(`[OttoAdapter] Price reduction successfully applied.`)
+    } catch (error) {
+      console.error(`[OttoAdapter] Error applying price reduction:`, error)
       throw error
     }
   }
