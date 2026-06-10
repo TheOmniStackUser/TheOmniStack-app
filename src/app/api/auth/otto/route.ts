@@ -9,12 +9,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Missing company ID in cookies. Please start the connection flow from TheOmniStack integrations page.' }, { status: 400 })
   }
 
-  // Determine environment
+  // Determine environment URLs
   const baseUrl = environment === 'sandbox' ? 'https://sandbox.api.otto.market' : 'https://api.otto.market'
-  const authUrl = `${baseUrl}/sec-api/auth/realms/deepsea-${environment}/protocol/openid-connect/auth`
-  const requestHost = request.headers.get('x-forwarded-host') || request.headers.get('host') || 'app.theomnistack.de'
-  const proto = request.headers.get('x-forwarded-proto') || 'https'
-  const redirectUri = `${proto}://${requestHost}/api/auth/callback/otto`
+  const authUrl = environment === 'sandbox'
+    ? 'https://sandbox.api.otto.market/sec-api/auth/realms/deepsea-sandbox/protocol/openid-connect/auth'
+    : 'https://portal.otto.market/sec-api/auth/realms/otto-partner/protocol/openid-connect/auth'
+  // Force redirect URI to match Otto config exactly, even if tested locally
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.theomnistack.de'
+  const redirectUri = `${appUrl}/api/auth/callback/otto`
 
   let appClientId = process.env.OTTO_APP_CLIENT_ID || '7dad7649-bdee-4593-8a65-c74f28693507'
   if (environment === 'sandbox') {

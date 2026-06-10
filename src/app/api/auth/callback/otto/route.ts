@@ -149,7 +149,12 @@ export async function GET(request: NextRequest) {
         const fullScopes = 'shipments availability orders returns products price-reduction receipts'
 
         console.log(`[Otto OAuth Callback] Fetching Developer Token via client_credentials...`)
-        const devTokenResponse = await fetch(`${baseUrl}/sec-api/auth/realms/deepsea-${environment}/protocol/openid-connect/token`, {
+        
+        const tokenUrl = environment === 'sandbox'
+          ? 'https://sandbox.api.otto.market/sec-api/auth/realms/deepsea-sandbox/protocol/openid-connect/token'
+          : 'https://api.otto.market/oauth2/token'
+
+        const devTokenResponse = await fetch(tokenUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded'
