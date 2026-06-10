@@ -7,6 +7,23 @@ import { invoices } from '@/db/schema/invoices'
 import { SyncButton } from './sync-button'
 import Link from 'next/link'
 
+function getMarketplaceName(id: string) {
+  if (!id) return 'Unbekannt'
+  if (id === 'mirakl_decathlon' || id === 'mirakl_decathlon_eu') return 'Decathlon'
+  if (id === 'mirakl_mediamarkt') return 'MediaMarkt'
+  if (id === 'mirakl_custom') return 'Custom Mirakl'
+  if (id === 'amazon') return 'Amazon'
+  if (id === 'otto') return 'Otto'
+  if (id === 'shopify') return 'Shopify'
+  if (id === 'aboutyou') return 'About You'
+  if (id === 'kaufland') return 'Kaufland'
+  if (id === 'ebay') return 'eBay'
+  if (id === 'woocommerce') return 'WooCommerce'
+  if (id === 'shopware') return 'Shopware'
+  if (id === 'manual') return 'Manuell'
+  return id.charAt(0).toUpperCase() + id.slice(1)
+}
+
 export default async function DashboardPage() {
   // The layout already enforces auth, but we fetch it here for the payload data
   const auth = await requireAuth()
@@ -19,7 +36,9 @@ export default async function DashboardPage() {
     .limit(1)
 
   const now = new Date()
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+  const startOfYear = new Date(now.getFullYear(), 0, 1)
 
   // Fetch KPI Data
   const [{ openOrdersCount }] = await db
@@ -67,6 +86,25 @@ export default async function DashboardPage() {
   const laterShipmentCount = orderStats.find(s => s.status === 'later_shipment')?.count || 0
   const shippedCount = orderStats.find(s => s.status === 'shipped')?.count || 0
   const cancelledCount = orderStats.find(s => s.status === 'cancelled')?.count || 0
+
+  // Marketplace stats
+  const marketplaceStats = await db
+    .select({
+      marketplace: orders.marketplace,
+      dayCount: sql<number>`count(case when coalesce(${orders.marketplacePurchaseDate}, ${orders.createdAt}) >= ${startOfDay.toISOString()} then 1 end)::int`,
+      monthCount: sql<number>`count(case when coalesce(${orders.marketplacePurchaseDate}, ${orders.createdAt}) >= ${startOfMonth.toISOString()} then 1 end)::int`,
+      yearCount: sql<number>`count(case when coalesce(${orders.marketplacePurchaseDate}, ${orders.createdAt}) >= ${startOfYear.toISOString()} then 1 end)::int`,
+    })
+    .from(orders)
+    .where(
+      and(
+        eq(orders.companyId, auth.activeCompanyId),
+        eq(orders.isArchived, false),
+        sql`coalesce(${orders.marketplacePurchaseDate}, ${orders.createdAt}) >= ${startOfYear.toISOString()}`
+      )
+    )
+    .groupBy(orders.marketplace)
+    .orderBy(sql`count(*) desc`)
 
   const [invoicesStats] = await db
     .select({
@@ -185,10 +223,44 @@ export default async function DashboardPage() {
         </div>
       </section>
 
+      {/* Bestellungen pro Marktplatz */}
+      {marketplaceStats.length > 0 && (
+        <section className="space-y-6">
+          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2">
+            Bestellungen pro Marktplatz
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {marketplaceStats.map((stat) => (
+              <div key={stat.marketplace || 'unknown'} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:border-gray-300 hover:shadow-md transition-all flex flex-col justify-between">
+                <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4 border-b border-gray-50 pb-2">
+                  {getMarketplaceName(stat.marketplace)}
+                </h4>
+                <div className="flex justify-between items-end">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-semibold text-gray-400 uppercase">Heute</span>
+                    <span className="text-xl font-bold text-gray-900">{stat.dayCount}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-semibold text-gray-400 uppercase">Monat</span>
+                    <span className="text-xl font-bold text-gray-900">{stat.monthCount}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-semibold text-gray-400 uppercase">Jahr</span>
+                    <span className="text-xl font-bold text-gray-900">{stat.yearCount}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Current Month & Active Section */}
-      <section className="space-y-6">
-        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2">
-          Aktueller Monat & Finanzen
+      {auth.role !== 'staff' && (
+      <>
+        <section className="space-y-6">
+          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2">
+            Aktueller Monat & Finanzen
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <Link href="/orders" className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all group flex flex-col justify-between hidden">
@@ -278,6 +350,8 @@ export default async function DashboardPage() {
           </div>
         </div>
       </section>
+      </>
+      )}
     </div>
   )
 }
