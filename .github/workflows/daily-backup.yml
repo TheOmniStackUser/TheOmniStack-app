@@ -18,11 +18,6 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Install PostgreSQL client
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client
-
       - name: Run Backup Script
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -31,7 +26,7 @@ jobs:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
         run: |
-          set -e
+          set -e -o pipefail
           TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
           BACKUP_DIR="/tmp/theomnistack_backup_$TIMESTAMP"
           DB_DUMP_FILE="$BACKUP_DIR/database_$TIMESTAMP.sql.gz"
@@ -39,9 +34,9 @@ jobs:
           echo "Starting backup process at $TIMESTAMP..."
           mkdir -p "$BACKUP_DIR"
           
-          # 1. PostgreSQL Backup
+          # 1. PostgreSQL Backup (Using Postgres 16 Docker Image)
           echo "Dumping PostgreSQL database..."
-          if pg_dump "$DATABASE_URL" | gzip > "$DB_DUMP_FILE"; then
+          if docker run --rm postgres:16-alpine pg_dump "$DATABASE_URL" | gzip > "$DB_DUMP_FILE"; then
               echo "Database dump successful."
           else
               echo "Error: Database dump failed!"
