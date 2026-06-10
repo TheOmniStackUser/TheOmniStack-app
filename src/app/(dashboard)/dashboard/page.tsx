@@ -223,6 +223,106 @@ export default async function DashboardPage() {
         </div>
       </section>
 
+      {/* Current Month & Active Section */}
+      <section className="space-y-6">
+        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2">
+          Aktueller Monat & Finanzen
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <Link href="/orders" className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all group flex flex-col justify-between hidden">
+            <div>
+              <h3 className="text-gray-500 text-sm font-medium uppercase tracking-wider group-hover:text-blue-600 transition-colors">Offene Bestellungen</h3>
+              <p className="text-4xl font-bold text-gray-900 mt-3">{openOrdersCount}</p>
+            </div>
+            <div className="mt-4 text-xs text-green-600 font-medium flex items-center gap-1">
+              Marktplätze synchronisiert
+              <svg className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+            </div>
+          </Link>
+          
+          <Link href="/invoices" className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all group flex flex-col justify-between">
+            <div>
+              <h3 className="text-gray-500 text-sm font-medium uppercase tracking-wider group-hover:text-blue-600 transition-colors">Rechnungen (Monat)</h3>
+              <p className="text-4xl font-bold text-gray-900 mt-3">{invoicesStats?.monthCount || 0}</p>
+            </div>
+            <div className="mt-4 text-xs text-gray-500 font-medium flex items-center gap-1">
+              {invoicesStats?.monthCount ? `${invoicesStats.monthCount} Rechnungen erzeugt` : 'Noch keine Rechnungen'}
+              <svg className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+            </div>
+          </Link>
+          
+          {auth.role !== 'staff' && (
+            <>
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-blue-300 transition-colors flex flex-col justify-between">
+                <div>
+                  <h3 className="text-gray-500 text-sm font-medium uppercase tracking-wider">Umsatz (Monat)</h3>
+                  <p className="text-3xl font-bold text-gray-900 mt-3 break-words">{formattedMonthRevenue}</p>
+                </div>
+                <div className="mt-4 text-xs text-gray-500 font-medium">{formattedMonthTax} Steuern</div>
+              </div>
+
+              <Link href="/invoices?status=open" className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-blue-500 hover:shadow-md transition-all group relative overflow-hidden flex flex-col justify-between">
+                <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-500" />
+                <div>
+                  <h3 className="text-gray-500 text-sm font-medium uppercase tracking-wider group-hover:text-blue-600 transition-colors">Offene Rechnungen</h3>
+                  <p className="text-4xl font-bold text-gray-900 mt-3">{openInvoicesStats?.count || 0}</p>
+                </div>
+                <div className="mt-4 text-xs text-blue-600 font-bold flex items-center gap-1">
+                  Summe: {formattedOpenRevenue}
+                  <svg className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+                </div>
+              </Link>
+
+              <Link href="/invoices?status=overdue" className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-red-500 hover:shadow-md transition-all group relative overflow-hidden flex flex-col justify-between">
+                <div className="absolute top-0 left-0 w-1.5 h-full bg-red-500" />
+                <div>
+                  <h3 className="text-gray-500 text-sm font-medium uppercase tracking-wider group-hover:text-red-600 transition-colors">Überfällige Rechnungen</h3>
+                  <p className="text-4xl font-bold text-gray-900 mt-3 text-red-600">{overdueInvoicesStats?.count || 0}</p>
+                </div>
+                <div className="mt-4 text-xs text-red-600 font-bold flex items-center gap-1">
+                  Summe: {formattedOverdueRevenue}
+                  <svg className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+                </div>
+              </Link>
+            </>
+          )}
+        </div>
+      </section>
+
+      {/* Lifetime / Overall Section */}
+      <section className="space-y-6">
+        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2">
+          Gesamtübersicht (Lebenszeit)
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Link href="/orders" className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all group">
+            <h3 className="text-gray-500 text-sm font-medium uppercase tracking-wider group-hover:text-blue-600 transition-colors">Bestellungen (Gesamt)</h3>
+            <p className="text-4xl font-bold text-gray-900 mt-3">{totalOrdersCount}</p>
+            <div className="mt-4 text-sm text-gray-500 font-medium flex items-center gap-1">
+              Inkl. versendeter Bestellungen
+              <svg className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+            </div>
+          </Link>
+          
+          <Link href="/invoices" className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all group">
+            <h3 className="text-gray-500 text-sm font-medium uppercase tracking-wider group-hover:text-blue-600 transition-colors">Rechnungen (Gesamt)</h3>
+            <p className="text-4xl font-bold text-gray-900 mt-3">{invoicesStats?.totalCount || 0}</p>
+            <div className="mt-4 text-sm text-gray-500 font-medium flex items-center gap-1">
+              Alle ausgestellten Rechnungen
+              <svg className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+            </div>
+          </Link>
+          
+          {auth.role !== 'staff' && (
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-blue-300 transition-colors">
+              <h3 className="text-gray-500 text-sm font-medium uppercase tracking-wider">Umsatz (Gesamt)</h3>
+              <p className="text-4xl font-bold text-gray-900 mt-3">{formattedTotalRevenue}</p>
+              <div className="mt-4 text-sm text-gray-500 font-medium">{formattedTotalTax} Steuern</div>
+            </div>
+          )}
+        </div>
+      </section>
+
       {/* Bestellungen pro Marktplatz */}
       {marketplaceStats.length > 0 && (
         <section className="space-y-6">
@@ -253,104 +353,6 @@ export default async function DashboardPage() {
             ))}
           </div>
         </section>
-      )}
-
-      {/* Current Month & Active Section */}
-      {auth.role !== 'staff' && (
-      <>
-        <section className="space-y-6">
-          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2">
-            Aktueller Monat & Finanzen
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Link href="/orders" className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all group flex flex-col justify-between hidden">
-            <div>
-              <h3 className="text-gray-500 text-sm font-medium uppercase tracking-wider group-hover:text-blue-600 transition-colors">Offene Bestellungen</h3>
-              <p className="text-4xl font-bold text-gray-900 mt-3">{openOrdersCount}</p>
-            </div>
-            <div className="mt-4 text-xs text-green-600 font-medium flex items-center gap-1">
-              Marktplätze synchronisiert
-              <svg className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
-            </div>
-          </Link>
-          
-          <Link href="/invoices" className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all group flex flex-col justify-between">
-            <div>
-              <h3 className="text-gray-500 text-sm font-medium uppercase tracking-wider group-hover:text-blue-600 transition-colors">Rechnungen (Monat)</h3>
-              <p className="text-4xl font-bold text-gray-900 mt-3">{invoicesStats?.monthCount || 0}</p>
-            </div>
-            <div className="mt-4 text-xs text-gray-500 font-medium flex items-center gap-1">
-              {invoicesStats?.monthCount ? `${invoicesStats.monthCount} Rechnungen erzeugt` : 'Noch keine Rechnungen'}
-              <svg className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
-            </div>
-          </Link>
-          
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-blue-300 transition-colors flex flex-col justify-between">
-            <div>
-              <h3 className="text-gray-500 text-sm font-medium uppercase tracking-wider">Umsatz (Monat)</h3>
-              <p className="text-3xl font-bold text-gray-900 mt-3 break-words">{formattedMonthRevenue}</p>
-            </div>
-            <div className="mt-4 text-xs text-gray-500 font-medium">{formattedMonthTax} Steuern</div>
-          </div>
-
-          <Link href="/invoices?status=open" className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-blue-500 hover:shadow-md transition-all group relative overflow-hidden flex flex-col justify-between">
-            <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-500" />
-            <div>
-              <h3 className="text-gray-500 text-sm font-medium uppercase tracking-wider group-hover:text-blue-600 transition-colors">Offene Rechnungen</h3>
-              <p className="text-4xl font-bold text-gray-900 mt-3">{openInvoicesStats?.count || 0}</p>
-            </div>
-            <div className="mt-4 text-xs text-blue-600 font-bold flex items-center gap-1">
-              Summe: {formattedOpenRevenue}
-              <svg className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
-            </div>
-          </Link>
-
-          <Link href="/invoices?status=overdue" className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-red-500 hover:shadow-md transition-all group relative overflow-hidden flex flex-col justify-between">
-            <div className="absolute top-0 left-0 w-1.5 h-full bg-red-500" />
-            <div>
-              <h3 className="text-gray-500 text-sm font-medium uppercase tracking-wider group-hover:text-red-600 transition-colors">Überfällige Rechnungen</h3>
-              <p className="text-4xl font-bold text-gray-900 mt-3 text-red-600">{overdueInvoicesStats?.count || 0}</p>
-            </div>
-            <div className="mt-4 text-xs text-red-600 font-bold flex items-center gap-1">
-              Summe: {formattedOverdueRevenue}
-              <svg className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
-            </div>
-          </Link>
-        </div>
-      </section>
-
-      {/* Lifetime / Overall Section */}
-      <section className="space-y-6">
-        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2">
-          Gesamtübersicht (Lebenszeit)
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Link href="/orders" className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all group">
-            <h3 className="text-gray-500 text-sm font-medium uppercase tracking-wider group-hover:text-blue-600 transition-colors">Bestellungen (Gesamt)</h3>
-            <p className="text-4xl font-bold text-gray-900 mt-3">{totalOrdersCount}</p>
-            <div className="mt-4 text-sm text-gray-500 font-medium flex items-center gap-1">
-              Inkl. versendeter Bestellungen
-              <svg className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
-            </div>
-          </Link>
-          
-          <Link href="/invoices" className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all group">
-            <h3 className="text-gray-500 text-sm font-medium uppercase tracking-wider group-hover:text-blue-600 transition-colors">Rechnungen (Gesamt)</h3>
-            <p className="text-4xl font-bold text-gray-900 mt-3">{invoicesStats?.totalCount || 0}</p>
-            <div className="mt-4 text-sm text-gray-500 font-medium flex items-center gap-1">
-              Alle ausgestellten Rechnungen
-              <svg className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
-            </div>
-          </Link>
-          
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-blue-300 transition-colors">
-            <h3 className="text-gray-500 text-sm font-medium uppercase tracking-wider">Umsatz (Gesamt)</h3>
-            <p className="text-4xl font-bold text-gray-900 mt-3">{formattedTotalRevenue}</p>
-            <div className="mt-4 text-sm text-gray-500 font-medium">{formattedTotalTax} Steuern</div>
-          </div>
-        </div>
-      </section>
-      </>
       )}
     </div>
   )
