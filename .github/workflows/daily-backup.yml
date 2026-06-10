@@ -49,7 +49,7 @@ jobs:
                 -H "Authorization: Bearer $RESEND_API_KEY" \
                 -H "Content-Type: application/json" \
                 -d '{
-                  "from": "onboarding@resend.dev",
+                  "from": "TheOmniStack Team <noreply@theomnistack.de>",
                   "to": "'"$ADMIN_EMAIL"'",
                   "subject": "❌ TheOmniStack Backup Failed",
                   "html": "<p>The automated backup failed during the database dump.</p>"
@@ -81,7 +81,7 @@ jobs:
             -H "Authorization: Bearer $RESEND_API_KEY" \
             -H "Content-Type: application/json" \
             -d '{
-              "from": "onboarding@resend.dev",
+              "from": "TheOmniStack Team <noreply@theomnistack.de>",
               "to": "'"$ADMIN_EMAIL"'",
               "subject": "✅ TheOmniStack Backup Successful",
               "html": "<p>The automated system backup completed successfully at '"$TIMESTAMP"'.</p>"
