@@ -1,7 +1,7 @@
 import { createMarketplaceSyncWorker } from './marketplace-sync'
 import { createReturnsReportWorker } from './returns-report'
 import { createDunningWorker } from './dunning'
-import { setupScheduledReports, setupScheduledSyncs, setupDunningSchedule } from './scheduler'
+import { setupScheduledReports, setupScheduledSyncs, setupDunningSchedule, setupHourlyInvoiceSyncs } from './scheduler'
 
 console.log('🚀 Starting OmniStack Worker Engine...')
 
@@ -16,6 +16,7 @@ const dunningWorker = createDunningWorker()
 // Setup CRON jobs
 setupScheduledReports().catch(console.error)
 setupScheduledSyncs().catch(console.error)
+setupHourlyInvoiceSyncs().catch(console.error)
 setupDunningSchedule().catch(console.error)
 
 marketplaceWorker.on('completed', (job) => {

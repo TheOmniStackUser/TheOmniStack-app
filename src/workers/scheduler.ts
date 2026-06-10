@@ -34,6 +34,42 @@ export async function setupScheduledReports() {
 }
 
 /**
+ * Sets up hourly repeatable invoice sync jobs for all companies where enabled.
+ */
+export async function setupHourlyInvoiceSyncs() {
+  console.log('⏰ Setting up scheduled hourly invoice syncs...')
+
+  // Clean up any existing repeatable hourly invoice sync jobs from the queue
+  try {
+    const repeatableJobs = await marketplaceSyncQueue.getRepeatableJobs()
+    for (const job of repeatableJobs) {
+      if (job.key?.includes('hourly-invoice-sync')) {
+        await marketplaceSyncQueue.removeRepeatableByKey(job.key)
+        console.log(`   - Cleared old repeatable invoice sync job: ${job.key}`)
+      }
+    }
+  } catch (err) {
+    console.error('[Scheduler] Failed to clear old repeatable invoice sync jobs:', err)
+  }
+
+  await marketplaceSyncQueue.add(
+    'hourly-invoice-sync',
+    { companyId: 'all' }, // special marker for all companies
+    {
+      jobId: 'hourly-invoice-sync',
+      repeat: {
+        pattern: '0 * * * *', // every hour
+        tz: 'Europe/Berlin',
+      },
+      removeOnComplete: true,
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 5000 },
+    }
+  )
+  console.log(`   - Scheduled hourly invoice sync at minute 0 (Europe/Berlin)`)
+}
+
+/**
  * Sets up daily repeatable marketplace sync jobs for all companies where enabled.
  */
 export async function setupScheduledSyncs() {

@@ -137,6 +137,38 @@ export function createMarketplaceSyncWorker() {
         return { success: true, message: `Dispatched daily sync for ${toSync.length} marketplaces.` }
       }
 
+      if (job.name === 'hourly-invoice-sync') {
+        // Fetch all active integrations that have autoInvoice or downloadInvoice enabled
+        const allActiveIntegrations = await db
+          .select()
+          .from(marketplaceIntegrations)
+          .where(eq(marketplaceIntegrations.isActive, true))
+
+        const toSync = allActiveIntegrations.filter(integration => {
+          const downloadInvoice = !!(integration.metadata as any)?.downloadInvoice
+          const autoInvoice = integration.autoInvoice
+          return downloadInvoice || autoInvoice
+        })
+
+        for (const integration of toSync) {
+          await marketplaceSyncQueue.add(
+            `sync-invoices-${integration.type}`,
+            {
+              companyId: integration.companyId,
+              marketplace: integration.type as any,
+              triggeredByUserId: null,
+              integrationId: integration.id,
+              isInvoiceSync: true,
+            },
+            {
+              jobId: `sync-invoices-${integration.type}-${integration.id}-${integration.companyId}-${Date.now()}`
+            }
+          )
+        }
+
+        return { success: true, message: `Dispatched hourly invoice sync for ${toSync.length} marketplaces.` }
+      }
+
       const isInvoiceSync = job.name.includes('-invoices-') || (job.data as any).isInvoiceSync === true
 
       if (!isInvoiceSync) {
