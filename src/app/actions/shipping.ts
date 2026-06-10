@@ -577,7 +577,9 @@ export async function generateDhlLabelsAction(
               country: (company.warehouseCountry || company.country) === 'DE' ? 'DEU' : ((company.warehouseCountry || company.country) || 'DEU'),
             },
             consignee: {
-              name1: order.shippingName ?? 'Empfänger',
+              name1: (order.shippingCompany || order.shippingName || 'Empfänger').slice(0, 50),
+              ...(order.shippingCompany && order.shippingName ? { name2: order.shippingName.slice(0, 50) } : {}),
+              ...(order.shippingAddressAddition ? { additionalAddressInformation1: order.shippingAddressAddition.slice(0, 50) } : {}),
               addressStreet: consigneeStreet,
               addressHouse: consigneeHouseNo,
               postalCode: resolvedZip,
