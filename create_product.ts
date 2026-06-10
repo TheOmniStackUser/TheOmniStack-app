@@ -119,8 +119,8 @@ async function main() {
   if (data.links && data.links.length > 0) {
      console.log('Waiting 10 seconds for validation...');
      await new Promise(r => setTimeout(r, 10000));
-     const failedLink = data.links.find(l => l.rel === 'failed');
-     const succeededLink = data.links.find(l => l.rel === 'succeeded');
+     const failedLink = data.links.find((l: any) => l.rel === 'failed');
+     const succeededLink = data.links.find((l: any) => l.rel === 'succeeded');
      
      if (failedLink) {
         const url = failedLink.href.startsWith('http') ? failedLink.href : `https://sandbox.api.otto.market${failedLink.href}`;
