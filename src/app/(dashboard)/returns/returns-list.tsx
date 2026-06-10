@@ -239,7 +239,8 @@ export function ReturnsList({
     const matchesSearch =
       log.orderNumber.toLowerCase().includes(q) ||
       (log.customerName || '').toLowerCase().includes(q) ||
-      (log.notes || '').toLowerCase().includes(q)
+      (log.notes || '').toLowerCase().includes(q) ||
+      (log.metadata?.tracking_number || '').toLowerCase().includes(q)
     
     const matchesStatus = statusFilter === 'all' || log.status === statusFilter
     
