@@ -1168,7 +1168,7 @@ export function InvoiceList({
     }
 
     if (activeFilters.search.trim() === '') return true
-    const q = activeFilters.search.toLowerCase()
+    const q = activeFilters.search.trim().toLowerCase()
     return (
       (invoice.invoiceNumber || '').toLowerCase().includes(q) ||
       (invoice.draftName || '').toLowerCase().includes(q) ||

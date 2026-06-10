@@ -235,10 +235,11 @@ export function ReturnsList({
 
   // Search & Filter
   const filteredLogs = logs.filter((log) => {
+    const q = searchTerm.trim().toLowerCase()
     const matchesSearch =
-      log.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (log.customerName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (log.notes || '').toLowerCase().includes(searchTerm.toLowerCase())
+      log.orderNumber.toLowerCase().includes(q) ||
+      (log.customerName || '').toLowerCase().includes(q) ||
+      (log.notes || '').toLowerCase().includes(q)
     
     const matchesStatus = statusFilter === 'all' || log.status === statusFilter
     

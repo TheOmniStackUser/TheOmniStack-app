@@ -968,7 +968,7 @@ export function OrdersTable({
 
     // Filter by Search (Order ID, Customer Name)
     if (activeFilters.search.trim() !== '') {
-      const q = activeFilters.search.toLowerCase()
+      const q = activeFilters.search.trim().toLowerCase()
       const orderNumber = getOrderNumber(order).toLowerCase()
       const buyerName = getOrderBuyerName(order).toLowerCase()
       const trackingNumber = (order.trackingNumber || '').toLowerCase()
@@ -1330,8 +1330,12 @@ export function OrdersTable({
           showToast(result.message, 'success')
         }
         
-        if (result.labels && result.labels.length > 0) {
-          window.open(`/api/orders/bulk/shipping-labels?ids=${ids.join(',')}`, '_blank')
+        if (result.generatedIds && result.generatedIds.length > 0) {
+          const url = `/api/orders/bulk/shipping-labels?ids=${ids.join(',')}`
+          const newTab = window.open(url, '_blank')
+          if (!newTab || newTab.closed || typeof newTab.closed === 'undefined') {
+            window.location.href = url
+          }
         }
       }
     } catch (e) {
@@ -1402,8 +1406,12 @@ export function OrdersTable({
         } else {
           showToast(result.message, 'success')
         }
-        if (result.labels && result.labels.length > 0) {
-          window.open(`/api/orders/bulk/shipping-labels?ids=${ids.join(',')}`, '_blank')
+        if (result.generatedIds && result.generatedIds.length > 0) {
+          const url = `/api/orders/bulk/shipping-labels?ids=${ids.join(',')}`
+          const newTab = window.open(url, '_blank')
+          if (!newTab || newTab.closed || typeof newTab.closed === 'undefined') {
+            window.location.href = url
+          }
         }
       }
     } catch (e) {
