@@ -2,9 +2,8 @@ name: Daily System Backup
 
 on:
   schedule:
-    # Run at 03:00 UTC every day
     - cron: '0 3 * * *'
-  workflow_dispatch: # Allow manual trigger
+  workflow_dispatch:
 
 jobs:
   backup:
@@ -18,13 +17,6 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Install PostgreSQL 16 client
-        run: |
-          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
-          wget -qO- https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo tee /etc/apt/trusted.gpg.d/pgdg.asc &>/dev/null
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client-16
-
       - name: Run Backup Script
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -33,7 +25,6 @@ jobs:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
         run: |
-          # Sanitize inputs (remove any invisible trailing spaces/newlines from secrets)
           ADMIN_EMAIL=$(echo "$ADMIN_EMAIL" | tr -d '\r\n ')
           DATABASE_URL=$(echo "$DATABASE_URL" | tr -d '\r\n ')
           
@@ -44,9 +35,8 @@ jobs:
           echo "Starting backup process at $TIMESTAMP..."
           mkdir -p "$BACKUP_DIR"
           
-          # 1. PostgreSQL Backup
-          echo "Dumping PostgreSQL database..."
-          if pg_dump "$DATABASE_URL" > "$DB_DUMP_FILE"; then
+          echo "Dumping PostgreSQL database (using Postgres 17)..."
+          if docker run --rm postgres:17-alpine pg_dump "$DATABASE_URL" > "$DB_DUMP_FILE"; then
               echo "Database dump successful."
               gzip "$DB_DUMP_FILE"
               DB_DUMP_FILE="$DB_DUMP_FILE.gz"
@@ -64,7 +54,6 @@ jobs:
               exit 1
           fi
           
-          # 2. Upload DB Backup to S3
           echo "Uploading database backup to S3..."
           if aws s3 cp "$DB_DUMP_FILE" "s3://$BACKUP_S3_BUCKET/database/database_$TIMESTAMP.sql.gz"; then
               echo "Database upload successful."
@@ -73,7 +62,6 @@ jobs:
               exit 1
           fi
           
-          # 3. S3 Documents Sync
           echo "Syncing S3 documents..."
           if aws s3 sync "s3://$SOURCE_S3_BUCKET" "s3://$BACKUP_S3_BUCKET/documents/"; then
               echo "S3 documents sync successful."
@@ -82,7 +70,6 @@ jobs:
               exit 1
           fi
           
-          # 4. Send Success Notification
           echo "Sending success notification to $ADMIN_EMAIL..."
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST https://api.resend.com/emails \
             -H "Authorization: Bearer $RESEND_API_KEY" \
