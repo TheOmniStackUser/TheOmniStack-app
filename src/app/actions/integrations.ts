@@ -885,3 +885,19 @@ export async function saveSyncSettingsAction(
   revalidatePath('/integrations')
   return { success: true, message: 'Automatisierungseinstellungen wurden erfolgreich gespeichert!' }
 }
+
+export async function disconnectShopifyAction() {
+  const { activeCompanyId } = await requireAuth()
+
+  await db
+    .delete(marketplaceIntegrations)
+    .where(
+      and(
+        eq(marketplaceIntegrations.companyId, activeCompanyId),
+        eq(marketplaceIntegrations.type, 'shopify')
+      )
+    )
+
+  revalidatePath('/integrations')
+  return { success: true }
+}

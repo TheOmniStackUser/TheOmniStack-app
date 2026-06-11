@@ -34,10 +34,10 @@ export function ShopifyIntegrationForm({ initialData }: { initialData?: any }) {
           TheOmniStack ist erfolgreich mit <strong>{initialData.environment}</strong> verknüpft.
         </p>
         <button
-          onClick={() => {
+          onClick={async () => {
             if(confirm('Möchtest du die Verbindung zu Shopify wirklich trennen?')) {
-              // Disconnect logic could be added here later
-              alert('Disconnect noch nicht implementiert.')
+              const { disconnectShopifyAction } = await import('@/app/actions/integrations')
+              await disconnectShopifyAction()
             }
           }}
           className="w-full py-2.5 px-4 border border-red-300 rounded-md shadow-sm text-sm font-bold text-red-600 bg-white hover:bg-red-50 focus:outline-none transition-colors"
