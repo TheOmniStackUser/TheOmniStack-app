@@ -137,6 +137,13 @@ const getOriginPriceFromPayload = (payload: any) => {
     return String(payload.msrp);
   }
 
+  if (payload.prices && Array.isArray(payload.prices) && payload.prices.length > 0) {
+    const priceObj = payload.prices.find((pr: any) => pr.country_code === 'DE') || payload.prices[0]
+    if (priceObj && priceObj.retail_price) {
+      return String(priceObj.retail_price);
+    }
+  }
+
   return null;
 };
 

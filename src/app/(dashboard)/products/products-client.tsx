@@ -173,7 +173,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
               <Th column="sku">SKU</Th>
               <Th column="title">Titel</Th>
               <Th column="currentStock">Bestand</Th>
-              <Th column="price">Preis (Netto)</Th>
+              <Th column="price">Preis (Brutto)</Th>
               <Th column="updatedAt">Letzte Änderung</Th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Aktion</th>
             </tr>
