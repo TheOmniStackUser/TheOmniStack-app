@@ -15,6 +15,28 @@ export async function GET(request: Request) {
     return new NextResponse('Missing Shopify Client ID in environment variables', { status: 500 })
   }
 
+  // 1.5 Check if already installed
+  const { db } = await import('@/db/client')
+  const { marketplaceIntegrations } = await import('@/db/schema/integrations')
+  const { eq, and } = await import('drizzle-orm')
+  const { getSession } = await import('@/lib/session')
+  
+  const payload = await getSession()
+  
+  const [existing] = await db
+    .select()
+    .from(marketplaceIntegrations)
+    .where(eq(marketplaceIntegrations.environment, shop))
+    .limit(1)
+
+  // If already installed and user is logged in, redirect straight to dashboard
+  if (existing && payload?.userId) {
+    return NextResponse.redirect(new URL('/dashboard', process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'))
+  } else if (existing && !payload?.userId) {
+    // Already installed but user not logged in -> redirect to login with intent
+    return NextResponse.redirect(new URL(`/login?shop=${shop}`, process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'))
+  }
+
   // 2. Define required scopes for TheOmniStack
   const scopes = 'read_orders,write_orders'
   
@@ -23,9 +45,10 @@ export async function GET(request: Request) {
 
   // 4. Set the nonce in an encrypted cookie to verify it later in the callback
   const cookieStore = await cookies()
+  const isLocalhost = (process.env.NEXT_PUBLIC_APP_URL || '').startsWith('http://localhost')
   cookieStore.set('shopify_oauth_nonce', nonce, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: process.env.NODE_ENV === 'production' && !isLocalhost,
     sameSite: 'lax',
     maxAge: 60 * 10 // 10 minutes expiry
   })
