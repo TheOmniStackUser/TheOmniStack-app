@@ -412,7 +412,7 @@ export class AboutYouAdapter implements MarketplaceAdapter {
           if (priceObj) {
             const currentPrice = priceObj.sale_price || priceObj.retail_price
             if (currentPrice) {
-              priceValue = currentPrice / 100 // Convert cents to EUR
+              priceValue = currentPrice // Prices are already floats like 35.89, not cents
             }
           }
         }

@@ -17,4 +17,7 @@ api_version = "2026-04"
 scopes = "read_orders,write_orders"
 
 [auth]
-redirect_urls = [ "https://app.theomnistack.de/api/auth/shopify/callback" ]
+redirect_urls = [
+  "https://app.theomnistack.de/api/auth/shopify/callback",
+  "http://localhost:3000/api/auth/shopify/callback"
+]

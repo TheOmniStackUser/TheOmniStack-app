@@ -13,3 +13,9 @@ Dockerfile
 docker-compose.yml
 README.md
 scratch
+debug-*
+test-*
+check-*
+query-*
+get-*
+trigger-*

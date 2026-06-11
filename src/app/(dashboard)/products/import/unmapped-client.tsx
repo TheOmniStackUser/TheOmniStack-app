@@ -111,7 +111,9 @@ const getEanFromPayload = (payload: any) => {
   }
 
   if (payload.ean) return payload.ean;
+  if (payload.EAN) return payload.EAN;
   if (payload.gtin) return payload.gtin;
+  if (payload.GTIN) return payload.GTIN;
 
   return null;
 };
