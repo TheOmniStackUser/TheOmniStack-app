@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { db } from '@/db/client'
 import { companies, returnsLog, returnedItems, orders } from '@/db/schema'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
-import { eq, and, or } from 'drizzle-orm'
+import { eq, and, or, ilike, sql } from 'drizzle-orm'
 
 export const dynamic = 'force-dynamic'
 
@@ -75,9 +75,13 @@ export async function POST(req: Request) {
       where: and(
         eq(orders.companyId, companyId),
         or(
-          eq(orders.marketplaceOrderId, scanInput),
-          eq(orders.trackingNumber, scanInput),
-          eq(orders.returnTrackingNumber, scanInput)
+          ilike(orders.marketplaceOrderId, scanInput),
+          ilike(orders.trackingNumber, scanInput),
+          ilike(orders.returnTrackingNumber, scanInput),
+          ilike(orders.customerNumber, scanInput),
+          ilike(orders.deliveryNoteNumber, scanInput),
+          sql`${orders.rawPayload}->>'orderNumber' ILIKE ${scanInput}`,
+          sql`${orders.rawPayload}->>'receiptNumber' ILIKE ${scanInput}`
         )
       )
     })

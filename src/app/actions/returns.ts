@@ -3,7 +3,7 @@
 import { db } from '@/db/client'
 import { returnsLog, returnedItems } from '@/db/schema/returns'
 import { orders } from '@/db/schema/orders'
-import { eq, and, inArray, or } from 'drizzle-orm'
+import { eq, and, inArray, or, ilike, sql } from 'drizzle-orm'
 import { requireAuth } from '@/lib/session'
 import { revalidatePath } from 'next/cache'
 import { executeRefund } from '@/lib/refund-service'
@@ -93,9 +93,13 @@ export async function updateReturnAction(
       where: and(
         eq(orders.companyId, session.activeCompanyId),
         or(
-          eq(orders.marketplaceOrderId, scanInput),
-          eq(orders.trackingNumber, scanInput),
-          eq(orders.returnTrackingNumber, scanInput)
+          ilike(orders.marketplaceOrderId, scanInput),
+          ilike(orders.trackingNumber, scanInput),
+          ilike(orders.returnTrackingNumber, scanInput),
+          ilike(orders.customerNumber, scanInput),
+          ilike(orders.deliveryNoteNumber, scanInput),
+          sql`${orders.rawPayload}->>'orderNumber' ILIKE ${scanInput}`,
+          sql`${orders.rawPayload}->>'receiptNumber' ILIKE ${scanInput}`
         )
       )
     })
