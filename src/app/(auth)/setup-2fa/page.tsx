@@ -5,8 +5,13 @@ import { eq } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
 import { TwoFactorSetup } from './two-factor-setup'
 
-export default async function Setup2FAPage() {
+export default async function Setup2FAPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ shop?: string }>
+}) {
   const auth = await requireAuth()
+  const { shop } = await searchParams
 
   const [user] = await db
     .select({ twoFactorEnabled: users.twoFactorEnabled })
@@ -16,7 +21,12 @@ export default async function Setup2FAPage() {
 
   // If already enabled, get out of here
   if (user?.twoFactorEnabled) {
-    redirect('/dashboard')
+    const clientId = process.env.SHOPIFY_CLIENT_ID
+    if (shop && clientId) {
+      redirect(`https://admin.shopify.com/store/${shop.replace('.myshopify.com', '')}/apps/${clientId}`)
+    } else {
+      redirect('/dashboard')
+    }
   }
 
   return (
@@ -32,7 +42,7 @@ export default async function Setup2FAPage() {
           </p>
         </div>
 
-        <TwoFactorSetup />
+        <TwoFactorSetup shop={shop} />
       </div>
     </div>
   )

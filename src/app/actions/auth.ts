@@ -355,7 +355,9 @@ export async function completeRegistrationAction(
     newCompanyId = company.id
   })
 
+  let shopForRedirect: string | null = null
   if (pendingShopify) {
+    shopForRedirect = pendingShopify.shop
     await clearShopifyPendingInstall()
   }
 
@@ -363,7 +365,7 @@ export async function completeRegistrationAction(
     await createSession(newUserId, newCompanyId)
   }
 
-  redirect('/setup-2fa')
+  redirect(shopForRedirect ? `/setup-2fa?shop=${shopForRedirect}` : '/setup-2fa')
 }
 
 // ─── Legacy Register (Remove later or keep for compatibility) ────────────────
@@ -436,6 +438,7 @@ export async function enableTwoFactorAction(
 ): Promise<AuthFormState> {
   const rawCode = formData.get('code') as string
   const secret = formData.get('secret') as string
+  const shop = formData.get('shop') as string | null
 
   // Sanitize code (remove spaces)
   const code = rawCode?.replace(/\s+/g, '')
@@ -456,7 +459,12 @@ export async function enableTwoFactorAction(
 
   await enableTwoFactor(userId, secret)
   
-  return { message: 'Zweistufige Authentifizierung wurde erfolgreich aktiviert.' }
+  const clientId = process.env.SHOPIFY_CLIENT_ID
+  const redirectUrl = shop && clientId 
+    ? `https://admin.shopify.com/store/${shop.replace('.myshopify.com', '')}/apps/${clientId}` 
+    : '/dashboard'
+
+  return { message: 'Zweistufige Authentifizierung wurde erfolgreich aktiviert.', fields: { redirectTo: redirectUrl } }
 }
 
 // ─── Disable 2FA ──────────────────────────────────────────────────────────────

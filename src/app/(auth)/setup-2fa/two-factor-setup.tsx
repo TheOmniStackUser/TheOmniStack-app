@@ -5,7 +5,7 @@ import { setupTwoFactorAction, enableTwoFactorAction } from '@/app/actions/auth'
 import { Loader2, ShieldCheck, AlertCircle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
-export function TwoFactorSetup() {
+export function TwoFactorSetup({ shop }: { shop?: string }) {
   const [setupData, setSetupData] = useState<{ secret: string; qrCodeUrl: string } | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isActivating, setIsActivating] = useState(false)
@@ -32,7 +32,8 @@ export function TwoFactorSetup() {
     try {
       const res = await enableTwoFactorAction(undefined, formData)
       if (res?.message?.includes('erfolgreich')) {
-        router.push('/dashboard')
+        const redirectTo = res.fields?.redirectTo || '/dashboard'
+        router.push(redirectTo)
         router.refresh()
       } else {
         setErrorMessage(res?.message || 'Fehler beim Aktivieren.')
@@ -85,6 +86,7 @@ export function TwoFactorSetup() {
 
         <form action={handleActivate} className="space-y-4">
           <input type="hidden" name="secret" value={setupData?.secret} />
+          {shop && <input type="hidden" name="shop" value={shop} />}
           <div className="space-y-2">
             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Verifizierungs-Code</label>
             <input
