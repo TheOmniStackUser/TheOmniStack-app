@@ -21,45 +21,24 @@ export class ShopifyAdapter implements MarketplaceAdapter {
       )
       .limit(1)
 
-    if (!integration || !integration.environment || !integration.clientId || !integration.clientSecret) {
+    if (!integration || !integration.environment) {
       console.warn(`[Shopify] No active credentials found for company ${companyId}`)
       return []
     }
 
-    // Shopify stores their URLs sometimes with or without protocol/trailing slashes.
     let shopUrl = integration.environment
     if (!shopUrl.startsWith('http')) {
       shopUrl = `https://${shopUrl}`
     }
-    shopUrl = shopUrl.replace(/\/$/, '') // remove trailing slash
+    shopUrl = shopUrl.replace(/\/$/, '')
 
-    console.log(`[Shopify] Fetching access token for: ${shopUrl}`)
-    
-    // 1. Get Access Token via Client Credentials Flow (New 2026 Standard)
-    const tokenRes = await fetch(`${shopUrl}/admin/oauth/access_token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        client_id: integration.clientId,
-        client_secret: integration.clientSecret,
-        grant_type: 'client_credentials'
-      })
-    })
-
-    if (!tokenRes.ok) {
-      const errText = await tokenRes.text()
-      console.error(`[Shopify] Token exchange failed: ${tokenRes.status} - ${errText}`)
-      // Fallback: maybe they entered a direct token in the secret field
-      if (integration.clientSecret.startsWith('shpat_')) {
-         return this.fetchWithToken(shopUrl, integration.clientSecret, options)
-      }
-      throw new Error(`Shopify Auth Fehler: ${tokenRes.status} - ${errText}`)
+    try {
+      const accessToken = await this.getAccessToken(integration)
+      return this.fetchWithToken(shopUrl, accessToken, options)
+    } catch (err) {
+      console.error(`[Shopify] Error getting access token:`, err)
+      return []
     }
-
-    const { access_token } = await tokenRes.json()
-    console.log('[Shopify] Token exchange successful.')
-    
-    return this.fetchWithToken(shopUrl, access_token, options)
   }
 
   private async fetchWithToken(shopUrl: string, token: string, options?: any): Promise<NormalizedOrder[]> {
@@ -172,7 +151,7 @@ export class ShopifyAdapter implements MarketplaceAdapter {
       )
       .limit(1)
 
-    if (!integration || !integration.environment || !integration.clientId || !integration.clientSecret) {
+    if (!integration || !integration.environment) {
       console.warn(`[Shopify] No active credentials found for company ${orderRow.companyId}`)
       return
     }
@@ -181,27 +160,7 @@ export class ShopifyAdapter implements MarketplaceAdapter {
     if (!shopUrl.startsWith('http')) shopUrl = `https://${shopUrl}`
     shopUrl = shopUrl.replace(/\/$/, '')
 
-    // Get Access Token
-    const tokenRes = await fetch(`${shopUrl}/admin/oauth/access_token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        client_id: integration.clientId,
-        client_secret: integration.clientSecret,
-        grant_type: 'client_credentials'
-      })
-    })
-
-    let accessToken = ''
-    if (tokenRes.ok) {
-      const data = await tokenRes.json()
-      accessToken = data.access_token
-    } else if (integration.clientSecret.startsWith('shpat_')) {
-      accessToken = integration.clientSecret
-    } else {
-      const errText = await tokenRes.text()
-      throw new Error(`Shopify Auth Fehler: ${tokenRes.status} - ${errText}`)
-    }
+    const accessToken = await this.getAccessToken(integration)
 
     const headers = {
       'X-Shopify-Access-Token': accessToken,
@@ -281,7 +240,7 @@ export class ShopifyAdapter implements MarketplaceAdapter {
         )
         .limit(1)
 
-      if (!integration || !integration.environment || !integration.clientId || !integration.clientSecret) {
+      if (!integration || !integration.environment) {
         console.warn(`[Shopify] No active credentials found for company ${orderRow.companyId}`)
         return false
       }
@@ -290,27 +249,7 @@ export class ShopifyAdapter implements MarketplaceAdapter {
       if (!shopUrl.startsWith('http')) shopUrl = `https://${shopUrl}`
       shopUrl = shopUrl.replace(/\/$/, '')
 
-      // 3. Get access token
-      const tokenRes = await fetch(`${shopUrl}/admin/oauth/access_token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          client_id: integration.clientId,
-          client_secret: integration.clientSecret,
-          grant_type: 'client_credentials'
-        })
-      })
-
-      let accessToken = ''
-      if (tokenRes.ok) {
-        const data = await tokenRes.json()
-        accessToken = data.access_token
-      } else if (integration.clientSecret.startsWith('shpat_')) {
-        accessToken = integration.clientSecret
-      } else {
-        const errText = await tokenRes.text()
-        throw new Error(`Shopify Auth Fehler: ${tokenRes.status} - ${errText}`)
-      }
+      const accessToken = await this.getAccessToken(integration)
 
       const headers = {
         'X-Shopify-Access-Token': accessToken,
@@ -399,7 +338,7 @@ export class ShopifyAdapter implements MarketplaceAdapter {
         )
         .limit(1)
 
-      if (!integration || !integration.environment || !integration.clientId || !integration.clientSecret) {
+      if (!integration || !integration.environment) {
         console.warn(`[Shopify] No active credentials found for company ${companyId}`)
         return []
       }
@@ -408,26 +347,7 @@ export class ShopifyAdapter implements MarketplaceAdapter {
       if (!shopUrl.startsWith('http')) shopUrl = `https://${shopUrl}`
       shopUrl = shopUrl.replace(/\/$/, '')
 
-      const tokenRes = await fetch(`${shopUrl}/admin/oauth/access_token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          client_id: integration.clientId,
-          client_secret: integration.clientSecret,
-          grant_type: 'client_credentials'
-        })
-      })
-
-      let accessToken = ''
-      if (tokenRes.ok) {
-        const data = await tokenRes.json()
-        accessToken = data.access_token
-      } else if (integration.clientSecret.startsWith('shpat_')) {
-        accessToken = integration.clientSecret
-      } else {
-        const errText = await tokenRes.text()
-        throw new Error(`Shopify Auth Fehler: ${tokenRes.status} - ${errText}`)
-      }
+      const accessToken = await this.getAccessToken(integration)
 
       const headers = {
         'X-Shopify-Access-Token': accessToken,
@@ -503,7 +423,7 @@ export class ShopifyAdapter implements MarketplaceAdapter {
         )
         .limit(1)
 
-      if (!integration || !integration.environment || !integration.clientId || !integration.clientSecret) {
+      if (!integration || !integration.environment) {
         console.warn(`[Shopify] No active credentials found for company ${companyId}`)
         return
       }
@@ -512,26 +432,7 @@ export class ShopifyAdapter implements MarketplaceAdapter {
       if (!shopUrl.startsWith('http')) shopUrl = `https://${shopUrl}`
       shopUrl = shopUrl.replace(/\/$/, '')
 
-      const tokenRes = await fetch(`${shopUrl}/admin/oauth/access_token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          client_id: integration.clientId,
-          client_secret: integration.clientSecret,
-          grant_type: 'client_credentials'
-        })
-      })
-
-      let accessToken = ''
-      if (tokenRes.ok) {
-        const data = await tokenRes.json()
-        accessToken = data.access_token
-      } else if (integration.clientSecret.startsWith('shpat_')) {
-        accessToken = integration.clientSecret
-      } else {
-        const errText = await tokenRes.text()
-        throw new Error(`Shopify Auth Fehler: ${tokenRes.status} - ${errText}`)
-      }
+      const accessToken = await this.getAccessToken(integration)
 
       const headers = {
         'X-Shopify-Access-Token': accessToken,
@@ -591,5 +492,36 @@ export class ShopifyAdapter implements MarketplaceAdapter {
       console.error(`[Shopify] Error updating listings:`, error)
       throw error
     }
+  }
+
+  private async getAccessToken(integration: any): Promise<string> {
+    if (integration.accessToken) return integration.accessToken;
+    if (integration.clientSecret && integration.clientSecret.startsWith('shpat_')) return integration.clientSecret;
+    
+    if (!integration.clientId || !integration.clientSecret) {
+      throw new Error(`Shopify: Missing credentials for token exchange`);
+    }
+
+    let shopUrl = integration.environment
+    if (!shopUrl.startsWith('http')) shopUrl = `https://${shopUrl}`
+    shopUrl = shopUrl.replace(/\/$/, '')
+
+    const tokenRes = await fetch(`${shopUrl}/admin/oauth/access_token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: integration.clientId,
+        client_secret: integration.clientSecret,
+        grant_type: 'client_credentials'
+      })
+    })
+    
+    if (!tokenRes.ok) {
+      const errText = await tokenRes.text()
+      throw new Error(`Shopify Auth Fehler: ${tokenRes.status} - ${errText}`)
+    }
+    
+    const data = await tokenRes.json()
+    return data.access_token;
   }
 }
