@@ -919,7 +919,7 @@ export class MiraklAdapter implements MarketplaceAdapter {
             order_line_id: lineId,
             amount: parseFloat((priceUnit * qtyToRefund).toFixed(2)),
             quantity: qtyToRefund,
-            reason_code: '15', // Default return code
+            reason_code: '14', // '14' = Customer return, '15' = Out of stock
             shipping_amount: 0,
             currency_iso_code: miraklOrder.currency_iso_code || 'EUR'
           }
