@@ -6,6 +6,7 @@ import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { eq, and, inArray } from 'drizzle-orm'
 import { products, productMappings, unmappedMarketplaceProducts } from '@/db/schema/products'
 import { revalidatePath } from 'next/cache'
+import { after } from 'next/server'
 
 export type MarketplaceSyncSettings = {
   enabled: boolean
@@ -76,9 +77,12 @@ export async function triggerProductImport(integrationId: string) {
   // Import sync function dynamically or statically
   const { syncProductsForCompany } = await import('@/workers/product-sync')
   
-  // Fire and forget - don't await the full sync to avoid timeout on UI
-  syncProductsForCompany(auth.activeCompanyId, integrationId).catch(err => {
-    console.error(`[ProductsAction] Background sync failed for integration ${integrationId}:`, err)
+  // Use Next.js `after` to ensure the background execution is not paused
+  // by Vercel Serverless Function freezing when the response is sent.
+  after(() => {
+    syncProductsForCompany(auth.activeCompanyId, integrationId).catch(err => {
+      console.error(`[ProductsAction] Background sync failed for integration ${integrationId}:`, err)
+    })
   })
 
   // To let the user see new products, we revalidate the import page
