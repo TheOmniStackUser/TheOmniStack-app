@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { DownloadCloud, Play, Loader2, CheckCircle2, AlertCircle, X } from 'lucide-react'
+import { DownloadCloud, Play, Loader2, CheckCircle2, AlertCircle, X, Info } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 import { triggerProductImport, getImportSyncStatus } from '@/app/actions/products'
@@ -163,6 +163,10 @@ export function ImportClient({ marketplaces }: { marketplaces: any[] }) {
               >
                 <div className="absolute inset-0 bg-white/20 w-full h-full animate-[shimmer_2s_infinite]" style={{ backgroundImage: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)' }}></div>
               </div>
+            </div>
+            <div className="mt-3 text-xs text-slate-500 flex items-start gap-1.5 leading-snug">
+              <Info className="w-4 h-4 shrink-0 text-indigo-400" />
+              <span>Dieser Vorgang kann bei vielen Produkten mehrere Minuten in Anspruch nehmen. Bitte haben Sie etwas Geduld.</span>
             </div>
           </div>
         )}
