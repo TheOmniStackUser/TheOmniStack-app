@@ -118,6 +118,59 @@ export async function loginAction(
     userAgent: hdrs.get('user-agent') ?? 'unknown',
   })
 
+  // Check if there is a pending Shopify install
+  const { getShopifyPendingInstall, clearShopifyPendingInstall } = await import('@/lib/session')
+  const pendingShopify = await getShopifyPendingInstall()
+
+  let shopForRedirect: string | null = null
+
+  if (pendingShopify && membership?.companyId) {
+    const { marketplaceIntegrations } = await import('@/db/schema/integrations')
+    
+    // Check if integration already exists
+    const [existingIntegration] = await db
+      .select()
+      .from(marketplaceIntegrations)
+      .where(
+        and(
+          eq(marketplaceIntegrations.companyId, membership.companyId),
+          eq(marketplaceIntegrations.type, 'shopify')
+        )
+      )
+
+    if (existingIntegration) {
+      await db
+        .update(marketplaceIntegrations)
+        .set({
+          environment: pendingShopify.shop,
+          accessToken: pendingShopify.accessToken,
+          isActive: true,
+          updatedAt: new Date(),
+          metadata: { ...((existingIntegration.metadata as any) || {}), shop: pendingShopify.shopMetadata }
+        })
+        .where(eq(marketplaceIntegrations.id, existingIntegration.id))
+    } else {
+      await db.insert(marketplaceIntegrations).values({
+        companyId: membership.companyId,
+        type: 'shopify',
+        environment: pendingShopify.shop,
+        accessToken: pendingShopify.accessToken,
+        isActive: true,
+        metadata: { shop: pendingShopify.shopMetadata }
+      })
+    }
+
+    shopForRedirect = pendingShopify.shop
+    await clearShopifyPendingInstall()
+  }
+
+  if (shopForRedirect) {
+    const clientId = process.env.SHOPIFY_CLIENT_ID
+    if (clientId) {
+      redirect(`https://admin.shopify.com/store/${shopForRedirect.replace('.myshopify.com', '')}/apps/${clientId}`)
+    }
+  }
+
   redirect(membership ? '/dashboard' : '/select-company')
 }
 
@@ -174,6 +227,59 @@ export async function verifyTwoFactorLoginAction(
     ipAddress: hdrs.get('x-forwarded-for') ?? 'unknown',
     userAgent: hdrs.get('user-agent') ?? 'unknown',
   })
+
+  // Check if there is a pending Shopify install
+  const { getShopifyPendingInstall, clearShopifyPendingInstall } = await import('@/lib/session')
+  const pendingShopify = await getShopifyPendingInstall()
+
+  let shopForRedirect: string | null = null
+
+  if (pendingShopify && membership?.companyId) {
+    const { marketplaceIntegrations } = await import('@/db/schema/integrations')
+    
+    // Check if integration already exists
+    const [existingIntegration] = await db
+      .select()
+      .from(marketplaceIntegrations)
+      .where(
+        and(
+          eq(marketplaceIntegrations.companyId, membership.companyId),
+          eq(marketplaceIntegrations.type, 'shopify')
+        )
+      )
+
+    if (existingIntegration) {
+      await db
+        .update(marketplaceIntegrations)
+        .set({
+          environment: pendingShopify.shop,
+          accessToken: pendingShopify.accessToken,
+          isActive: true,
+          updatedAt: new Date(),
+          metadata: { ...((existingIntegration.metadata as any) || {}), shop: pendingShopify.shopMetadata }
+        })
+        .where(eq(marketplaceIntegrations.id, existingIntegration.id))
+    } else {
+      await db.insert(marketplaceIntegrations).values({
+        companyId: membership.companyId,
+        type: 'shopify',
+        environment: pendingShopify.shop,
+        accessToken: pendingShopify.accessToken,
+        isActive: true,
+        metadata: { shop: pendingShopify.shopMetadata }
+      })
+    }
+
+    shopForRedirect = pendingShopify.shop
+    await clearShopifyPendingInstall()
+  }
+
+  if (shopForRedirect) {
+    const clientId = process.env.SHOPIFY_CLIENT_ID
+    if (clientId) {
+      redirect(`https://admin.shopify.com/store/${shopForRedirect.replace('.myshopify.com', '')}/apps/${clientId}`)
+    }
+  }
 
   redirect(membership ? '/dashboard' : '/select-company')
 }
