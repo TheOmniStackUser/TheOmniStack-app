@@ -8,9 +8,10 @@ import { and, eq } from 'drizzle-orm'
 
 export async function GET(request: Request) {
   try {
-    // 1. Authenticate user to know which company to connect the shop to
-    const auth = await requireAuth()
-    const companyId = auth.activeCompanyId
+    // 1. Check if user is authenticated (they might not be if installing directly from App Store)
+    const { getSession, setShopifyPendingInstall } = await import('@/lib/session')
+    const payload = await getSession()
+    const companyId = payload?.activeCompanyId
 
     const { searchParams } = new URL(request.url)
     const code = searchParams.get('code')
@@ -89,42 +90,55 @@ export async function GET(request: Request) {
       console.error('[Shopify OAuth] Failed to fetch shop data during install:', e)
     }
 
-    // 5. Save the token and shop domain to our Database
-    const [existing] = await db
-      .select()
-      .from(marketplaceIntegrations)
-      .where(
-        and(
-          eq(marketplaceIntegrations.companyId, companyId),
-          eq(marketplaceIntegrations.type, 'shopify')
+    // 5. Save the token
+    if (companyId) {
+      // User is logged in and has a company, save directly to Database
+      const [existing] = await db
+        .select()
+        .from(marketplaceIntegrations)
+        .where(
+          and(
+            eq(marketplaceIntegrations.companyId, companyId),
+            eq(marketplaceIntegrations.type, 'shopify')
+          )
         )
-      )
 
-    if (existing) {
-      await db
-        .update(marketplaceIntegrations)
-        .set({
-          environment: shop, // Store the shop domain here (e.g. "my-shop.myshopify.com")
+      if (existing) {
+        await db
+          .update(marketplaceIntegrations)
+          .set({
+            environment: shop, // Store the shop domain here (e.g. "my-shop.myshopify.com")
+            accessToken: accessToken,
+            isActive: true,
+            updatedAt: new Date(),
+            metadata: { ...((existing.metadata as any) || {}), shop: shopMetadata }
+          })
+          .where(eq(marketplaceIntegrations.id, existing.id))
+      } else {
+        await db.insert(marketplaceIntegrations).values({
+          companyId,
+          type: 'shopify',
+          environment: shop,
           accessToken: accessToken,
           isActive: true,
-          updatedAt: new Date(),
-          metadata: { ...((existing.metadata as any) || {}), shop: shopMetadata }
+          metadata: { shop: shopMetadata }
         })
-        .where(eq(marketplaceIntegrations.id, existing.id))
-    } else {
-      await db.insert(marketplaceIntegrations).values({
-        companyId,
-        type: 'shopify',
-        environment: shop,
-        accessToken: accessToken,
-        isActive: true,
-        metadata: { shop: shopMetadata }
-      })
-    }
+      }
 
-    // 6. Cleanup CSRF cookie and redirect to dashboard with success message
-    cookieStore.delete('shopify_oauth_nonce')
-    return NextResponse.redirect(new URL('/integrations?success=shopify_connected', request.url))
+      // 6. Cleanup CSRF cookie and redirect to dashboard with success message
+      cookieStore.delete('shopify_oauth_nonce')
+      return NextResponse.redirect(new URL('/integrations?success=shopify_connected', request.url))
+    } else {
+      // User is NOT logged in. Save pending install to secure cookie and redirect to registration.
+      await setShopifyPendingInstall({
+        shop,
+        accessToken,
+        shopMetadata
+      })
+      
+      cookieStore.delete('shopify_oauth_nonce')
+      return NextResponse.redirect(new URL('/register?source=shopify', request.url))
+    }
 
   } catch (error) {
     console.error('[Shopify OAuth Error]', error)

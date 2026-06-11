@@ -306,6 +306,9 @@ export async function completeRegistrationAction(
   let newUserId: string | null = null
   let newCompanyId: string | null = null
 
+  const { getShopifyPendingInstall, clearShopifyPendingInstall } = await import('@/lib/session')
+  const pendingShopify = await getShopifyPendingInstall()
+
   await db.transaction(async (tx) => {
     const [user] = await tx
       .insert(users)
@@ -326,6 +329,18 @@ export async function completeRegistrationAction(
       })
       .returning({ id: companies.id })
 
+    if (pendingShopify) {
+      const { marketplaceIntegrations } = await import('@/db/schema/integrations')
+      await tx.insert(marketplaceIntegrations).values({
+        companyId: company.id,
+        type: 'shopify',
+        environment: pendingShopify.shop,
+        accessToken: pendingShopify.accessToken,
+        isActive: true,
+        metadata: { shop: pendingShopify.shopMetadata }
+      })
+    }
+
     const isOwnerEmail = pending.email.toLowerCase() === 'leis@guggen-mountain.com'
     await tx.insert(companyMembers).values({
       userId: user.id,
@@ -339,6 +354,10 @@ export async function completeRegistrationAction(
     newUserId = user.id
     newCompanyId = company.id
   })
+
+  if (pendingShopify) {
+    await clearShopifyPendingInstall()
+  }
 
   if (newUserId && newCompanyId) {
     await createSession(newUserId, newCompanyId)

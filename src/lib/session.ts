@@ -182,3 +182,43 @@ export const getCurrentUser = cache(async () => {
 
   return user ?? null
 })
+
+// ─── Shopify Pending Installs ──────────────────────────────────────────────────
+const SHOPIFY_PENDING_COOKIE = 'omnistack_shopify_pending'
+
+export type ShopifyPendingPayload = {
+  shop: string
+  accessToken: string
+  shopMetadata: any
+}
+
+export async function setShopifyPendingInstall(payload: ShopifyPendingPayload): Promise<void> {
+  const token = await new SignJWT(payload)
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('1h') // Valid for 1 hour to allow the user to complete registration
+    .sign(encodedKey)
+
+  const cookieStore = await cookies()
+  cookieStore.set(SHOPIFY_PENDING_COOKIE, token, { ...COOKIE_OPTIONS, maxAge: 3600 })
+}
+
+export async function getShopifyPendingInstall(): Promise<ShopifyPendingPayload | null> {
+  const cookieStore = await cookies()
+  const token = cookieStore.get(SHOPIFY_PENDING_COOKIE)?.value
+  if (!token) return null
+
+  try {
+    const { payload } = await jwtVerify(token, encodedKey, {
+      algorithms: ['HS256'],
+    })
+    return payload as ShopifyPendingPayload
+  } catch {
+    return null
+  }
+}
+
+export async function clearShopifyPendingInstall(): Promise<void> {
+  const cookieStore = await cookies()
+  cookieStore.delete(SHOPIFY_PENDING_COOKIE)
+}
