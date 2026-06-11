@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     const state = searchParams.get('state')
 
     if (!code || !hmac || !shop || !state) {
-      return NextResponse.redirect(new URL('/integrations?error=missing_shopify_params', request.url))
+      return NextResponse.redirect(new URL('/integrations?error=missing_shopify_params', (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000')))
     }
 
     // 2. Verify State (CSRF Protection) using our securely set cookie
@@ -28,7 +28,7 @@ export async function GET(request: Request) {
     const storedNonce = cookieStore.get('shopify_oauth_nonce')?.value
 
     if (!storedNonce || storedNonce !== state) {
-      return NextResponse.redirect(new URL('/integrations?error=invalid_oauth_state', request.url))
+      return NextResponse.redirect(new URL('/integrations?error=invalid_oauth_state', (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000')))
     }
 
     // 3. Verify HMAC signature to ensure request came authenticly from Shopify
@@ -51,7 +51,7 @@ export async function GET(request: Request) {
       .digest('hex')
 
     if (generatedHash !== hmac) {
-      return NextResponse.redirect(new URL('/integrations?error=invalid_hmac_signature', request.url))
+      return NextResponse.redirect(new URL('/integrations?error=invalid_hmac_signature', (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000')))
     }
 
     // 4. Exchange the temporary code for a permanent access token
@@ -66,7 +66,7 @@ export async function GET(request: Request) {
     })
 
     if (!tokenResponse.ok) {
-      return NextResponse.redirect(new URL('/integrations?error=shopify_token_exchange_failed', request.url))
+      return NextResponse.redirect(new URL('/integrations?error=shopify_token_exchange_failed', (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000')))
     }
 
     const tokenData = await tokenResponse.json()
@@ -125,9 +125,14 @@ export async function GET(request: Request) {
         })
       }
 
-      // 6. Cleanup CSRF cookie and redirect to dashboard with success message
+      // 6. Cleanup CSRF cookie and redirect to Shopify Admin (Shopify App Review Requirement)
       cookieStore.delete('shopify_oauth_nonce')
-      return NextResponse.redirect(new URL('/integrations?success=shopify_connected', request.url))
+      const clientId = process.env.SHOPIFY_CLIENT_ID
+      const redirectUrl = clientId 
+        ? `https://admin.shopify.com/store/${shop.replace('.myshopify.com', '')}/apps/${clientId}`
+        : `${(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000')}/integrations?success=shopify_connected`
+        
+      return NextResponse.redirect(redirectUrl)
     } else {
       // User is NOT logged in. Save pending install to secure cookie and redirect to registration.
       await setShopifyPendingInstall({
@@ -137,11 +142,11 @@ export async function GET(request: Request) {
       })
       
       cookieStore.delete('shopify_oauth_nonce')
-      return NextResponse.redirect(new URL('/register?source=shopify', request.url))
+      return NextResponse.redirect(new URL('/register?source=shopify', (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000')))
     }
 
   } catch (error) {
     console.error('[Shopify OAuth Error]', error)
-    return NextResponse.redirect(new URL('/integrations?error=internal_server_error', request.url))
+    return NextResponse.redirect(new URL('/integrations?error=internal_server_error', (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000')))
   }
 }
