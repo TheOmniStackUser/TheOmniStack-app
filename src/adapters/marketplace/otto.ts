@@ -53,6 +53,7 @@ export class OttoAdapter implements MarketplaceAdapter {
         grant_type: 'client_credentials',
         scope: currentScope,
       }).toString(),
+      signal: AbortSignal.timeout(15000)
     })
 
     let response = await doFetch(scope)
@@ -141,7 +142,8 @@ export class OttoAdapter implements MarketplaceAdapter {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
             'Accept': 'application/json'
-          }
+          },
+          signal: AbortSignal.timeout(15000)
         })
 
         if (!res.ok) {
@@ -583,17 +585,31 @@ export class OttoAdapter implements MarketplaceAdapter {
           await onProgress(pagesFetched, 0, `Lade Produktdaten von OTTO (Seite ${pagesFetched})...`)
         }
 
-        const response: Response = await fetch(nextUrl, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Accept': 'application/json'
+        let response: Response;
+        let fetchRetries = 3;
+        while (fetchRetries > 0) {
+          try {
+            response = await fetch(nextUrl, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Accept': 'application/json'
+              },
+              signal: AbortSignal.timeout(15000) // 15s timeout to prevent hanging
+            })
+            if (response.ok || (response.status >= 400 && response.status < 500 && response.status !== 429)) break;
+            console.warn(`[OttoAdapter] Fetch returned ${response.status}. Retrying...`);
+          } catch (err: any) {
+            console.warn(`[OttoAdapter] Fetch error: ${err.message}. Retrying...`);
+            if (fetchRetries === 1) throw err;
           }
-        })
+          fetchRetries--;
+          if (fetchRetries > 0) await new Promise(r => setTimeout(r, 2000));
+        }
 
-        if (!response.ok) {
-          const errText = await response.text()
-          throw new Error(`Otto API fetchProducts failed: ${response.status} - ${errText}`)
+        if (!response!.ok) {
+          const errText = await response!.text()
+          throw new Error(`Otto API fetchProducts failed: ${response!.status} - ${errText}`)
         }
 
         const data = await response.json()
@@ -643,15 +659,29 @@ export class OttoAdapter implements MarketplaceAdapter {
             await onProgress(pagesFetched + qPagesFetched, 0, `Lade Bestände von OTTO (Seite ${qPagesFetched})...`)
           }
 
-          const qRes: Response = await fetch(quantitiesUrl, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Accept': 'application/json'
+          let qRes: Response | undefined;
+          let qRetries = 3;
+          while (qRetries > 0) {
+            try {
+              qRes = await fetch(quantitiesUrl, {
+                method: 'GET',
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Accept': 'application/json'
+                },
+                signal: AbortSignal.timeout(15000)
+              })
+              if (qRes.ok || (qRes.status >= 400 && qRes.status < 500 && qRes.status !== 429)) break;
+              console.warn(`[OttoAdapter] Quantities fetch returned ${qRes.status}. Retrying...`);
+            } catch (err: any) {
+              console.warn(`[OttoAdapter] Quantities fetch error: ${err.message}. Retrying...`);
+              if (qRetries === 1) throw err;
             }
-          })
+            qRetries--;
+            if (qRetries > 0) await new Promise(r => setTimeout(r, 2000));
+          }
 
-          if (qRes.ok) {
+          if (qRes && qRes.ok) {
             const qData = await qRes.json()
             // Otto Availability API returns { resources: { variations: [...] }, links: [...] }
             const resources = (
