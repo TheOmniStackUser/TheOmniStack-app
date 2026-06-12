@@ -101,7 +101,8 @@ export class OttoAdapter implements MarketplaceAdapter {
         body: new URLSearchParams({
           grant_type: 'client_credentials',
           scope: 'orders products shipments returns receipts availability price-reduction'
-        }).toString()
+        }).toString(),
+        signal: AbortSignal.timeout(15000)
       })
 
       if (!installResponse.ok) {
