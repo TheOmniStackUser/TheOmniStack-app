@@ -808,6 +808,7 @@ export function InvoiceList({
 
   // Draft Filters
   const [draftSearch, setDraftSearch] = useState('')
+  const [isSearchFocused, setIsSearchFocused] = useState(false)
   const [draftCountry, setDraftCountry] = useState('all')
   const [draftMarketplace, setDraftMarketplace] = useState('all')
   const [draftDocumentType, setDraftDocumentType] = useState('all')
@@ -986,6 +987,8 @@ export function InvoiceList({
       search: value
     }))
     setCurrentPage(1)
+    setIsSearchFocused(false)
+    document.getElementById('search')?.blur()
   }
 
   const handleDownload = async (invoiceId: string) => {
@@ -1337,6 +1340,7 @@ export function InvoiceList({
                 </div>
                 <input
                   type="text"
+                  id="search"
                   placeholder="Rechnungsnummer oder Kunde suchen..."
                   className="block w-full pl-10 pr-10 py-2.5 border border-slate-200 rounded-lg leading-5 bg-slate-50/30 text-slate-900 font-medium placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-all"
                   value={draftSearch}
@@ -1346,6 +1350,8 @@ export function InvoiceList({
                     setActiveFilters(prev => ({ ...prev, search: val }))
                     setCurrentPage(1)
                   }}
+                  onFocus={() => setIsSearchFocused(true)}
+                  onBlur={() => setIsSearchFocused(false)}
                 />
                 {draftSearch && (
                   <button
@@ -1359,7 +1365,7 @@ export function InvoiceList({
                     </svg>
                   </button>
                 )}
-                {searchSuggestions.length > 0 && (
+                {isSearchFocused && searchSuggestions.length > 0 && (
                   <div className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
                     {searchSuggestions.map((suggestion) => (
                       <button
