@@ -368,6 +368,29 @@ export class AboutYouAdapter implements MarketplaceAdapter {
       const allProducts: any[] = []
       let nextUrl: string | null = `${this.baseUrl}/products?per_page=100`
 
+      const brandMap = new Map<number, string>()
+      try {
+        const brandsResponse = await fetch(`${this.baseUrl}/brands`, {
+          method: 'GET',
+          headers: {
+            'X-API-Key': this.config.apiKey,
+            'Accept': 'application/json'
+          }
+        })
+        if (brandsResponse.ok) {
+           const brandsData = await brandsResponse.json()
+           if (Array.isArray(brandsData)) {
+             for (const b of brandsData) {
+                if (b.id && b.name) {
+                  brandMap.set(b.id, b.name)
+                }
+             }
+           }
+        }
+      } catch (e) {
+        console.warn(`[AboutYouAdapter] Failed to fetch brands mapping:`, e)
+      }
+
       while (nextUrl) {
         console.log(`[AboutYouAdapter] Fetching products page: ${nextUrl}`)
         const response: Response = await fetch(nextUrl, {
@@ -417,13 +440,25 @@ export class AboutYouAdapter implements MarketplaceAdapter {
           }
         }
 
+        // Map brand ID to brand name if possible
+        let mappedBrand = p.brand;
+        if (typeof p.brand === 'number' && brandMap.has(p.brand)) {
+           mappedBrand = {
+              id: p.brand,
+              name: brandMap.get(p.brand)
+           }
+        }
+
         return {
           marketplaceProductId: p.sku || p.ean || p.id?.toString(),
           sku: p.sku || p.ean || p.id?.toString() || 'UNKNOWN',
           title: p.name || p.sku || p.ean || 'About You Product',
           price: priceValue,
           stock: p.quantity ?? p.quantity_fbm ?? undefined,
-          rawPayload: p
+          rawPayload: {
+            ...p,
+            brand: mappedBrand
+          }
         }
       })
     } catch (error) {
