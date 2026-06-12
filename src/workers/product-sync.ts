@@ -143,7 +143,7 @@ export async function syncProductsForCompany(companyId: string, integrationId?: 
       await updateSyncStatus(integration.id, { isRunning: false, status: 'done', message: `Import erfolgreich abgeschlossen.`, progress: totalCount, total: totalCount })
       console.log(`[ProductSync] Completed ${integration.type}: ${toAutoMap.length} auto-mapped, ${toUpsertUnmapped.length} unmapped.`)
       
-    } catch (error) {
+    } catch (error: any) {
       console.error(`[ProductSync] Failed to sync products for marketplace ${integration.type}`, error)
       await updateSyncStatus(integration.id, { isRunning: false, status: 'error', message: `Fehler: ${error?.message || 'Ein unbekannter Fehler ist aufgetreten.'}`, progress: 0, total: 0 })
     }
