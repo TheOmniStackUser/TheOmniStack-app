@@ -145,7 +145,7 @@ export async function syncProductsForCompany(companyId: string, integrationId?: 
       
     } catch (error) {
       console.error(`[ProductSync] Failed to sync products for marketplace ${integration.type}`, error)
-      await updateSyncStatus(integration.id, { isRunning: false, status: 'error', message: `Ein Fehler ist aufgetreten.`, progress: 0, total: 0 })
+      await updateSyncStatus(integration.id, { isRunning: false, status: 'error', message: `Fehler: ${error?.message || 'Ein unbekannter Fehler ist aufgetreten.'}`, progress: 0, total: 0 })
     }
   }
 }
