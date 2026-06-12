@@ -34,6 +34,7 @@ export default async function IntegrationsPage(props: {
         fetchOrdersDaily: companies.fetchOrdersDaily,
         fetchOrdersTime: companies.fetchOrdersTime,
         fetchOrdersMarketplaces: companies.fetchOrdersMarketplaces,
+        syncNotificationEmail: companies.syncNotificationEmail,
       })
       .from(companies)
       .where(eq(companies.id, auth.activeCompanyId))

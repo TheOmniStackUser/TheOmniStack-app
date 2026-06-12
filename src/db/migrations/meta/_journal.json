@@ -120,6 +120,13 @@
       "when": 1780940129960,
       "tag": "0016_mushy_lady_ursula",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1781244033505,
+      "tag": "0017_bright_the_hood",
+      "breakpoints": true
     }
   ]
 }

@@ -180,4 +180,33 @@ export async function sendCompanyEmailVerificationEmail(toEmail: string, company
     return { success: false, error }
   }
 }
+import { SyncNotificationEmail } from '@/emails/SyncNotificationEmail'
 
+export async function sendSyncNotificationEmail({
+  toEmail,
+  companyName,
+  results,
+}: {
+  toEmail: string
+  companyName: string
+  results: Array<{ marketplace: string; success: boolean; count?: number; error?: string }>
+}) {
+  try {
+    const { data, error } = await resend.emails.send({
+      from: DEFAULT_SENDER,
+      to: [toEmail],
+      subject: `TheOmniStack - Automatischer Bestellabruf (${new Date().toLocaleDateString('de-DE')})`,
+      react: SyncNotificationEmail({ companyName, results, date: new Date().toLocaleString('de-DE') }),
+    })
+
+    if (error) {
+      console.error('[Email Service] Error sending sync notification email:', error)
+      return { success: false, error }
+    }
+
+    return { success: true, data }
+  } catch (error) {
+    console.error('[Email Service] Fatal error sending sync notification email:', error)
+    return { success: false, error }
+  }
+}

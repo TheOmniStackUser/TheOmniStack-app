@@ -14,6 +14,7 @@ type SyncSettingsFormProps = {
     fetchOrdersDaily: boolean
     fetchOrdersTime: string
     fetchOrdersMarketplaces: string[]
+    syncNotificationEmail: string | null
   }
   activeMarketplaces: MarketplaceOption[]
 }
@@ -80,21 +81,39 @@ export function SyncSettingsForm({ company, activeMarketplaces }: SyncSettingsFo
 
       {isEnabled && (
         <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
-          {/* Time Picker */}
-          <div className="space-y-2">
-            <label htmlFor="fetchOrdersTime" className="block text-sm font-semibold text-gray-700 flex items-center gap-1.5">
-              <Clock className="w-4 h-4 text-gray-400" />
-              Abruf-Uhrzeit (täglich)
-            </label>
-            <input
-              id="fetchOrdersTime"
-              name="fetchOrdersTime"
-              type="time"
-              defaultValue={company.fetchOrdersTime || '03:00'}
-              required
-              className="block w-full max-w-[150px] px-4 py-2.5 border border-gray-300 rounded-xl shadow-sm text-black focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all bg-white font-medium"
-            />
-            <p className="text-xs text-gray-500">Wähle die Uhrzeit, zu der die Bestellungen importiert werden sollen.</p>
+          {/* Time Picker and Email Notification */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label htmlFor="fetchOrdersTime" className="block text-sm font-semibold text-gray-700 flex items-center gap-1.5">
+                <Clock className="w-4 h-4 text-gray-400" />
+                Abruf-Uhrzeit (täglich)
+              </label>
+              <input
+                id="fetchOrdersTime"
+                name="fetchOrdersTime"
+                type="time"
+                defaultValue={company.fetchOrdersTime || '03:00'}
+                required
+                className="block w-full max-w-[150px] px-4 py-2.5 border border-gray-300 rounded-xl shadow-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all bg-white font-medium"
+              />
+              <p className="text-xs text-gray-500">Wähle die Uhrzeit, zu der die Bestellungen importiert werden sollen.</p>
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="syncNotificationEmail" className="block text-sm font-semibold text-gray-700 flex items-center gap-1.5">
+                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                Benachrichtigungs-E-Mail (Optional)
+              </label>
+              <input
+                id="syncNotificationEmail"
+                name="syncNotificationEmail"
+                type="email"
+                defaultValue={company.syncNotificationEmail || ''}
+                placeholder="z.B. info@dein-shop.de"
+                className="block w-full px-4 py-2.5 border border-gray-300 rounded-xl shadow-sm text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all bg-white font-medium"
+              />
+              <p className="text-xs text-gray-500">Erhalte eine E-Mail-Zusammenfassung nach jedem automatischen Import.</p>
+            </div>
           </div>
 
           {/* Marketplaces Checklist */}

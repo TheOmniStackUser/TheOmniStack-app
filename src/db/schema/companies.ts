@@ -122,6 +122,7 @@ export const companies = pgTable('companies', {
   fetchOrdersDaily: boolean('fetch_orders_daily').notNull().default(false),
   fetchOrdersTime: text('fetch_orders_time').notNull().default('03:00'),
   fetchOrdersMarketplaces: jsonb('fetch_orders_marketplaces').$type<string[]>().notNull().default([]),
+  syncNotificationEmail: text('sync_notification_email'),
 
   // Features
   featuresReturnsEnabled: boolean('features_returns_enabled').notNull().default(false),

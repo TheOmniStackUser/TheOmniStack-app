@@ -5,6 +5,7 @@
 // ============================================================================
 
 import { Worker, Queue, type Job } from 'bullmq'
+import { sendSyncNotificationEmail } from '@/lib/email'
 import IORedis from 'ioredis'
 import { db } from '@/db/client'
 import { orders, orderItems } from '@/db/schema/orders'
@@ -92,8 +93,10 @@ export function createMarketplaceSyncWorker() {
         // Fetch company config
         const [company] = await db
           .select({
+            name: companies.name,
             fetchOrdersDaily: companies.fetchOrdersDaily,
             fetchOrdersMarketplaces: companies.fetchOrdersMarketplaces,
+            syncNotificationEmail: companies.syncNotificationEmail,
           })
           .from(companies)
           .where(eq(companies.id, companyId))
@@ -181,6 +184,16 @@ export function createMarketplaceSyncWorker() {
           nextState: { marketplace, startedAt: new Date().toISOString() },
         })
       }
+
+      // Fetch company notification settings
+      const [companySettings] = await db
+        .select({
+          name: companies.name,
+          syncNotificationEmail: companies.syncNotificationEmail,
+        })
+        .from(companies)
+        .where(eq(companies.id, companyId))
+        .limit(1)
 
       try {
         // Fetch credentials from the database
@@ -317,7 +330,17 @@ export function createMarketplaceSyncWorker() {
             entityId: marketplace,
             nextState: { marketplace, completedAt: new Date().toISOString(), ordersImported: rawOrders.length },
           })
+          
+          if (companySettings?.syncNotificationEmail) {
+            await sendSyncNotificationEmail({
+              toEmail: companySettings.syncNotificationEmail,
+              companyName: companySettings.name,
+              results: [{ marketplace: marketplace || 'Unbekannt', success: true, count: rawOrders.length }]
+            })
+          }
         }
+        
+        return { success: true, ordersImported: rawOrders?.length || 0 }
       } catch (error) {
         if (!isInvoiceSync) {
           await auditLog({
@@ -331,6 +354,15 @@ export function createMarketplaceSyncWorker() {
               error: error instanceof Error ? error.message : String(error),
             },
           })
+          
+          // Only send failure email on the LAST attempt to avoid spamming during retries
+          if (companySettings?.syncNotificationEmail && job.attemptsMade >= (job.opts.attempts || 1) - 1) {
+            await sendSyncNotificationEmail({
+              toEmail: companySettings.syncNotificationEmail,
+              companyName: companySettings.name,
+              results: [{ marketplace: marketplace || 'Unbekannt', success: false, error: error instanceof Error ? error.message : String(error) }]
+            })
+          }
         }
         throw error // Re-throw so BullMQ marks the job as failed and retries
       }

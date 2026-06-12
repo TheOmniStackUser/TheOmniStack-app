@@ -792,6 +792,7 @@ const SyncSettingsSchema = z.object({
   fetchOrdersDaily: z.boolean(),
   fetchOrdersTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'Ungültiges Uhrzeitformat (HH:MM).' }),
   fetchOrdersMarketplaces: z.array(z.string().uuid()),
+  syncNotificationEmail: z.union([z.literal(''), z.string().email({ message: 'Ungültige E-Mail-Adresse.' })]).optional().transform(v => v === '' ? null : v),
 })
 
 export async function saveSyncSettingsAction(
@@ -803,6 +804,8 @@ export async function saveSyncSettingsAction(
   const fetchOrdersDaily = formData.get('fetchOrdersDaily') === 'true'
   const fetchOrdersTime = (formData.get('fetchOrdersTime') as string) || '03:00'
   const marketplacesListRaw = (formData.get('marketplacesList') as string) || '[]'
+  const syncNotificationEmail = formData.get('syncNotificationEmail') as string | null
+
   
   let fetchOrdersMarketplaces: string[] = []
   try {
@@ -815,6 +818,7 @@ export async function saveSyncSettingsAction(
     fetchOrdersDaily,
     fetchOrdersTime,
     fetchOrdersMarketplaces,
+    syncNotificationEmail,
   })
 
   if (!validated.success) {
@@ -830,6 +834,7 @@ export async function saveSyncSettingsAction(
       fetchOrdersDaily: data.fetchOrdersDaily,
       fetchOrdersTime: data.fetchOrdersTime,
       fetchOrdersMarketplaces: data.fetchOrdersMarketplaces,
+      syncNotificationEmail: data.syncNotificationEmail,
       updatedAt: new Date(),
     })
     .where(eq(companies.id, auth.activeCompanyId))
