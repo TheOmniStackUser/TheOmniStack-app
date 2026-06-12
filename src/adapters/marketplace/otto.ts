@@ -731,7 +731,7 @@ export class OttoAdapter implements MarketplaceAdapter {
             
             quantitiesUrl = proposedNextUrl
           } else {
-            console.warn(`[OttoAdapter] Failed to fetch quantities: ${qRes.status}`)
+            console.warn(`[OttoAdapter] Failed to fetch quantities: ${qRes?.status || 'Unknown error'}`)
             break
           }
         }
