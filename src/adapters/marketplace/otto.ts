@@ -585,7 +585,7 @@ export class OttoAdapter implements MarketplaceAdapter {
           await onProgress(pagesFetched, 0, `Lade Produktdaten von OTTO (Seite ${pagesFetched})...`)
         }
 
-        let response: Response;
+        let response: Response | undefined;
         let fetchRetries = 3;
         while (fetchRetries > 0) {
           try {
@@ -607,9 +607,9 @@ export class OttoAdapter implements MarketplaceAdapter {
           if (fetchRetries > 0) await new Promise(r => setTimeout(r, 2000));
         }
 
-        if (!response!.ok) {
-          const errText = await response!.text()
-          throw new Error(`Otto API fetchProducts failed: ${response!.status} - ${errText}`)
+        if (!response || !response.ok) {
+          const errText = await response?.text()
+          throw new Error(`Otto API fetchProducts failed: ${response?.status} - ${errText}`)
         }
 
         const data = await response.json()
