@@ -161,6 +161,24 @@ const getCategoryFromPayload = (payload: any) => {
   return null;
 };
 
+const getBrandFromPayload = (payload: any) => {
+  if (!payload || typeof payload !== 'object') return null;
+
+  if (payload.brand) {
+     if (typeof payload.brand === 'string') return payload.brand;
+     if (payload.brand.name) return payload.brand.name;
+  }
+  if (payload.vendor) return payload.vendor;
+  if (payload.product_brand) return payload.product_brand;
+  
+  if (Array.isArray(payload.attributes)) {
+     const brandAttr = payload.attributes.find((a: any) => a.name === 'Brand' || a.name === 'brand' || a.code === 'brand');
+     if (brandAttr && brandAttr.value) return String(brandAttr.value);
+  }
+  
+  return null;
+};
+
 export async function bulkCreateProductsFromUnmapped(unmappedProductIds: string[]) {
   const auth = await requireAuth()
 
@@ -200,6 +218,7 @@ export async function bulkCreateProductsFromUnmapped(unmappedProductIds: string[
       const description = getDescriptionFromPayload(unmapped.rawPayload);
       const originPrice = getOriginPriceFromPayload(unmapped.rawPayload);
       const category = getCategoryFromPayload(unmapped.rawPayload);
+      const brand = getBrandFromPayload(unmapped.rawPayload);
       
       const [newProduct] = await db.insert(products).values({
         companyId: auth.activeCompanyId,
@@ -211,6 +230,7 @@ export async function bulkCreateProductsFromUnmapped(unmappedProductIds: string[
         ean: ean || null,
         msrp: originPrice || null,
         category: category || null,
+        brand: brand || null,
       }).returning({ id: products.id })
       productId = newProduct.id
     }

@@ -75,6 +75,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       ean: (formData.get('ean') as string) || null,
       description: (formData.get('description') as string) || null,
       category: (formData.get('category') as string) || null,
+      brand: (formData.get('brand') as string) || null,
       price: (formData.get('price') as string) || '0',
       purchasePrice: (formData.get('purchasePrice') as string) || null,
       msrp: (formData.get('msrp') as string) || null,
@@ -162,6 +163,10 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-slate-700">Kategorie</label>
                   <input type="text" name="category" defaultValue={product.category || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 placeholder:text-slate-500" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700">Marke / Brand</label>
+                  <input type="text" name="brand" defaultValue={product.brand || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 placeholder:text-slate-500" />
                 </div>
               </div>
               

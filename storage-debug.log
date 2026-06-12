@@ -1,0 +1,30 @@
+[2026-06-09T14:57:27.383Z] Error: No value provided for input HTTP label: Bucket.
+Stack: Error: No value provided for input HTTP label: Bucket.
+    at S3RestXmlProtocol.serializeRequest (/Users/alexanderleis/billing-app/node_modules/@aws-sdk/middleware-sdk-s3/dist-cjs/index.js:542:31)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async /Users/alexanderleis/billing-app/node_modules/@smithy/core/dist-cjs/submodules/schema/index.js:91:21
+    at async /Users/alexanderleis/billing-app/node_modules/@aws-sdk/middleware-sdk-s3/dist-cjs/index.js:64:28
+    at async /Users/alexanderleis/billing-app/node_modules/@aws-sdk/middleware-sdk-s3/dist-cjs/index.js:91:20
+    at async /Users/alexanderleis/billing-app/node_modules/@aws-sdk/middleware-logger/dist-cjs/index.js:5:26
+    at async ensureBucketExists (/Users/alexanderleis/billing-app/src/lib/storage.ts:48:5)
+    at async documentExists (/Users/alexanderleis/billing-app/src/lib/storage.ts:125:5)
+    at async generateOrDownloadDeliveryNote (/Users/alexanderleis/billing-app/src/workers/marketplace-sync.ts:516:20)
+    at async persistOrders (/Users/alexanderleis/billing-app/src/workers/marketplace-sync.ts:1360:7)
+Bucket: undefined
+Endpoint: undefined
+---
+[2026-06-09T14:57:29.002Z] Error: No value provided for input HTTP label: Bucket.
+Stack: Error: No value provided for input HTTP label: Bucket.
+    at S3RestXmlProtocol.serializeRequest (/Users/alexanderleis/billing-app/node_modules/@aws-sdk/middleware-sdk-s3/dist-cjs/index.js:542:31)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async /Users/alexanderleis/billing-app/node_modules/@smithy/core/dist-cjs/submodules/schema/index.js:91:21
+    at async /Users/alexanderleis/billing-app/node_modules/@aws-sdk/middleware-sdk-s3/dist-cjs/index.js:64:28
+    at async /Users/alexanderleis/billing-app/node_modules/@aws-sdk/middleware-sdk-s3/dist-cjs/index.js:91:20
+    at async /Users/alexanderleis/billing-app/node_modules/@aws-sdk/middleware-logger/dist-cjs/index.js:5:26
+    at async ensureBucketExists (/Users/alexanderleis/billing-app/src/lib/storage.ts:48:5)
+    at async uploadDocument (/Users/alexanderleis/billing-app/src/lib/storage.ts:88:3)
+    at async generateOrDownloadDeliveryNote (/Users/alexanderleis/billing-app/src/workers/marketplace-sync.ts:584:5)
+    at async persistOrders (/Users/alexanderleis/billing-app/src/workers/marketplace-sync.ts:1360:7)
+Bucket: undefined
+Endpoint: undefined
+---

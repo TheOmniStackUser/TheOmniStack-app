@@ -35,6 +35,7 @@ export const products = pgTable('products', {
   description: text('description'),
   ean: text('ean'),
   category: text('category'),
+  brand: text('brand'),
   
   // Inventory
   currentStock: numeric('current_stock', { precision: 10, scale: 0 }).notNull().default('0'),
@@ -114,6 +115,7 @@ export const unmappedMarketplaceProducts = pgTable('unmapped_marketplace_product
   marketplaceProductId: text('marketplace_product_id'),
   
   title: text('title').notNull(),
+  brand: text('brand'),
   price: numeric('price', { precision: 12, scale: 2 }),
   stock: numeric('stock', { precision: 10, scale: 0 }),
   rawPayload: jsonb('raw_payload'),
