@@ -79,6 +79,61 @@ export async function executeRefund({
     autoCreditNote = false
   }
 
+  // 3. Resolve EAN to actual marketplace SKUs if needed
+  const resolvedItemsToRefund: RefundItemInput[] = []
+  
+  for (const refundItem of itemsToRefund) {
+    if (refundItem.quantity <= 0) continue
+
+    let matchedOrderItem = order.items.find(
+      item => item.sku?.toLowerCase() === refundItem.sku.toLowerCase()
+    )
+
+    if (!matchedOrderItem) {
+      // Try to resolve EAN -> SKU via products table
+      const { products, productMappings } = await import('@/db/schema/products')
+      const productByEan = await db.query.products.findFirst({
+        where: and(eq(products.ean, refundItem.sku), eq(products.companyId, companyId)),
+        columns: { sku: true, id: true }
+      })
+
+      if (productByEan) {
+        matchedOrderItem = order.items.find(
+          item => item.sku?.toLowerCase() === productByEan.sku.toLowerCase()
+        )
+        
+        if (!matchedOrderItem) {
+           // Try to resolve via productMappings for this marketplace
+           const mapping = await db.query.productMappings.findFirst({
+             where: and(
+               eq(productMappings.productId, productByEan.id),
+               eq(productMappings.marketplace, order.marketplace as any)
+             )
+           })
+           if (mapping) {
+              matchedOrderItem = order.items.find(
+                item => item.sku?.toLowerCase() === mapping.marketplaceSku.toLowerCase()
+              )
+           }
+        }
+      }
+    }
+
+    if (matchedOrderItem) {
+       // Update SKU to the exact one from the order to prevent downstream mismatches
+       resolvedItemsToRefund.push({
+         sku: matchedOrderItem.sku || refundItem.sku,
+         quantity: refundItem.quantity
+       })
+    } else {
+       // Keep original if not matched, maybe the API adapter can handle it
+       resolvedItemsToRefund.push(refundItem)
+    }
+  }
+
+  // Update itemsToRefund with resolved SKUs for downstream processes
+  itemsToRefund = resolvedItemsToRefund
+
   let creditNoteNumber = ''
   let newCreditNoteInvoiceId = ''
   let pdfBuffer: Buffer | null = null
