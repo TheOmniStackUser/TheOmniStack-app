@@ -516,14 +516,34 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
                  <p className="font-bold text-slate-900 text-base">{detailsProduct.price} €</p>
                </div>
                
-               {/* Extract UVP & Category from raw payload for display */}
+               {/* Extract UVP, Category, & Brand from raw payload for display */}
                {(() => {
                  const raw = detailsProduct.rawPayload as any;
                  const uvp = raw?.discount?.origin_price || raw?.origin_price || raw?.msrp;
                  const category = raw?.category_label || raw?.category || raw?.product_type;
                  
+                 let brand = null;
+                 if (raw?.brand !== undefined && raw?.brand !== null) {
+                    if (typeof raw.brand === 'string') brand = raw.brand;
+                    else if (typeof raw.brand === 'number') brand = String(raw.brand);
+                    else if (raw.brand.name) brand = String(raw.brand.name);
+                 } else if (raw?.vendor) {
+                    brand = String(raw.vendor);
+                 } else if (raw?.product_brand) {
+                    brand = String(raw.product_brand);
+                 } else if (Array.isArray(raw?.attributes)) {
+                    const brandAttr = raw.attributes.find((a: any) => a.name === 'Brand' || a.name === 'brand' || a.code === 'brand');
+                    if (brandAttr && brandAttr.value) brand = String(brandAttr.value);
+                 }
+                 
                  return (
                    <>
+                     {brand && (
+                       <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col">
+                         <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Marke / Brand</p>
+                         <p className="font-bold text-slate-900 text-base">{brand}</p>
+                       </div>
+                     )}
                      {uvp && (
                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col">
                          <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">UVP</p>

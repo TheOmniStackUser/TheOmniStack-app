@@ -164,9 +164,10 @@ const getCategoryFromPayload = (payload: any) => {
 const getBrandFromPayload = (payload: any) => {
   if (!payload || typeof payload !== 'object') return null;
 
-  if (payload.brand) {
+  if (payload.brand !== undefined && payload.brand !== null) {
      if (typeof payload.brand === 'string') return payload.brand;
-     if (payload.brand.name) return payload.brand.name;
+     if (typeof payload.brand === 'number') return String(payload.brand);
+     if (payload.brand.name) return String(payload.brand.name);
   }
   if (payload.vendor) return payload.vendor;
   if (payload.product_brand) return payload.product_brand;
