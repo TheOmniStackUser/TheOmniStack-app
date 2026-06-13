@@ -79,7 +79,7 @@ export const SyncNotificationEmail = ({
                   </Text>
                 ) : (
                   results.map((result, index) => (
-                    <div key={index} className="mb-[12px] last:mb-0">
+                    <div key={index} className="mb-[12px]">
                       <Text className="m-0 text-[14px] font-semibold text-gray-800">
                         {result.marketplace}
                       </Text>
