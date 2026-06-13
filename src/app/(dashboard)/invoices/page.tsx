@@ -112,8 +112,22 @@ export default async function InvoicesPage() {
   const hasAmazonIntegration = integrations.some(i => i.type === 'amazon' && i.refreshToken)
   const hasShopifyIntegration = integrations.some(i => i.type === 'shopify' && i.accessToken)
 
+  const uniqueInvoicesMap = new Map()
+  for (const inv of allInvoices) {
+    if (!uniqueInvoicesMap.has(inv.id)) {
+      uniqueInvoicesMap.set(inv.id, inv)
+    } else {
+      // If we find a duplicate (happens with manual credit notes matching two orders),
+      // prefer the original marketplace over the "manual" ghost order.
+      if (inv.marketplace !== 'manual') {
+        uniqueInvoicesMap.set(inv.id, inv)
+      }
+    }
+  }
+  const uniqueInvoices = Array.from(uniqueInvoicesMap.values())
+
   // Map dunning stage info
-  const invoicesWithDunning = allInvoices.map((inv) => {
+  const invoicesWithDunning = uniqueInvoices.map((inv) => {
     const logs = companyDunningLogs.filter((log) => log.invoiceId === inv.id)
     return {
       ...inv,
