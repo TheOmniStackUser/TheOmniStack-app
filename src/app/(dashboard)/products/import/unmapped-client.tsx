@@ -422,7 +422,8 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
               <input 
                 type="checkbox"
                 checked={selectedIds.length > 0 && selectedIds.length === filteredProducts.length}
-                onChange={() => {}} // handled by parent onClick
+                onChange={toggleSelectAll}
+                onClick={(e) => e.stopPropagation()}
                 className="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 cursor-pointer"
               />
               <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider select-none">Alle auswählen</span>
@@ -431,11 +432,12 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
               <div key={p.id} onClick={() => setDetailsProduct(p)} className={`p-6 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 transition-colors cursor-pointer ${selectedIds.includes(p.id) ? 'bg-indigo-50/30' : 'hover:bg-slate-50/30'}`}>
                 
                 <div className="flex items-start gap-4 flex-1">
-                  <div className="mt-1 flex items-center" onClick={(e) => e.stopPropagation()}>
+                  <div className="mt-1 flex items-center">
                     <input 
                       type="checkbox"
                       checked={selectedIds.includes(p.id)}
                       onChange={() => toggleSelect(p.id)}
+                      onClick={(e) => e.stopPropagation()}
                       className="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 cursor-pointer"
                     />
                   </div>
