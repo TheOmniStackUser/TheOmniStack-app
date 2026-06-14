@@ -29,7 +29,7 @@ export default async function DashboardPage() {
   const auth = await requireAuth()
   const user = await getCurrentUser()
 
-  const [company] = await db
+  const companyPromise = db
     .select()
     .from(companies)
     .where(eq(companies.id, auth.activeCompanyId))
@@ -41,7 +41,7 @@ export default async function DashboardPage() {
   const startOfYear = new Date(now.getFullYear(), 0, 1)
 
   // Fetch KPI Data
-  const [{ openOrdersCount }] = await db
+  const openOrdersPromise = db
     .select({
       openOrdersCount: sql<number>`count(*)::int`,
     })
@@ -54,7 +54,7 @@ export default async function DashboardPage() {
       )
     )
 
-  const [{ totalOrdersCount }] = await db
+  const totalOrdersPromise = db
     .select({
       totalOrdersCount: sql<number>`count(*)::int`,
     })
@@ -67,7 +67,7 @@ export default async function DashboardPage() {
       )
     )
 
-  const [{ monthOrdersCount }] = await db
+  const monthOrdersPromise = db
     .select({
       monthOrdersCount: sql<number>`count(*)::int`,
     })
@@ -82,7 +82,7 @@ export default async function DashboardPage() {
     )
 
   // Orders status breakdown
-  const orderStats = await db
+  const orderStatsPromise = db
     .select({
       status: orders.status,
       count: sql<number>`count(*)::int`,
@@ -96,13 +96,8 @@ export default async function DashboardPage() {
     )
     .groupBy(orders.status)
 
-  const pendingCount = orderStats.find(s => s.status === 'pending' || s.status === 'invoiced')?.count || 0
-  const laterShipmentCount = orderStats.find(s => s.status === 'later_shipment')?.count || 0
-  const shippedCount = orderStats.find(s => s.status === 'shipped')?.count || 0
-  const cancelledCount = orderStats.find(s => s.status === 'cancelled')?.count || 0
-
   // Marketplace stats
-  const marketplaceStats = await db
+  const marketplaceStatsPromise = db
     .select({
       marketplace: orders.marketplace,
       dayCount: sql<number>`count(case when coalesce(${orders.marketplacePurchaseDate}, ${orders.createdAt}) >= ${startOfDay.toISOString()} then 1 end)::int`,
@@ -120,7 +115,7 @@ export default async function DashboardPage() {
     .groupBy(orders.marketplace)
     .orderBy(sql`count(*) desc`)
 
-  const [invoicesStats] = await db
+  const invoicesStatsPromise = db
     .select({
       monthCount: sql<number>`count(case when coalesce(${invoices.issuedAt}, ${invoices.createdAt}) >= ${startOfMonth.toISOString()} then 1 end)::int`,
       monthRevenue: sql<number>`COALESCE(sum(case when coalesce(${invoices.issuedAt}, ${invoices.createdAt}) >= ${startOfMonth.toISOString()} then (case when ${invoices.isCreditNote} and ${invoices.subtotalAmount}::numeric > 0 then -${invoices.subtotalAmount}::numeric else ${invoices.subtotalAmount}::numeric end) * (case ${invoices.currency} when 'CHF' then 1.03 when 'USD' then 0.92 when 'GBP' then 1.17 when 'PLN' then 0.23 when 'SEK' then 0.087 when 'DKK' then 0.13 when 'NOK' then 0.087 when 'CZK' then 0.04 when 'HUF' then 0.0025 when 'RON' then 0.20 when 'BGN' then 0.51 when 'TRY' then 0.029 when 'AUD' then 0.60 when 'CAD' then 0.68 when 'JPY' then 0.006 else 1.0 end) end), 0)::float`,
@@ -138,7 +133,7 @@ export default async function DashboardPage() {
       )
     )
 
-  const [openInvoicesStats] = await db
+  const openInvoicesPromise = db
     .select({
       count: sql<number>`count(*)::int`,
       revenue: sql<number>`COALESCE(sum(${invoices.totalAmount}::numeric * (case ${invoices.currency} when 'CHF' then 1.03 when 'USD' then 0.92 when 'GBP' then 1.17 when 'PLN' then 0.23 when 'SEK' then 0.087 when 'DKK' then 0.13 when 'NOK' then 0.087 when 'CZK' then 0.04 when 'HUF' then 0.0025 when 'RON' then 0.20 when 'BGN' then 0.51 when 'TRY' then 0.029 when 'AUD' then 0.60 when 'CAD' then 0.68 when 'JPY' then 0.006 else 1.0 end)), 0)::float`,
@@ -159,7 +154,7 @@ export default async function DashboardPage() {
       )
     )
 
-  const [overdueInvoicesStats] = await db
+  const overdueInvoicesPromise = db
     .select({
       count: sql<number>`count(*)::int`,
       revenue: sql<number>`COALESCE(sum(${invoices.totalAmount}::numeric * (case ${invoices.currency} when 'CHF' then 1.03 when 'USD' then 0.92 when 'GBP' then 1.17 when 'PLN' then 0.23 when 'SEK' then 0.087 when 'DKK' then 0.13 when 'NOK' then 0.087 when 'CZK' then 0.04 when 'HUF' then 0.0025 when 'RON' then 0.20 when 'BGN' then 0.51 when 'TRY' then 0.029 when 'AUD' then 0.60 when 'CAD' then 0.68 when 'JPY' then 0.006 else 1.0 end)), 0)::float`,
@@ -180,6 +175,33 @@ export default async function DashboardPage() {
         )
       )
     )
+
+  const [
+    [company],
+    [{ openOrdersCount }],
+    [{ totalOrdersCount }],
+    [{ monthOrdersCount }],
+    orderStats,
+    marketplaceStats,
+    [invoicesStats],
+    [openInvoicesStats],
+    [overdueInvoicesStats]
+  ] = await Promise.all([
+    companyPromise,
+    openOrdersPromise,
+    totalOrdersPromise,
+    monthOrdersPromise,
+    orderStatsPromise,
+    marketplaceStatsPromise,
+    invoicesStatsPromise,
+    openInvoicesPromise,
+    overdueInvoicesPromise
+  ])
+
+  const pendingCount = orderStats.find(s => s.status === 'pending' || s.status === 'invoiced')?.count || 0
+  const laterShipmentCount = orderStats.find(s => s.status === 'later_shipment')?.count || 0
+  const shippedCount = orderStats.find(s => s.status === 'shipped')?.count || 0
+  const cancelledCount = orderStats.find(s => s.status === 'cancelled')?.count || 0
 
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(val)

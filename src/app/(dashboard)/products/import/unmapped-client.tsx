@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Database, Search, Filter, Loader2, CheckSquare, Square, X, Info, AlertTriangle, Trash2, Download } from 'lucide-react'
 import { bulkCreateProductsFromUnmapped, deleteUnmappedProducts } from '@/app/actions/products'
 import { useRouter } from 'next/navigation'
@@ -122,18 +122,23 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
   const router = useRouter()
   const [search, setSearch] = useState('')
   const [marketplaceFilter, setMarketplaceFilter] = useState<string>('all')
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [detailsProduct, setDetailsProduct] = useState<UnmappedMarketplaceProduct | null>(null)
   const [alertState, setAlertState] = useState<{ isOpen: boolean; title?: string; message: string }>({ isOpen: false, message: '' })
   const [deleteConfirmation, setDeleteConfirmation] = useState<{ isOpen: boolean, type: 'single' | 'bulk', id?: string }>({ isOpen: false, type: 'single' })
 
+  // Local state for optimistic updates
+  const [localProducts, setLocalProducts] = useState(unmappedProducts)
+
+  useEffect(() => {
+    setLocalProducts(unmappedProducts)
+  }, [unmappedProducts])
+
+  const hideAlert = () => setAlertState(prev => ({ ...prev, isOpen: false }))
+
   const showAlert = (message: string, title?: string) => {
     setAlertState({ isOpen: true, message, title })
-  }
-
-  const hideAlert = () => {
-    setAlertState(prev => ({ ...prev, isOpen: false }))
   }
 
   const getMarketplaceDisplayName = (type: string) => {
@@ -160,15 +165,15 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
 
   // Get unique marketplaces for the filter dropdown
   const uniqueMarketplaces = useMemo(() => {
-    const types = new Set(unmappedProducts.map(p => p.marketplace))
+    const types = new Set(localProducts.map(p => p.marketplace))
     return Array.from(types).map(type => ({
       type,
       name: getMarketplaceDisplayName(type)
     }))
-  }, [unmappedProducts, marketplaces])
+  }, [localProducts, marketplaces])
 
   const filteredProducts = useMemo(() => {
-    return unmappedProducts.filter(p => {
+    return localProducts.filter(p => {
       // Filter by marketplace
       if (marketplaceFilter !== 'all' && p.marketplace !== marketplaceFilter) return false
       
@@ -181,32 +186,28 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
       }
       return true
     })
-  }, [unmappedProducts, search, marketplaceFilter])
+  }, [localProducts, search, marketplaceFilter])
 
   const toggleSelectAll = () => {
-    if (selectedIds.size === filteredProducts.length && filteredProducts.length > 0) {
-      setSelectedIds(new Set())
+    if (selectedIds.length === filteredProducts.length && filteredProducts.length > 0) {
+      setSelectedIds([])
     } else {
-      setSelectedIds(new Set(filteredProducts.map(p => p.id)))
+      setSelectedIds(filteredProducts.map(p => p.id))
     }
   }
 
   const toggleSelect = (id: string) => {
-    const newSet = new Set(selectedIds)
-    if (newSet.has(id)) {
-      newSet.delete(id)
-    } else {
-      newSet.add(id)
-    }
-    setSelectedIds(newSet)
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    )
   }
 
   const handleBulkCreate = async () => {
-    if (selectedIds.size === 0) return
+    if (selectedIds.length === 0) return
     setIsSubmitting(true)
     try {
-      await bulkCreateProductsFromUnmapped(Array.from(selectedIds))
-      setSelectedIds(new Set())
+      await bulkCreateProductsFromUnmapped(selectedIds)
+      setSelectedIds([])
       router.refresh()
     } catch (error) {
       console.error(error)
@@ -217,11 +218,11 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
   }
 
   const handleBulkDelete = async () => {
-    if (selectedIds.size === 0) return
+    if (selectedIds.length === 0) return
     setIsSubmitting(true)
     try {
-      await deleteUnmappedProducts(Array.from(selectedIds))
-      setSelectedIds(new Set())
+      await deleteUnmappedProducts(selectedIds)
+      setSelectedIds([])
       setDeleteConfirmation({ isOpen: false, type: 'single' })
       router.refresh()
     } catch (error) {
@@ -374,10 +375,10 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
           </button>
         </div>
 
-        {selectedIds.size > 0 && (
+        {selectedIds.length > 0 && (
           <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-lg flex items-center justify-between animate-in fade-in slide-in-from-top-2">
             <span className="text-indigo-800 text-sm font-semibold">
-              {selectedIds.size} Produkte ausgewählt
+              {selectedIds.length} Produkte ausgewählt
             </span>
             <div className="flex gap-2">
               <button
@@ -414,27 +415,30 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
           </div>
         ) : (
           <div>
-            <div className="px-6 py-3 bg-slate-50 flex items-center gap-4 border-b border-slate-100">
-              <button onClick={toggleSelectAll} className="text-slate-400 hover:text-indigo-600 transition-colors focus:outline-none">
-                {selectedIds.size > 0 && selectedIds.size === filteredProducts.length ? (
-                  <CheckSquare className="w-5 h-5 text-indigo-600" />
-                ) : (
-                  <Square className="w-5 h-5" />
-                )}
-              </button>
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Alle auswählen</span>
+            <div 
+              className="px-6 py-3 bg-slate-50 flex items-center gap-4 border-b border-slate-100 cursor-pointer hover:bg-slate-100/50 transition-colors"
+              onClick={toggleSelectAll}
+            >
+              <input 
+                type="checkbox"
+                checked={selectedIds.length > 0 && selectedIds.length === filteredProducts.length}
+                onChange={() => {}} // handled by parent onClick
+                className="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 cursor-pointer"
+              />
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider select-none">Alle auswählen</span>
             </div>
             {filteredProducts.map((p) => (
-              <div key={p.id} onClick={() => setDetailsProduct(p)} className={`p-6 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 transition-colors cursor-pointer ${selectedIds.has(p.id) ? 'bg-indigo-50/30' : 'hover:bg-slate-50/30'}`}>
+              <div key={p.id} onClick={() => setDetailsProduct(p)} className={`p-6 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 transition-colors cursor-pointer ${selectedIds.includes(p.id) ? 'bg-indigo-50/30' : 'hover:bg-slate-50/30'}`}>
                 
                 <div className="flex items-start gap-4 flex-1">
-                  <button onClick={(e) => { e.stopPropagation(); toggleSelect(p.id); }} className="mt-1 focus:outline-none">
-                    {selectedIds.has(p.id) ? (
-                      <CheckSquare className="w-5 h-5 text-indigo-600" />
-                    ) : (
-                      <Square className="w-5 h-5 text-slate-300 hover:text-indigo-400" />
-                    )}
-                  </button>
+                  <div className="mt-1 flex items-center" onClick={(e) => e.stopPropagation()}>
+                    <input 
+                      type="checkbox"
+                      checked={selectedIds.includes(p.id)}
+                      onChange={() => toggleSelect(p.id)}
+                      className="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 cursor-pointer"
+                    />
+                  </div>
                   
                   <div>
                     <div className="flex items-center gap-3 mb-2">
@@ -596,7 +600,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
             </div>
           </div>
           <p className="text-center text-slate-600 text-base">
-            Möchtest du {deleteConfirmation.type === 'bulk' ? `die ${selectedIds.size} ausgewählten Einträge` : 'diesen Eintrag'} wirklich löschen? Du kannst sie später durch einen erneuten Import wieder abrufen.
+            Möchtest du {deleteConfirmation.type === 'bulk' ? `die ${selectedIds.length} ausgewählten Einträge` : 'diesen Eintrag'} wirklich löschen? Du kannst sie später durch einen erneuten Import wieder abrufen.
           </p>
           <div className="flex justify-center gap-3 pt-4 border-t border-slate-100">
             <button onClick={() => setDeleteConfirmation({ isOpen: false, type: 'single' })} className="px-6 py-2.5 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 transition-colors" disabled={isSubmitting}>
