@@ -130,7 +130,6 @@ export async function loginAction(
 
   await createSession(user.id, membership?.companyId ?? null)
 
-  const hdrs = await headers()
   await auditLog({
     userId: user.id,
     companyId: membership?.companyId,
