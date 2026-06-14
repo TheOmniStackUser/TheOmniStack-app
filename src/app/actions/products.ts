@@ -237,12 +237,23 @@ export async function bulkCreateProductsFromUnmapped(unmappedProductIds: string[
       const category = getCategoryFromPayload(unmapped.rawPayload);
       const brand = getBrandFromPayload(unmapped.rawPayload);
       
+      // Dynamically check for salePrice in rawPayload
+      let actualPrice = unmapped.price;
+      const payload: any = unmapped.rawPayload;
+      if (payload && typeof payload === 'object') {
+        if (payload.salePrice && payload.salePrice.amount !== undefined) {
+           actualPrice = String(payload.salePrice.amount);
+        } else if (payload.pricing && payload.pricing.salePrice && payload.pricing.salePrice.amount !== undefined) {
+           actualPrice = String(payload.pricing.salePrice.amount);
+        }
+      }
+      
       const [newProduct] = await db.insert(products).values({
         companyId: auth.activeCompanyId,
         sku: unmapped.marketplaceSku,
         title: unmapped.title,
         description: description || null,
-        price: unmapped.price || '0',
+        price: actualPrice || '0',
         currentStock: unmapped.stock || '0',
         ean: ean || null,
         msrp: originPrice || null,
