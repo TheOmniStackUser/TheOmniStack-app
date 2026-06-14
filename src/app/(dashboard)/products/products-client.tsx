@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react'
 import Link from 'next/link'
-import { Package, Search, ChevronUp, ChevronDown, ChevronRight, Scale, MapPin, Tag, FileText, Barcode, ExternalLink, Trash2 } from 'lucide-react'
+import { Package, Search, ChevronUp, ChevronDown, ChevronRight, Scale, MapPin, Tag, FileText, Barcode, ExternalLink, Trash2, Building2 } from 'lucide-react'
 import { DeleteProductButton } from './delete-button'
 import { useRouter } from 'next/navigation'
 
@@ -264,6 +264,10 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                                   <div className="flex justify-between items-center">
                                     <span className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5"><Barcode className="w-3.5 h-3.5"/> EAN</span>
                                     <span className="text-sm text-slate-900 font-mono">{product.ean || '-'}</span>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5"/> Marke</span>
+                                    <span className="text-sm text-slate-900">{product.brand || '-'}</span>
                                   </div>
                                   <div className="flex justify-between items-center">
                                     <span className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5"><Scale className="w-3.5 h-3.5"/> Gewicht</span>
