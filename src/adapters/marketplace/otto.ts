@@ -758,7 +758,7 @@ export class OttoAdapter implements MarketplaceAdapter {
           marketplaceProductId: sku,
           sku: sku,
           title: p.productTitle || p.title || p.productReference || sku,
-          price: p.standardPrice?.amount || p.price?.amount || p.pricing?.standardPrice?.amount,
+          price: p.salePrice?.amount || p.standardPrice?.amount || p.price?.amount || p.pricing?.standardPrice?.amount,
           stock: stockMap.get(sku),
           rawPayload: p
         }
