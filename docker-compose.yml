@@ -6,7 +6,7 @@ services:
     restart: always
     environment:
       POSTGRES_USER: admin
-      POSTGRES_PASSWORD: password123
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-supersecretpassword}
       POSTGRES_DB: billing_app
     ports:
       - "5432:5432"
@@ -17,6 +17,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: easybill_redis
+    command: redis-server --requirepass ${REDIS_PASSWORD:-supersecretpassword}
     ports:
       - "6379:6379"
 
@@ -29,7 +30,7 @@ services:
       - "9001:9001"
     environment:
       MINIO_ROOT_USER: admin
-      MINIO_ROOT_PASSWORD: password123
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-supersecretpassword}
     command: server /data --console-address ":9001"
 
   # S3 Initializer: Automatically create buckets on startup
@@ -39,7 +40,7 @@ services:
       - minio
     entrypoint: >
       /bin/sh -c "
-      until (/usr/bin/mc config host add myminio http://minio:9000 admin password123) do echo '...waiting...' && sleep 1; done;
+      until (/usr/bin/mc config host add myminio http://minio:9000 admin $${MINIO_ROOT_PASSWORD:-supersecretpassword}) do echo '...waiting...' && sleep 1; done;
       /usr/bin/mc mb --ignore-existing myminio/omnistack-documents;
       exit 0;
       "

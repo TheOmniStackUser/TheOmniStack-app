@@ -13,6 +13,8 @@ import { headers } from 'next/headers'
 import crypto from 'crypto'
 import { sendVerificationEmail } from '@/lib/email'
 
+const rateLimitMap = new Map<string, { count: number, resetAt: number }>()
+
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 const LoginSchema = z.object({
   email: z.string().email({ message: 'Bitte gib eine gültige E-Mail ein.' }).trim(),
@@ -53,6 +55,27 @@ export async function loginAction(
   }
 
   const { email, password } = validated.data
+
+  const hdrs = await headers()
+  const ip = hdrs.get('x-forwarded-for') ?? 'unknown'
+  const rateKey = `${ip}_${email.toLowerCase()}`
+  const now = Date.now()
+
+  if (Math.random() < 0.1) {
+    for (const [key, value] of rateLimitMap.entries()) {
+      if (now > value.resetAt) rateLimitMap.delete(key)
+    }
+  }
+
+  const limit = rateLimitMap.get(rateKey)
+  if (limit && now < limit.resetAt) {
+    if (limit.count >= 5) {
+      return { message: 'Zu viele Login-Versuche. Bitte versuche es in 15 Minuten erneut.' }
+    }
+    limit.count++
+  } else {
+    rateLimitMap.set(rateKey, { count: 1, resetAt: now + 15 * 60 * 1000 })
+  }
 
   const [user] = await db
     .select()

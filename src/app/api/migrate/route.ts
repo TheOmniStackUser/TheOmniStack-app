@@ -2,7 +2,12 @@ import { NextResponse } from 'next/server'
 import { db } from '@/db/client'
 import { sql } from 'drizzle-orm'
 
-export async function GET() {
+export async function GET(req: Request) {
+  const authHeader = req.headers.get('authorization')
+  if (!process.env.ADMIN_SECRET || authHeader !== `Bearer ${process.env.ADMIN_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   try {
     await db.execute(sql`
       ALTER TABLE company_members ADD COLUMN IF NOT EXISTS api_key text UNIQUE;

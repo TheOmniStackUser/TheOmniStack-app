@@ -362,7 +362,10 @@ export class AboutYouAdapter implements MarketplaceAdapter {
     }
   }
 
-  async fetchProducts(companyId: string): Promise<import('./base').MarketplaceProduct[]> {
+  async fetchProducts(
+    companyId: string,
+    onProgress?: (progress: number, total: number, message: string) => Promise<void>
+  ): Promise<import('./base').MarketplaceProduct[]> {
     console.log(`[AboutYouAdapter] Fetching products for company ${companyId}...`)
     try {
       const allProducts: any[] = []
@@ -391,7 +394,9 @@ export class AboutYouAdapter implements MarketplaceAdapter {
         console.warn(`[AboutYouAdapter] Failed to fetch brands mapping:`, e)
       }
 
+      let pageCount = 0
       while (nextUrl) {
+        pageCount++
         console.log(`[AboutYouAdapter] Fetching products page: ${nextUrl}`)
         const response: Response = await fetch(nextUrl, {
           method: 'GET',
@@ -410,6 +415,15 @@ export class AboutYouAdapter implements MarketplaceAdapter {
         const items = data.items || []
         allProducts.push(...items)
         console.log(`[AboutYouAdapter] Fetched ${items.length} raw products in this page (total so far: ${allProducts.length}).`)
+
+        if (onProgress) {
+          const totalItems = data.pagination?.total || allProducts.length
+          await onProgress(
+            allProducts.length,
+            totalItems,
+            `Lade Daten von About You... (Seite ${pageCount}, ${allProducts.length} von ${totalItems} Produkten)`
+          )
+        }
 
         // Pagination for AboutYou API is typically cursor-based
         if (data.pagination) {
