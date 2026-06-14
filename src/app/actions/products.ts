@@ -118,6 +118,10 @@ const getDescriptionFromPayload = (payload: any) => {
   if (!payload || typeof payload !== 'object') return null;
 
   if (payload.product_description) return payload.product_description;
+  if (payload.productDescription && typeof payload.productDescription === 'object') {
+    if (payload.productDescription.description) return payload.productDescription.description;
+    if (payload.productDescription.shortDescription) return payload.productDescription.shortDescription;
+  }
   if (payload.body_html) return payload.body_html;
   if (payload.short_description) return payload.short_description;
   // Fallback to generic description, though for Mirakl this might be the offer condition
@@ -128,6 +132,11 @@ const getDescriptionFromPayload = (payload: any) => {
 
 const getOriginPriceFromPayload = (payload: any) => {
   if (!payload || typeof payload !== 'object') return null;
+
+  // Otto v5 standard price
+  if (payload.standardPrice && payload.standardPrice.amount !== undefined) {
+    return String(payload.standardPrice.amount);
+  }
 
   if (payload.discount && payload.discount.origin_price !== undefined && payload.discount.origin_price !== null) {
     return String(payload.discount.origin_price);
@@ -154,6 +163,7 @@ const getOriginPriceFromPayload = (payload: any) => {
 const getCategoryFromPayload = (payload: any) => {
   if (!payload || typeof payload !== 'object') return null;
 
+  if (payload.productDescription && payload.productDescription.category) return payload.productDescription.category;
   if (payload.category_label) return payload.category_label;
   if (payload.category) return payload.category;
   if (payload.product_type) return payload.product_type;
@@ -163,6 +173,12 @@ const getCategoryFromPayload = (payload: any) => {
 
 const getBrandFromPayload = (payload: any) => {
   if (!payload || typeof payload !== 'object') return null;
+
+  if (payload.productDescription && payload.productDescription.brand) {
+    const b = payload.productDescription.brand;
+    if (typeof b === 'string') return b;
+    if (typeof b === 'object' && b.name) return String(b.name);
+  }
 
   if (payload.brand !== undefined && payload.brand !== null) {
      if (typeof payload.brand === 'string') return payload.brand;
