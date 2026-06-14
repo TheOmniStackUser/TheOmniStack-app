@@ -89,6 +89,7 @@ export const orders = pgTable('orders', {
   unqOrder: unique('unq_company_marketplace_order').on(t.companyId, t.marketplaceOrderId),
   companyActiveOrdersIdx: index('orders_company_active_idx').on(t.companyId, t.isArchived, t.status, t.marketplacePurchaseDate),
   companyOrdersCreatedAtIdx: index('orders_company_created_at_idx').on(t.companyId, t.createdAt),
+  ordersInvoiceIdIdx: index('orders_invoice_id_idx').on(t.invoiceId),
 }))
 
 // ─── Order Items ──────────────────────────────────────────────────────────────
@@ -104,7 +105,9 @@ export const orderItems = pgTable('order_items', {
   quantity: numeric('quantity', { precision: 10, scale: 0 }).notNull().default('1'),
   unitPrice: numeric('unit_price', { precision: 12, scale: 2 }).notNull(),
   taxRate: numeric('tax_rate', { precision: 5, scale: 4 }).notNull().default('0.19'),
-})
+}, (t) => ({
+  orderItemsOrderIdIdx: index('order_items_order_id_idx').on(t.orderId),
+}))
 
 // ─── Relations ────────────────────────────────────────────────────────────────
 export const ordersRelations = relations(orders, ({ one, many }) => ({

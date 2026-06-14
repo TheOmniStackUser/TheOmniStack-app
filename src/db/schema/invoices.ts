@@ -91,7 +91,9 @@ export const invoiceItems = pgTable('invoice_items', {
   unitPrice: numeric('unit_price', { precision: 12, scale: 2 }).notNull(),
   taxRate: numeric('tax_rate', { precision: 5, scale: 4 }).notNull().default('0.19'),
   lineTotal: numeric('line_total', { precision: 12, scale: 2 }).notNull(),
-})
+}, (t) => ({
+  invoiceItemsInvoiceIdIdx: index('invoice_items_invoice_id_idx').on(t.invoiceId),
+}))
 
 // ─── Invoice Logs ─────────────────────────────────────────────────────────────
 export const invoiceLogs = pgTable('invoice_logs', {
@@ -104,7 +106,9 @@ export const invoiceLogs = pgTable('invoice_logs', {
   action: text('action').notNull().default('edited'),
   note: text('note').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-})
+}, (t) => ({
+  invoiceLogsInvoiceIdIdx: index('invoice_logs_invoice_id_idx').on(t.invoiceId),
+}))
 
 // ─── Relations ────────────────────────────────────────────────────────────────
 export const invoicesRelations = relations(invoices, ({ one, many }) => ({
