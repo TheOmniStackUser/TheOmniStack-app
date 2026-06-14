@@ -643,6 +643,18 @@ export class OttoAdapter implements MarketplaceAdapter {
           }
           break
         }
+
+        const extractParam = (u: string, param: string) => {
+          try { return new URL(u).searchParams.get(param) } catch { return null }
+        }
+        
+        const nextCursor = extractParam(proposedNextUrl, 'cursor') || extractParam(proposedNextUrl, 'page') || extractParam(proposedNextUrl, 'offset')
+        const currentCursor = extractParam(nextUrl, 'cursor') || extractParam(nextUrl, 'page') || extractParam(nextUrl, 'offset')
+        
+        if (nextCursor && currentCursor && nextCursor === currentCursor) {
+          console.warn(`[OttoAdapter] Infinite loop detected (pagination param did not change: ${nextCursor}). Breaking.`)
+          break
+        }
         
         nextUrl = proposedNextUrl
       }
