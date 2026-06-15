@@ -195,8 +195,8 @@ export async function sendSyncNotificationEmail({
     const { data, error } = await resend.emails.send({
       from: DEFAULT_SENDER,
       to: [toEmail],
-      subject: `TheOmniStack - Automatischer Bestellabruf (${new Date().toLocaleDateString('de-DE')})`,
-      react: SyncNotificationEmail({ companyName, results, date: new Date().toLocaleString('de-DE') }),
+      subject: `TheOmniStack - Automatischer Bestellabruf (${new Date().toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin' })})`,
+      react: SyncNotificationEmail({ companyName, results, date: new Date().toLocaleString('de-DE', { timeZone: 'Europe/Berlin' }) }),
     })
 
     if (error) {

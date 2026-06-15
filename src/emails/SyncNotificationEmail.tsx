@@ -29,7 +29,7 @@ interface SyncNotificationEmailProps {
 export const SyncNotificationEmail = ({ 
   companyName = 'Deine Firma', 
   results = [],
-  date = new Date().toLocaleString('de-DE')
+  date = new Date().toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })
 }: SyncNotificationEmailProps) => {
   const allSuccess = results.every(r => r.success);
   const totalOrders = results.reduce((acc, curr) => acc + (curr.count || 0), 0);

@@ -43,6 +43,7 @@ export type MarketplaceSyncJobData = {
   toDate?: string
   integrationId?: string | null
   isInvoiceSync?: boolean
+  syncGroupId?: string
 }
 
 // ─── Lazy Redis Connection & Queue Initialization ─────────────────────────────
@@ -81,6 +82,42 @@ export const marketplaceSyncQueue = new Proxy({} as Queue<MarketplaceSyncJobData
     return val
   }
 })
+
+// ─── Unified Email Reporting Logic ───────────────────────────────────────────────
+async function reportChildResult(
+  companyId: string,
+  companyName: string,
+  syncNotificationEmail: string,
+  syncGroupId: string,
+  result: { marketplace: string; success: boolean; count?: number; error?: string }
+) {
+  const redis = getRedisConnection()
+  const groupKey = `sync-group:${companyId}:${syncGroupId}`
+  
+  // Store this child's result
+  await redis.hset(`${groupKey}:results`, result.marketplace, JSON.stringify(result))
+  
+  // Increment completed count
+  const doneCount = await redis.incr(`${groupKey}:done`)
+  const totalStr = await redis.get(`${groupKey}:total`)
+  const total = totalStr ? parseInt(totalStr, 10) : 0
+  
+  if (total > 0 && doneCount >= total) {
+    // All jobs are done! Fetch all results
+    const resultsMap = await redis.hgetall(`${groupKey}:results`)
+    const resultsArray = Object.values(resultsMap).map(v => JSON.parse(v))
+    
+    // Send unified email
+    await sendSyncNotificationEmail({
+      toEmail: syncNotificationEmail,
+      companyName,
+      results: resultsArray
+    })
+    
+    // Cleanup
+    await redis.del(`${groupKey}:total`, `${groupKey}:done`, `${groupKey}:results`)
+  }
+}
 
 // ─── Worker ───────────────────────────────────────────────────────────────────
 export function createMarketplaceSyncWorker() {
@@ -122,19 +159,42 @@ export function createMarketplaceSyncWorker() {
           company.fetchOrdersMarketplaces.includes(integration.id)
         )
 
-        for (const integration of toSync) {
-          await marketplaceSyncQueue.add(
-            `sync-${integration.type}`,
-            {
-              companyId,
-              marketplace: integration.type as any,
-              triggeredByUserId: null,
-              integrationId: integration.id,
-            },
-            {
-              jobId: `sync-${integration.type}-${integration.id}-${companyId}-${Date.now()}`
-            }
-          )
+        if (company.syncNotificationEmail) {
+          const syncGroupId = `daily-${Date.now()}`
+          const redis = getRedisConnection()
+          const groupKey = `sync-group:${companyId}:${syncGroupId}`
+          await redis.set(`${groupKey}:total`, toSync.length, 'EX', 86400) // 24h expire
+
+          for (const integration of toSync) {
+            await marketplaceSyncQueue.add(
+              `sync-${integration.type}`,
+              {
+                companyId,
+                marketplace: integration.type as any,
+                triggeredByUserId: null,
+                integrationId: integration.id,
+                syncGroupId,
+              },
+              {
+                jobId: `sync-${integration.type}-${integration.id}-${companyId}-${Date.now()}`
+              }
+            )
+          }
+        } else {
+          for (const integration of toSync) {
+            await marketplaceSyncQueue.add(
+              `sync-${integration.type}`,
+              {
+                companyId,
+                marketplace: integration.type as any,
+                triggeredByUserId: null,
+                integrationId: integration.id,
+              },
+              {
+                jobId: `sync-${integration.type}-${integration.id}-${companyId}-${Date.now()}`
+              }
+            )
+          }
         }
 
         return { success: true, message: `Dispatched daily sync for ${toSync.length} marketplaces.` }
@@ -332,11 +392,21 @@ export function createMarketplaceSyncWorker() {
           })
           
           if (companySettings?.syncNotificationEmail) {
-            await sendSyncNotificationEmail({
-              toEmail: companySettings.syncNotificationEmail,
-              companyName: companySettings.name,
-              results: [{ marketplace: marketplace || 'Unbekannt', success: true, count: rawOrders.length }]
-            })
+            if (job.data.syncGroupId) {
+              await reportChildResult(
+                companyId, 
+                companySettings.name, 
+                companySettings.syncNotificationEmail, 
+                job.data.syncGroupId, 
+                { marketplace: marketplace || 'Unbekannt', success: true, count: rawOrders.length }
+              )
+            } else {
+              await sendSyncNotificationEmail({
+                toEmail: companySettings.syncNotificationEmail,
+                companyName: companySettings.name,
+                results: [{ marketplace: marketplace || 'Unbekannt', success: true, count: rawOrders.length }]
+              })
+            }
           }
         }
         
@@ -357,11 +427,21 @@ export function createMarketplaceSyncWorker() {
           
           // Only send failure email on the LAST attempt to avoid spamming during retries
           if (companySettings?.syncNotificationEmail && job.attemptsMade >= (job.opts.attempts || 1) - 1) {
-            await sendSyncNotificationEmail({
-              toEmail: companySettings.syncNotificationEmail,
-              companyName: companySettings.name,
-              results: [{ marketplace: marketplace || 'Unbekannt', success: false, error: error instanceof Error ? error.message : String(error) }]
-            })
+            if (job.data.syncGroupId) {
+              await reportChildResult(
+                companyId, 
+                companySettings.name, 
+                companySettings.syncNotificationEmail, 
+                job.data.syncGroupId, 
+                { marketplace: marketplace || 'Unbekannt', success: false, error: error instanceof Error ? error.message : String(error) }
+              )
+            } else {
+              await sendSyncNotificationEmail({
+                toEmail: companySettings.syncNotificationEmail,
+                companyName: companySettings.name,
+                results: [{ marketplace: marketplace || 'Unbekannt', success: false, error: error instanceof Error ? error.message : String(error) }]
+              })
+            }
           }
         }
         throw error // Re-throw so BullMQ marks the job as failed and retries
