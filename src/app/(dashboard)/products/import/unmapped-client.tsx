@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import { Database, Search, Filter, Loader2, CheckSquare, Square, X, Info, AlertTriangle, Trash2, Download } from 'lucide-react'
-import { bulkCreateProductsFromUnmapped, deleteUnmappedProducts } from '@/app/actions/products'
+import { bulkCreateProductsFromUnmapped, deleteUnmappedProducts, searchProducts, mapUnmappedProductToExisting, getSuggestedProducts } from '@/app/actions/products'
 import { useRouter } from 'next/navigation'
 import { UnmappedMarketplaceProduct } from '@/db/schema/products'
 import { AlertModal } from '@/components/alert-modal'
@@ -127,9 +127,42 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
   const [detailsProduct, setDetailsProduct] = useState<UnmappedMarketplaceProduct | null>(null)
   const [alertState, setAlertState] = useState<{ isOpen: boolean; title?: string; message: string }>({ isOpen: false, message: '' })
   const [deleteConfirmation, setDeleteConfirmation] = useState<{ isOpen: boolean, type: 'single' | 'bulk', id?: string }>({ isOpen: false, type: 'single' })
+  const [mapConfirmation, setMapConfirmation] = useState<{ isOpen: boolean, product: UnmappedMarketplaceProduct | null }>({ isOpen: false, product: null })
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<any[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
+  const [suggestions, setSuggestions] = useState<any[]>([])
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
 
   // Local state for optimistic updates
   const [localProducts, setLocalProducts] = useState(unmappedProducts)
+
+  useEffect(() => {
+    if (!mapConfirmation.isOpen) {
+      setSearchQuery('')
+      setSearchResults([])
+      setSelectedProductId(null)
+      return
+    }
+
+    const timer = setTimeout(async () => {
+      if (searchQuery.length >= 2) {
+        setIsSearching(true)
+        try {
+          const results = await searchProducts(searchQuery)
+          setSearchResults(results)
+        } catch (e) {
+          console.error(e)
+        } finally {
+          setIsSearching(false)
+        }
+      } else {
+        setSearchResults([])
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery, mapConfirmation.isOpen])
 
   useEffect(() => {
     setLocalProducts(unmappedProducts)
@@ -262,8 +295,34 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
     }
   }
 
-  const handleMapSingle = (id: string) => {
-    showAlert('Die Mappen-Funktion (Suche nach bestehenden Produkten) wird in Kürze hinzugefügt. Bitte lege das Produkt vorerst neu an oder warte auf das Update.', 'Hinweis')
+  const handleMapSingle = async (product: UnmappedMarketplaceProduct) => {
+    setMapConfirmation({ isOpen: true, product })
+    setIsLoadingSuggestions(true)
+    setSuggestions([])
+    try {
+      const ean = getEanFromPayload(product.rawPayload)
+      const sugs = await getSuggestedProducts(product.marketplaceSku, ean)
+      setSuggestions(sugs)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setIsLoadingSuggestions(false)
+    }
+  }
+
+  const handleConfirmMap = async () => {
+    if (!mapConfirmation.product || !selectedProductId) return
+    setIsSubmitting(true)
+    try {
+      await mapUnmappedProductToExisting(mapConfirmation.product.id, selectedProductId)
+      setMapConfirmation({ isOpen: false, product: null })
+      router.refresh()
+    } catch (error) {
+      console.error(error)
+      showAlert('Fehler beim Mappen des Produkts', 'Fehler')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const handleExportCsv = () => {
@@ -465,7 +524,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
                   <button onClick={(e) => { e.stopPropagation(); setDeleteConfirmation({ isOpen: true, type: 'single', id: p.id }); }} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors focus:outline-none" title="Eintrag verwerfen">
                     <Trash2 className="w-5 h-5" />
                   </button>
-                  <button onClick={(e) => { e.stopPropagation(); handleMapSingle(p.id); }} className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-all font-semibold shadow-sm text-sm">
+                  <button onClick={(e) => { e.stopPropagation(); handleMapSingle(p); }} className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-all font-semibold shadow-sm text-sm">
                     Mappen
                   </button>
                   <button disabled={isSubmitting} onClick={(e) => { e.stopPropagation(); handleCreateSingle(p.id); }} className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-lg hover:from-emerald-400 hover:to-teal-400 transition-all font-semibold shadow-sm text-sm disabled:opacity-50">
@@ -612,6 +671,128 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
             </button>
             <button onClick={() => deleteConfirmation.type === 'bulk' ? handleBulkDelete() : deleteConfirmation.id && handleDeleteSingle(deleteConfirmation.id)} className="px-6 py-2.5 text-sm font-semibold text-white bg-rose-600 rounded-xl hover:bg-rose-700 shadow-sm shadow-rose-600/20 transition-all flex items-center gap-2" disabled={isSubmitting}>
               {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Löschen'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Mapping Modal */}
+      <Modal isOpen={mapConfirmation.isOpen} onClose={() => setMapConfirmation({ isOpen: false, product: null })} title="Produkt mappen">
+        <div className="space-y-6 text-sm">
+          {mapConfirmation.product && (
+            <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl mb-4">
+              <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Zu mappendes Produkt</p>
+              <div className="flex items-center gap-3">
+                <span className="px-2.5 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold rounded-md uppercase tracking-wider">
+                  {getMarketplaceDisplayName(mapConfirmation.product.marketplace)}
+                </span>
+                <span className="font-mono text-sm font-bold text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded">
+                  {mapConfirmation.product.marketplaceSku}
+                </span>
+              </div>
+              <h3 className="mt-2 text-base font-bold text-slate-900">{mapConfirmation.product.title}</h3>
+            </div>
+          )}
+
+          <div>
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Suche nach Stammprodukt (Name oder SKU)..."
+                className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-900 placeholder:text-slate-500 bg-white"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              {isSearching && (
+                <Loader2 className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 animate-spin" />
+              )}
+            </div>
+
+            <div className="mt-4 max-h-60 overflow-y-auto border border-slate-100 rounded-lg divide-y divide-slate-100 custom-scrollbar">
+              {searchQuery.length < 2 ? (
+                <>
+                  {isLoadingSuggestions ? (
+                    <div className="p-6 text-center text-slate-500 text-sm flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin"/> Lade Vorschläge...</div>
+                  ) : suggestions.length > 0 ? (
+                    <div>
+                      <div className="bg-indigo-50/50 px-3 py-2 text-xs font-semibold text-indigo-700 uppercase tracking-wider border-b border-indigo-100">
+                        Vorgeschlagene Produkte (SKU / EAN Match)
+                      </div>
+                      {suggestions.map(p => (
+                        <div 
+                          key={p.id} 
+                          onClick={() => setSelectedProductId(p.id)}
+                          className={`p-3 flex items-center justify-between cursor-pointer transition-colors ${selectedProductId === p.id ? 'bg-indigo-50/50' : 'hover:bg-slate-50/50'}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="mt-0.5 flex items-center">
+                              <input 
+                                type="radio"
+                                checked={selectedProductId === p.id}
+                                readOnly
+                                className="w-4 h-4 text-indigo-600 border-slate-300 focus:ring-indigo-600"
+                              />
+                            </div>
+                            <div>
+                              <div className="font-mono text-xs font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded inline-block mb-1">
+                                {p.sku}
+                              </div>
+                              <h4 className="text-sm font-semibold text-slate-900 line-clamp-1">{p.title}</h4>
+                            </div>
+                          </div>
+                          <div className="text-right text-xs text-slate-500">
+                            <div>Preis: {p.price} €</div>
+                            <div>Bestand: {p.currentStock}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-6 text-center text-slate-500 text-sm">Bitte gib mindestens 2 Zeichen ein, um zu suchen.</div>
+                  )}
+                </>
+              ) : searchResults.length === 0 ? (
+                <div className="p-6 text-center text-slate-500 text-sm">{isSearching ? 'Sucht...' : 'Keine Produkte gefunden.'}</div>
+              ) : (
+                searchResults.map(p => (
+                  <div 
+                    key={p.id} 
+                    onClick={() => setSelectedProductId(p.id)}
+                    className={`p-3 flex items-center justify-between cursor-pointer transition-colors ${selectedProductId === p.id ? 'bg-indigo-50/50' : 'hover:bg-slate-50/50'}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="mt-0.5 flex items-center">
+                        <input 
+                          type="radio"
+                          checked={selectedProductId === p.id}
+                          readOnly
+                          className="w-4 h-4 text-indigo-600 border-slate-300 focus:ring-indigo-600"
+                        />
+                      </div>
+                      <div>
+                        <div className="font-mono text-xs font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded inline-block mb-1">
+                          {p.sku}
+                        </div>
+                        <h4 className="text-sm font-semibold text-slate-900 line-clamp-1">{p.title}</h4>
+                      </div>
+                    </div>
+                    <div className="text-right text-xs text-slate-500">
+                      <div>Preis: {p.price} €</div>
+                      <div>Bestand: {p.currentStock}</div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+            <button onClick={() => setMapConfirmation({ isOpen: false, product: null })} className="px-6 py-2.5 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 transition-colors" disabled={isSubmitting}>
+              Abbrechen
+            </button>
+            <button onClick={handleConfirmMap} className="px-6 py-2.5 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 shadow-sm shadow-indigo-600/20 transition-all flex items-center gap-2 disabled:opacity-50" disabled={isSubmitting || !selectedProductId}>
+              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Mappen'}
             </button>
           </div>
         </div>

@@ -3,7 +3,7 @@
 import { requireAuth } from '@/lib/session'
 import { db } from '@/db/client'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
-import { eq, and, inArray } from 'drizzle-orm'
+import { eq, and, inArray, ilike, or } from 'drizzle-orm'
 import { products, productMappings, unmappedMarketplaceProducts } from '@/db/schema/products'
 import { revalidatePath } from 'next/cache'
 import { after } from 'next/server'
@@ -351,4 +351,109 @@ export async function getImportSyncStatus(integrationId: string) {
 
   const metadata = (integration.metadata as any) || {}
   return metadata.syncStatus || null
+}
+
+export async function searchProducts(query: string) {
+  const auth = await requireAuth()
+  if (!query) return []
+  
+  const results = await db
+    .select({
+      id: products.id,
+      sku: products.sku,
+      title: products.title,
+      price: products.price,
+      currentStock: products.currentStock,
+    })
+    .from(products)
+    .where(
+      and(
+        eq(products.companyId, auth.activeCompanyId),
+        or(
+          ilike(products.sku, `%${query}%`),
+          ilike(products.title, `%${query}%`)
+        )
+      )
+    )
+    .limit(20)
+    
+  return results
+}
+
+export async function getSuggestedProducts(sku: string, ean: string | null) {
+  const auth = await requireAuth()
+  if (!sku && !ean) return []
+  
+  const conditions = []
+  if (sku) conditions.push(eq(products.sku, sku))
+  if (ean) conditions.push(eq(products.ean, ean))
+  
+  if (conditions.length === 0) return []
+
+  const results = await db
+    .select({
+      id: products.id,
+      sku: products.sku,
+      title: products.title,
+      price: products.price,
+      currentStock: products.currentStock,
+    })
+    .from(products)
+    .where(
+      and(
+        eq(products.companyId, auth.activeCompanyId),
+        or(...conditions)
+      )
+    )
+    .limit(5)
+    
+  return results
+}
+
+export async function mapUnmappedProductToExisting(unmappedProductId: string, productId: string) {
+  const auth = await requireAuth()
+
+  const [unmapped] = await db
+    .select()
+    .from(unmappedMarketplaceProducts)
+    .where(
+      and(
+        eq(unmappedMarketplaceProducts.companyId, auth.activeCompanyId),
+        eq(unmappedMarketplaceProducts.id, unmappedProductId)
+      )
+    )
+    .limit(1)
+
+  if (!unmapped) throw new Error('Unmapped product not found.')
+
+  const [central] = await db
+    .select()
+    .from(products)
+    .where(
+      and(
+        eq(products.companyId, auth.activeCompanyId),
+        eq(products.id, productId)
+      )
+    )
+    .limit(1)
+
+  if (!central) throw new Error('Central product not found.')
+
+  await db.insert(productMappings).values({
+    companyId: auth.activeCompanyId,
+    productId: central.id,
+    marketplace: unmapped.marketplace,
+    marketplaceSku: unmapped.marketplaceSku,
+    marketplaceProductId: unmapped.marketplaceProductId,
+    syncStock: true,
+    syncPrice: false,
+  }).onConflictDoNothing()
+
+  await db.delete(unmappedMarketplaceProducts)
+    .where(eq(unmappedMarketplaceProducts.id, unmapped.id))
+
+  revalidatePath('/products')
+  revalidatePath('/products/import')
+  
+  return { success: true }
 }
