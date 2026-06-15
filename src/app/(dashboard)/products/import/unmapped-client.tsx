@@ -177,12 +177,14 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
       // Filter by marketplace
       if (marketplaceFilter !== 'all' && p.marketplace !== marketplaceFilter) return false
       
-      // Filter by search (title or sku)
+      // Filter by search (title, sku, or ean)
       if (search) {
         const q = search.toLowerCase()
-        const matchTitle = p.title.toLowerCase().includes(q)
-        const matchSku = p.marketplaceSku.toLowerCase().includes(q)
-        if (!matchTitle && !matchSku) return false
+        const matchTitle = p.title?.toLowerCase().includes(q) || false
+        const matchSku = p.marketplaceSku?.toLowerCase().includes(q) || false
+        const ean = getEanFromPayload(p.rawPayload)
+        const matchEan = ean ? String(ean).toLowerCase().includes(q) : false
+        if (!matchTitle && !matchSku && !matchEan) return false
       }
       return true
     })
@@ -345,7 +347,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Suche nach Name oder SKU..."
+              placeholder="Suche nach Name, SKU oder EAN..."
               className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-900 placeholder:text-slate-500 bg-white"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
