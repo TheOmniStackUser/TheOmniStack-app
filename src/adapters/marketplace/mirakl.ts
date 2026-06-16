@@ -947,26 +947,32 @@ export class MiraklAdapter implements MarketplaceAdapter {
       // 3. Put Refund
       const baseUrl = this.config.baseUrl.replace(/\/$/, '')
       let refundUrl = ''
+      let reasonUrl = ''
       if (baseUrl.includes('miraklconnect.com')) {
         if (baseUrl.endsWith('/v1')) {
           refundUrl = `${baseUrl}/orders/refund`
+          reasonUrl = `${baseUrl}/reasons/REFUND`
         } else {
           refundUrl = `${baseUrl}/api/v1/orders/refund`
+          reasonUrl = `${baseUrl}/api/v1/reasons/REFUND`
         }
       } else {
         if (baseUrl.endsWith('/api')) {
           refundUrl = `${baseUrl}/orders/refund`
+          reasonUrl = `${baseUrl}/reasons/REFUND`
         } else {
           refundUrl = `${baseUrl}/api/orders/refund`
+          reasonUrl = `${baseUrl}/api/reasons/REFUND`
         }
       }
       
       if (this.config.shopId) {
         refundUrl += `?shop_id=${this.config.shopId}`
+        reasonUrl += `?shop_id=${this.config.shopId}`
       }
 
       console.log(`[MiraklAdapter:${this.marketplace}] Sending refund to Mirakl via PUT ${refundUrl}...`)
-      const refundResponse = await fetch(refundUrl, {
+      let refundResponse = await fetch(refundUrl, {
         method: 'PUT',
         headers,
         body: JSON.stringify({ refunds })
@@ -974,8 +980,40 @@ export class MiraklAdapter implements MarketplaceAdapter {
 
       if (!refundResponse.ok) {
         const errText = await refundResponse.text()
-        console.error(`[MiraklAdapter:${this.marketplace}] Refund failed: ${refundResponse.status} - ${errText}`)
-        throw new Error(`Mirakl Refund API Error: ${errText}`)
+        console.warn(`[MiraklAdapter:${this.marketplace}] Refund failed with default reason: ${refundResponse.status} - ${errText}. Attempting to fetch valid reason codes...`)
+        
+        try {
+          console.log(`[MiraklAdapter:${this.marketplace}] Fetching valid reason codes via GET ${reasonUrl}...`)
+          const reasonRes = await fetch(reasonUrl, { method: 'GET', headers })
+          if (reasonRes.ok) {
+            const reasonData = await reasonRes.json()
+            if (reasonData.reasons && reasonData.reasons.length > 0) {
+              const validReason = reasonData.reasons.find((r: any) => r.code === '111' || r.code === '14' || r.label?.toLowerCase().includes('return')) || reasonData.reasons[0]
+              console.log(`[MiraklAdapter:${this.marketplace}] Found valid reason code: ${validReason.code} (${validReason.label}). Retrying refund...`)
+              
+              refunds.forEach(r => r.reason_code = validReason.code)
+              
+              refundResponse = await fetch(refundUrl, {
+                method: 'PUT',
+                headers,
+                body: JSON.stringify({ refunds })
+              })
+            } else {
+              console.warn(`[MiraklAdapter:${this.marketplace}] API returned no valid reason codes.`)
+            }
+          } else {
+             const rErr = await reasonRes.text()
+             console.warn(`[MiraklAdapter:${this.marketplace}] Failed to fetch reason codes: ${reasonRes.status} - ${rErr}`)
+          }
+        } catch(e) {
+          console.error(`[MiraklAdapter:${this.marketplace}] Exception fetching reason codes for fallback:`, e)
+        }
+
+        if (!refundResponse.ok) {
+          const errTextFinal = await refundResponse.text()
+          console.error(`[MiraklAdapter:${this.marketplace}] Refund failed after retry: ${refundResponse.status} - ${errTextFinal}`)
+          throw new Error(`Mirakl Refund API Error: ${errTextFinal || errText}`)
+        }
       }
 
       console.log(`[MiraklAdapter:${this.marketplace}] Refund processed successfully for order ${marketplaceOrderId}`)

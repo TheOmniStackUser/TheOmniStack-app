@@ -164,7 +164,12 @@ export async function getDocumentUrl(
   key: string,
   expiresInSeconds = 3600
 ): Promise<string> {
-  const command = new GetObjectCommand({ Bucket: BUCKET, Key: key })
+  const command = new GetObjectCommand({ 
+    Bucket: BUCKET, 
+    Key: key,
+    ResponseContentType: 'application/pdf',
+    ResponseContentDisposition: 'inline'
+  })
   return getSignedUrl(s3SigningClient, command, { expiresIn: expiresInSeconds })
 }
 
