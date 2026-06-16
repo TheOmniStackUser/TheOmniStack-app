@@ -157,8 +157,8 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                   <input type="text" name="sku" defaultValue={product.sku} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 placeholder:text-slate-500" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">EAN / Barcode</label>
-                  <input type="text" name="ean" defaultValue={product.ean || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 placeholder:text-slate-500" />
+                  <label className="text-sm font-semibold text-slate-700">EANs / Barcodes (kommagetrennt)</label>
+                  <textarea name="ean" rows={2} defaultValue={product.ean || ''} placeholder="Z.B. 4251439205740, 4251439205741" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all resize-none text-slate-900 placeholder:text-slate-500" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-slate-700">Kategorie</label>
