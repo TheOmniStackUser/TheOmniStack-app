@@ -1095,29 +1095,23 @@ export class MiraklAdapter implements MarketplaceAdapter {
 
       console.log(`[MiraklAdapter:${this.marketplace}] Marking return ${returnIdToReceive} as received...`)
       
-      const receiveUrl = `${baseUrl}/api/returns/${returnIdToReceive}/receive`
+      const receiveUrl = `${baseUrl}/api/returns/receive`
       let receiveOk = false
-      const receiveRes = await fetch(receiveUrl, { method: 'PUT', headers, body: JSON.stringify({}) })
+      const receivePayload = { returns: [{ id: returnIdToReceive }] }
+      const receiveRes = await fetch(receiveUrl, { method: 'PUT', headers, body: JSON.stringify(receivePayload) })
 
       if (!receiveRes.ok) {
         const errText = await receiveRes.text()
         console.warn(`[MiraklAdapter:${this.marketplace}] Failed to mark return ${returnIdToReceive} as received: ${receiveRes.status} - ${errText}`)
-        // Fallback to V1 endpoint format if needed
-        const fallbackUrl = `${baseUrl}/api/v1/returns/${returnIdToReceive}/receive`
-        const fallbackRes = await fetch(fallbackUrl, { method: 'PUT', headers, body: JSON.stringify({}) })
-        if (!fallbackRes.ok) {
-           console.error(`[MiraklAdapter:${this.marketplace}] Fallback also failed: ${fallbackRes.status}`)
-        } else {
-           receiveOk = true
-        }
       } else {
         receiveOk = true
       }
 
       if (receiveOk) {
         console.log(`[MiraklAdapter:${this.marketplace}] Marking return ${returnIdToReceive} as accepted (triggering refund)...`)
-        const acceptUrl = `${baseUrl}/api/returns/${returnIdToReceive}/accept`
-        const acceptRes = await fetch(acceptUrl, { method: 'PUT', headers, body: JSON.stringify({}) })
+        const acceptUrl = `${baseUrl}/api/returns/accept`
+        const acceptPayload = { returns: [{ id: returnIdToReceive, accepted: true }] }
+        const acceptRes = await fetch(acceptUrl, { method: 'PUT', headers, body: JSON.stringify(acceptPayload) })
         if (!acceptRes.ok) {
           console.warn(`[MiraklAdapter:${this.marketplace}] Failed to accept return ${returnIdToReceive}: ${acceptRes.status} - ${await acceptRes.text()}`)
         } else {
