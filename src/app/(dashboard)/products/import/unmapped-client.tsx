@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useDeferredValue } from 'react'
 import { Database, Search, Filter, Loader2, CheckSquare, Square, X, Info, AlertTriangle, Trash2, Download } from 'lucide-react'
 import { bulkCreateProductsFromUnmapped, deleteUnmappedProducts, searchProducts, mapUnmappedProductToExisting, getSuggestedProducts } from '@/app/actions/products'
 import { useRouter } from 'next/navigation'
@@ -137,6 +137,8 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
 
   // Local state for optimistic updates
   const [localProducts, setLocalProducts] = useState(unmappedProducts)
+  const deferredSearch = useDeferredValue(search)
+  const [displayCount, setDisplayCount] = useState(50)
 
   useEffect(() => {
     if (!mapConfirmation.isOpen) {
@@ -205,23 +207,33 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
     }))
   }, [localProducts, marketplaces])
 
+  const enrichedProducts = useMemo(() => {
+    return localProducts.map(p => ({
+      ...p,
+      parsedEan: getEanFromPayload(p.rawPayload)
+    }))
+  }, [localProducts])
+
   const filteredProducts = useMemo(() => {
-    return localProducts.filter(p => {
+    return enrichedProducts.filter(p => {
       // Filter by marketplace
       if (marketplaceFilter !== 'all' && p.marketplace !== marketplaceFilter) return false
       
       // Filter by search (title, sku, or ean)
-      if (search) {
-        const q = search.toLowerCase()
+      if (deferredSearch) {
+        const q = deferredSearch.toLowerCase()
         const matchTitle = p.title?.toLowerCase().includes(q) || false
         const matchSku = p.marketplaceSku?.toLowerCase().includes(q) || false
-        const ean = getEanFromPayload(p.rawPayload)
-        const matchEan = ean ? String(ean).toLowerCase().includes(q) : false
+        const matchEan = p.parsedEan ? String(p.parsedEan).toLowerCase().includes(q) : false
         if (!matchTitle && !matchSku && !matchEan) return false
       }
       return true
     })
-  }, [localProducts, search, marketplaceFilter])
+  }, [enrichedProducts, deferredSearch, marketplaceFilter])
+
+  useEffect(() => {
+    setDisplayCount(50)
+  }, [deferredSearch, marketplaceFilter])
 
   const toggleSelectAll = () => {
     if (selectedIds.length === filteredProducts.length && filteredProducts.length > 0) {
@@ -489,8 +501,8 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
               />
               <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider select-none">Alle auswählen</span>
             </div>
-            {filteredProducts.map((p) => (
-              <div key={p.id} onClick={() => setDetailsProduct(p)} className={`p-6 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 transition-colors cursor-pointer ${selectedIds.includes(p.id) ? 'bg-indigo-50/30' : 'hover:bg-slate-50/30'}`}>
+            {filteredProducts.slice(0, displayCount).map((p) => (
+              <div key={p.id} onClick={() => setDetailsProduct(p as any)} className={`p-6 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 transition-colors cursor-pointer ${selectedIds.includes(p.id) ? 'bg-indigo-50/30' : 'hover:bg-slate-50/30'}`}>
                 
                 <div className="flex items-start gap-4 flex-1">
                   <div className="mt-1 flex items-center">
@@ -524,7 +536,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
                   <button onClick={(e) => { e.stopPropagation(); setDeleteConfirmation({ isOpen: true, type: 'single', id: p.id }); }} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors focus:outline-none" title="Eintrag verwerfen">
                     <Trash2 className="w-5 h-5" />
                   </button>
-                  <button onClick={(e) => { e.stopPropagation(); handleMapSingle(p); }} className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-all font-semibold shadow-sm text-sm">
+                  <button onClick={(e) => { e.stopPropagation(); handleMapSingle(p as any); }} className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-all font-semibold shadow-sm text-sm">
                     Mappen
                   </button>
                   <button disabled={isSubmitting} onClick={(e) => { e.stopPropagation(); handleCreateSingle(p.id); }} className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-lg hover:from-emerald-400 hover:to-teal-400 transition-all font-semibold shadow-sm text-sm disabled:opacity-50">
@@ -533,6 +545,16 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
                 </div>
               </div>
             ))}
+            {filteredProducts.length > displayCount && (
+              <div className="p-6 text-center border-t border-slate-100 bg-slate-50/50">
+                <button 
+                  onClick={() => setDisplayCount(prev => prev + 50)} 
+                  className="px-6 py-2.5 bg-white border border-slate-300 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
+                >
+                  Weitere anzeigen ({filteredProducts.length - displayCount} verbleibend)
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
