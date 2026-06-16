@@ -452,6 +452,18 @@ export async function mapUnmappedProductToExisting(unmappedProductId: string, pr
     syncPrice: false,
   }).onConflictDoNothing()
 
+  const unmappedEan = getEanFromPayload(unmapped.rawPayload);
+  if (unmappedEan) {
+    const existingEans = central.ean ? central.ean.split(',').map((s: string) => s.trim()) : [];
+    if (!existingEans.includes(unmappedEan)) {
+      existingEans.push(unmappedEan);
+      await db.update(products).set({
+        ean: existingEans.join(', '),
+        updatedAt: new Date()
+      }).where(eq(products.id, central.id));
+    }
+  }
+
   await db.delete(unmappedMarketplaceProducts)
     .where(eq(unmappedMarketplaceProducts.id, unmapped.id))
 
