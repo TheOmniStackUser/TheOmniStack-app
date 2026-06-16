@@ -410,17 +410,23 @@ export async function executeRefund({
     const adapter = getAdapterForIntegration(integration)
     if (adapter && adapter.refundOrder) {
       try {
+        let receiveResult: boolean | 'ACCEPTED' = false
         if (adapter.receiveReturnItems) {
           console.log(`[RefundService] Attempting to mark return items as received on marketplace...`)
-          await adapter.receiveReturnItems(order.marketplaceOrderId, itemsToRefund, order.rawPayload)
+          receiveResult = await adapter.receiveReturnItems(order.marketplaceOrderId, itemsToRefund, order.rawPayload)
         }
 
-        console.log(`[RefundService] Triggering API refund for marketplace ${order.marketplace}...`)
-        apiSuccess = await adapter.refundOrder(
-          order.marketplaceOrderId,
-          itemsToRefund,
-          order.rawPayload
-        )
+        if (receiveResult === 'ACCEPTED') {
+          console.log(`[RefundService] Return was received and accepted (refunded) successfully via Returns API. Skipping Order Refund API.`)
+          apiSuccess = true
+        } else {
+          console.log(`[RefundService] Triggering API refund for marketplace ${order.marketplace}...`)
+          apiSuccess = await adapter.refundOrder(
+            order.marketplaceOrderId,
+            itemsToRefund,
+            order.rawPayload
+          )
+        }
         if (apiSuccess) {
           console.log(`[RefundService] API refund processed successfully on marketplace.`)
         } else {

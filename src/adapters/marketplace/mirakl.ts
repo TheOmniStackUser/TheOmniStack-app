@@ -1032,7 +1032,7 @@ export class MiraklAdapter implements MarketplaceAdapter {
     marketplaceOrderId: string,
     refundItems: { sku: string; quantity: number }[],
     rawOrderPayload?: unknown
-  ): Promise<boolean> {
+  ): Promise<boolean | 'ACCEPTED'> {
     try {
       const token = await this.getAccessToken()
       const headers: Record<string, string> = {
@@ -1054,28 +1054,39 @@ export class MiraklAdapter implements MarketplaceAdapter {
       }
 
       const baseUrl = this.config.baseUrl.replace(/\/$/, '')
-      let url = `${baseUrl}/api/returns?max=100&sort=date_created,DESC`
-      if (this.config.shopId) url += `&shop_id=${this.config.shopId}`
-
-      // We fetch recent open returns to find the one matching the order
+      
       const states = ['IN_PROGRESS', 'WAITING_RECEPTION', 'PENDING_RECEPTION', 'CREATED']
       let returnIdToReceive: string | null = null
+      let pageToken: string | null = null
+      let pageCount = 0
 
-      console.log(`[MiraklAdapter:${this.marketplace}] Fetching recent returns to find RMA for order ${marketplaceOrderId}...`)
-      const res = await fetch(url, { method: 'GET', headers })
+      console.log(`[MiraklAdapter:${this.marketplace}] Fetching open returns to find RMA for order ${marketplaceOrderId}...`)
       
-      if (res.ok) {
+      do {
+        pageCount++
+        let url = `${baseUrl}/api/returns?state=${states.join(',')}&limit=100`
+        if (this.config.shopId) url += `&shop_id=${this.config.shopId}`
+        if (pageToken) url += `&page_token=${encodeURIComponent(pageToken)}`
+
+        const res = await fetch(url, { method: 'GET', headers })
+        if (!res.ok) {
+          console.warn(`[MiraklAdapter:${this.marketplace}] Failed to fetch returns: ${res.status}`)
+          break
+        }
+        
         const data = await res.json()
-        const returns = data.returns || []
+        const returns = data.data || data.returns || []
         
         for (const r of returns) {
-          if (!states.includes(r.state)) continue
           if (r.order_id?.includes(marketplaceOrderId) || r.order_commercial_id?.includes(marketplaceOrderId)) {
             returnIdToReceive = r.id
             break
           }
         }
-      }
+        
+        if (returnIdToReceive || returns.length === 0) break
+        pageToken = data.next_page_token
+      } while (pageToken && pageCount < 20)
 
       if (!returnIdToReceive) {
         console.log(`[MiraklAdapter:${this.marketplace}] No open return found for order ${marketplaceOrderId}. Skipping receive step.`)
@@ -1085,6 +1096,7 @@ export class MiraklAdapter implements MarketplaceAdapter {
       console.log(`[MiraklAdapter:${this.marketplace}] Marking return ${returnIdToReceive} as received...`)
       
       const receiveUrl = `${baseUrl}/api/returns/${returnIdToReceive}/receive`
+      let receiveOk = false
       const receiveRes = await fetch(receiveUrl, { method: 'PUT', headers, body: JSON.stringify({}) })
 
       if (!receiveRes.ok) {
@@ -1095,12 +1107,26 @@ export class MiraklAdapter implements MarketplaceAdapter {
         const fallbackRes = await fetch(fallbackUrl, { method: 'PUT', headers, body: JSON.stringify({}) })
         if (!fallbackRes.ok) {
            console.error(`[MiraklAdapter:${this.marketplace}] Fallback also failed: ${fallbackRes.status}`)
-           return false
+        } else {
+           receiveOk = true
+        }
+      } else {
+        receiveOk = true
+      }
+
+      if (receiveOk) {
+        console.log(`[MiraklAdapter:${this.marketplace}] Marking return ${returnIdToReceive} as accepted (triggering refund)...`)
+        const acceptUrl = `${baseUrl}/api/returns/${returnIdToReceive}/accept`
+        const acceptRes = await fetch(acceptUrl, { method: 'PUT', headers, body: JSON.stringify({}) })
+        if (!acceptRes.ok) {
+          console.warn(`[MiraklAdapter:${this.marketplace}] Failed to accept return ${returnIdToReceive}: ${acceptRes.status} - ${await acceptRes.text()}`)
+        } else {
+          console.log(`[MiraklAdapter:${this.marketplace}] Return ${returnIdToReceive} accepted successfully!`)
+          return 'ACCEPTED'
         }
       }
 
-      console.log(`[MiraklAdapter:${this.marketplace}] Return ${returnIdToReceive} successfully marked as received.`)
-      return true
+      return receiveOk
     } catch (error) {
       console.error(`[MiraklAdapter:${this.marketplace}] Error receiving return items:`, error)
       return false

@@ -126,5 +126,5 @@ export interface MarketplaceAdapter {
     marketplaceOrderId: string,
     refundItems: { sku: string; quantity: number }[],
     rawOrderPayload?: unknown
-  ): Promise<boolean>
+  ): Promise<boolean | 'ACCEPTED'>
 }
