@@ -388,7 +388,7 @@ export async function getSuggestedProducts(sku: string, ean: string | null) {
   
   const conditions = []
   if (sku) conditions.push(eq(products.sku, sku))
-  if (ean) conditions.push(eq(products.ean, ean))
+  if (ean) conditions.push(ilike(products.ean, `%${ean}%`))
   
   if (conditions.length === 0) return []
 
@@ -458,5 +458,89 @@ export async function mapUnmappedProductToExisting(unmappedProductId: string, pr
   revalidatePath('/products')
   revalidatePath('/products/import')
   
+  return { success: true }
+}
+
+export async function getAutoMappableProducts() {
+  const auth = await requireAuth()
+
+  const unmapped = await db
+    .select()
+    .from(unmappedMarketplaceProducts)
+    .where(eq(unmappedMarketplaceProducts.companyId, auth.activeCompanyId))
+
+  if (unmapped.length === 0) return []
+
+  const unmappedWithKeys = unmapped.map(p => ({
+    ...p,
+    ean: getEanFromPayload(p.rawPayload)
+  }))
+
+  const eans = [...new Set(unmappedWithKeys.filter(p => !!p.ean).map(p => p.ean as string))]
+  const skus = [...new Set(unmappedWithKeys.map(p => p.marketplaceSku))]
+
+  const conditions = []
+  if (eans.length > 0) conditions.push(or(...eans.map(e => ilike(products.ean, `%${e}%`))))
+  if (skus.length > 0) conditions.push(inArray(products.sku, skus))
+  if (conditions.length === 0) return []
+
+  const existing = await db
+    .select({
+      id: products.id,
+      sku: products.sku,
+      title: products.title,
+      ean: products.ean,
+    })
+    .from(products)
+    .where(
+      and(
+        eq(products.companyId, auth.activeCompanyId),
+        or(...conditions)
+      )
+    )
+
+  const eanMap = new Map()
+  const skuMap = new Map()
+  for (const prod of existing) {
+    if (prod.ean) {
+      const prodEans = prod.ean.split(',').map((s: string) => s.trim())
+      for (const e of prodEans) {
+        if (!eanMap.has(e)) eanMap.set(e, prod)
+      }
+    }
+    if (prod.sku && !skuMap.has(prod.sku)) skuMap.set(prod.sku, prod)
+  }
+
+  const matches = []
+  for (const u of unmappedWithKeys) {
+    const match = skuMap.get(u.marketplaceSku) || (u.ean ? eanMap.get(u.ean) : null)
+    if (match) {
+      matches.push({
+        unmappedId: u.id,
+        unmappedSku: u.marketplaceSku,
+        unmappedTitle: u.title,
+        unmappedMarketplace: u.marketplace,
+        ean: u.ean,
+        matchedProductId: match.id,
+        matchedProductSku: match.sku,
+        matchedProductTitle: match.title,
+        matchReason: match.sku === u.marketplaceSku ? 'SKU' : 'EAN'
+      })
+    }
+  }
+
+  return matches
+}
+
+export async function bulkAutoMapProducts(mappings: { unmappedId: string, matchedProductId: string }[]) {
+  const auth = await requireAuth()
+
+  for (const mapping of mappings) {
+     try {
+       await mapUnmappedProductToExisting(mapping.unmappedId, mapping.matchedProductId)
+     } catch (err) {
+       console.error('Failed to auto-map:', err)
+     }
+  }
   return { success: true }
 }

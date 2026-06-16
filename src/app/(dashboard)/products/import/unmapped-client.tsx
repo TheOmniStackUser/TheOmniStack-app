@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useDeferredValue } from 'react'
 import { Database, Search, Filter, Loader2, CheckSquare, Square, X, Info, AlertTriangle, Trash2, Download } from 'lucide-react'
-import { bulkCreateProductsFromUnmapped, deleteUnmappedProducts, searchProducts, mapUnmappedProductToExisting, getSuggestedProducts } from '@/app/actions/products'
+import { bulkCreateProductsFromUnmapped, deleteUnmappedProducts, searchProducts, mapUnmappedProductToExisting, getSuggestedProducts, getAutoMappableProducts, bulkAutoMapProducts } from '@/app/actions/products'
 import { useRouter } from 'next/navigation'
 import { UnmappedMarketplaceProduct } from '@/db/schema/products'
 import { AlertModal } from '@/components/alert-modal'
@@ -134,6 +134,8 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
   const [suggestions, setSuggestions] = useState<any[]>([])
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
+  
+  const [autoMapState, setAutoMapState] = useState<{ isOpen: boolean, matches: any[], isLoading: boolean }>({ isOpen: false, matches: [], isLoading: false })
 
   // Local state for optimistic updates
   const [localProducts, setLocalProducts] = useState(unmappedProducts)
@@ -398,6 +400,37 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
     document.body.removeChild(link)
   }
 
+  const handleOpenAutoMap = async () => {
+    setAutoMapState({ isOpen: true, matches: [], isLoading: true })
+    try {
+      const matches = await getAutoMappableProducts()
+      setAutoMapState({ isOpen: true, matches, isLoading: false })
+    } catch (e) {
+      console.error(e)
+      setAutoMapState({ isOpen: false, matches: [], isLoading: false })
+      showAlert('Fehler beim Suchen nach Auto-Map Vorschlägen.', 'Fehler')
+    }
+  }
+
+  const handleConfirmAutoMap = async () => {
+    if (autoMapState.matches.length === 0) return
+    setIsSubmitting(true)
+    try {
+      await bulkAutoMapProducts(autoMapState.matches.map(m => ({
+        unmappedId: m.unmappedId,
+        matchedProductId: m.matchedProductId
+      })))
+      setAutoMapState({ isOpen: false, matches: [], isLoading: false })
+      router.refresh()
+      showAlert(`${autoMapState.matches.length} Produkte wurden erfolgreich gemappt!`, 'Erfolg')
+    } catch (e) {
+      console.error(e)
+      showAlert('Fehler beim Auto-Mappen der Produkte.', 'Fehler')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   return (
     <>
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mt-8">
@@ -439,13 +472,22 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
             </select>
           </div>
           
-          <button
-            onClick={handleExportCsv}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-all font-semibold shadow-sm text-sm ml-auto"
-          >
-            <Download className="w-4 h-4" />
-            CSV Export
-          </button>
+          <div className="flex gap-2 w-full sm:w-auto ml-auto">
+            <button
+              onClick={handleOpenAutoMap}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 hover:border-indigo-300 transition-all font-semibold shadow-sm text-sm"
+            >
+              <CheckSquare className="w-4 h-4" />
+              Auto-Map
+            </button>
+            <button
+              onClick={handleExportCsv}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-all font-semibold shadow-sm text-sm"
+            >
+              <Download className="w-4 h-4" />
+              CSV Export
+            </button>
+          </div>
         </div>
 
         {selectedIds.length > 0 && (
@@ -841,6 +883,73 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
               {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Mappen'}
             </button>
           </div>
+        </div>
+      </Modal>
+
+      {/* Auto-Map Modal */}
+      <Modal isOpen={autoMapState.isOpen} onClose={() => setAutoMapState({ isOpen: false, matches: [], isLoading: false })} title="Automatisches Mapping">
+        <div className="space-y-6 text-sm">
+          {autoMapState.isLoading ? (
+            <div className="p-12 text-center text-slate-500 flex flex-col items-center justify-center gap-3">
+              <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+              <p>Suche nach übereinstimmenden SKUs und EANs...</p>
+            </div>
+          ) : autoMapState.matches.length === 0 ? (
+            <div className="p-12 text-center text-slate-500 flex flex-col items-center justify-center gap-3">
+              <Info className="w-8 h-8 text-slate-300" />
+              <p>Keine übereinstimmenden Produkte gefunden.</p>
+              <p className="text-xs max-w-sm">Es wurden keine ungemappten Produkte gefunden, deren EAN oder SKU mit einem bestehenden Stammprodukt übereinstimmt.</p>
+            </div>
+          ) : (
+            <>
+              <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-xl text-indigo-800">
+                <p className="font-semibold text-base mb-1">
+                  {autoMapState.matches.length} Produkte können automatisch gemappt werden!
+                </p>
+                <p className="text-indigo-600">
+                  Diese ungemappten Produkte haben eine EAN oder SKU, die exakt mit einem deiner Stammprodukte übereinstimmt.
+                </p>
+              </div>
+
+              <div className="max-h-60 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100 custom-scrollbar">
+                {autoMapState.matches.map((m, i) => (
+                  <div key={i} className="p-4 bg-white flex flex-col gap-2">
+                    <div className="flex items-center gap-2">
+                       <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-bold rounded uppercase tracking-wider">
+                         {getMarketplaceDisplayName(m.unmappedMarketplace)}
+                       </span>
+                       <span className="font-bold text-slate-900">{m.unmappedTitle}</span>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs text-slate-500">
+                      <div>
+                        <span className="font-semibold uppercase">Von SKU: </span>
+                        <span className="font-mono">{m.unmappedSku}</span>
+                      </div>
+                      <div className="flex-1 border-t border-dashed border-slate-300 relative top-0.5"></div>
+                      <div className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-semibold text-[10px] uppercase">
+                        {m.matchReason} Match
+                      </div>
+                      <div className="flex-1 border-t border-dashed border-slate-300 relative top-0.5"></div>
+                      <div>
+                        <span className="font-semibold uppercase">Zu SKU: </span>
+                        <span className="font-mono">{m.matchedProductSku}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                <button onClick={() => setAutoMapState({ isOpen: false, matches: [], isLoading: false })} className="px-6 py-2.5 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 transition-colors" disabled={isSubmitting}>
+                  Abbrechen
+                </button>
+                <button onClick={handleConfirmAutoMap} className="px-6 py-2.5 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 shadow-sm shadow-indigo-600/20 transition-all flex items-center gap-2" disabled={isSubmitting}>
+                  {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckSquare className="w-4 h-4" />}
+                  Alle {autoMapState.matches.length} Produkte mappen
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </Modal>
     </>
