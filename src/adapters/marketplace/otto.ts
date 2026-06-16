@@ -15,6 +15,13 @@ export type OttoAdapterConfig = {
   connectionType?: 'service_partner' | 'private'
 }
 
+interface TokenCacheEntry {
+  token: string;
+  expiresAt: number;
+}
+const tokenCache = new Map<string, TokenCacheEntry>();
+const tokenPromiseCache = new Map<string, Promise<string>>();
+
 export class OttoAdapter implements MarketplaceAdapter {
   readonly marketplace = 'otto' as const
 
@@ -35,6 +42,27 @@ export class OttoAdapter implements MarketplaceAdapter {
    * Exchanges the Client ID and Secret for a short-lived Access Token
    */
   private async getAccessToken(): Promise<string> {
+    const cacheKey = `${this.config.clientId}-${this.config.installationId || 'no-install'}-${this.config.connectionType || 'service_partner'}`;
+
+    const cached = tokenCache.get(cacheKey);
+    // Buffer of 10 seconds
+    if (cached && cached.expiresAt > Date.now() + 10000) {
+      return cached.token;
+    }
+
+    if (tokenPromiseCache.has(cacheKey)) {
+      return tokenPromiseCache.get(cacheKey)!;
+    }
+
+    const promise = this._fetchAccessToken(cacheKey).finally(() => {
+      tokenPromiseCache.delete(cacheKey);
+    });
+
+    tokenPromiseCache.set(cacheKey, promise);
+    return promise;
+  }
+
+  private async _fetchAccessToken(cacheKey: string): Promise<string> {
     const isPrivate = this.config.connectionType === 'private'
     const tokenClientId = this.config.clientId
     const tokenClientSecret = this.config.clientSecret
@@ -60,6 +88,7 @@ export class OttoAdapter implements MarketplaceAdapter {
 
     if (!response.ok) {
       const errText = await response.text()
+      
       // If the user misconfigured private vs service_partner, try fallback
       if (response.status === 400 && errText.includes('invalid_scope')) {
          console.warn(`[OttoAdapter] Invalid scope '${scope}', attempting fallback...`)
@@ -79,10 +108,15 @@ export class OttoAdapter implements MarketplaceAdapter {
 
     const data = await response.json()
     const developerToken = data.access_token
+    const devExpiresIn = data.expires_in || 300 // default 5 mins
 
     // If this is a Private App, the developer token is all we need
     if (this.config.connectionType === 'private') {
       console.log(`[OttoAdapter] Using Private App flow. Dev Token is fully authorized.`)
+      tokenCache.set(cacheKey, {
+        token: developerToken,
+        expiresAt: Date.now() + (devExpiresIn * 1000)
+      })
       return developerToken
     }
 
@@ -112,8 +146,20 @@ export class OttoAdapter implements MarketplaceAdapter {
 
       const installData = await installResponse.json()
       console.log('[OttoAdapter] Successfully fetched installation access token!')
+      const installExpiresIn = installData.expires_in || 300
+      
+      tokenCache.set(cacheKey, {
+        token: installData.access_token,
+        expiresAt: Date.now() + (installExpiresIn * 1000)
+      })
+      
       return installData.access_token
     }
+
+    tokenCache.set(cacheKey, {
+      token: developerToken,
+      expiresAt: Date.now() + (devExpiresIn * 1000)
+    })
 
     return developerToken
   }
@@ -148,7 +194,8 @@ export class OttoAdapter implements MarketplaceAdapter {
         })
 
         if (!res.ok) {
-          const errText = await res.text()
+          let errText = await res.text()
+          if (errText.includes('<html')) errText = 'HTML Gateway Error (e.g. Rate Limit / 429)'
           throw new Error(`[OttoAdapter] Failed to fetch orders: ${res.status} - ${errText}`)
         }
 

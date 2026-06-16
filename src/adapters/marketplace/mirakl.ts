@@ -784,15 +784,15 @@ export class MiraklAdapter implements MarketplaceAdapter {
       let url = ''
       if (baseUrl.includes('miraklconnect.com')) {
         if (baseUrl.endsWith('/v1')) {
-          url = `${baseUrl}/returns?return_state=REFUNDED&max=100`
+          url = `${baseUrl}/returns?max=100`
         } else {
-          url = `${baseUrl}/api/v1/returns?return_state=REFUNDED&max=100`
+          url = `${baseUrl}/api/v1/returns?max=100`
         }
       } else {
         if (baseUrl.endsWith('/api')) {
-          url = `${baseUrl}/returns?return_state=REFUNDED&max=100`
+          url = `${baseUrl}/returns?max=100`
         } else {
-          url = `${baseUrl}/api/returns?return_state=REFUNDED&max=100`
+          url = `${baseUrl}/api/returns?max=100`
         }
       }
 
@@ -814,8 +814,9 @@ export class MiraklAdapter implements MarketplaceAdapter {
 
       const data = await response.json()
       const returns = data.returns || []
-      console.log(`[MiraklAdapter:${this.marketplace}] Fetched ${returns.length} returns.`)
-      return returns
+      const refundedReturns = returns.filter((r: any) => r.state === 'REFUNDED' || r.state === 'CLOSED')
+      console.log(`[MiraklAdapter:${this.marketplace}] Fetched ${returns.length} returns. ${refundedReturns.length} are refunded/closed.`)
+      return refundedReturns
     } catch (error) {
       console.error(`[MiraklAdapter:${this.marketplace}] Error fetching returns:`, error)
       throw error
