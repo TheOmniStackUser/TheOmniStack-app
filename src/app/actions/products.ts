@@ -364,6 +364,7 @@ export async function searchProducts(query: string) {
       title: products.title,
       price: products.price,
       currentStock: products.currentStock,
+      ean: products.ean,
     })
     .from(products)
     .where(
@@ -371,7 +372,8 @@ export async function searchProducts(query: string) {
         eq(products.companyId, auth.activeCompanyId),
         or(
           ilike(products.sku, `%${query}%`),
-          ilike(products.title, `%${query}%`)
+          ilike(products.title, `%${query}%`),
+          ilike(products.ean, `%${query}%`)
         )
       )
     )
@@ -397,6 +399,7 @@ export async function getSuggestedProducts(sku: string, ean: string | null) {
       title: products.title,
       price: products.price,
       currentStock: products.currentStock,
+      ean: products.ean,
     })
     .from(products)
     .where(

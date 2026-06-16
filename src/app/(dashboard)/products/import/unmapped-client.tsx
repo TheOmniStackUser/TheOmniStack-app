@@ -679,20 +679,34 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
       {/* Mapping Modal */}
       <Modal isOpen={mapConfirmation.isOpen} onClose={() => setMapConfirmation({ isOpen: false, product: null })} title="Produkt mappen">
         <div className="space-y-6 text-sm">
-          {mapConfirmation.product && (
-            <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl mb-4">
-              <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Zu mappendes Produkt</p>
-              <div className="flex items-center gap-3">
-                <span className="px-2.5 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold rounded-md uppercase tracking-wider">
-                  {getMarketplaceDisplayName(mapConfirmation.product.marketplace)}
-                </span>
-                <span className="font-mono text-sm font-bold text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded">
-                  {mapConfirmation.product.marketplaceSku}
-                </span>
+          {mapConfirmation.product && (() => {
+            const ean = getEanFromPayload(mapConfirmation.product.rawPayload);
+            return (
+              <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl mb-4">
+                <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Zu mappendes Produkt</p>
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="px-2.5 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold rounded-md uppercase tracking-wider">
+                    {getMarketplaceDisplayName(mapConfirmation.product.marketplace)}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500 font-semibold uppercase">SKU:</span>
+                    <span className="font-mono text-sm font-bold text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded">
+                      {mapConfirmation.product.marketplaceSku}
+                    </span>
+                  </div>
+                  {ean && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-500 font-semibold uppercase">EAN:</span>
+                      <span className="font-mono text-sm font-bold text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded">
+                        {ean}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <h3 className="mt-2 text-base font-bold text-slate-900">{mapConfirmation.product.title}</h3>
               </div>
-              <h3 className="mt-2 text-base font-bold text-slate-900">{mapConfirmation.product.title}</h3>
-            </div>
-          )}
+            );
+          })()}
 
           <div>
             <div className="relative">
@@ -738,6 +752,11 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
                               <div className="font-mono text-xs font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded inline-block mb-1">
                                 {p.sku}
                               </div>
+                              {p.ean && (
+                                <div className="ml-2 font-mono text-xs font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded inline-block mb-1">
+                                  EAN: {p.ean}
+                                </div>
+                              )}
                               <h4 className="text-sm font-semibold text-slate-900 line-clamp-1">{p.title}</h4>
                             </div>
                           </div>
@@ -774,6 +793,11 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
                         <div className="font-mono text-xs font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded inline-block mb-1">
                           {p.sku}
                         </div>
+                        {p.ean && (
+                          <div className="ml-2 font-mono text-xs font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded inline-block mb-1">
+                            EAN: {p.ean}
+                          </div>
+                        )}
                         <h4 className="text-sm font-semibold text-slate-900 line-clamp-1">{p.title}</h4>
                       </div>
                     </div>
