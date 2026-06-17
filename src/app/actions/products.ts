@@ -360,13 +360,38 @@ export async function searchProducts(query: string) {
   const terms = query.trim().split(/\s+/).filter(Boolean)
   if (terms.length === 0) return []
 
-  const searchConditions = terms.map(term => 
-    or(
-      ilike(products.sku, `%${term}%`),
-      ilike(products.title, `%${term}%`),
-      ilike(products.ean, `%${term}%`)
-    )
-  )
+  let validProductIds: string[] | null = null
+
+  for (const term of terms) {
+    const termMatches = await db
+      .select({ id: products.id })
+      .from(products)
+      .leftJoin(productMappings, eq(products.id, productMappings.productId))
+      .where(
+        and(
+          eq(products.companyId, auth.activeCompanyId),
+          or(
+            ilike(products.sku, `%${term}%`),
+            ilike(products.title, `%${term}%`),
+            ilike(products.ean, `%${term}%`),
+            ilike(productMappings.marketplaceSku, `%${term}%`),
+            ilike(productMappings.ean, `%${term}%`)
+          )
+        )
+      )
+    
+    const ids = [...new Set(termMatches.map(m => m.id))]
+    
+    if (validProductIds === null) {
+      validProductIds = ids
+    } else {
+      validProductIds = validProductIds.filter(id => ids.includes(id))
+    }
+    
+    if (validProductIds.length === 0) break
+  }
+
+  if (!validProductIds || validProductIds.length === 0) return []
 
   const results = await db
     .select({
@@ -378,14 +403,8 @@ export async function searchProducts(query: string) {
       ean: products.ean,
     })
     .from(products)
-    .where(
-      and(
-        eq(products.companyId, auth.activeCompanyId),
-        ...searchConditions
-      )
-    )
-    .limit(20)
-    
+    .where(inArray(products.id, validProductIds.slice(0, 20)))
+
   return results
 }
 
@@ -449,6 +468,9 @@ export async function mapUnmappedProductToExisting(unmappedProductId: string, pr
 
   if (!central) throw new Error('Central product not found.')
 
+  const unmappedEan = getEanFromPayload(unmapped.rawPayload);
+
+  // Create mapping
   await db.insert(productMappings).values({
     companyId: auth.activeCompanyId,
     productId: central.id,
@@ -457,9 +479,9 @@ export async function mapUnmappedProductToExisting(unmappedProductId: string, pr
     marketplaceProductId: unmapped.marketplaceProductId,
     syncStock: true,
     syncPrice: false,
+    ean: unmappedEan || null,
   }).onConflictDoNothing()
 
-  const unmappedEan = getEanFromPayload(unmapped.rawPayload);
   if (unmappedEan) {
     const existingEans = central.ean ? central.ean.split(',').map((s: string) => s.trim()) : [];
     if (!existingEans.includes(unmappedEan)) {

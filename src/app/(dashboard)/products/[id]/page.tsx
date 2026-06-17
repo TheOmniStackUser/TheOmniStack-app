@@ -238,7 +238,14 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                         <span className="uppercase text-xs font-bold tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
                           {getMarketplaceName(mapping.marketplace)}
                         </span>
-                        <p className="font-mono text-sm font-bold text-slate-700 mt-1">{mapping.marketplaceSku}</p>
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          <p className="font-mono text-sm font-bold text-slate-700">{mapping.marketplaceSku}</p>
+                          {mapping.ean && (
+                            <span className="text-[10px] font-mono font-bold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded uppercase tracking-wide border border-slate-200">
+                              EAN: {mapping.ean}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <button className="text-rose-400 hover:text-rose-600 p-1 bg-rose-50 hover:bg-rose-100 rounded transition-colors">
                         <Trash2 className="w-4 h-4" />

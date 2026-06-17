@@ -58,6 +58,18 @@ Die Logistik-Adapter übernehmen die automatisierte Label-Erstellung.
 *   **Hermes:** Sichere Anbindung über das Hermes HSI-Portal via OAuth.
 *   **Routing-Logik:** Die Plattform entscheidet intelligent pro Marktplatz (z.B. bei Otto), ob dem Paket ein Retouren-Label beigelegt werden muss oder ob der Marktplatz die Retoure eigenständig abwickelt.
 
+### 4.3 Retourenmanagement (Returns Processing)
+Die Plattform bietet ein zentralisiertes Retourenmanagement zur effizienten Rückabwicklung von Bestellungen.
+*   **Retouren-Erfassung:** Automatischer und manueller Import von Kundenretouren über alle angebundenen Verkaufskanäle.
+*   **Zustandsprüfung & Erstattung:** Workflow-gestützte Prüfung der retournierten Artikel und automatisierte Auslösung der Rückerstattung (Refund) über die entsprechenden Marktplatz- oder Shop-APIs.
+*   **Status-Synchronisation:** Kontinuierliche Übermittlung des Retourenstatus an den ursprünglichen Verkaufskanal.
+
+### 4.4 Warenwirtschaft & Bestandsmanagement (Inventory Management)
+TheOmniStack verfügt über ein integriertes Warenwirtschaftssystem (Wawi) zur plattformübergreifenden Bestandsführung.
+*   **Zentraler Artikelstamm:** Verwaltung aller Produktdaten, EANs, SKUs und Preise in einer zentralen Datenbank.
+*   **Echtzeit-Bestandssynchronisation:** Automatischer Abgleich der Lagerbestände über alle angebundenen Marktplätze und Shops hinweg. Sobald ein Artikel verkauft wird, reduziert das System den Bestand auf allen anderen Kanälen, um Überverkäufe zu vermeiden.
+*   **Lagerbuchungen:** Lückenlose Protokollierung aller Wareneingänge, Warenausgänge und manuellen Korrekturen für maximale Transparenz.
+
 ---
 
 ## 5. Sicherheit & Datenschutz (Compliance)

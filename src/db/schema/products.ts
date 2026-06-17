@@ -72,6 +72,7 @@ export const productMappings = pgTable('product_mappings', {
   marketplace: marketplaceEnum('marketplace').notNull(),
   marketplaceSku: text('marketplace_sku').notNull(),
   marketplaceProductId: text('marketplace_product_id'), // Some marketplaces have an internal ID (e.g. Shopify Item ID)
+  ean: text('ean'),
   
   // Sync Configuration
   syncStock: boolean('sync_stock').notNull().default(true),

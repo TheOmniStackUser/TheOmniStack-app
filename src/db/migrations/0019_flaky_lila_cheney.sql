@@ -1,0 +1,1 @@
+ALTER TABLE "product_mappings" ADD COLUMN "ean" text;
