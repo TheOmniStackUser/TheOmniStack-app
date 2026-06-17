@@ -55,13 +55,17 @@ function StockEditor({ product }: { product: Product }) {
   if (!isEditing) {
     return (
       <div 
-        className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-1 -ml-1 rounded transition-colors group"
-        onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
-        title="Klicken zum Bearbeiten"
+        className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-1.5 -ml-1.5 rounded-md transition-colors group w-fit"
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsEditing(true); }}
+        title="Bestand bearbeiten"
       >
         <div className={`w-2 h-2 rounded-full ${Number(product.currentStock) > 0 ? 'bg-emerald-400' : 'bg-rose-400'}`} />
-        <span className="font-semibold text-slate-700 border-b border-transparent group-hover:border-slate-300 border-dashed transition-colors">{product.currentStock}</span>
-        {isSaving && <Loader2 className="w-3 h-3 animate-spin text-slate-400" />}
+        <span className="font-semibold text-slate-700 border-b border-slate-300 border-dashed">{product.currentStock}</span>
+        {isSaving ? (
+          <Loader2 className="w-3 h-3 animate-spin text-slate-400" />
+        ) : (
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+        )}
       </div>
     )
   }
