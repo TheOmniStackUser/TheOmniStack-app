@@ -1,9 +1,9 @@
 import { requireAuth } from '@/lib/session'
 import { db } from '@/db/client'
-import { products } from '@/db/schema/products'
+import { products, productMappings } from '@/db/schema/products'
 import { eq, isNull } from 'drizzle-orm'
 import Link from 'next/link'
-import { Plus, Package, Settings, ServerCrash } from 'lucide-react'
+import { Plus, Package, Settings, ServerCrash, AlertTriangle } from 'lucide-react'
 import { CsvActions } from './csv-actions'
 import { ProductsClient } from './products-client'
 
@@ -14,17 +14,18 @@ export const metadata = {
 export default async function ProductsPage() {
   const auth = await requireAuth()
 
-  // Fetch parent products or standalone products
-  const productList = await db
-    .select()
-    .from(products)
-    .where(
-      eq(products.companyId, auth.activeCompanyId)
-    )
-    .orderBy(products.createdAt)
+  try {
+    // Fetch parent products or standalone products
+    const productList = await db
+      .select()
+      .from(products)
+      .where(
+        eq(products.companyId, auth.activeCompanyId)
+      )
+      .orderBy(products.createdAt)
 
-  // Fetch all mappings to include their SKUs and EANs in the client search
-  const { productMappings } = await import('@/db/schema/products')
+    // Fetch all mappings to include their SKUs and EANs in the client search
+
   const allMappings = await db
     .select({
       productId: productMappings.productId,
@@ -87,4 +88,24 @@ export default async function ProductsPage() {
       <ProductsClient initialProducts={productsWithMappings} />
     </div>
   )
+  } catch (error: any) {
+    return (
+      <div className="max-w-7xl mx-auto p-8 animate-in fade-in">
+        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-6 text-rose-900">
+          <div className="flex items-center gap-3 mb-4">
+            <AlertTriangle className="w-8 h-8 text-rose-500" />
+            <h1 className="text-2xl font-bold">Ladefehler auf der Produkte-Seite</h1>
+          </div>
+          <p className="mb-4">
+            Beim Laden der Daten ist ein Fehler aufgetreten. Bitte senden Sie diesen Fehler an den Support:
+          </p>
+          <pre className="bg-white/50 p-4 rounded-xl text-sm overflow-auto border border-rose-100">
+            {error?.message || String(error)}
+            {'\n'}
+            {error?.stack}
+          </pre>
+        </div>
+      </div>
+    )
+  }
 }
