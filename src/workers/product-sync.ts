@@ -14,7 +14,7 @@ async function updateSyncStatus(integrationId: string, status: { isRunning: bool
     const [integration] = await db.select().from(marketplaceIntegrations).where(eq(marketplaceIntegrations.id, integrationId)).limit(1)
     if (integration) {
       const metadata = (integration.metadata as any) || {}
-      metadata.syncStatus = status
+      metadata.syncStatus = { ...status, lastUpdated: Date.now() }
       await db.update(marketplaceIntegrations).set({ metadata }).where(eq(marketplaceIntegrations.id, integrationId))
     }
   } catch (err) {

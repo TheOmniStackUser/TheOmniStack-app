@@ -1,5 +1,7 @@
 'use server'
 
+export const maxDuration = 300;
+
 import { requireAuth } from '@/lib/session'
 import { db } from '@/db/client'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
@@ -354,7 +356,30 @@ export async function getImportSyncStatus(integrationId: string) {
   if (!integration) return null
 
   const metadata = (integration.metadata as any) || {}
-  return metadata.syncStatus || null
+  const status = metadata.syncStatus || null
+
+  if (status && status.isRunning && status.lastUpdated) {
+    const timeSinceLastUpdate = Date.now() - status.lastUpdated;
+    // If no update for 2 minutes, assume the process was killed by Vercel
+    if (timeSinceLastUpdate > 120000) {
+      const errorStatus = {
+        isRunning: false,
+        status: 'error',
+        message: 'Der Import-Prozess wurde wegen Zeitüberschreitung abgebrochen (Vercel Timeout).',
+        progress: status.progress,
+        total: status.total,
+        lastUpdated: Date.now()
+      };
+      
+      // Update DB to clear the stuck state asynchronously
+      metadata.syncStatus = errorStatus;
+      db.update(marketplaceIntegrations).set({ metadata }).where(eq(marketplaceIntegrations.id, integrationId)).catch(console.error);
+      
+      return errorStatus;
+    }
+  }
+
+  return status
 }
 
 export async function searchProducts(query: string) {
