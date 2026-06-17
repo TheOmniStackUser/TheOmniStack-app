@@ -3,6 +3,7 @@ import { db } from '@/db/client'
 import { products, productMappings } from '@/db/schema/products'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { MappingSyncRules } from './mapping-sync-rules'
+import { AddMappingClient } from './add-mapping-client'
 import { eq, and } from 'drizzle-orm'
 import Link from 'next/link'
 import { ArrowLeft, Save, Package, Link as LinkIcon, Settings2, Trash2 } from 'lucide-react'
@@ -260,9 +261,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             </div>
             
             <div className="p-4 bg-slate-50 border-t border-slate-100">
-              <button className="w-full py-2 bg-white border border-slate-200 text-slate-700 font-semibold rounded-lg text-sm hover:bg-slate-100 transition-colors shadow-sm">
-                + Mapping hinzufügen
-              </button>
+              <AddMappingClient productId={product.id} activeIntegrations={integrations} />
             </div>
           </section>
         </div>

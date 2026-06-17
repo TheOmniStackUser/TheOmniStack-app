@@ -502,6 +502,20 @@ export async function mapUnmappedProductToExisting(unmappedProductId: string, pr
   return { success: true }
 }
 
+export async function addManualMapping(productId: string, marketplace: string, sku: string, ean: string) {
+  const auth = await requireAuth()
+  
+  await db.insert(productMappings).values({
+    companyId: auth.activeCompanyId,
+    productId,
+    marketplace: marketplace as any,
+    marketplaceSku: sku,
+    ean: ean || null,
+    syncStock: true,
+    syncPrice: false,
+  }).onConflictDoNothing()
+}
+
 export async function getAutoMappableProducts() {
   const auth = await requireAuth()
 
