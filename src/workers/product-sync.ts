@@ -71,30 +71,16 @@ export async function syncProductsForCompany(companyId: string, integrationId?: 
         const mpProduct = marketplaceProducts[i]
 
         if (!mappedSkus.has(mpProduct.sku)) {
-          const centralProduct = centralProductMap.get(mpProduct.sku)
-          if (centralProduct) {
-            toAutoMap.push({
-              companyId,
-              productId: centralProduct.id,
-              marketplace: integration.type as any,
-              marketplaceSku: String(mpProduct.sku),
-              marketplaceProductId: String(mpProduct.marketplaceProductId),
-              syncStock: true,
-              syncPrice: false,
-              ean: centralProduct.ean ? centralProduct.ean.split(',')[0].trim() : null
-            })
-          } else {
-            toUpsertUnmapped.push({
-              companyId,
-              marketplace: integration.type as any,
-              marketplaceSku: String(mpProduct.sku),
-              marketplaceProductId: String(mpProduct.marketplaceProductId),
-              title: mpProduct.title,
-              price: mpProduct.price?.toString() || '0',
-              stock: mpProduct.stock?.toString() || '0',
-              rawPayload: mpProduct.rawPayload
-            })
-          }
+          toUpsertUnmapped.push({
+            companyId,
+            marketplace: integration.type as any,
+            marketplaceSku: String(mpProduct.sku),
+            marketplaceProductId: String(mpProduct.marketplaceProductId),
+            title: mpProduct.title,
+            price: mpProduct.price?.toString() || '0',
+            stock: mpProduct.stock?.toString() || '0',
+            rawPayload: mpProduct.rawPayload
+          })
         }
 
         // Update progress in DB every 50 items to not overload DB
