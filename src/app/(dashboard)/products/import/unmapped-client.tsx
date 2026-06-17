@@ -232,11 +232,13 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
       
       // Filter by search (title, sku, or ean)
       if (deferredSearch) {
-        const q = deferredSearch.toLowerCase()
-        const matchTitle = p.title?.toLowerCase().includes(q) || false
-        const matchSku = p.marketplaceSku?.toLowerCase().includes(q) || false
-        const matchEan = p.parsedEan ? String(p.parsedEan).toLowerCase().includes(q) : false
-        if (!matchTitle && !matchSku && !matchEan) return false
+        const terms = deferredSearch.toLowerCase().trim().split(/\s+/).filter(Boolean)
+        for (const term of terms) {
+          const matchTitle = p.title?.toLowerCase().includes(term) || false
+          const matchSku = p.marketplaceSku?.toLowerCase().includes(term) || false
+          const matchEan = p.parsedEan ? String(p.parsedEan).toLowerCase().includes(term) : false
+          if (!matchTitle && !matchSku && !matchEan) return false
+        }
       }
       return true
     })

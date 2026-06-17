@@ -357,6 +357,17 @@ export async function searchProducts(query: string) {
   const auth = await requireAuth()
   if (!query) return []
   
+  const terms = query.trim().split(/\s+/).filter(Boolean)
+  if (terms.length === 0) return []
+
+  const searchConditions = terms.map(term => 
+    or(
+      ilike(products.sku, `%${term}%`),
+      ilike(products.title, `%${term}%`),
+      ilike(products.ean, `%${term}%`)
+    )
+  )
+
   const results = await db
     .select({
       id: products.id,
@@ -370,11 +381,7 @@ export async function searchProducts(query: string) {
     .where(
       and(
         eq(products.companyId, auth.activeCompanyId),
-        or(
-          ilike(products.sku, `%${query}%`),
-          ilike(products.title, `%${query}%`),
-          ilike(products.ean, `%${query}%`)
-        )
+        ...searchConditions
       )
     )
     .limit(20)
