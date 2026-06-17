@@ -54,8 +54,11 @@ export default async function ProductsPage() {
               <Package className="w-6 h-6" />
             </div>
             Warenwirtschaft
+            <span className="text-sm font-bold bg-slate-100 text-slate-600 px-3 py-1 rounded-full border border-slate-200 align-middle shadow-sm">
+              {productList.length} Produkte
+            </span>
           </h1>
-          <p className="text-slate-500 mt-2 font-medium">Verwalten Sie Ihre Produkte und Marktplatz-Listings zentral.</p>
+          <p className="text-slate-500 mt-2 font-medium">Verwalten Sie Ihre {productList.length} Produkte und Marktplatz-Listings zentral.</p>
         </div>
 
         <div className="flex flex-wrap gap-3">
