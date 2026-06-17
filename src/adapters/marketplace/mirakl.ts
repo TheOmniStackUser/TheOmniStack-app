@@ -1108,7 +1108,12 @@ export class MiraklAdapter implements MarketplaceAdapter {
         const errText = await receiveRes.text()
         console.warn(`[MiraklAdapter:${this.marketplace}] Failed to mark return ${returnIdToReceive} as received: ${receiveRes.status} - ${errText}`)
       } else {
-        receiveOk = true
+        const receiveData = await receiveRes.json()
+        if (receiveData.return_errors && receiveData.return_errors.length > 0) {
+          console.warn(`[MiraklAdapter:${this.marketplace}] Failed to mark return ${returnIdToReceive} as received: ${JSON.stringify(receiveData.return_errors)}`)
+        } else {
+          receiveOk = true
+        }
       }
 
       if (receiveOk) {
@@ -1119,8 +1124,13 @@ export class MiraklAdapter implements MarketplaceAdapter {
         if (!acceptRes.ok) {
           console.warn(`[MiraklAdapter:${this.marketplace}] Failed to accept return ${returnIdToReceive}: ${acceptRes.status} - ${await acceptRes.text()}`)
         } else {
-          console.log(`[MiraklAdapter:${this.marketplace}] Return ${returnIdToReceive} accepted successfully!`)
-          return 'ACCEPTED'
+          const acceptData = await acceptRes.json()
+          if (acceptData.return_errors && acceptData.return_errors.length > 0) {
+            console.warn(`[MiraklAdapter:${this.marketplace}] Failed to accept return ${returnIdToReceive}: ${JSON.stringify(acceptData.return_errors)}`)
+          } else {
+            console.log(`[MiraklAdapter:${this.marketplace}] Return ${returnIdToReceive} accepted successfully!`)
+            return 'ACCEPTED'
+          }
         }
       }
 
