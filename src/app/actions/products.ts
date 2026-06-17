@@ -527,6 +527,31 @@ export async function deleteMapping(mappingId: string) {
   )
 }
 
+export async function updateProductStockInline(productId: string, newStock: number) {
+  const auth = await requireAuth()
+
+  // Verify and get the product
+  const [product] = await db.select()
+    .from(products)
+    .where(and(eq(products.id, productId), eq(products.companyId, auth.activeCompanyId)))
+
+  if (!product) throw new Error("Product not found")
+
+  // Update central stock
+  await db.update(products)
+    .set({ currentStock: newStock.toString(), updatedAt: new Date() })
+    .where(eq(products.id, productId))
+
+  // Trigger sync
+  const { pushUpdatesToMarketplaces } = await import('@/workers/product-sync')
+  await pushUpdatesToMarketplaces(auth.activeCompanyId, [{
+    sku: product.sku,
+    stock: newStock
+  }])
+
+  return { success: true }
+}
+
 export async function getAutoMappableProducts() {
   const auth = await requireAuth()
 

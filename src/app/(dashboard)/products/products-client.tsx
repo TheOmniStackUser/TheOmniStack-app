@@ -2,11 +2,77 @@
 
 import React, { useState, useMemo } from 'react'
 import Link from 'next/link'
-import { Package, Search, ChevronUp, ChevronDown, ChevronRight, Scale, MapPin, Tag, FileText, Barcode, ExternalLink, Trash2, Building2, X } from 'lucide-react'
+import { Package, Search, ChevronUp, ChevronDown, ChevronRight, Scale, MapPin, Tag, FileText, Barcode, ExternalLink, Trash2, Building2, X, Loader2 } from 'lucide-react'
 import { DeleteProductButton } from './delete-button'
 import { useRouter } from 'next/navigation'
 
 type Product = any
+
+function StockEditor({ product }: { product: Product }) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [value, setValue] = useState(product.currentStock || '0')
+  const [isSaving, setIsSaving] = useState(false)
+  const router = useRouter()
+
+  const handleSave = async () => {
+    const numericValue = Number(value)
+    if (String(numericValue) === product.currentStock || isNaN(numericValue)) {
+      setIsEditing(false)
+      setValue(product.currentStock || '0')
+      return
+    }
+    
+    setIsSaving(true)
+    try {
+      const { updateProductStockInline } = await import('@/app/actions/products')
+      await updateProductStockInline(product.id, numericValue)
+      setIsEditing(false)
+      router.refresh()
+    } catch (e) {
+      console.error(e)
+      alert("Fehler beim Speichern des Bestands")
+      setValue(product.currentStock || '0')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleSave()
+    if (e.key === 'Escape') {
+      setValue(product.currentStock || '0')
+      setIsEditing(false)
+    }
+  }
+
+  if (!isEditing) {
+    return (
+      <div 
+        className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-1 -ml-1 rounded transition-colors group"
+        onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
+        title="Klicken zum Bearbeiten"
+      >
+        <div className={`w-2 h-2 rounded-full ${Number(product.currentStock) > 0 ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+        <span className="font-semibold text-slate-700 border-b border-transparent group-hover:border-slate-300 border-dashed transition-colors">{product.currentStock}</span>
+        {isSaving && <Loader2 className="w-3 h-3 animate-spin text-slate-400" />}
+      </div>
+    )
+  }
+
+  return (
+    <input
+      autoFocus
+      type="number"
+      value={value}
+      onChange={e => setValue(e.target.value)}
+      onBlur={handleSave}
+      onKeyDown={handleKeyDown}
+      onClick={e => e.stopPropagation()}
+      disabled={isSaving}
+      className="w-20 px-2 py-1 text-sm border border-cyan-400 focus:ring-2 focus:ring-cyan-500/50 outline-none rounded font-semibold text-slate-900 bg-white"
+    />
+  )
+}
 
 export function ProductsClient({ initialProducts }: { initialProducts: Product[] }) {
   const router = useRouter()
@@ -234,10 +300,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                         {product.ean && <div className="text-xs text-slate-500 mt-0.5">EAN: {product.ean}</div>}
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${Number(product.currentStock) > 0 ? 'bg-emerald-400' : 'bg-rose-400'}`} />
-                          <span className="font-semibold text-slate-700">{product.currentStock}</span>
-                        </div>
+                        <StockEditor product={product} />
                       </td>
                       <td className="px-6 py-4 text-slate-700 font-medium">
                         {Number(product.price).toFixed(2)} €
