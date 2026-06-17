@@ -5,7 +5,7 @@ import { db } from '@/db/client'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { eq, and, inArray, ilike, or } from 'drizzle-orm'
 import { products, productMappings, unmappedMarketplaceProducts } from '@/db/schema/products'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, unstable_noStore } from 'next/cache'
 import { after } from 'next/server'
 
 export type MarketplaceSyncSettings = {
@@ -337,6 +337,7 @@ export async function deleteUnmappedProducts(unmappedProductIds: string[]) {
 }
 
 export async function getImportSyncStatus(integrationId: string) {
+  unstable_noStore()
   const auth = await requireAuth()
 
   const [integration] = await db
