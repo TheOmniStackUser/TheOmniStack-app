@@ -413,6 +413,12 @@ export class AboutYouAdapter implements MarketplaceAdapter {
 
         const data = await response.json()
         const items = data.items || []
+        
+        // Prevent infinite loop if API keeps returning same cursor but no items
+        if (items.length === 0) {
+          break
+        }
+
         allProducts.push(...items)
         console.log(`[AboutYouAdapter] Fetched ${items.length} raw products in this page (total so far: ${allProducts.length}).`)
 
