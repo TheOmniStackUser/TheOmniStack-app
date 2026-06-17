@@ -12,6 +12,8 @@ export const metadata = {
   title: 'Import & Mapping - Produkte',
 }
 
+export const maxDuration = 300;
+
 export default async function ProductImportPage() {
   const auth = await requireAuth()
 
