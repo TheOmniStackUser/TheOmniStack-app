@@ -21,9 +21,27 @@ export default async function ProductsPage() {
     .where(
       eq(products.companyId, auth.activeCompanyId)
     )
-    // In a real scenario, we might want to filter isNull(products.parentId) to only show top-level,
-    // but for now we'll fetch all or just the top-level. Let's fetch all.
     .orderBy(products.createdAt)
+
+  // Fetch all mappings to include their SKUs and EANs in the client search
+  const { productMappings } = await import('@/db/schema/products')
+  const allMappings = await db
+    .select({
+      productId: productMappings.productId,
+      marketplaceSku: productMappings.marketplaceSku,
+      ean: productMappings.ean,
+    })
+    .from(productMappings)
+    .where(eq(productMappings.companyId, auth.activeCompanyId))
+
+  const productsWithMappings = productList.map(p => {
+    const pMappings = allMappings.filter(m => m.productId === p.id)
+    return {
+      ...p,
+      mappingSkus: pMappings.map(m => m.marketplaceSku).join(' '),
+      mappingEans: pMappings.map(m => m.ean).filter(Boolean).join(' '),
+    }
+  })
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
@@ -63,7 +81,7 @@ export default async function ProductsPage() {
         </div>
       </header>
 
-      <ProductsClient initialProducts={productList} />
+      <ProductsClient initialProducts={productsWithMappings} />
     </div>
   )
 }

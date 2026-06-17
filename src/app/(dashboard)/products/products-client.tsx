@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react'
 import Link from 'next/link'
-import { Package, Search, ChevronUp, ChevronDown, ChevronRight, Scale, MapPin, Tag, FileText, Barcode, ExternalLink, Trash2, Building2 } from 'lucide-react'
+import { Package, Search, ChevronUp, ChevronDown, ChevronRight, Scale, MapPin, Tag, FileText, Barcode, ExternalLink, Trash2, Building2, X } from 'lucide-react'
 import { DeleteProductButton } from './delete-button'
 import { useRouter } from 'next/navigation'
 
@@ -74,12 +74,16 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
     let result = [...initialProducts]
 
     if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase()
-      result = result.filter(p => 
-        (p.sku && p.sku.toLowerCase().includes(q)) || 
-        (p.title && p.title.toLowerCase().includes(q)) || 
-        (p.ean && p.ean.toLowerCase().includes(q))
-      )
+      const terms = searchQuery.toLowerCase().trim().split(/\s+/).filter(Boolean)
+      result = result.filter(p => {
+        return terms.every(term => 
+          (p.sku && p.sku.toLowerCase().includes(term)) || 
+          (p.title && p.title.toLowerCase().includes(term)) || 
+          (p.ean && p.ean.toLowerCase().includes(term)) ||
+          (p.mappingSkus && p.mappingSkus.toLowerCase().includes(term)) ||
+          (p.mappingEans && p.mappingEans.toLowerCase().includes(term))
+        )
+      })
     }
 
     result.sort((a, b) => {
@@ -132,8 +136,16 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
             placeholder="SKU, Titel oder EAN suchen..." 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all text-slate-900 placeholder:text-slate-500"
+            className="w-full pl-10 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all text-slate-900 placeholder:text-slate-500"
           />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-0.5 rounded-full hover:bg-slate-200"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
         
         {selectedProductIds.size > 0 && (
