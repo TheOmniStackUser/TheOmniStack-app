@@ -15,7 +15,14 @@ function StockEditor({ product }: { product: Product }) {
   const router = useRouter()
 
   const handleSave = async () => {
-    const numericValue = Number(value)
+    let numericValue = Number(value)
+    
+    // Prevent negative stock
+    if (numericValue < 0) {
+      numericValue = 0
+      setValue('0')
+    }
+
     if (String(numericValue) === product.currentStock || isNaN(numericValue)) {
       setIsEditing(false)
       setValue(product.currentStock || '0')
@@ -63,6 +70,7 @@ function StockEditor({ product }: { product: Product }) {
     <input
       autoFocus
       type="number"
+      min="0"
       value={value}
       onChange={e => setValue(e.target.value)}
       onBlur={handleSave}
