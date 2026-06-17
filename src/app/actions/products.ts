@@ -516,6 +516,17 @@ export async function addManualMapping(productId: string, marketplace: string, s
   }).onConflictDoNothing()
 }
 
+export async function deleteMapping(mappingId: string) {
+  const auth = await requireAuth()
+  
+  await db.delete(productMappings).where(
+    and(
+      eq(productMappings.id, mappingId),
+      eq(productMappings.companyId, auth.activeCompanyId)
+    )
+  )
+}
+
 export async function getAutoMappableProducts() {
   const auth = await requireAuth()
 

@@ -4,6 +4,7 @@ import { products, productMappings } from '@/db/schema/products'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { MappingSyncRules } from './mapping-sync-rules'
 import { AddMappingClient } from './add-mapping-client'
+import { DeleteMappingClient } from './delete-mapping-client'
 import { eq, and } from 'drizzle-orm'
 import Link from 'next/link'
 import { ArrowLeft, Save, Package, Link as LinkIcon, Settings2, Trash2 } from 'lucide-react'
@@ -248,9 +249,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                           )}
                         </div>
                       </div>
-                      <button className="text-rose-400 hover:text-rose-600 p-1 bg-rose-50 hover:bg-rose-100 rounded transition-colors">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <DeleteMappingClient mappingId={mapping.id} />
                     </div>
 
                     {/* Sync Rules */}
