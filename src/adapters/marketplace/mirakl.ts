@@ -807,6 +807,10 @@ export class MiraklAdapter implements MarketplaceAdapter {
       })
 
       if (!response.ok) {
+        if (response.status === 404) {
+          console.warn(`[MiraklAdapter:${this.marketplace}] Returns API not supported (404) for this instance. Skipping return sync.`)
+          return []
+        }
         const errText = await response.text()
         console.error(`[MiraklAdapter:${this.marketplace}] Fetch returns failed (${response.status}): ${errText}`)
         throw new Error(`Mirakl API returns failed with status ${response.status}`)
