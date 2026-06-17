@@ -39,7 +39,8 @@ export class AboutYouAdapter implements MarketplaceAdapter {
         headers: {
           'X-API-Key': this.config.apiKey,
           'Accept': 'application/json'
-        }
+        },
+        signal: AbortSignal.timeout(15000)
       })
 
       if (!response.ok) {
@@ -403,7 +404,8 @@ export class AboutYouAdapter implements MarketplaceAdapter {
           headers: {
             'X-API-Key': this.config.apiKey,
             'Accept': 'application/json'
-          }
+          },
+          signal: AbortSignal.timeout(15000)
         })
 
         if (!response.ok) {

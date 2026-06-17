@@ -228,10 +228,12 @@ export async function bulkCreateProductsFromUnmapped(unmappedProductIds: string[
       .limit(1)
 
     let productId = existing?.id
+    let mappingEan = existing?.ean ? existing.ean.split(',')[0].trim() : null
 
     if (!existing) {
       // Create new central product
       const ean = getEanFromPayload(unmapped.rawPayload);
+      mappingEan = ean || null
       const description = getDescriptionFromPayload(unmapped.rawPayload);
       const originPrice = getOriginPriceFromPayload(unmapped.rawPayload);
       const category = getCategoryFromPayload(unmapped.rawPayload);
@@ -273,6 +275,7 @@ export async function bulkCreateProductsFromUnmapped(unmappedProductIds: string[
         marketplaceProductId: unmapped.marketplaceProductId,
         syncStock: true,
         syncPrice: false,
+        ean: mappingEan,
       }).onConflictDoNothing() // Ignore if already mapped
 
       // Delete from unmapped
@@ -505,12 +508,20 @@ export async function mapUnmappedProductToExisting(unmappedProductId: string, pr
 export async function addManualMapping(productId: string, marketplace: string, sku: string, ean: string) {
   const auth = await requireAuth()
   
+  let finalEan = ean || null
+  if (!finalEan) {
+    const [product] = await db.select().from(products).where(eq(products.id, productId)).limit(1)
+    if (product && product.ean) {
+      finalEan = product.ean.split(',')[0].trim()
+    }
+  }
+
   await db.insert(productMappings).values({
     companyId: auth.activeCompanyId,
     productId,
     marketplace: marketplace as any,
     marketplaceSku: sku,
-    ean: ean || null,
+    ean: finalEan,
     syncStock: true,
     syncPrice: false,
   }).onConflictDoNothing()

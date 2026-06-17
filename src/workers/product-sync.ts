@@ -80,7 +80,8 @@ export async function syncProductsForCompany(companyId: string, integrationId?: 
               marketplaceSku: String(mpProduct.sku),
               marketplaceProductId: String(mpProduct.marketplaceProductId),
               syncStock: true,
-              syncPrice: false
+              syncPrice: false,
+              ean: centralProduct.ean ? centralProduct.ean.split(',')[0].trim() : null
             })
           } else {
             toUpsertUnmapped.push({
