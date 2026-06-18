@@ -24,7 +24,8 @@ export default async function ReturnsPage() {
           columns: {
             status: true,
             totalAmount: true,
-            currency: true
+            currency: true,
+            rawPayload: true
           }
         },
         user: {

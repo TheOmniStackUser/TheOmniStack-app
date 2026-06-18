@@ -50,12 +50,20 @@ export function ReturnsList({
   customMiraklName,
 }: ReturnsListProps) {
   const [logs, setLogs] = useState<ReturnLog[]>(
-    initialLogs.map((l) => ({
-      ...l,
-      scannedAt: new Date(l.scannedAt),
-      receivedAt: l.receivedAt ? new Date(l.receivedAt) : new Date(l.scannedAt),
-      items: l.items || []
-    }))
+    initialLogs.map((l) => {
+      let displayOrderNumber = l.orderNumber
+      if (l.marketplace?.toLowerCase() === 'otto' && l.order?.rawPayload?.orderNumber) {
+        displayOrderNumber = l.order.rawPayload.orderNumber
+      }
+
+      return {
+        ...l,
+        orderNumber: displayOrderNumber,
+        scannedAt: new Date(l.scannedAt),
+        receivedAt: l.receivedAt ? new Date(l.receivedAt) : new Date(l.scannedAt),
+        items: l.items || []
+      }
+    })
   )
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [searchTerm, setSearchTerm] = useState('')
