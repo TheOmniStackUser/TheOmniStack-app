@@ -44,6 +44,7 @@ export type MarketplaceSyncJobData = {
   integrationId?: string | null
   isInvoiceSync?: boolean
   syncGroupId?: string
+  marketplaceDisplayName?: string
 }
 
 // ─── Lazy Redis Connection & Queue Initialization ─────────────────────────────
@@ -174,6 +175,7 @@ export function createMarketplaceSyncWorker() {
                 triggeredByUserId: null,
                 integrationId: integration.id,
                 syncGroupId,
+                marketplaceDisplayName: (integration.metadata as any)?.customName || integration.type,
               },
               {
                 jobId: `sync-${integration.type}-${integration.id}-${companyId}-${Date.now()}`
@@ -189,6 +191,7 @@ export function createMarketplaceSyncWorker() {
                 marketplace: integration.type as any,
                 triggeredByUserId: null,
                 integrationId: integration.id,
+                marketplaceDisplayName: (integration.metadata as any)?.customName || integration.type,
               },
               {
                 jobId: `sync-${integration.type}-${integration.id}-${companyId}-${Date.now()}`
@@ -398,13 +401,13 @@ export function createMarketplaceSyncWorker() {
                 companySettings.name, 
                 companySettings.syncNotificationEmail, 
                 job.data.syncGroupId, 
-                { marketplace: marketplace || 'Unbekannt', success: true, count: rawOrders.length }
+                { marketplace: job.data.marketplaceDisplayName || marketplace || 'Unbekannt', success: true, count: rawOrders.length }
               )
             } else {
               await sendSyncNotificationEmail({
                 toEmail: companySettings.syncNotificationEmail,
                 companyName: companySettings.name,
-                results: [{ marketplace: marketplace || 'Unbekannt', success: true, count: rawOrders.length }]
+                results: [{ marketplace: job.data.marketplaceDisplayName || marketplace || 'Unbekannt', success: true, count: rawOrders.length }]
               })
             }
           }
@@ -433,13 +436,13 @@ export function createMarketplaceSyncWorker() {
                 companySettings.name, 
                 companySettings.syncNotificationEmail, 
                 job.data.syncGroupId, 
-                { marketplace: marketplace || 'Unbekannt', success: false, error: error instanceof Error ? error.message : String(error) }
+                { marketplace: job.data.marketplaceDisplayName || marketplace || 'Unbekannt', success: false, error: error instanceof Error ? error.message : String(error) }
               )
             } else {
               await sendSyncNotificationEmail({
                 toEmail: companySettings.syncNotificationEmail,
                 companyName: companySettings.name,
-                results: [{ marketplace: marketplace || 'Unbekannt', success: false, error: error instanceof Error ? error.message : String(error) }]
+                results: [{ marketplace: job.data.marketplaceDisplayName || marketplace || 'Unbekannt', success: false, error: error instanceof Error ? error.message : String(error) }]
               })
             }
           }
