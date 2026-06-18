@@ -141,7 +141,7 @@ export async function importProductsCsvAction(csvString: string) {
         and(
           eq(productMappings.companyId, auth.activeCompanyId),
           eq(productMappings.productId, insertedProduct.id),
-          eq(productMappings.marketplace, marketplace)
+          eq(productMappings.marketplace, marketplace as any)
         )
       )
 
@@ -158,7 +158,7 @@ export async function importProductsCsvAction(csvString: string) {
             await db.insert(productMappings).values({
               companyId: auth.activeCompanyId,
               productId: insertedProduct.id,
-              marketplace,
+              marketplace: marketplace as any,
               marketplaceSku: mpSku,
               ean: mpEan,
               syncStock: true,
