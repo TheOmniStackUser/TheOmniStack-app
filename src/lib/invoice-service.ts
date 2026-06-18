@@ -207,6 +207,8 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
   // 3. Generate PDF Buffer (CPU intensive)
   // Dynamic imports required to avoid ESM/CJS module conflict
   const { renderToBuffer } = await import('@react-pdf/renderer')
+  const { fetchImageAsBase64 } = await import('@/lib/image-fetcher')
+  const logoBase64 = await fetchImageAsBase64(company.logoUrl || undefined)
 
   const { paymentMethod, isPaid } = extractPaymentInfo(order)
   const metadata = (order.rawPayload as any)?.manualMetadata || {}
@@ -317,7 +319,7 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
           bankName: company.bankName || undefined,
           bankIban: company.iban || undefined,
           bankBic: company.bic || undefined,
-          logoUrl: company.logoUrl || undefined,
+          logoUrl: logoBase64 || undefined,
           paymentRecipient: company.paymentRecipient || undefined,
           management: company.management || undefined,
           registrationCourt: company.registrationCourt || undefined,
@@ -555,6 +557,9 @@ export async function regenerateInvoicePdf(invoiceId: string, companyId: string)
   // Dynamic imports for PDF generation
   const { renderToBuffer } = await import('@react-pdf/renderer')
   const { InvoiceDocument } = await import('@/components/pdf/invoice')
+  const { fetchImageAsBase64 } = await import('@/lib/image-fetcher')
+  
+  const logoBase64 = await fetchImageAsBase64(company.logoUrl || undefined)
 
   const paymentInfo = order ? extractPaymentInfo(order) : { paymentMethod: 'Marketplace', isPaid: true }
   const metadata = (order?.rawPayload as any)?.manualMetadata || {}
@@ -615,7 +620,7 @@ export async function regenerateInvoicePdf(invoiceId: string, companyId: string)
           bankName: company.bankName || undefined,
           bankIban: company.iban || undefined,
           bankBic: company.bic || undefined,
-          logoUrl: company.logoUrl || undefined,
+          logoUrl: logoBase64 || undefined,
           paymentRecipient: company.paymentRecipient || undefined,
           management: company.management || undefined,
           registrationCourt: company.registrationCourt || undefined,

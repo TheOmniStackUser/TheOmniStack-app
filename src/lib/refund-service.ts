@@ -245,6 +245,8 @@ export async function executeRefund({
     // 6. Generate and render Credit Note PDF
     const { renderToBuffer } = await import('@react-pdf/renderer')
     const { InvoiceDocument } = await import('@/components/pdf/invoice')
+    const { fetchImageAsBase64 } = await import('@/lib/image-fetcher')
+    const logoBase64 = await fetchImageAsBase64(company.logoUrl || undefined)
 
     console.log(`[RefundService] Rendering Credit Note PDF for document ${creditNoteNumber}...`)
     pdfBuffer = await renderToBuffer(
@@ -269,7 +271,7 @@ export async function executeRefund({
           bankName: company.bankName || undefined,
           bankIban: company.iban || undefined,
           bankBic: company.bic || undefined,
-          logoUrl: company.logoUrl || undefined,
+          logoUrl: logoBase64 || undefined,
           paymentRecipient: company.paymentRecipient || undefined,
           management: company.management || undefined,
           registrationCourt: company.registrationCourt || undefined,
