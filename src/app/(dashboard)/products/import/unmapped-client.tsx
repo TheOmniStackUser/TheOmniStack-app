@@ -127,7 +127,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
   const [detailsProduct, setDetailsProduct] = useState<UnmappedMarketplaceProduct | null>(null)
   const [alertState, setAlertState] = useState<{ isOpen: boolean; title?: string; message: string }>({ isOpen: false, message: '' })
   const [deleteConfirmation, setDeleteConfirmation] = useState<{ isOpen: boolean, type: 'single' | 'bulk', id?: string }>({ isOpen: false, type: 'single' })
-  const [mapConfirmation, setMapConfirmation] = useState<{ isOpen: boolean, product: UnmappedMarketplaceProduct | null }>({ isOpen: false, product: null })
+  const [mapConfirmation, setMapConfirmation] = useState<{ isOpen: boolean, products: UnmappedMarketplaceProduct[] }>({ isOpen: false, products: [] })
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [isSearching, setIsSearching] = useState(false)
@@ -321,7 +321,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
   }
 
   const handleMapSingle = async (product: UnmappedMarketplaceProduct) => {
-    setMapConfirmation({ isOpen: true, product })
+    setMapConfirmation({ isOpen: true, products: [product] })
     setIsLoadingSuggestions(true)
     setSuggestions([])
     try {
@@ -335,32 +335,54 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
     }
   }
 
+  const handleMapBulk = async () => {
+    if (selectedIds.length === 0) return
+    const productsToMap = localProducts.filter(p => selectedIds.includes(p.id))
+    setMapConfirmation({ isOpen: true, products: productsToMap })
+    setIsLoadingSuggestions(true)
+    setSuggestions([])
+    try {
+      const firstProduct = productsToMap[0]
+      const ean = getEanFromPayload(firstProduct.rawPayload)
+      const sugs = await getSuggestedProducts(firstProduct.marketplaceSku, ean)
+      setSuggestions(sugs)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setIsLoadingSuggestions(false)
+    }
+  }
+
   const handleConfirmMap = async () => {
-    if (!mapConfirmation.product || !selectedProductId) return
+    if (mapConfirmation.products.length === 0 || !selectedProductId) return
     setIsSubmitting(true)
     try {
-      await mapUnmappedProductToExisting(mapConfirmation.product.id, selectedProductId)
-      setMapConfirmation({ isOpen: false, product: null })
+      await Promise.all(
+        mapConfirmation.products.map(p => mapUnmappedProductToExisting(p.id, selectedProductId))
+      )
+      setMapConfirmation({ isOpen: false, products: [] })
+      setSelectedIds([])
       router.refresh()
     } catch (error) {
       console.error(error)
-      showAlert('Fehler beim Mappen des Produkts', 'Fehler')
+      showAlert('Fehler beim Mappen der Produkte', 'Fehler')
     } finally {
       setIsSubmitting(false)
     }
   }
 
   const handleCreateFromMapModal = async () => {
-    if (!mapConfirmation.product) return
+    if (mapConfirmation.products.length === 0) return
     setIsSubmitting(true)
     try {
-      await bulkCreateProductsFromUnmapped([mapConfirmation.product.id])
-      setMapConfirmation({ isOpen: false, product: null })
+      await bulkCreateProductsFromUnmapped(mapConfirmation.products.map(p => p.id))
+      setMapConfirmation({ isOpen: false, products: [] })
+      setSelectedIds([])
       router.refresh()
-      showAlert('Produkt wurde erfolgreich neu angelegt.', 'Erfolg')
+      showAlert(`${mapConfirmation.products.length > 1 ? mapConfirmation.products.length + ' Produkte wurden' : 'Produkt wurde'} erfolgreich neu angelegt.`, 'Erfolg')
     } catch (error) {
       console.error(error)
-      showAlert('Fehler beim Anlegen des Produkts', 'Fehler')
+      showAlert('Fehler beim Anlegen der Produkte', 'Fehler')
     } finally {
       setIsSubmitting(false)
     }
@@ -529,6 +551,13 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
                 className="inline-flex items-center gap-2 px-4 py-1.5 bg-white border border-rose-200 text-rose-600 text-sm font-semibold rounded-md hover:bg-rose-50 transition-all disabled:opacity-50 shadow-sm"
               >
                 Löschen
+              </button>
+              <button
+                onClick={handleMapBulk}
+                disabled={isSubmitting}
+                className="inline-flex items-center gap-2 px-4 py-1.5 bg-white border border-slate-200 text-slate-700 text-sm font-semibold rounded-md hover:bg-slate-50 transition-all disabled:opacity-50 shadow-sm"
+              >
+                Ausgewählte mappen
               </button>
               <button
                 onClick={handleBulkCreate}
@@ -768,35 +797,47 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
       </Modal>
 
       {/* Mapping Modal */}
-      <Modal isOpen={mapConfirmation.isOpen} onClose={() => setMapConfirmation({ isOpen: false, product: null })} title="Produkt mappen">
+      <Modal isOpen={mapConfirmation.isOpen} onClose={() => setMapConfirmation({ isOpen: false, products: [] })} title="Produkt mappen">
         <div className="space-y-6 text-sm">
-          {mapConfirmation.product && (() => {
-            const ean = getEanFromPayload(mapConfirmation.product.rawPayload);
-            return (
-              <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl mb-4">
-                <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Zu mappendes Produkt</p>
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className="px-2.5 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold rounded-md uppercase tracking-wider">
-                    {getMarketplaceDisplayName(mapConfirmation.product.marketplace)}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-500 font-semibold uppercase">SKU:</span>
-                    <span className="font-mono text-sm font-bold text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded">
-                      {mapConfirmation.product.marketplaceSku}
+          {mapConfirmation.products.length > 0 && (() => {
+            if (mapConfirmation.products.length === 1) {
+              const product = mapConfirmation.products[0];
+              const ean = getEanFromPayload(product.rawPayload);
+              return (
+                <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl mb-4">
+                  <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Zu mappendes Produkt</p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="px-2.5 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold rounded-md uppercase tracking-wider">
+                      {getMarketplaceDisplayName(product.marketplace)}
                     </span>
-                  </div>
-                  {ean && (
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-500 font-semibold uppercase">EAN:</span>
+                      <span className="text-xs text-slate-500 font-semibold uppercase">SKU:</span>
                       <span className="font-mono text-sm font-bold text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded">
-                        {ean}
+                        {product.marketplaceSku}
                       </span>
                     </div>
-                  )}
+                    {ean && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-slate-500 font-semibold uppercase">EAN:</span>
+                        <span className="font-mono text-sm font-bold text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded">
+                          {ean}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <h3 className="mt-2 text-base font-bold text-slate-900">{product.title}</h3>
                 </div>
-                <h3 className="mt-2 text-base font-bold text-slate-900">{mapConfirmation.product.title}</h3>
-              </div>
-            );
+              );
+            } else {
+              return (
+                <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-xl mb-4">
+                  <h3 className="text-base font-bold text-indigo-900">{mapConfirmation.products.length} Produkte werden gemappt</h3>
+                  <p className="text-indigo-700 text-sm mt-1">
+                    Sie weisen nun {mapConfirmation.products.length} ungemappte Marktplatz-Angebote demselben zentralen Stammprodukt zu.
+                  </p>
+                </div>
+              )
+            }
           })()}
 
           <div>
