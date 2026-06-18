@@ -67,7 +67,7 @@ export function ReturnsList({
   )
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'neu' | 'bearbeitet'>('neu')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'neu' | 'bearbeitet' | 'in_klaerung'>('neu')
   const [marketplaceFilter, setMarketplaceFilter] = useState<string>('all')
   const [isPending, startTransition] = useTransition()
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null)
@@ -352,8 +352,7 @@ export function ReturnsList({
     })
   }
 
-  const handleStatusToggle = async (id: string, currentStatus: string) => {
-    const newStatus = currentStatus === 'neu' ? 'bearbeitet' : 'neu'
+  const handleStatusChange = async (id: string, newStatus: string) => {
     startTransition(async () => {
       try {
         await updateReturnStatusAction(id, newStatus)
@@ -364,6 +363,14 @@ export function ReturnsList({
         showToast('Fehler beim Ändern des Status.', 'error')
       }
     })
+  }
+
+  const handleStatusToggle = async (id: string, currentStatus: string) => {
+    let newStatus = 'neu'
+    if (currentStatus === 'neu') newStatus = 'in_klaerung'
+    else if (currentStatus === 'in_klaerung') newStatus = 'bearbeitet'
+    
+    await handleStatusChange(id, newStatus)
   }
 
   const handleBulkStatusChange = async (newStatus: string) => {
@@ -572,6 +579,19 @@ export function ReturnsList({
             >
               Bearbeitet
             </button>
+            <button
+              onClick={() => {
+                setStatusFilter('in_klaerung')
+                setCurrentPage(1)
+              }}
+              className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
+                statusFilter === 'in_klaerung'
+                  ? 'bg-amber-500 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              In Klärung
+            </button>
           </div>
         </div>
       </div>
@@ -599,6 +619,13 @@ export function ReturnsList({
               className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 text-xs font-bold transition-all disabled:opacity-50"
             >
               Neu
+            </button>
+            <button
+              onClick={() => handleBulkStatusChange('in_klaerung')}
+              disabled={isPending}
+              className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200 text-xs font-bold transition-all disabled:opacity-50"
+            >
+              In Klärung
             </button>
             <button
               onClick={handleBulkDelete}
@@ -683,12 +710,14 @@ export function ReturnsList({
                       className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border transition-all cursor-pointer select-none ${
                         log.status === 'bearbeitet'
                           ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                          : log.status === 'in_klaerung'
+                          ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
                           : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
                       }`}
                       title="Klicken, um den Status zu wechseln"
                     >
-                      <span className={`w-1.5 h-1.5 rounded-full ${log.status === 'bearbeitet' ? 'bg-emerald-500' : 'bg-indigo-500'}`} />
-                      {log.status === 'bearbeitet' ? 'Bearbeitet' : 'Neu'}
+                      <span className={`w-1.5 h-1.5 rounded-full ${log.status === 'bearbeitet' ? 'bg-emerald-500' : log.status === 'in_klaerung' ? 'bg-amber-500' : 'bg-indigo-500'}`} />
+                      {log.status === 'bearbeitet' ? 'Bearbeitet' : log.status === 'in_klaerung' ? 'In Klärung' : 'Neu'}
                     </button>
                   </td>
 
@@ -904,7 +933,7 @@ export function ReturnsList({
                             <button
                               onClick={() => {
                                 setOpenDropdownId(null)
-                                handleStatusToggle(log.id, log.status)
+                                handleStatusChange(log.id, 'neu')
                               }}
                               disabled={isPending}
                               className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-indigo-600 flex items-center gap-2"
@@ -915,11 +944,26 @@ export function ReturnsList({
                               Status: Neu
                             </button>
                           )}
+                          {log.status !== 'in_klaerung' && (
+                            <button
+                              onClick={() => {
+                                setOpenDropdownId(null)
+                                handleStatusChange(log.id, 'in_klaerung')
+                              }}
+                              disabled={isPending}
+                              className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-amber-600 flex items-center gap-2"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              Status: In Klärung
+                            </button>
+                          )}
                           {log.status !== 'bearbeitet' && (
                             <button
                               onClick={() => {
                                 setOpenDropdownId(null)
-                                handleStatusToggle(log.id, log.status)
+                                handleStatusChange(log.id, 'bearbeitet')
                               }}
                               disabled={isPending}
                               className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-emerald-600 flex items-center gap-2"
@@ -1146,6 +1190,7 @@ export function ReturnsList({
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-semibold text-slate-900 bg-white"
                   >
                     <option value="neu">Neu</option>
+                    <option value="in_klaerung">In Klärung</option>
                     <option value="bearbeitet">Bearbeitet</option>
                   </select>
                 </div>
