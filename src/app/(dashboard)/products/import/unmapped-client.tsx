@@ -944,7 +944,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
-            <button onClick={() => setMapConfirmation({ isOpen: false, product: null })} className="px-6 py-2.5 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 transition-colors" disabled={isSubmitting}>
+            <button onClick={() => setMapConfirmation({ isOpen: false, products: [] })} className="px-6 py-2.5 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 transition-colors" disabled={isSubmitting}>
               Abbrechen
             </button>
             <button onClick={handleCreateFromMapModal} className="px-6 py-2.5 text-sm font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-xl hover:bg-indigo-100 transition-colors" disabled={isSubmitting}>
