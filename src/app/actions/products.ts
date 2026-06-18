@@ -555,12 +555,32 @@ export async function addManualMapping(productId: string, marketplace: string, s
 export async function deleteMapping(mappingId: string) {
   const auth = await requireAuth()
   
-  await db.delete(productMappings).where(
+  const [mappingToDelete] = await db.select().from(productMappings).where(
     and(
       eq(productMappings.id, mappingId),
       eq(productMappings.companyId, auth.activeCompanyId)
     )
   )
+
+  if (!mappingToDelete) return;
+
+  // Re-create it in unmappedMarketplaceProducts so it shows up in the import list again
+  await db.insert(unmappedMarketplaceProducts).values({
+    companyId: auth.activeCompanyId,
+    marketplace: mappingToDelete.marketplace,
+    marketplaceSku: mappingToDelete.marketplaceSku,
+    marketplaceProductId: mappingToDelete.marketplaceProductId,
+    title: mappingToDelete.marketplaceSku, // Fallback title
+    updatedAt: new Date()
+  }).onConflictDoUpdate({
+    target: [unmappedMarketplaceProducts.companyId, unmappedMarketplaceProducts.marketplace, unmappedMarketplaceProducts.marketplaceSku],
+    set: {
+      updatedAt: new Date()
+    }
+  })
+
+  // Delete the mapping
+  await db.delete(productMappings).where(eq(productMappings.id, mappingId))
 }
 
 export async function updateProductStockInline(productId: string, newStock: number) {
