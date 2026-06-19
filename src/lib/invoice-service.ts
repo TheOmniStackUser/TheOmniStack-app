@@ -350,6 +350,9 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
         documentType,
         cancelsInvoiceNumber,
         cancelsInvoiceDate,
+        discountRate: metadata.discountRate,
+        skontoRate: metadata.skontoRate,
+        skontoDays: metadata.skontoDays,
       }) as any
     )
   }
@@ -651,6 +654,9 @@ export async function regenerateInvoicePdf(invoiceId: string, companyId: string)
         documentType: invoice.documentType || 'invoice',
         cancelsInvoiceNumber: invoice.originalInvoice?.invoiceNumber || undefined,
         cancelsInvoiceDate: invoice.originalInvoice?.createdAt || undefined,
+        discountRate: metadata.discountRate,
+        skontoRate: metadata.skontoRate,
+        skontoDays: metadata.skontoDays,
       }) as any
     )
   }

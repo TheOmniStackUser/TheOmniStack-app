@@ -116,6 +116,9 @@ interface InvoiceProps {
   documentType?: 'invoice' | 'quote' | 'delivery_note'
   cancelsInvoiceNumber?: string
   cancelsInvoiceDate?: Date
+  discountRate?: number
+  skontoRate?: number
+  skontoDays?: number
 }
 
 export const InvoiceDocument: React.FC<InvoiceProps> = ({
@@ -139,6 +142,9 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
   documentType = 'invoice',
   cancelsInvoiceNumber,
   cancelsInvoiceDate,
+  discountRate = 0,
+  skontoRate = 0,
+  skontoDays = 0,
 }) => {
   const countryCode = (recipient.country || '').toUpperCase()
   const isGerman = countryCode === 'DE' || countryCode === 'DEU' || countryCode === 'GERMANY' || countryCode === 'DEUTSCHLAND'
@@ -260,15 +266,18 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
   const formatPrice = (val: number) => 
     new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val) + ` ${currency}`
 
-  const totalNet = items.reduce((acc, item) => acc + (item.unitPrice * item.quantity), 0)
+  const rawTotalNet = items.reduce((acc, item) => acc + (item.unitPrice * item.quantity), 0)
+  const discountAmount = rawTotalNet * (discountRate / 100)
+  const totalNet = rawTotalNet - discountAmount
   
   const taxesByRate = items.reduce((acc, item) => {
     const rate = item.taxRate
     const lineNet = item.unitPrice * item.quantity
-    const lineTax = lineNet * rate
+    const discountedLineNet = lineNet * (1 - discountRate / 100)
+    const lineTax = discountedLineNet * rate
     
     if (!acc[rate]) acc[rate] = { net: 0, tax: 0 }
-    acc[rate].net += lineNet
+    acc[rate].net += discountedLineNet
     acc[rate].tax += lineTax
     return acc
   }, {} as Record<number, { net: number, tax: number }>)
@@ -471,13 +480,43 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
                   <Text key={i} style={{ marginBottom: 2 }}>{line}</Text>
                 ))
               ))}
+              {skontoRate > 0 && skontoDays > 0 && (
+                <View style={{ marginTop: 10 }}>
+                  <Text style={{ fontWeight: 'bold' }}>
+                    {lang === 'de' 
+                      ? `Zahlbar innerhalb von ${skontoDays} Tagen abzüglich ${skontoRate}% Skonto (${formatPrice(subtotal * (skontoRate / 100))}) = ${formatPrice(subtotal * (1 - skontoRate / 100))}.`
+                      : `Payable within ${skontoDays} days with a ${skontoRate}% discount (${formatPrice(subtotal * (skontoRate / 100))}) = ${formatPrice(subtotal * (1 - skontoRate / 100))}.`
+                    }
+                  </Text>
+                  {dueDate && documentType !== 'quote' && (
+                    <Text style={{ marginTop: 2 }}>
+                      {lang === 'de'
+                        ? `Andernfalls zahlbar bis zum ${format(dueDate, 'dd.MM.yyyy')} ohne Abzug.`
+                        : `Otherwise payable until ${format(dueDate, 'dd.MM.yyyy')} without deduction.`
+                      }
+                    </Text>
+                  )}
+                </View>
+              )}
             </View>
           </View>
           <View style={styles.summaryTable}>
             <View style={styles.summaryRow}>
               <Text>{t.net}</Text>
-              <Text>{formatPrice(totalNet * factor)}</Text>
+              <Text>{formatPrice(rawTotalNet * factor)}</Text>
             </View>
+            {discountRate > 0 && (
+              <View style={styles.summaryRow}>
+                <Text>{lang === 'de' ? `Rabatt (${discountRate}%)` : `Discount (${discountRate}%)`}</Text>
+                <Text>-{formatPrice(discountAmount * factor)}</Text>
+              </View>
+            )}
+            {discountRate > 0 && (
+              <View style={styles.summaryRow}>
+                <Text>{lang === 'de' ? 'Gesamt Netto abzüglich Rabatt' : 'Total Net after discount'}</Text>
+                <Text>{formatPrice(totalNet * factor)}</Text>
+              </View>
+            )}
             {Object.entries(taxesByRate).map(([rate, vals]) => (
               <View key={rate} style={styles.summaryRow}>
                 <Text>{t.vat} ({Number((parseFloat(rate) * 100).toFixed(2))}%)</Text>
