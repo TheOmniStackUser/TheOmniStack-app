@@ -18,6 +18,7 @@ export function SidebarNav({
     { href: '/invoices', label: 'Rechnungen' },
     { href: '/delivery-notes', label: 'Lieferscheine' },
     { href: '/quotes', label: 'Angebote' },
+    { href: '/customers', label: 'Kunden' },
   ]
 
   if (features.returns) {
