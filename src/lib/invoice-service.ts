@@ -518,7 +518,7 @@ export function extractPaymentInfo(order: any) {
       paymentMethod = raw.transactions?.[0]?.paymentMethod?.name || 'Shopware'
       isPaid = raw.transactions?.[0]?.stateMachineState?.technicalName === 'paid'
     } else if (marketplace === 'manual') {
-      paymentMethod = 'Vorkasse / Überweisung'
+      paymentMethod = ''
       isPaid = false
     } else {
       paymentMethod = 'Marketplace'

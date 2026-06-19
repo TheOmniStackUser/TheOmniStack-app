@@ -864,7 +864,7 @@ export async function previewInvoiceAction(data: {
       currency: data.currency,
       isCreditNote: data.isCreditNote,
       isPaid: false,
-      paymentMethod: 'Vorschau',
+      paymentMethod: '',
     }) as any
   )
 

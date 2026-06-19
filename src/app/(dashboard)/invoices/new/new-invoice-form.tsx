@@ -256,7 +256,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
       const { invoice, items: clonedItems } = await getInvoiceDetailsForCloneAction(id)
       setClonedFromInvoiceId(invoice.id || null)
       setCustomer({
-        id: invoice.id,
+        id: undefined,
         companyName: (invoice as any).recipientCompany || '',
         name: invoice.recipientName || '',
         street: invoice.recipientStreet || '',
