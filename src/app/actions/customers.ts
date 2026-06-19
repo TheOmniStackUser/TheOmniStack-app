@@ -317,3 +317,23 @@ export async function saveCustomerAction(data: any) {
     .returning()
   return { success: true, id: newCust.id, customerNumber: newCust.customerNumber }
 }
+
+export async function getCustomerByIdAction(customerId: string) {
+  const auth = await requireAuth()
+  const companyId = auth.activeCompanyId
+
+  if (!customerId) return null
+
+  const [customer] = await db
+    .select()
+    .from(customers)
+    .where(
+      and(
+        eq(customers.id, customerId),
+        eq(customers.companyId, companyId)
+      )
+    )
+    .limit(1)
+
+  return customer || null
+}

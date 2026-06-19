@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createManualInvoiceAction, editManualInvoiceAction, previewInvoiceAction, getDraftsAction, getDraftDetailsAction, deleteDraftAction } from '@/app/actions/manual-invoice'
 import { getInvoiceSettingsAction, saveInvoiceTemplateAction } from '@/app/actions/invoice-settings'
-import { searchCustomersAction, validateVatAction, saveCustomerAction } from '@/app/actions/customers'
+import { searchCustomersAction, validateVatAction, saveCustomerAction, getCustomerByIdAction } from '@/app/actions/customers'
 import { getInvoiceDetailsForCloneAction } from '@/app/actions/invoices'
 import { WORLD_COUNTRIES, EU_COUNTRIES, get2LetterCountryCode } from '@/lib/countries'
 
@@ -32,6 +32,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
   const [editId, setEditId] = useState<string | null>(editIdParam)
   const cloneId = searchParams.get('clone')
   const isCreditNoteParam = searchParams.get('isCreditNote')
+  const customerIdParam = searchParams.get('customerId')
   const [clonedFromInvoiceId, setClonedFromInvoiceId] = useState<string | null>(null)
 
   const [customer, setCustomer] = useState({
@@ -133,6 +134,16 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
       handleLoadClone(cloneId)
     }
   }, [cloneId])
+
+  useEffect(() => {
+    if (customerIdParam && !editIdParam && !cloneId && !draftIdParam) {
+      getCustomerByIdAction(customerIdParam).then(c => {
+        if (c) {
+          selectCustomer(c)
+        }
+      })
+    }
+  }, [customerIdParam])
   const [companyVatId, setCompanyVatId] = useState('')
   const [showVatModal, setShowVatModal] = useState(false)
 
