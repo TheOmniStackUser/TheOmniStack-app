@@ -28,13 +28,15 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
   const [internalNote, setInternalNote] = useState('')
   const [notification, setNotification] = useState<{ message: string, type: 'success' | 'error' | 'info' } | null>(null)
   const searchParams = useSearchParams()
-  const editId = searchParams.get('edit')
+  const editIdParam = searchParams.get('edit')
+  const [editId, setEditId] = useState<string | null>(editIdParam)
   const cloneId = searchParams.get('clone')
   const isCreditNoteParam = searchParams.get('isCreditNote')
   const [clonedFromInvoiceId, setClonedFromInvoiceId] = useState<string | null>(null)
 
   const [customer, setCustomer] = useState({
     id: undefined as string | undefined,
+    companyName: '',
     name: '',
     street: '',
     zip: '',
@@ -121,10 +123,10 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
   const [ownVatId, setOwnVatId] = useState('')
 
   useEffect(() => {
-    if (editId) {
-      handleLoadDraft(editId)
+    if (editIdParam) {
+      handleLoadDraft(editIdParam)
     }
-  }, [editId])
+  }, [editIdParam])
 
   useEffect(() => {
     if (cloneId) {
@@ -195,9 +197,16 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
   const handleLoadDraft = async (draftId: string) => {
     try {
       const { invoice, items: draftItems } = await getDraftDetailsAction(draftId)
-      setCurrentDraftId(draftId)
+      if (invoice.status === 'draft') {
+        setEditId(null)
+        setCurrentDraftId(draftId)
+      } else {
+        setEditId(draftId)
+        setCurrentDraftId(null)
+      }
       setCustomer({
         id: undefined,
+        companyName: invoice.recipientCompany || '',
         name: invoice.recipientName || '',
         street: invoice.recipientStreet || '',
         zip: invoice.recipientZip || '',
@@ -247,7 +256,8 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
       const { invoice, items: clonedItems } = await getInvoiceDetailsForCloneAction(id)
       setClonedFromInvoiceId(invoice.id || null)
       setCustomer({
-        id: undefined,
+        id: invoice.id,
+        companyName: (invoice as any).recipientCompany || '',
         name: invoice.recipientName || '',
         street: invoice.recipientStreet || '',
         zip: invoice.recipientZip || '',
@@ -345,7 +355,8 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
   const selectCustomer = (c: any) => {
     setCustomer({
       id: c.id,
-      name: c.name,
+      companyName: c.companyName || '',
+      name: c.name || '',
       street: c.street || '',
       zip: c.zip || '',
       city: c.city || '',
@@ -830,16 +841,28 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
           <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-6">
           <h2 className="text-xl font-bold text-slate-900 border-b border-slate-100 pb-4">Empfänger</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="md:col-span-2 relative">
-              <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Name / Firma</label>
-              <input 
-                required 
-                className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-slate-900" 
-                value={customer.name} 
-                onChange={e => handleSearchCustomers(e.target.value)} 
-                placeholder="Erika Mustermann" 
-                autoComplete="off"
-              />
+            <div className="md:col-span-2 relative grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Firma</label>
+                <input 
+                  className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-slate-900 placeholder:text-slate-500" 
+                  value={customer.companyName || ''} 
+                  onChange={e => setCustomer({ ...customer, companyName: e.target.value })} 
+                  placeholder="Muster GmbH (Optional)" 
+                  autoComplete="off"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Vor- und Nachname *</label>
+                <input 
+                  required 
+                  className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-slate-900 placeholder:text-slate-500" 
+                  value={customer.name} 
+                  onChange={e => handleSearchCustomers(e.target.value)} 
+                  placeholder="Erika Mustermann" 
+                  autoComplete="off"
+                />
+              </div>
               <button 
                 type="button"
                 onClick={async () => {
@@ -1367,7 +1390,11 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
               <form onSubmit={handleSaveCustomer} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
-                    <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Name / Firma *</label>
+                    <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Firma</label>
+                    <input className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-slate-900 placeholder:text-slate-500" value={customerFormData?.companyName || ''} onChange={e => setCustomerFormData({ ...customerFormData, companyName: e.target.value })} placeholder="Muster GmbH (Optional)" />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Vor- und Nachname *</label>
                     <input required className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-slate-900 placeholder:text-slate-500" value={customerFormData?.name || ''} onChange={e => setCustomerFormData({ ...customerFormData, name: e.target.value })} placeholder="Erika Mustermann" />
                   </div>
                   <div>

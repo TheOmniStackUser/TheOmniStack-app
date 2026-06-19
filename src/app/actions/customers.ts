@@ -15,11 +15,25 @@ export async function searchCustomersAction(query: string) {
     .from(customers)
     .where(eq(customers.companyId, companyId))
 
-  if (!query || query.length < 2) {
+  if (!query || query.trim().length < 2) {
     return await baseQuery
       .orderBy(desc(customers.createdAt))
       .limit(10)
   }
+
+  const searchTerms = query.trim().split(/\s+/).filter(t => t.length > 0)
+
+  const conditions = searchTerms.map(term => 
+    or(
+      ilike(customers.name, `%${term}%`),
+      ilike(customers.companyName, `%${term}%`),
+      ilike(customers.email, `%${term}%`),
+      ilike(customers.customerNumber, `%${term}%`),
+      ilike(customers.street, `%${term}%`),
+      ilike(customers.city, `%${term}%`),
+      ilike(customers.zip, `%${term}%`)
+    )
+  )
 
   return await db
     .select()
@@ -27,13 +41,10 @@ export async function searchCustomersAction(query: string) {
     .where(
       and(
         eq(customers.companyId, companyId),
-        or(
-          ilike(customers.name, `%${query}%`),
-          ilike(customers.email, `%${query}%`),
-          ilike(customers.customerNumber, `%${query}%`)
-        )
+        ...conditions
       )
     )
+    .orderBy(desc(customers.createdAt))
     .limit(20)
 }
 
@@ -183,6 +194,7 @@ export async function saveCustomerAction(data: any) {
   // Normalize empty strings to null for unique constraints
   const { vatCheckStatus, id, companyId: dataCompanyId, ...rest } = data
   const normalizedData: any = {
+    companyName: rest.companyName?.trim() || null,
     name: rest.name?.trim(),
     email: rest.email?.trim() || null,
     phone: rest.phone?.trim() || null,

@@ -96,7 +96,7 @@ export function CustomersClient({ initialCustomers }: { initialCustomers: any[] 
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
                 <th className="px-6 py-4 font-bold text-slate-600 uppercase text-[10px] tracking-wider">Kundennr.</th>
-                <th className="px-6 py-4 font-bold text-slate-600 uppercase text-[10px] tracking-wider">Name / Firma</th>
+                <th className="px-6 py-4 font-bold text-slate-600 uppercase text-[10px] tracking-wider">Firma / Name</th>
                 <th className="px-6 py-4 font-bold text-slate-600 uppercase text-[10px] tracking-wider">Kontakt</th>
                 <th className="px-6 py-4 font-bold text-slate-600 uppercase text-[10px] tracking-wider">Adresse</th>
                 <th className="px-6 py-4 font-bold text-slate-600 uppercase text-[10px] tracking-wider text-right">Aktionen</th>
@@ -109,7 +109,8 @@ export function CustomersClient({ initialCustomers }: { initialCustomers: any[] 
                     <span className="font-black text-cyan-600 bg-cyan-50 px-2 py-1 rounded-md text-[10px] uppercase">{c.customerNumber || '---'}</span>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="font-bold text-slate-900">{c.name}</div>
+                    {c.companyName && <div className="font-bold text-slate-900">{c.companyName}</div>}
+                    <div className={c.companyName ? "text-slate-600 font-medium mt-1" : "font-bold text-slate-900"}>{c.name}</div>
                     {c.vatId && <div className="text-[10px] text-slate-500 font-medium uppercase mt-1">USt-Id: {c.vatId}</div>}
                   </td>
                   <td className="px-6 py-4">
@@ -163,7 +164,11 @@ export function CustomersClient({ initialCustomers }: { initialCustomers: any[] 
             <form onSubmit={handleSave} className="p-6 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
-                  <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Name / Firma *</label>
+                  <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Firma</label>
+                  <input className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-cyan-500 outline-none font-bold text-slate-900 placeholder:text-slate-500" value={formData?.companyName || ''} onChange={e => setFormData({ ...formData, companyName: e.target.value })} placeholder="Muster GmbH (Optional)" />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Vor- und Nachname *</label>
                   <input required className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-cyan-500 outline-none font-bold text-slate-900 placeholder:text-slate-500" value={formData?.name || ''} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="Erika Mustermann" />
                 </div>
                 <div>

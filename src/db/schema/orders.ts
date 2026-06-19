@@ -53,6 +53,7 @@ export const orders = pgTable('orders', {
   marketplacePurchaseDate: timestamp('marketplace_purchase_date', { withTimezone: true }),
   // Buyer information
   buyerName: text('buyer_name'),
+  buyerCompany: text('buyer_company'),
   buyerEmail: text('buyer_email'),
   buyerPhone: text('buyer_phone'),
   shippingName: text('shipping_name'),

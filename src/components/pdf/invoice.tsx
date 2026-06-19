@@ -36,9 +36,10 @@ const styles = StyleSheet.create({
   tableRow: { flexDirection: 'row', borderBottom: '1px solid #eee', paddingVertical: 8, alignItems: 'center' },
   colPos: { width: 30 },
   colSkuTitle: { flex: 1 },
-  colMenge: { width: 60, textAlign: 'right' },
-  colPrice: { width: 80, textAlign: 'right' },
-  colTotal: { width: 80, textAlign: 'right' },
+  colMenge: { width: 50, textAlign: 'right' },
+  colTax: { width: 50, textAlign: 'right' },
+  colPrice: { width: 70, textAlign: 'right' },
+  colTotal: { width: 70, textAlign: 'right' },
   
   summarySection: { marginTop: 30, flexDirection: 'row', justifyContent: 'flex-end' },
   summaryTable: { width: 200 },
@@ -189,6 +190,7 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
       taxNote: 'Das Rechnungsdatum entspricht dem Leistungsdatum',
       quantity: 'Menge',
       sku: 'Art.-Nr. + Bezeichnung',
+      taxRate: 'MwSt.',
       price: 'Einzelpreis',
       total: 'Gesamt',
       pos: 'Pos',
@@ -230,6 +232,7 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
       taxNote: 'The invoice date corresponds to the service date',
       quantity: 'Qty',
       sku: 'SKU + Description',
+      taxRate: 'VAT',
       price: 'Unit Price',
       total: 'Total',
       pos: 'Pos',
@@ -435,6 +438,7 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
             <Text style={styles.colPos}>{t.pos}</Text>
             <Text style={styles.colSkuTitle}>{t.sku}</Text>
             <Text style={styles.colMenge}>{t.quantity}</Text>
+            <Text style={styles.colTax}>{t.taxRate}</Text>
             <Text style={styles.colPrice}>{t.price}</Text>
             <Text style={styles.colTotal}>{t.total}</Text>
           </View>
@@ -448,6 +452,7 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
                 )}
               </View>
               <Text style={styles.colMenge}>{item.quantity}</Text>
+              <Text style={styles.colTax}>{Number((item.taxRate * 100).toFixed(2))}%</Text>
               <Text style={styles.colPrice}>{formatPrice(item.unitPrice * factor)}</Text>
               <Text style={styles.colTotal}>{formatPrice(item.unitPrice * item.quantity * factor)}</Text>
             </View>
@@ -475,7 +480,7 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
             </View>
             {Object.entries(taxesByRate).map(([rate, vals]) => (
               <View key={rate} style={styles.summaryRow}>
-                <Text>{t.vat} ({parseFloat(rate) * 100}%)</Text>
+                <Text>{t.vat} ({Number((parseFloat(rate) * 100).toFixed(2))}%)</Text>
                 <Text>{formatPrice(vals.tax * factor)}</Text>
               </View>
             ))}
