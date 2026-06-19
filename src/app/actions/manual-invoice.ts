@@ -75,6 +75,25 @@ export async function createManualInvoiceAction(data: {
   const tax = data.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice * (item.taxRate / 100)), 0)
   const total = subtotal + tax
 
+  let finalCustomerNumber = data.customer.customerNumber || null
+  if (data.customer.name?.trim()) {
+    const custResult = await saveCustomerAction({
+      id: data.customer.id,
+      name: data.customer.name,
+      email: data.customer.email,
+      street: data.customer.street,
+      zip: data.customer.zip,
+      city: data.customer.city,
+      country: data.customer.country,
+      vatId: data.customer.vatId,
+      customerNumber: data.customer.customerNumber,
+      vatCheckStatus: data.vatCheckStatus
+    })
+    if (custResult.success) {
+      finalCustomerNumber = custResult.customerNumber
+    }
+  }
+
   const order = await db.transaction(async (tx) => {
     // 1. Remove existing draft if updating
     if (data.currentDraftId) {
@@ -183,6 +202,7 @@ export async function createManualInvoiceAction(data: {
         taxAmount: tax.toFixed(2),
         totalAmount: total.toFixed(2),
         isArchived: data.createOrder === false, // Hide from list if false
+        customerNumber: finalCustomerNumber,
         rawPayload: {
           manualMetadata: {
             draftName: data.draftName,
@@ -217,30 +237,6 @@ export async function createManualInvoiceAction(data: {
         taxRate: (item.taxRate / 100).toString(),
       }))
     )
-
-    // 1b. Upsert Customer and get customer number
-    let finalCustomerNumber = data.customer.customerNumber || null
-    if (data.customer.name?.trim()) {
-      const custResult = await saveCustomerAction({
-        id: data.customer.id,
-        name: data.customer.name,
-        email: data.customer.email,
-        street: data.customer.street,
-        zip: data.customer.zip,
-        city: data.customer.city,
-        country: data.customer.country,
-        vatId: data.customer.vatId,
-        customerNumber: data.customer.customerNumber,
-        vatCheckStatus: data.vatCheckStatus
-      })
-      if (custResult.success) {
-        finalCustomerNumber = custResult.customerNumber
-        // Update the order with the customer number
-        await tx.update(orders)
-          .set({ customerNumber: finalCustomerNumber })
-          .where(eq(orders.id, newOrder.id))
-      }
-    }
 
     return [newOrder]
   })
@@ -951,6 +947,21 @@ export async function editManualInvoiceAction(data: {
     const tax = data.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice * (item.taxRate / 100)), 0)
     const total = subtotal + tax
 
+    if (data.customer.name?.trim()) {
+      await saveCustomerAction({
+        id: data.customer.id,
+        name: data.customer.name,
+        email: data.customer.email,
+        street: data.customer.street,
+        zip: data.customer.zip,
+        city: data.customer.city,
+        country: data.customer.country,
+        vatId: data.customer.vatId,
+        customerNumber: data.customer.customerNumber,
+        vatCheckStatus: data.vatCheckStatus
+      })
+    }
+
     await db.transaction(async (tx) => {
       // a) Create Log Entry
       await tx.insert(invoiceLogs).values({
@@ -960,22 +971,6 @@ export async function editManualInvoiceAction(data: {
         note: data.internalNote,
         action: 'edited'
       })
-
-      // Save/Update customer record
-      if (data.customer.name?.trim()) {
-        await saveCustomerAction({
-          id: data.customer.id,
-          name: data.customer.name,
-          email: data.customer.email,
-          street: data.customer.street,
-          zip: data.customer.zip,
-          city: data.customer.city,
-          country: data.customer.country,
-          vatId: data.customer.vatId,
-          customerNumber: data.customer.customerNumber,
-          vatCheckStatus: data.vatCheckStatus
-        })
-      }
 
       // b) Update Invoice Record
       await tx.update(invoices).set({
