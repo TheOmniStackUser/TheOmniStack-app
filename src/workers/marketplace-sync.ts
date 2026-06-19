@@ -103,7 +103,7 @@ async function reportChildResult(
   const totalStr = await redis.get(`${groupKey}:total`)
   const total = totalStr ? parseInt(totalStr, 10) : 0
   
-  if (total > 0 && doneCount >= total) {
+  if (total > 0 && doneCount === total) {
     // All jobs are done! Fetch all results
     const resultsMap = await redis.hgetall(`${groupKey}:results`)
     const resultsArray = Object.values(resultsMap).map(v => JSON.parse(v))

@@ -842,21 +842,11 @@ export async function saveSyncSettingsAction(
   // Clean up any existing repeatable sync jobs in Redis for this company
   try {
     const repeatableJobs = await marketplaceSyncQueue.getRepeatableJobs()
-    const client = await marketplaceSyncQueue.client
     for (const job of repeatableJobs) {
-      const redisKey = `${marketplaceSyncQueue.toKey('repeat')}:${job.key}:${job.next}`
-      const jobData = await client.hgetall(redisKey)
-      let jobId: string | null = null
-      if (jobData && jobData.opts) {
-        try {
-          const opts = JSON.parse(jobData.opts)
-          jobId = opts.repeat?.jobId || opts.jobId || null
-        } catch (e) {}
-      }
-
-      if (jobId?.startsWith(`daily-sync-${auth.activeCompanyId}`)) {
+      // In BullMQ, repeatable jobs include the custom jobId in their `id` property.
+      if (job.id === `daily-sync-${auth.activeCompanyId}`) {
         await marketplaceSyncQueue.removeRepeatableByKey(job.key)
-        console.log(`   - Cleared old repeatable sync job: ${jobId}`)
+        console.log(`   - Cleared old repeatable sync job: ${job.id}`)
       }
     }
 
