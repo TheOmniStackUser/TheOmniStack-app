@@ -213,14 +213,28 @@ export async function saveCustomerAction(data: any) {
 
   let existingCustomer = null
 
-  if (normalizedData.email) {
+  if (normalizedData.customerNumber) {
     const [found] = await db
       .select()
       .from(customers)
       .where(
         and(
           eq(customers.companyId, companyId),
-          eq(customers.email, normalizedData.email)
+          eq(customers.customerNumber, normalizedData.customerNumber)
+        )
+      )
+      .limit(1)
+    existingCustomer = found
+  }
+
+  if (!existingCustomer && id) {
+    const [found] = await db
+      .select()
+      .from(customers)
+      .where(
+        and(
+          eq(customers.companyId, companyId),
+          eq(customers.id, id)
         )
       )
       .limit(1)
@@ -260,7 +274,19 @@ export async function saveCustomerAction(data: any) {
       )
       .limit(1)
     if (foundOrder?.customerNumber) {
-      fallbackCustomerNumber = foundOrder.customerNumber
+      const [usedNum] = await db
+        .select({ id: customers.id })
+        .from(customers)
+        .where(
+          and(
+            eq(customers.companyId, companyId),
+            eq(customers.customerNumber, foundOrder.customerNumber)
+          )
+        )
+        .limit(1)
+      if (!usedNum) {
+        fallbackCustomerNumber = foundOrder.customerNumber
+      }
     }
   }
 

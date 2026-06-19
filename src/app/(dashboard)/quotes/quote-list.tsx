@@ -131,7 +131,6 @@ export function QuoteList({
   const router = useRouter()
   const [quotes, setQuotes] = useState<Quote[]>(initialQuotes)
   const [loadingId, setLoadingId] = useState<string | null>(null)
-  const [convertingId, setConvertingId] = useState<string | null>(null)
   const [orderingId, setOrderingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -192,20 +191,7 @@ export function QuoteList({
     }
   }
 
-  const handleConvert = async (id: string, targetType: 'invoice' | 'delivery_note') => {
-    setConvertingId(id)
-    try {
-      const result = await convertQuoteAction(id, targetType) as any
-      if (result?.error) {
-        showToast(`Fehler: ${result.error}`, 'error')
-        setConvertingId(null)
-      }
-    } catch (error: any) {
-      if (error?.digest?.includes('NEXT_REDIRECT')) return
-      showToast('Fehler bei der Konvertierung.', 'error')
-      setConvertingId(null)
-    }
-  }
+
 
   const handleDelete = async (id: string) => {
     if (!confirm('Angebot wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.')) return
@@ -536,17 +522,17 @@ export function QuoteList({
                       </Link>
 
                       {/* Convert to Delivery Note */}
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleConvert(quote.id, 'delivery_note'); }}
-                        disabled={convertingId === quote.id}
+                      <Link
+                        href={`/delivery-notes/new?clone=${quote.id}`}
+                        onClick={(e) => e.stopPropagation()}
                         title="Als Lieferschein erstellen"
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-all disabled:opacity-50"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-all cursor-pointer"
                       >
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
                         </svg>
                         → Lieferschein
-                      </button>
+                      </Link>
 
                       {/* Convert to Order */}
                       <button
@@ -836,29 +822,16 @@ export function QuoteList({
                         </button>
 
                         {/* → Lieferschein erstellen */}
-                        <button
-                          onClick={() => handleConvert(details.invoice.id, 'delivery_note')}
-                          disabled={convertingId === details.invoice.id}
+                        <Link
+                          href={`/delivery-notes/new?clone=${details.invoice.id}`}
                           title="Neuen Lieferschein auf Basis dieses Angebots erstellen"
-                          className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl text-xs font-bold text-blue-700 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl text-xs font-bold text-blue-700 transition-all shadow-sm"
                         >
-                          {convertingId === details.invoice.id ? (
-                            <>
-                              <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                              </svg>
-                              Wird erstellt...
-                            </>
-                          ) : (
-                            <>
-                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                              </svg>
-                              → Lieferschein erstellen
-                            </>
-                          )}
-                        </button>
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                          </svg>
+                          → Lieferschein erstellen
+                        </Link>
                       </div>
                     </div>
 

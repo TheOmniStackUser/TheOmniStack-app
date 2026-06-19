@@ -34,7 +34,6 @@ export const customers = pgTable('customers', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({
-  unqCustomerEmail: unique('unq_company_customer_email').on(t.companyId, t.email),
   unqCustomerNumber: unique('unq_company_customer_number').on(t.companyId, t.customerNumber)
 }))
 

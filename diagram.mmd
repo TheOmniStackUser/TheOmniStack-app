@@ -1,0 +1,69 @@
+flowchart TD
+    %% Define Styles with explicit text colors for readability
+    classDef publicZone fill:#e6f2ff,stroke:#3399ff,stroke-width:2px,color:#000000;
+    classDef privateZone fill:#f9f2ec,stroke:#ff9933,stroke-width:2px,color:#000000;
+    classDef secureData fill:#ffcccc,stroke:#ff0000,stroke-width:2px,color:#000000;
+    classDef amazon fill:#ff9900,stroke:#333,stroke-width:2px,color:#ffffff;
+    classDef security fill:#d9d9d9,stroke:#666,stroke-width:2px,color:#000000;
+
+    %% External Entities
+    subgraph Internet ["Internet (Public Zone)"]
+        Users["Web Users / Administrators"]
+        AmazonSP["Amazon SP-API\n(Amazon Information Source)"]:::amazon
+        ThirdParties["Third-Party APIs\n(DHL, Hermes, Shopify, Otto)"]
+    end
+
+    %% Security & Edge
+    subgraph Edge ["Edge Protection & Access"]
+        WAF["Web Application Firewall (WAF) & IDS/IPS\n(Blocks Unauthorized Traffic)"]:::security
+        VPN["Zero-Trust Gateway / VPN\n(Requires MFA for Admins)"]:::security
+    end
+
+    %% Application Layer (Public Facing / Edge)
+    subgraph Vercel ["Vercel Hosting Environment (Frontend)"]
+        NextFrontend["Next.js React Frontend"]
+        NextAPI["Serverless API Actions\n(TLS 1.2+ Termination)"]
+    end
+
+    %% Private VPC (Secure Backend)
+    subgraph AWS_VPC ["Private VPC (Private Zone - No Public IP)"]
+        
+        subgraph Workers ["Compute Subnet"]
+            NodeWorker["Node.js Background Workers\n(Hetzner / Internal)"]
+        end
+
+        subgraph DataSubnet ["Data Subnet (Amazon Information)"]
+            PostgreSQL[("Managed PostgreSQL Database\n(AES-256 Encrypted via AWS KMS)")]:::secureData
+            Redis[("Managed Redis Cluster\n(BullMQ Queues - Encrypted)")]:::secureData
+            S3[("AWS S3 Object Lock\n(WORM Storage for Invoices)")]:::secureData
+        end
+        
+        KMS["AWS KMS\n(Key Management Service)"]:::security
+        CloudWatch["AWS CloudWatch / CloudTrail\n(Logging & Monitoring - No PII)"]:::security
+    end
+
+    %% Connections & Data Flow
+    Users -- "HTTPS (TLS 1.2+)" --> WAF
+    WAF -- "Filtered Traffic" --> NextFrontend
+    NextFrontend -- "HTTPS" --> NextAPI
+
+    %% Amazon Data Flow
+    AmazonSP -- "SP-API OAuth / TLS 1.2+" --> NodeWorker
+    NextAPI -- "Internal VPC Traffic" --> PostgreSQL
+    NextAPI -- "Internal VPC Traffic" --> Redis
+    
+    %% Worker Data Flow
+    NodeWorker -- "Process Queues" --> Redis
+    NodeWorker -- "Read/Write Amazon Info" --> PostgreSQL
+    NodeWorker -- "Store PDFs" --> S3
+    NodeWorker -- "Outbound HTTPS" --> ThirdParties
+
+    %% Security Connections
+    VPN -- "Secure Admin Access" --> AWS_VPC
+    PostgreSQL -. "Encrypt/Decrypt" .- KMS
+    S3 -. "Encrypt/Decrypt" .- KMS
+    AWS_VPC -. "System Logs (12-Month Retention)" .- CloudWatch
+
+    %% Labels
+    class Internet,Edge publicZone;
+    class AWS_VPC privateZone;

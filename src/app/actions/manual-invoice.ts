@@ -18,6 +18,7 @@ import { invoiceTextTemplates } from '@/db/schema/templates'
 export async function createManualInvoiceAction(data: {
   customer: {
     id?: string
+    companyName?: string
     name: string
     street: string
     zip: string
@@ -79,6 +80,7 @@ export async function createManualInvoiceAction(data: {
   if (data.customer.name?.trim()) {
     const custResult = await saveCustomerAction({
       id: data.customer.id,
+      companyName: data.customer.companyName,
       name: data.customer.name,
       email: data.customer.email,
       street: data.customer.street,
@@ -773,6 +775,7 @@ export async function deleteDraftAction(draftId: string) {
 export async function previewInvoiceAction(data: {
   customer: {
     id?: string
+    companyName?: string
     name: string
     street: string
     zip: string
@@ -876,6 +879,7 @@ export async function editManualInvoiceAction(data: {
   internalNote: string
   customer: {
     id?: string
+    companyName?: string
     name: string
     street: string
     zip: string
@@ -950,6 +954,7 @@ export async function editManualInvoiceAction(data: {
     if (data.customer.name?.trim()) {
       await saveCustomerAction({
         id: data.customer.id,
+        companyName: data.customer.companyName,
         name: data.customer.name,
         email: data.customer.email,
         street: data.customer.street,
@@ -975,6 +980,7 @@ export async function editManualInvoiceAction(data: {
       // b) Update Invoice Record
       await tx.update(invoices).set({
         recipientName: data.customer.name,
+        recipientCompany: (data.customer as any).companyName || '',
         recipientStreet: data.customer.street,
         recipientZip: data.customer.zip,
         recipientCity: data.customer.city,
