@@ -59,6 +59,7 @@ export async function createManualInvoiceAction(data: {
   vatCheckStatus?: { status: string, lastChecked?: Date }
   documentType?: 'invoice' | 'quote' | 'delivery_note'
   cancelsInvoiceId?: string
+  showServiceDateNote?: boolean
 }) {
   try {
     const auth = await requireAuth()
@@ -924,6 +925,7 @@ export async function editManualInvoiceAction(data: {
   ossEnabled?: boolean
   dueDateDays?: number
   vatCheckStatus?: { status: string, lastChecked?: Date }
+  showServiceDateNote?: boolean
 }) {
   try {
     const auth = await requireAuth()

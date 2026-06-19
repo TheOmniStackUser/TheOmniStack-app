@@ -119,6 +119,7 @@ interface InvoiceProps {
   discountRate?: number
   skontoRate?: number
   skontoDays?: number
+  showServiceDateNote?: boolean
 }
 
 export const InvoiceDocument: React.FC<InvoiceProps> = ({
@@ -145,6 +146,7 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
   discountRate = 0,
   skontoRate = 0,
   skontoDays = 0,
+  showServiceDateNote = false,
 }) => {
   const countryCode = (recipient.country || '').toUpperCase()
   const isGerman = countryCode === 'DE' || countryCode === 'DEU' || countryCode === 'GERMANY' || countryCode === 'DEUTSCHLAND'
@@ -438,6 +440,11 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
           {taxReason && (
             <View style={styles.taxReasonSection}>
               <Text>{taxReason}</Text>
+            </View>
+          )}
+          {showServiceDateNote && (
+            <View style={{ ...styles.taxReasonSection, marginTop: taxReason ? 5 : 10 }}>
+              <Text>{t.taxNote}</Text>
             </View>
           )}
         </View>

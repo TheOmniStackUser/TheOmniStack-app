@@ -33,6 +33,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
   const cloneId = searchParams.get('clone')
   const isCreditNoteParam = searchParams.get('isCreditNote')
   const customerIdParam = searchParams.get('customerId')
+  const draftIdParam = searchParams.get('draftId')
   const [clonedFromInvoiceId, setClonedFromInvoiceId] = useState<string | null>(null)
 
   const [customer, setCustomer] = useState({
@@ -181,8 +182,6 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
     loadSettings()
   }, [])
 
-  const draftIdParam = searchParams.get('draftId')
-
   const handleSaveCustomer = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSavingCustomer(true)
@@ -313,6 +312,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
         taxOption: invoice.taxOption || 'standard',
         isOss: invoice.ossEnabled || false,
         createOrder: false,
+        showServiceDateNote: false,
       })
       
       if (isCreditNoteParam === 'true') {
