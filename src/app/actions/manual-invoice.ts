@@ -220,6 +220,7 @@ export async function createManualInvoiceAction(data: {
             skontoRate: data.skontoRate,
             skontoDays: data.skontoDays,
             discountRate: data.discountRate,
+            showServiceDateNote: data.showServiceDateNote,
             ossEnabled: data.ossEnabled,
             dueDateDays: data.dueDateDays,
             createOrder: data.createOrder
@@ -722,6 +723,7 @@ export async function getDraftDetailsAction(draftId: string) {
       skontoRate: metadata.skontoRate,
       skontoDays: metadata.skontoDays,
       discountRate: metadata.discountRate,
+      showServiceDateNote: metadata.showServiceDateNote,
       ossEnabled: metadata.ossEnabled,
       dueDateDays: metadata.dueDateDays,
       createOrder: metadata.createOrder ?? false
@@ -802,6 +804,10 @@ export async function previewInvoiceAction(data: {
   buyerReference?: string
   externalId?: string
   documentType?: 'invoice' | 'quote' | 'delivery_note'
+  showServiceDateNote?: boolean
+  discountRate?: number
+  skontoRate?: number
+  skontoDays?: number
 }) {
   const auth = await requireAuth()
   const companyId = auth.activeCompanyId
@@ -825,6 +831,10 @@ export async function previewInvoiceAction(data: {
       customText: data.customText,
       taxOption: data.taxOption,
       documentType: data.documentType || 'invoice',
+      showServiceDateNote: data.showServiceDateNote,
+      discountRate: data.discountRate,
+      skontoRate: data.skontoRate,
+      skontoDays: data.skontoDays,
       company: {
         name: company.legalName || company.name,
         street: company.street || undefined,
@@ -1039,6 +1049,7 @@ export async function editManualInvoiceAction(data: {
             skontoRate: data.skontoRate,
             skontoDays: data.skontoDays,
             discountRate: data.discountRate,
+            showServiceDateNote: data.showServiceDateNote,
             ossEnabled: data.ossEnabled,
             dueDateDays: data.dueDateDays
           }

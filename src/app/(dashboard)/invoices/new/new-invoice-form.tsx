@@ -64,7 +64,8 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
     externalId: '',
     isOss: false,
     taxOption: 'standard',
-    createOrder: false
+    createOrder: false,
+    showServiceDateNote: false
   })
 
   const getAvailableVatRates = () => {
@@ -122,6 +123,15 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
   const [vatValidationHistory, setVatValidationHistory] = useState<any[]>([])
   const [activeVatProvider, setActiveVatProvider] = useState<'NONE' | 'VIES' | 'EVATR'>('NONE')
   const [ownVatId, setOwnVatId] = useState('')
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !editIdParam && !cloneId && !draftIdParam) {
+      const savedPref = localStorage.getItem('billing_app_showServiceDateNote')
+      if (savedPref === 'true') {
+        setSettings(s => ({ ...s, showServiceDateNote: true }))
+      }
+    }
+  }, [editIdParam, cloneId, draftIdParam])
 
   useEffect(() => {
     if (editIdParam) {
@@ -252,6 +262,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
         taxOption: (invoice as any).taxOption || 'standard',
         isOss: (invoice as any).ossEnabled || false,
         createOrder: (invoice as any).createOrder || false,
+        showServiceDateNote: (invoice as any).showServiceDateNote || false,
       })
       setCustomText(invoice.customText || '')
       setShowDraftsList(false)
@@ -491,6 +502,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
           skontoDays: settings.skontoDays,
           discountRate: settings.discount,
           ossEnabled: settings.isOss,
+          showServiceDateNote: settings.showServiceDateNote,
           dueDateDays: settings.dueDateDays,
           vatCheckStatus
         })
@@ -532,6 +544,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
         skontoDays: settings.skontoDays,
         discountRate: settings.discount,
         ossEnabled: settings.isOss,
+        showServiceDateNote: settings.showServiceDateNote,
         dueDateDays: settings.dueDateDays,
         createOrder: settings.createOrder,
         currentDraftId,
@@ -584,7 +597,11 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
         orderDate: settings.orderDate ? new Date(settings.orderDate) : undefined,
         buyerReference: settings.buyerReference,
         externalId: settings.externalId,
-        documentType
+        documentType,
+        showServiceDateNote: settings.showServiceDateNote,
+        discountRate: settings.discount,
+        skontoRate: settings.skontoPercent,
+        skontoDays: settings.skontoDays,
       })
 
       if (result.base64) {
@@ -840,6 +857,26 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                     <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all ${settings.isOss ? 'left-7' : 'left-1'}`} />
                   </div>
                   <span className="text-sm font-bold text-slate-700">OSS-Verfahren aktiv</span>
+                </label>
+              </div>
+              <div className="flex items-center gap-3 pt-4">
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <div className={`w-12 h-6 rounded-full transition-all relative ${settings.showServiceDateNote ? 'bg-blue-600' : 'bg-slate-200'}`}>
+                    <input 
+                      type="checkbox" 
+                      checked={settings.showServiceDateNote} 
+                      onChange={e => {
+                        const checked = e.target.checked
+                        setSettings({ ...settings, showServiceDateNote: checked })
+                        if (typeof window !== 'undefined') {
+                          localStorage.setItem('billing_app_showServiceDateNote', checked.toString())
+                        }
+                      }} 
+                      className="hidden" 
+                    />
+                    <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all ${settings.showServiceDateNote ? 'left-7' : 'left-1'}`} />
+                  </div>
+                  <span className="text-sm font-bold text-slate-700">Leistungsdatum entspricht Rechnungsdatum</span>
                 </label>
               </div>
             </div>
