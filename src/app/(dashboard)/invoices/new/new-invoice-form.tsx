@@ -1206,7 +1206,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
         </div>
       )}
 
-      <div className="flex justify-end gap-4 fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md p-6 border-t border-slate-200 z-50 px-10">
+      <div className="flex justify-end gap-4 fixed bottom-0 left-64 right-0 bg-white/80 backdrop-blur-md p-6 border-t border-slate-200 z-50 px-10">
         <button type="button" onClick={() => window.history.back()} className="px-8 py-3 text-slate-600 font-bold hover:bg-slate-100 rounded-xl">Abbrechen</button>
         <button type="button" onClick={handlePreview} disabled={isPreviewing || isSubmitting || isSavingDraft} className="px-8 py-3 bg-white border-2 border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition-all flex items-center gap-2 disabled:opacity-50">{isPreviewing ? <span className="animate-spin">🌀</span> : 'Vorschau'}</button>
         {!editId && (
