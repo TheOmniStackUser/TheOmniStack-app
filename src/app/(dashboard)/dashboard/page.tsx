@@ -213,6 +213,8 @@ export default async function DashboardPage() {
   const formattedOpenRevenue = formatCurrency(openInvoicesStats?.revenue || 0)
   const formattedOverdueRevenue = formatCurrency(overdueInvoicesStats?.revenue || 0)
 
+  const isCraftVariant = process.env.NEXT_PUBLIC_APP_VARIANT === 'craft'
+
   return (
     <div className="max-w-6xl mx-auto space-y-12">
       <header className="flex items-start justify-between">
@@ -226,12 +228,13 @@ export default async function DashboardPage() {
           </p>
         </div>
         <div className="flex gap-3">
-          <SyncButton />
+          {!isCraftVariant && <SyncButton />}
         </div>
       </header>
 
       {/* Orders Breakdown */}
-      <section className="space-y-6">
+      {!isCraftVariant && (
+        <section className="space-y-6">
         <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2">
           Bestellungen Übersicht
         </h3>
@@ -265,7 +268,9 @@ export default async function DashboardPage() {
           Aktueller Monat & Finanzen
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
-          <Link href="/orders" className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all group flex flex-col justify-between hidden">
+          {!isCraftVariant && (
+            <>
+              <Link href="/orders" className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all group flex flex-col justify-between hidden">
             <div>
               <h3 className="text-gray-500 text-sm font-medium uppercase tracking-wider group-hover:text-blue-600 transition-colors">Offene Bestellungen</h3>
               <p className="text-4xl font-bold text-gray-900 mt-3">{openOrdersCount}</p>
@@ -286,6 +291,8 @@ export default async function DashboardPage() {
               <svg className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
             </div>
           </Link>
+          </>
+          )}
           
           <Link href="/invoices" className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all group flex flex-col justify-between">
             <div>
@@ -342,14 +349,16 @@ export default async function DashboardPage() {
           Gesamtübersicht (Lebenszeit)
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Link href="/orders" className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all group">
+          {!isCraftVariant && (
+            <Link href="/orders" className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all group">
             <h3 className="text-gray-500 text-sm font-medium uppercase tracking-wider group-hover:text-blue-600 transition-colors">Bestellungen (Gesamt)</h3>
             <p className="text-4xl font-bold text-gray-900 mt-3">{totalOrdersCount}</p>
             <div className="mt-4 text-sm text-gray-500 font-medium flex items-center gap-1">
               Inkl. versendeter Bestellungen
               <svg className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
             </div>
-          </Link>
+            </Link>
+          )}
           
           <Link href="/invoices" className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all group">
             <h3 className="text-gray-500 text-sm font-medium uppercase tracking-wider group-hover:text-blue-600 transition-colors">Rechnungen (Gesamt)</h3>
@@ -371,7 +380,7 @@ export default async function DashboardPage() {
       </section>
 
       {/* Bestellungen pro Marktplatz */}
-      {marketplaceStats.length > 0 && (
+      {!isCraftVariant && marketplaceStats.length > 0 && (
         <section className="space-y-6">
           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2">
             Bestellungen pro Marktplatz

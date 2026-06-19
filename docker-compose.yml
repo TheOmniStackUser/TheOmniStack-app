@@ -45,7 +45,7 @@ services:
       exit 0;
       "
 
-  # Next.js Application
+  # Next.js Application (TheOmniStack - E-Commerce)
   app:
     build:
       context: .
@@ -55,6 +55,25 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
+      - NEXT_PUBLIC_APP_VARIANT=omni
+    env_file:
+      - .env.local
+    depends_on:
+      - db
+      - redis
+      - minio
+
+  # Next.js Application (ProfiFaktura - Handwerker)
+  app_craft:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: profifaktura_app
+    ports:
+      - "3002:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_APP_VARIANT=craft
     env_file:
       - .env.local
     depends_on:

@@ -12,7 +12,9 @@ export function SidebarNav({
 }) {
   const pathname = usePathname()
 
-  const links = [
+  const isCraftVariant = process.env.NEXT_PUBLIC_APP_VARIANT === 'craft'
+
+  let links = [
     { href: '/dashboard', label: 'Dashboard' },
     { href: '/orders', label: 'Bestellungen' },
     { href: '/invoices', label: 'Rechnungen' },
@@ -29,6 +31,9 @@ export function SidebarNav({
     links.push({ href: '/products', label: 'Produkte' })
   }
 
+  if (isCraftVariant) {
+    links = links.filter(link => !['/orders', '/returns', '/products'].includes(link.href))
+  }
 
   return (
     <nav className="flex-1 px-4 space-y-1 mt-4">

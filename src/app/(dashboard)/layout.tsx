@@ -51,6 +51,8 @@ export default async function DashboardLayout({
   const isBetaSupport = auth.role === 'omnistack_beta'
   const canManage = auth.role === 'owner' || auth.role === 'admin' || isSupport || isBetaSupport
 
+  const isCraftVariant = process.env.NEXT_PUBLIC_APP_VARIANT === 'craft'
+
   return (
     <div className="h-screen bg-[#F8FAFC] flex overflow-hidden font-sans">
       <aside className="w-64 bg-[#0F172A] text-slate-300 flex flex-col flex-shrink-0 overflow-y-auto border-r border-slate-800/50 shadow-xl">
@@ -64,9 +66,18 @@ export default async function DashboardLayout({
               />
             </div>
             <h1 className="text-xl font-extrabold tracking-tight flex items-center leading-none">
-              <span className="text-white">The</span>
-              <span className="text-cyan-400">Omni</span>
-              <span className="text-white">Stack</span>
+              {isCraftVariant ? (
+                <>
+                  <span className="text-white">Profi</span>
+                  <span className="text-cyan-400">Faktura</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-white">The</span>
+                  <span className="text-cyan-400">Omni</span>
+                  <span className="text-white">Stack</span>
+                </>
+              )}
             </h1>
           </Link>
         </div>
@@ -89,9 +100,11 @@ export default async function DashboardLayout({
                 <Link href="/settings" className="flex items-center px-3 py-2 text-sm font-medium rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all">
                   Einstellungen
                 </Link>
-                <Link href="/integrations" className="flex items-center px-3 py-2 text-sm font-medium rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all">
-                  Integrationen
-                </Link>
+                {!isCraftVariant && (
+                  <Link href="/integrations" className="flex items-center px-3 py-2 text-sm font-medium rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+                    Integrationen
+                  </Link>
+                )}
               </>
             )}
 

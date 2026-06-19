@@ -60,6 +60,8 @@ export default async function SettingsPage(props: {
     )
   }
 
+  const isCraftVariant = process.env.NEXT_PUBLIC_APP_VARIANT === 'craft'
+
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-8">
       <div>
@@ -85,7 +87,7 @@ export default async function SettingsPage(props: {
 
       <TwoFactorSettings initialEnabled={user?.twoFactorEnabled ?? false} />
 
-      <MarketplaceAutomation integrations={integrations} />
+      {!isCraftVariant && <MarketplaceAutomation integrations={integrations} />}
 
       <SmtpSettings company={company} />
 
