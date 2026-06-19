@@ -261,6 +261,7 @@ export default async function DashboardPage() {
           </Link>
         </div>
       </section>
+      )}
 
       {/* Current Month & Active Section */}
       <section className="space-y-6">
