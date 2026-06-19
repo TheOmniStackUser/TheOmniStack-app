@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createManualInvoiceAction, editManualInvoiceAction, previewInvoiceAction, getDraftsAction, getDraftDetailsAction, deleteDraftAction } from '@/app/actions/manual-invoice'
 import { getInvoiceSettingsAction, saveInvoiceTemplateAction } from '@/app/actions/invoice-settings'
-import { searchCustomersAction, validateVatAction } from '@/app/actions/customers'
+import { searchCustomersAction, validateVatAction, saveCustomerAction } from '@/app/actions/customers'
 import { getInvoiceDetailsForCloneAction } from '@/app/actions/invoices'
 import { WORLD_COUNTRIES, EU_COUNTRIES, get2LetterCountryCode } from '@/lib/countries'
 
@@ -103,6 +103,9 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
   })
   const [customerResults, setCustomerResults] = useState<any[]>([])
   const [isSearchingCustomers, setIsSearchingCustomers] = useState(false)
+  const [customerFormMode, setCustomerFormMode] = useState<'search' | 'edit' | 'create'>('search')
+  const [customerFormData, setCustomerFormData] = useState<any>(null)
+  const [isSavingCustomer, setIsSavingCustomer] = useState(false)
   const [vatCheckStatus, setVatCheckStatus] = useState<{ 
     status: 'idle' | 'checking' | 'valid' | 'invalid' | 'uncertain', 
     lastChecked?: Date,
@@ -156,6 +159,32 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
   }, [])
 
   const draftIdParam = searchParams.get('draftId')
+
+  const handleSaveCustomer = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSavingCustomer(true)
+    try {
+      await saveCustomerAction(customerFormData)
+      setCustomerFormMode('search')
+      setNotification({ message: 'Kunde erfolgreich gespeichert', type: 'success' })
+      if (searchQuery.length >= 2) {
+        setIsSearchingCustomers(true)
+        const res = await searchCustomersAction(searchQuery)
+        setCustomerResults(res)
+        setIsSearchingCustomers(false)
+      } else {
+        setIsSearchingCustomers(true)
+        const res = await searchCustomersAction('')
+        setCustomerResults(res)
+        setIsSearchingCustomers(false)
+      }
+    } catch (error) {
+      console.error('Failed to save customer', error)
+      setNotification({ message: 'Fehler beim Speichern des Kunden', type: 'error' })
+    } finally {
+      setIsSavingCustomer(false)
+    }
+  }
 
   useEffect(() => {
     if (draftIdParam) {
@@ -1196,98 +1225,190 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
         <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl relative z-[210] overflow-hidden border border-slate-200 animate-in fade-in zoom-in duration-200">
           <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
             <div>
-              <h3 className="text-xl font-bold text-slate-900">Bestandskunden suchen</h3>
-              <p className="text-xs text-slate-500 font-medium">Suchen Sie nach Name, E-Mail oder Kundennummer</p>
+              <h3 className="text-xl font-bold text-slate-900">
+                {customerFormMode === 'search' ? 'Bestandskunden suchen' : customerFormMode === 'create' ? 'Neuen Kunden anlegen' : 'Kunden bearbeiten'}
+              </h3>
+              <p className="text-xs text-slate-500 font-medium">
+                {customerFormMode === 'search' ? 'Suchen Sie nach Name, E-Mail oder Kundennummer' : 'Bitte füllen Sie die Kundendaten aus'}
+              </p>
             </div>
-            <button onClick={() => setShowCustomerSearch(false)} className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-400 hover:text-slate-600">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
+            <div className="flex items-center gap-4">
+              {customerFormMode === 'search' && (
+                <button
+                  onClick={() => {
+                    setCustomerFormData({ name: '', email: '', customerNumber: '', street: '', zip: '', city: '', country: 'DE', vatId: '' })
+                    setCustomerFormMode('create')
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 transition-all shadow-md shadow-blue-200 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
+                  Neuen Kunden anlegen
+                </button>
+              )}
+              <button onClick={() => {
+                if (customerFormMode !== 'search') setCustomerFormMode('search')
+                else setShowCustomerSearch(false)
+              }} className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-400 hover:text-slate-600">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
           </div>
           
           <div className="p-6">
-            <div className="relative mb-6">
-              <input 
-                autoFocus
-                className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-blue-500 outline-none font-bold text-slate-900 text-lg transition-all pr-12" 
-                placeholder="Name, E-Mail oder K-Nummer..." 
-                value={searchQuery}
-                onChange={e => {
-                  const q = e.target.value
-                  setSearchQuery(q)
-                  if (q.length >= 2) {
-                    setIsSearchingCustomers(true)
-                    searchCustomersAction(q).then(res => {
-                      setCustomerResults(res)
-                      setIsSearchingCustomers(false)
-                    })
-                  } else {
-                    setCustomerResults([])
-                  }
-                }}
-              />
-              <div className="absolute right-4 top-4.5 text-slate-400">
-                {isSearchingCustomers ? (
-                  <div className="animate-spin h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full" />
-                ) : (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                )}
-              </div>
-            </div>
-
-            <div className="max-h-[400px] overflow-y-auto pr-2 space-y-2 custom-scrollbar">
-              {customerResults.length > 0 ? (
-                customerResults.map(c => (
-                  <button 
-                    key={c.id} 
-                    onClick={() => selectCustomer(c)}
-                    className="w-full p-5 text-left hover:bg-blue-50 border border-slate-100 rounded-2xl transition-all flex justify-between items-center group hover:border-blue-200 hover:shadow-md"
-                  >
-                    <div>
-                      <div className="font-bold text-slate-900 group-hover:text-blue-600 text-lg">{c.name}</div>
-                      <div className="text-sm text-slate-500 font-medium">{c.email}</div>
-                      <div className="text-xs text-slate-400 mt-1 italic">{c.street}, {c.zip} {c.city}</div>
-                    </div>
-                    <div className="text-right space-y-2">
-                      <div className="text-[10px] font-black text-blue-600 bg-blue-50 px-3 py-1 rounded-full uppercase tracking-tighter border border-blue-100 group-hover:bg-blue-600 group-hover:text-white transition-all">
-                        {c.customerNumber || 'Kunde'}
-                      </div>
-                      {c.vatCheckResult && (
-                        <div className={`text-[9px] font-black px-2 py-0.5 rounded-md border uppercase flex flex-col items-end ${c.vatCheckResult === 'VALID' ? 'text-green-600 bg-green-50 border-green-100' : 'text-red-600 bg-red-50 border-red-100'}`}>
-                          <span>UST: {c.vatCheckResult === 'VALID' ? 'GÜLTIG' : 'UNGÜLTIG'}</span>
-                          {c.lastVatCheckAt && (
-                            <span className="text-[7px] opacity-60 font-bold">{new Date(c.lastVatCheckAt).toLocaleDateString('de-DE')}</span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </button>
-                ))
-              ) : searchQuery.length < 2 && !isSearchingCustomers && customerResults.length > 0 ? (
-                // Show initial results even for short query
-                customerResults.map(c => (
-                  <button 
-                    key={c.id} 
-                    onClick={() => selectCustomer(c)}
-                    className="w-full p-5 text-left hover:bg-blue-50 border border-slate-100 rounded-2xl transition-all flex justify-between items-center group hover:border-blue-200 hover:shadow-md"
-                  >
-                    <div>
-                      <div className="font-bold text-slate-900 group-hover:text-blue-600 text-lg">{c.name}</div>
-                      <div className="text-sm text-slate-500 font-medium">{c.email}</div>
-                      <div className="text-xs text-slate-400 mt-1 italic">{c.street}, {c.zip} {c.city}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-[10px] font-black text-blue-600 bg-blue-50 px-3 py-1 rounded-full uppercase tracking-tighter border border-blue-100 group-hover:bg-blue-600 group-hover:text-white transition-all">
-                        {c.customerNumber || 'Kunde'}
-                      </div>
-                    </div>
-                  </button>
-                ))
-              ) : (
-                <div className="text-center py-12 text-slate-400">
-                  <p className="font-medium">Tippen Sie mindestens 2 Zeichen ein...</p>
+            {customerFormMode === 'search' ? (
+              <>
+                <div className="relative mb-6">
+                  <input 
+                    autoFocus
+                    className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-blue-500 outline-none font-bold text-slate-900 text-lg transition-all pr-12 placeholder:text-slate-500" 
+                    placeholder="Name, E-Mail oder K-Nummer..." 
+                    value={searchQuery}
+                    onChange={e => {
+                      const q = e.target.value
+                      setSearchQuery(q)
+                      if (q.length >= 2) {
+                        setIsSearchingCustomers(true)
+                        searchCustomersAction(q).then(res => {
+                          setCustomerResults(res)
+                          setIsSearchingCustomers(false)
+                        })
+                      } else {
+                        setCustomerResults([])
+                      }
+                    }}
+                  />
+                  <div className="absolute right-4 top-4.5 text-slate-400">
+                    {isSearchingCustomers ? (
+                      <div className="animate-spin h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full" />
+                    ) : (
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
+
+                <div className="max-h-[400px] overflow-y-auto pr-2 space-y-2 custom-scrollbar">
+                  {customerResults.length > 0 ? (
+                    customerResults.map(c => (
+                      <button 
+                        key={c.id} 
+                        onClick={() => selectCustomer(c)}
+                        className="w-full p-5 text-left hover:bg-blue-50 border border-slate-100 rounded-2xl transition-all flex justify-between items-center group hover:border-blue-200 hover:shadow-md"
+                      >
+                        <div>
+                          <div className="font-bold text-slate-900 group-hover:text-blue-600 text-lg">{c.name}</div>
+                          <div className="text-sm text-slate-500 font-medium">{c.email}</div>
+                          <div className="text-xs text-slate-400 mt-1 italic">{c.street}, {c.zip} {c.city}</div>
+                        </div>
+                        <div className="text-right space-y-2">
+                          <div className="text-[10px] font-black text-blue-600 bg-blue-50 px-3 py-1 rounded-full uppercase tracking-tighter border border-blue-100 group-hover:bg-blue-600 group-hover:text-white transition-all">
+                            {c.customerNumber || 'Kunde'}
+                          </div>
+                          {c.vatCheckResult && (
+                            <div className={`text-[9px] font-black px-2 py-0.5 rounded-md border uppercase flex flex-col items-end ${c.vatCheckResult === 'VALID' ? 'text-green-600 bg-green-50 border-green-100' : 'text-red-600 bg-red-50 border-red-100'}`}>
+                              <span>UST: {c.vatCheckResult === 'VALID' ? 'GÜLTIG' : 'UNGÜLTIG'}</span>
+                              {c.lastVatCheckAt && (
+                                <span className="text-[7px] opacity-60 font-bold">{new Date(c.lastVatCheckAt).toLocaleDateString('de-DE')}</span>
+                              )}
+                            </div>
+                          )}
+                          <div 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCustomerFormData(c);
+                              setCustomerFormMode('edit');
+                            }}
+                            className="mt-2 text-xs font-bold text-slate-400 hover:text-blue-600 flex items-center justify-end w-full gap-1 transition-colors cursor-pointer"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                            Bearbeiten
+                          </div>
+                        </div>
+                      </button>
+                    ))
+                  ) : searchQuery.length < 2 && !isSearchingCustomers && customerResults.length > 0 ? (
+                    // Show initial results even for short query
+                    customerResults.map(c => (
+                      <button 
+                        key={c.id} 
+                        onClick={() => selectCustomer(c)}
+                        className="w-full p-5 text-left hover:bg-blue-50 border border-slate-100 rounded-2xl transition-all flex justify-between items-center group hover:border-blue-200 hover:shadow-md"
+                      >
+                        <div>
+                          <div className="font-bold text-slate-900 group-hover:text-blue-600 text-lg">{c.name}</div>
+                          <div className="text-sm text-slate-500 font-medium">{c.email}</div>
+                          <div className="text-xs text-slate-400 mt-1 italic">{c.street}, {c.zip} {c.city}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-[10px] font-black text-blue-600 bg-blue-50 px-3 py-1 rounded-full uppercase tracking-tighter border border-blue-100 group-hover:bg-blue-600 group-hover:text-white transition-all">
+                            {c.customerNumber || 'Kunde'}
+                          </div>
+                          <div 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCustomerFormData(c);
+                              setCustomerFormMode('edit');
+                            }}
+                            className="mt-2 text-xs font-bold text-slate-400 hover:text-blue-600 flex items-center justify-end w-full gap-1 transition-colors cursor-pointer"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                            Bearbeiten
+                          </div>
+                        </div>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="text-center py-12 text-slate-400">
+                      <p className="font-medium">Tippen Sie mindestens 2 Zeichen ein...</p>
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <form onSubmit={handleSaveCustomer} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Name / Firma *</label>
+                    <input required className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-slate-900 placeholder:text-slate-500" value={customerFormData?.name || ''} onChange={e => setCustomerFormData({ ...customerFormData, name: e.target.value })} placeholder="Erika Mustermann" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 uppercase mb-1">E-Mail</label>
+                    <input type="email" className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-slate-900 placeholder:text-slate-500" value={customerFormData?.email || ''} onChange={e => setCustomerFormData({ ...customerFormData, email: e.target.value })} placeholder="erika@mustermann.de" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Kundennummer</label>
+                    <input className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-slate-900 placeholder:text-slate-500" value={customerFormData?.customerNumber || ''} onChange={e => setCustomerFormData({ ...customerFormData, customerNumber: e.target.value })} placeholder="Leer lassen für auto. Vergabe" />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-slate-600 uppercase mb-1">USt-IdNr. (VAT ID)</label>
+                    <input className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-slate-900 placeholder:text-slate-500" value={customerFormData?.vatId || ''} onChange={e => setCustomerFormData({ ...customerFormData, vatId: e.target.value.toUpperCase() })} placeholder="DE123456789" />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Straße & Hausnummer *</label>
+                    <input required className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-slate-900 placeholder:text-slate-500" value={customerFormData?.street || ''} onChange={e => setCustomerFormData({ ...customerFormData, street: e.target.value })} placeholder="Musterstraße 123" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 uppercase mb-1">PLZ *</label>
+                    <input required className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-slate-900 placeholder:text-slate-500" value={customerFormData?.zip || ''} onChange={e => setCustomerFormData({ ...customerFormData, zip: e.target.value })} placeholder="12345" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Ort *</label>
+                    <input required className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-slate-900 placeholder:text-slate-500" value={customerFormData?.city || ''} onChange={e => setCustomerFormData({ ...customerFormData, city: e.target.value })} placeholder="Musterstadt" />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Land</label>
+                    <select className="w-full px-4 py-3 border border-slate-300 rounded-xl font-bold text-slate-900 outline-none bg-white" value={customerFormData?.country || 'DE'} onChange={e => setCustomerFormData({ ...customerFormData, country: e.target.value })}>
+                      {WORLD_COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="pt-6 flex justify-end gap-4 border-t border-slate-100">
+                  <button type="button" onClick={() => setCustomerFormMode('search')} className="px-6 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-xl transition-all">Abbrechen</button>
+                  <button type="submit" disabled={isSavingCustomer} className="px-6 py-2 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-md shadow-blue-200 disabled:opacity-50 flex items-center gap-2">
+                    {isSavingCustomer ? <span className="animate-spin">🌀</span> : 'Speichern'}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       </div>
