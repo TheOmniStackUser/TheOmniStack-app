@@ -322,6 +322,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
 
   const handleMapSingle = async (product: UnmappedMarketplaceProduct) => {
     setMapConfirmation({ isOpen: true, products: [product] })
+    setSearchQuery(search)
     setIsLoadingSuggestions(true)
     setSuggestions([])
     try {
@@ -339,6 +340,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
     if (selectedIds.length === 0) return
     const productsToMap = localProducts.filter(p => selectedIds.includes(p.id))
     setMapConfirmation({ isOpen: true, products: productsToMap })
+    setSearchQuery(search)
     setIsLoadingSuggestions(true)
     setSuggestions([])
     try {
