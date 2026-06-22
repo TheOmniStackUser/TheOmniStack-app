@@ -165,6 +165,11 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
         try {
           const results = await searchProducts(searchQuery)
           setSearchResults(results)
+          if (results.length === 1) {
+            setSelectedProductId(results[0].id)
+          } else if (results.length === 0 || !results.find(r => r.id === selectedProductId)) {
+            setSelectedProductId(null)
+          }
         } catch (e) {
           console.error(e)
         } finally {
@@ -329,6 +334,9 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
       const ean = getEanFromPayload(product.rawPayload)
       const sugs = await getSuggestedProducts(product.marketplaceSku, ean)
       setSuggestions(sugs)
+      if (sugs.length === 1) {
+        setSelectedProductId(sugs[0].id)
+      }
     } catch (e) {
       console.error(e)
     } finally {
@@ -348,6 +356,9 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
       const ean = getEanFromPayload(firstProduct.rawPayload)
       const sugs = await getSuggestedProducts(firstProduct.marketplaceSku, ean)
       setSuggestions(sugs)
+      if (sugs.length === 1) {
+        setSelectedProductId(sugs[0].id)
+      }
     } catch (e) {
       console.error(e)
     } finally {
