@@ -242,9 +242,9 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                         </span>
                         <div className="mt-1 flex flex-wrap items-center gap-2">
                           <p className="font-mono text-sm font-bold text-slate-700">{mapping.marketplaceSku}</p>
-                          {mapping.ean && (
+                          {(mapping.ean || (product.ean ? product.ean.split(',')[0].trim() : null)) && (
                             <span className="text-[10px] font-mono font-bold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded uppercase tracking-wide border border-slate-200">
-                              EAN: {mapping.ean}
+                              EAN: {mapping.ean || (product.ean ? product.ean.split(',')[0].trim() : '')}
                             </span>
                           )}
                         </div>
