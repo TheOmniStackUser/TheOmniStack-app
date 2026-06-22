@@ -495,32 +495,72 @@ export class AboutYouAdapter implements MarketplaceAdapter {
   ): Promise<void> {
     console.log(`[AboutYouAdapter] Updating listings for company ${companyId}:`, updates)
     try {
-      const items = updates.map(u => {
-        const item: any = { sku: u.sku || u.marketplaceProductId }
-        if (u.stock !== undefined) {
-          item.quantity = u.stock
-        }
-        if (u.price !== undefined) {
-          // Send price in DE by default, or just generic price obj if country_code is needed
-          item.prices = [
-            {
-              country_code: 'DE',
-              retail_price: u.price
+      // About You Seller Center API requires the FULL product payload for an update.
+      // We must fetch the existing product by SKU, update stock/price, and push it back.
+      const validItems: any[] = []
+
+      // Process in chunks of 5 to avoid rate limits
+      const chunkSize = 5
+      for (let i = 0; i < updates.length; i += chunkSize) {
+        const chunk = updates.slice(i, i + chunkSize)
+        
+        const chunkResults = await Promise.all(chunk.map(async (u) => {
+          const targetSku = u.sku || u.marketplaceProductId
+          try {
+            const res = await fetch(`${this.baseUrl}/products/?sku=${targetSku}`, {
+              headers: {
+                'X-API-Key': this.config.apiKey,
+                'Accept': 'application/json'
+              }
+            })
+            if (!res.ok) return null
+            const result = await res.json()
+            const existingProduct = result.items?.[0]
+            if (!existingProduct) return null
+            
+            // Merge updates
+            if (u.stock !== undefined) {
+              existingProduct.quantity = u.stock
             }
-          ]
-        }
-        return item
-      })
+            if (u.price !== undefined) {
+              // Maintain existing prices array, just update 'DE' or the first one
+              if (existingProduct.prices && existingProduct.prices.length > 0) {
+                const dePrice = existingProduct.prices.find((p: any) => p.country_code === 'DE')
+                if (dePrice) {
+                  dePrice.retail_price = u.price
+                } else {
+                  existingProduct.prices[0].retail_price = u.price
+                }
+              } else {
+                existingProduct.prices = [{ country_code: 'DE', retail_price: u.price }]
+              }
+            }
+            return existingProduct
+          } catch (e) {
+            console.error(`[AboutYouAdapter] Failed to fetch existing product for ${targetSku}:`, e)
+            return null
+          }
+        }))
+        
+        validItems.push(...chunkResults.filter(Boolean))
+      }
+
+      if (validItems.length === 0) {
+        console.log(`[AboutYouAdapter] No valid products found on About You to update.`)
+        return
+      }
+
+      console.log(`[AboutYouAdapter] Pushing full payload for ${validItems.length} products...`)
 
       // Send the batch update
-      const response = await fetch(`${this.baseUrl}/products`, {
+      const response = await fetch(`${this.baseUrl}/products/`, {
         method: 'POST',
         headers: {
           'X-API-Key': this.config.apiKey,
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify({ items })
+        body: JSON.stringify({ items: validItems })
       })
 
       if (!response.ok) {
