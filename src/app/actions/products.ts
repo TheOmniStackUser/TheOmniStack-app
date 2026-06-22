@@ -75,6 +75,11 @@ export async function triggerProductImport(integrationId: string) {
     throw new Error('Integration nicht gefunden.')
   }
 
+  // Clear previous sync status immediately to prevent race conditions on the client
+  const metadata = (integration.metadata as any) || {}
+  metadata.syncStatus = { isRunning: true, status: 'starting', message: 'Import wird im Hintergrund gestartet...', progress: 0, total: 0, lastUpdated: Date.now() }
+  await db.update(marketplaceIntegrations).set({ metadata }).where(eq(marketplaceIntegrations.id, integrationId))
+
   // Import sync function dynamically or statically
   const { syncProductsForCompany } = await import('@/workers/product-sync')
   
@@ -523,6 +528,24 @@ export async function mapUnmappedProductToExisting(unmappedProductId: string, pr
 
   await db.delete(unmappedMarketplaceProducts)
     .where(eq(unmappedMarketplaceProducts.id, unmapped.id))
+
+  // Trigger marketplace sync so the newly mapped marketplace product gets the central stock
+  if (central.currentStock !== null) {
+    const { pushUpdatesToMarketplaces } = await import('@/workers/product-sync')
+    // We use `after` so we don't block the UI response
+    import('next/server').then(({ after }) => {
+      after(async () => {
+        try {
+          await pushUpdatesToMarketplaces(auth.activeCompanyId, [{
+            sku: central.sku,
+            stock: parseInt(central.currentStock?.toString() || '0', 10)
+          }])
+        } catch (e) {
+          console.error('[mapUnmappedProduct] Failed to push stock updates', e)
+        }
+      })
+    }).catch(console.error)
+  }
 
   revalidatePath('/products')
   revalidatePath('/products/import')
