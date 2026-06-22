@@ -493,6 +493,48 @@ export class AboutYouAdapter implements MarketplaceAdapter {
     companyId: string, 
     updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number }[]
   ): Promise<void> {
-    console.log(`[AboutYouAdapter] Simulating update listings for company ${companyId}:`, updates)
+    console.log(`[AboutYouAdapter] Updating listings for company ${companyId}:`, updates)
+    try {
+      const items = updates.map(u => {
+        const item: any = { sku: u.sku || u.marketplaceProductId }
+        if (u.stock !== undefined) {
+          item.quantity = u.stock
+        }
+        if (u.price !== undefined) {
+          // Send price in DE by default, or just generic price obj if country_code is needed
+          item.prices = [
+            {
+              country_code: 'DE',
+              retail_price: u.price
+            }
+          ]
+        }
+        return item
+      })
+
+      // Send the batch update
+      const response = await fetch(`${this.baseUrl}/products`, {
+        method: 'POST',
+        headers: {
+          'X-API-Key': this.config.apiKey,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ items })
+      })
+
+      if (!response.ok) {
+        const errText = await response.text()
+        console.error(`[AboutYouAdapter] Update failed: ${response.status} - ${errText}`)
+        throw new Error(`About You API Fehler beim Bestandsabgleich: ${response.status} - ${errText}`)
+      }
+
+      const result = await response.json()
+      console.log(`[AboutYouAdapter] Update successful, batchRequestId:`, result.batchRequestId || result)
+
+    } catch (error) {
+      console.error(`[AboutYouAdapter] Error updating listings:`, error)
+      throw error
+    }
   }
 }
