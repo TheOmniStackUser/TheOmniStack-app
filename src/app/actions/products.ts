@@ -683,8 +683,18 @@ export async function getAutoMappableProducts() {
 
   const matches = []
   for (const u of unmappedWithKeys) {
-    const match = skuMap.get(u.marketplaceSku) || (u.ean ? eanMap.get(u.ean) : null)
+    const skuMatch = skuMap.get(u.marketplaceSku)
+    const eanMatch = u.ean ? eanMap.get(u.ean) : null
+
+    const match = skuMatch || eanMatch
     if (match) {
+      const isSkuMatch = skuMatch && skuMatch.id === match.id
+      const isEanMatch = eanMatch && eanMatch.id === match.id
+      let matchReason = isSkuMatch ? 'SKU' : 'EAN'
+      if (isSkuMatch && isEanMatch) {
+        matchReason = 'SKU & EAN'
+      }
+
       matches.push({
         unmappedId: u.id,
         unmappedSku: u.marketplaceSku,
@@ -694,7 +704,7 @@ export async function getAutoMappableProducts() {
         matchedProductId: match.id,
         matchedProductSku: match.sku,
         matchedProductTitle: match.title,
-        matchReason: match.sku === u.marketplaceSku ? 'SKU' : 'EAN'
+        matchReason
       })
     }
   }

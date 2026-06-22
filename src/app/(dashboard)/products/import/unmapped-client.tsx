@@ -140,9 +140,13 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
 
   const filteredAutoMapMatches = useMemo(() => {
     return autoMapState.matches.filter(m => {
-      if (m.matchReason === 'EAN' && !autoMapOptions.matchEan) return false
-      if (m.matchReason === 'SKU' && !autoMapOptions.matchSku) return false
-      return true
+      const isEanMatch = m.matchReason === 'EAN' || m.matchReason === 'SKU & EAN'
+      const isSkuMatch = m.matchReason === 'SKU' || m.matchReason === 'SKU & EAN'
+
+      const keepForEan = autoMapOptions.matchEan && isEanMatch
+      const keepForSku = autoMapOptions.matchSku && isSkuMatch
+
+      return keepForEan || keepForSku
     })
   }, [autoMapState.matches, autoMapOptions])
 
