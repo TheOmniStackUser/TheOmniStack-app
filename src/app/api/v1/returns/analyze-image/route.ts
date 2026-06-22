@@ -10,11 +10,13 @@ export const maxDuration = 300 // Erhöht auf 5 Minuten, da Gemini (vor allem im
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
 
-// iOS URLSession-Fix: Gemeinsame Response-Headers damit der Client
-// die Verbindung NICHT wiederverwendet (verhindert NSURLErrorBadServerResponse -1011)
+// iOS URLSession-Fix: Cache-Control: no-store verwenden.
+// ACHTUNG: 'Connection': 'close' WURDE ENTFERNT! Das Schließen der Verbindung nach 
+// jedem Request hat bei hoher Last (freitags) die Vercel DDoS-Protection (WAF) ausgelöst, 
+// was zu "429: Too Many Requests" führte (zu viele TCP/TLS Handshakes in kurzer Zeit).
+// Falls NSURLErrorBadServerResponse -1011 wieder auftritt, sollte die iOS App Retry-Logik nutzen.
 const MOBILE_SAFE_HEADERS = {
   'Cache-Control': 'no-store',
-  'Connection': 'close',
 }
 
 export async function POST(req: NextRequest) {

@@ -6,11 +6,13 @@ import { eq, and, or, ilike, sql } from 'drizzle-orm'
 
 export const dynamic = 'force-dynamic'
 
-// iOS URLSession-Fix: Verbindung nach jedem Request schließen
-// verhindert NSURLErrorBadServerResponse -1011 beim zweiten Scan
+// iOS URLSession-Fix: Cache-Control: no-store verwenden.
+// ACHTUNG: 'Connection': 'close' WURDE ENTFERNT! Das Schließen der Verbindung nach 
+// jedem Request hat bei hoher Last (freitags) die Vercel DDoS-Protection (WAF) ausgelöst, 
+// was zu "429: Too Many Requests" führte (zu viele TCP/TLS Handshakes in kurzer Zeit).
+// Falls NSURLErrorBadServerResponse -1011 wieder auftritt, sollte die iOS App Retry-Logik nutzen.
 const MOBILE_SAFE_HEADERS = {
   'Cache-Control': 'no-store',
-  'Connection': 'close',
 }
 
 /**
