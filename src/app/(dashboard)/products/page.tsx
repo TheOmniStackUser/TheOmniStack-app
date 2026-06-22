@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Plus, Package, Settings, ServerCrash, AlertTriangle } from 'lucide-react'
 import { CsvActions } from './csv-actions'
 import { ProductsClient } from './products-client'
+import { ManualSyncButton } from './manual-sync-button'
 
 export const metadata = {
   title: 'Produkte - TheOmniStack',
@@ -77,6 +78,7 @@ export default async function ProductsPage() {
             <ServerCrash className="w-4 h-4" />
             Marketplace Import
           </Link>
+          <ManualSyncButton />
           <CsvActions />
           <button className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold hover:from-cyan-400 hover:to-blue-400 shadow-md hover:shadow-lg transition-all duration-300">
             <Plus className="w-4 h-4" />

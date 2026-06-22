@@ -631,6 +631,34 @@ export async function updateProductStockInline(productId: string, newStock: numb
   return { success: true }
 }
 
+export async function triggerGlobalMarketplaceSync() {
+  const auth = await requireAuth()
+
+  // Fetch all products
+  const allProducts = await db
+    .select({
+      sku: products.sku,
+      currentStock: products.currentStock,
+      price: products.price
+    })
+    .from(products)
+    .where(eq(products.companyId, auth.activeCompanyId))
+
+  if (allProducts.length === 0) return
+
+  // Prepare updates payload
+  const updates = allProducts.map(p => ({
+    sku: p.sku,
+    stock: p.currentStock,
+    price: p.price ?? undefined
+  }))
+
+  const { pushUpdatesToMarketplaces } = await import('@/workers/product-sync')
+
+  // Push all updates. pushUpdatesToMarketplaces groups them by integration
+  await pushUpdatesToMarketplaces(auth.activeCompanyId, updates)
+}
+
 export async function getAutoMappableProducts() {
   const auth = await requireAuth()
 
