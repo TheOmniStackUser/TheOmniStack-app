@@ -649,8 +649,8 @@ export async function triggerGlobalMarketplaceSync() {
   // Prepare updates payload
   const updates = allProducts.map(p => ({
     sku: p.sku,
-    stock: p.currentStock,
-    price: p.price ?? undefined
+    stock: p.currentStock !== null && p.currentStock !== undefined ? Number(p.currentStock) : undefined,
+    price: p.price !== null && p.price !== undefined ? Number(p.price) : undefined
   }))
 
   const { pushUpdatesToMarketplaces } = await import('@/workers/product-sync')
