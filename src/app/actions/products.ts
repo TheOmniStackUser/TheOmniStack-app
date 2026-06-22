@@ -644,7 +644,7 @@ export async function triggerGlobalMarketplaceSync() {
     .from(products)
     .where(eq(products.companyId, auth.activeCompanyId))
 
-  if (allProducts.length === 0) return
+  if (allProducts.length === 0) return { totalUpdatesSent: 0, activeMarketplaces: [] }
 
   // Prepare updates payload
   const updates = allProducts.map(p => ({
@@ -656,7 +656,7 @@ export async function triggerGlobalMarketplaceSync() {
   const { pushUpdatesToMarketplaces } = await import('@/workers/product-sync')
 
   // Push all updates. pushUpdatesToMarketplaces groups them by integration
-  await pushUpdatesToMarketplaces(auth.activeCompanyId, updates)
+  return await pushUpdatesToMarketplaces(auth.activeCompanyId, updates)
 }
 
 export async function getAutoMappableProducts() {

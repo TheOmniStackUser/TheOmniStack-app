@@ -15,11 +15,18 @@ export function ManualSyncButton() {
   const handleSync = async () => {
     setIsSyncing(true)
     try {
-      await triggerGlobalMarketplaceSync()
+      const result = await triggerGlobalMarketplaceSync()
+      
+      const count = result?.totalUpdatesSent || 0
+      const mkts = result?.activeMarketplaces?.join(', ') || ''
+      const msg = count > 0 
+        ? `Es wurden ${count} Listings erfolgreich an ${result?.activeMarketplaces?.length || 0} Marktplätze (${mkts}) gesendet!`
+        : 'Es wurden keine zu synchronisierenden Listings gefunden (entweder keine Mappings oder Sync ist deaktiviert).'
+
       setModalState({
         isOpen: true,
         type: 'success',
-        message: 'Der Live-Sync wurde für alle aktiven Produkte erfolgreich angestoßen!'
+        message: msg
       })
     } catch (error: any) {
       console.error(error)

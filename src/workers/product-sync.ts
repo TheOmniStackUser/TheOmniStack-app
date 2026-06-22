@@ -143,7 +143,7 @@ export async function syncProductsForCompany(companyId: string, integrationId?: 
 export async function pushUpdatesToMarketplaces(companyId: string, updates: { sku: string, stock?: number, price?: number }[]) {
   console.log(`[ProductSync] Pushing updates for ${updates.length} products for company ${companyId}...`)
   
-  if (updates.length === 0) return
+  if (updates.length === 0) return { totalUpdatesSent: 0, activeMarketplaces: [] }
 
   const skus = updates.map(u => u.sku)
 
@@ -159,7 +159,7 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
       )
     )
 
-  if (centralProducts.length === 0) return
+  if (centralProducts.length === 0) return { totalUpdatesSent: 0, activeMarketplaces: [] }
 
   const productIds = centralProducts.map(p => p.id)
   
@@ -225,6 +225,9 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
       )
     )
 
+  let totalUpdatesSent = 0
+  const activeMarketplaces: string[] = []
+
   for (const [marketplace, mpUpdates] of Object.entries(updatesByMarketplace)) {
     const integration = activeIntegrations.find(i => i.type === marketplace)
     if (!integration) continue
@@ -235,8 +238,17 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
     try {
       console.log(`[ProductSync] Pushing ${mpUpdates.length} updates to ${marketplace}...`)
       await adapter.updateListings(companyId, mpUpdates)
+      totalUpdatesSent += mpUpdates.length
+      if (!activeMarketplaces.includes(marketplace)) {
+        activeMarketplaces.push(marketplace)
+      }
     } catch (error) {
       console.error(`[ProductSync] Failed to push updates to ${marketplace}:`, error)
     }
+  }
+
+  return {
+    totalUpdatesSent,
+    activeMarketplaces
   }
 }
