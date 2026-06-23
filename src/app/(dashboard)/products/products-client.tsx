@@ -71,18 +71,38 @@ function StockEditor({ product }: { product: Product }) {
   }
 
   return (
-    <input
-      autoFocus
-      type="number"
-      min="0"
-      value={value}
-      onChange={e => setValue(e.target.value)}
-      onBlur={handleSave}
-      onKeyDown={handleKeyDown}
-      onClick={e => e.stopPropagation()}
-      disabled={isSaving}
-      className="w-20 px-2 py-1 text-sm border border-cyan-400 focus:ring-2 focus:ring-cyan-500/50 outline-none rounded font-semibold text-slate-900 bg-white"
-    />
+    <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+      <input
+        autoFocus
+        type="number"
+        min="0"
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        onKeyDown={handleKeyDown}
+        disabled={isSaving}
+        className="w-20 px-2 py-1 text-sm border border-cyan-400 focus:ring-2 focus:ring-cyan-500/50 outline-none rounded font-semibold text-slate-900 bg-white"
+      />
+      <button
+        onClick={handleSave}
+        disabled={isSaving}
+        className="p-1.5 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors disabled:opacity-50 flex items-center justify-center"
+        title="Speichern"
+      >
+        {isSaving ? (
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+        ) : (
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        )}
+      </button>
+      <button
+        onClick={() => { setValue(product.currentStock || '0'); setIsEditing(false); }}
+        disabled={isSaving}
+        className="p-1.5 rounded bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors disabled:opacity-50"
+        title="Abbrechen"
+      >
+        <X className="w-3.5 h-3.5" />
+      </button>
+    </div>
   )
 }
 
