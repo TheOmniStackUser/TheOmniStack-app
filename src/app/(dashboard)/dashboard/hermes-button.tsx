@@ -10,19 +10,29 @@ export function HermesButton() {
 
   const confirmGenerate = () => {
     setShowModal(false)
+    const newTab = window.open('about:blank', '_blank')
     startTransition(async () => {
-      const result = await generateHermesLabelsAction(undefined, selectedParcelClass)
-      if (result?.error) {
-        alert(result.error)
-      } else if (result) {
-        alert(result.message)
-        if (result.generatedIds && result.generatedIds.length > 0) {
-          const url = `/api/orders/bulk/shipping-labels?ids=${result.generatedIds.join(',')}`
-          const newTab = window.open(url, '_blank')
-          if (!newTab || newTab.closed || typeof newTab.closed === 'undefined') {
-            window.location.href = url
+      try {
+        const result = await generateHermesLabelsAction(undefined, selectedParcelClass)
+        if (result?.error) {
+          alert(result.error)
+          if (newTab) newTab.close()
+        } else if (result) {
+          alert(result.message)
+          if (result.generatedIds && result.generatedIds.length > 0) {
+            const url = `/api/orders/bulk/shipping-labels?ids=${result.generatedIds.join(',')}`
+            if (newTab) {
+              newTab.location.href = url
+            } else {
+              window.open(url, '_blank') || (window.location.href = url)
+            }
+          } else {
+            if (newTab) newTab.close()
           }
         }
+      } catch (e) {
+        alert('Ein Fehler ist aufgetreten.')
+        if (newTab) newTab.close()
       }
     })
   }

@@ -1156,18 +1156,21 @@ export function OrdersTable({
   const [isOpeningLabel, setIsOpeningLabel] = useState(false)
 
   const openLabel = async (orderId: string, type: 'labelUrl' | 'returnLabelUrl') => {
+    const newTab = window.open('about:blank', '_blank')
     try {
       setIsOpeningLabel(true)
       const res = await getOrderLabelsAction(orderId)
       
       if (res.error) {
         showToast(res.error, 'error')
+        if (newTab) newTab.close()
         return
       }
 
       const url = type === 'labelUrl' ? res.labelUrl : res.returnLabelUrl
       if (!url) {
         showToast('Etikett nicht gefunden.', 'error')
+        if (newTab) newTab.close()
         return
       }
 
@@ -1188,16 +1191,26 @@ export function OrdersTable({
           for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
           const blob = new Blob([bytes], { type: 'application/pdf' })
           const blobUrl = URL.createObjectURL(blob)
-          window.open(blobUrl, '_blank')
+          if (newTab) {
+            newTab.location.href = blobUrl
+          } else {
+            window.open(blobUrl, '_blank')
+          }
         } catch (e) {
           showToast('Das Label konnte nicht geöffnet werden. Bitte versuche es erneut.', 'error')
           console.error('[openLabel] base64 decode error:', e)
+          if (newTab) newTab.close()
         }
       } else {
-        window.open(url, '_blank')
+        if (newTab) {
+          newTab.location.href = url
+        } else {
+          window.open(url, '_blank')
+        }
       }
     } catch (e) {
       showToast('Ein Fehler ist aufgetreten.', 'error')
+      if (newTab) newTab.close()
     } finally {
       setIsOpeningLabel(false)
     }
@@ -1318,11 +1331,13 @@ export function OrdersTable({
   const confirmGenerateHermesLabels = async () => {
     setShowHermesModal(false)
     setIsGenerating(true)
+    const newTab = window.open('about:blank', '_blank')
     try {
       const ids = Object.keys(hermesSelections)
       const result = await generateHermesLabelsAction(ids, hermesSelections)
       if (result.error) {
         showToast(result.error, 'error')
+        if (newTab) newTab.close()
       } else {
         if (result.warning) {
           showToast(result.warning, 'error')
@@ -1332,14 +1347,18 @@ export function OrdersTable({
         
         if (result.generatedIds && result.generatedIds.length > 0) {
           const url = `/api/orders/bulk/shipping-labels?ids=${ids.join(',')}`
-          const newTab = window.open(url, '_blank')
-          if (!newTab || newTab.closed || typeof newTab.closed === 'undefined') {
-            window.location.href = url
+          if (newTab) {
+            newTab.location.href = url
+          } else {
+            window.open(url, '_blank') || (window.location.href = url)
           }
+        } else {
+          if (newTab) newTab.close()
         }
       }
     } catch (e) {
       showToast('Fehler: ' + (e instanceof Error ? e.message : String(e)), 'error')
+      if (newTab) newTab.close()
     } finally {
       setIsGenerating(false)
     }
@@ -1395,11 +1414,13 @@ export function OrdersTable({
   const confirmGenerateDhlLabels = async () => {
     setShowDhlModal(false)
     setIsDhlGenerating(true)
+    const newTab = window.open('about:blank', '_blank')
     try {
       const ids = Object.keys(dhlSelections)
       const result = await generateDhlLabelsAction(ids, dhlSelections)
       if (result.error) {
         showToast(result.error, 'error')
+        if (newTab) newTab.close()
       } else {
         if (result.warning) {
           showToast(result.warning, 'error')
@@ -1408,14 +1429,18 @@ export function OrdersTable({
         }
         if (result.generatedIds && result.generatedIds.length > 0) {
           const url = `/api/orders/bulk/shipping-labels?ids=${ids.join(',')}`
-          const newTab = window.open(url, '_blank')
-          if (!newTab || newTab.closed || typeof newTab.closed === 'undefined') {
-            window.location.href = url
+          if (newTab) {
+            newTab.location.href = url
+          } else {
+            window.open(url, '_blank') || (window.location.href = url)
           }
+        } else {
+          if (newTab) newTab.close()
         }
       }
     } catch (e) {
       showToast('Fehler: ' + (e instanceof Error ? e.message : String(e)), 'error')
+      if (newTab) newTab.close()
     } finally {
       setIsDhlGenerating(false)
     }

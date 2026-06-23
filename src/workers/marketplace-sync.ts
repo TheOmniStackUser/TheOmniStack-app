@@ -593,9 +593,7 @@ export async function syncShippedOrdersInvoices(
             eq(orders.status, 'shipped'),
             isNull(orders.invoiceId),
             eq(orders.isArchived, false),
-            autoInvoice 
-              ? gte(orders.createdAt, thresholdDate)
-              : undefined
+            gte(orders.createdAt, thresholdDate)
           )
         )
 
@@ -627,7 +625,12 @@ export async function syncShippedOrdersInvoices(
         try {
           if (downloadInvoice) {
             if (adapter) {
-              await downloadAndSaveMarketplaceInvoice(order.id, companyId, adapter)
+              const success = await downloadAndSaveMarketplaceInvoice(order.id, companyId, adapter)
+              // Delay a bit to prevent rate limit
+              await new Promise(resolve => setTimeout(resolve, 500))
+              if (success === 'RATE_LIMIT') {
+                break // Stop processing this marketplace's orders for now to respect rate limit
+              }
             } else {
               console.error(`[Worker] Failed to initialize adapter for ${integration.type} during syncShippedOrdersInvoices download`)
             }
@@ -739,7 +742,7 @@ export async function downloadAndSaveMarketplaceInvoice(
   orderId: string,
   companyId: string,
   adapter?: MarketplaceAdapter | null
-): Promise<boolean> {
+): Promise<boolean | 'RATE_LIMIT'> {
   if (!adapter || !adapter.getInvoice) {
     console.log(`[Worker] Adapter does not support getInvoice for order ${orderId}`)
     return false
@@ -931,6 +934,9 @@ export async function downloadAndSaveMarketplaceInvoice(
     return true
   } catch (err) {
     console.error(`[Worker] Error downloading and saving invoice for order ${order.marketplaceOrderId}:`, err)
+    if (err instanceof Error && err.message === 'RATE_LIMIT') {
+      return 'RATE_LIMIT'
+    }
     return false
   }
 }
