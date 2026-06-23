@@ -533,6 +533,17 @@ export class AboutYouAdapter implements MarketplaceAdapter {
           existingProduct.images = existingProduct.images.slice(0, 10)
         }
 
+        // AboutYou API now strictly requires 'brand' to be an integer (the brand ID). 
+        // When fetching, it might return a full object like { id: 123, name: '...' }
+        if (existingProduct.brand && typeof existingProduct.brand === 'object' && existingProduct.brand.id) {
+          existingProduct.brand = existingProduct.brand.id
+        } else if (existingProduct.brand !== undefined && existingProduct.brand !== null) {
+          const parsedBrand = parseInt(existingProduct.brand, 10)
+          if (!isNaN(parsedBrand)) {
+            existingProduct.brand = parsedBrand
+          }
+        }
+
         validItems.push(existingProduct)
       }
 
