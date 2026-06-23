@@ -66,9 +66,10 @@ export default async function ProductsPage() {
               <Info className="w-5 h-5" />
             </div>
             <div className="text-sm text-blue-800/90 leading-relaxed">
-              <strong>TheOmniStack ist Ihr Master-System.</strong> Bitte passen Sie Bestände und Preise immer hier an. 
+              <strong>TheOmniStack ist Ihr Master-System.</strong> Bitte passen Sie manuelle Bestände und Preise immer hier an. 
               Diese werden dann automatisch an alle angebundenen Marktplätze (Otto, About You, etc.) gepusht. 
-              <em>Hinweis:</em> Manuelle Änderungen direkt in Fremdportalen werden nicht nach TheOmniStack zurücksynchronisiert.
+              <br/><br/>
+              <em>Hinweis zu Verkäufen:</em> Eingehende Bestellungen aus den Marktplätzen reduzieren den Bestand hier in TheOmniStack natürlich vollautomatisch. Nur <strong>manuelle Änderungen</strong>, die direkt in Fremdportalen vorgenommen werden, überträgt das System nicht zurück.
             </div>
           </div>
         </div>
