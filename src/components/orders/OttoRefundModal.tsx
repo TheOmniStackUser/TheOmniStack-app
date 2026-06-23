@@ -116,7 +116,7 @@ export function OttoRefundModal({ order, onClose, onSuccess }: OttoRefundModalPr
                   const grossPrice = item.itemValueGrossPrice?.amount
                   return (
                     <option key={item.positionItemId} value={item.positionItemId}>
-                      {title} (SKU: {sku}) {grossPrice ? `- ${grossPrice} €` : ''}
+                      {sku} {grossPrice ? `(${grossPrice} €)` : ''} - {title}
                     </option>
                   )
                 })}
