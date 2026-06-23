@@ -134,7 +134,7 @@ export class OttoAdapter implements MarketplaceAdapter {
         },
         body: new URLSearchParams({
           grant_type: 'client_credentials',
-          scope: 'orders products shipments returns receipts availability price-reduction'
+          scope: 'orders products shipments returns receipts availability'
         }).toString(),
         signal: AbortSignal.timeout(15000)
       })
@@ -412,6 +412,9 @@ export class OttoAdapter implements MarketplaceAdapter {
       if (!response.ok) {
         const errText = await response.text()
         console.warn(`[OttoAdapter] Failed to fetch receipts list for ${marketplaceOrderId}: ${response.status} - ${errText}`)
+        if (response.status === 429) {
+          throw new Error('RATE_LIMIT')
+        }
         return null
       }
 
@@ -437,6 +440,9 @@ export class OttoAdapter implements MarketplaceAdapter {
 
       if (!pdfResponse.ok) {
         const errText = await pdfResponse.text()
+        if (pdfResponse.status === 429) {
+          throw new Error('RATE_LIMIT')
+        }
         throw new Error(`Otto API Fehler beim Download von Beleg ${receiptNumber}: ${pdfResponse.status} - ${errText}`)
       }
 
@@ -846,20 +852,25 @@ export class OttoAdapter implements MarketplaceAdapter {
       }))
 
       if (stockUpdates.length > 0) {
-        console.log(`[OttoAdapter] Updating ${stockUpdates.length} quantities via POST /v1/availability/quantities...`)
-        const qRes = await fetch(`${this.baseUrl}/v1/availability/quantities`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify(stockUpdates)
-        })
+        const chunkSize = 150
+        for (let i = 0; i < stockUpdates.length; i += chunkSize) {
+          const chunk = stockUpdates.slice(i, i + chunkSize)
+          console.log(`[OttoAdapter] Updating ${chunk.length} quantities via POST /v1/availability/quantities...`)
+          const qRes = await fetch(`${this.baseUrl}/v1/availability/quantities`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify(chunk)
+          })
 
-        if (!qRes.ok) {
-          const errText = await qRes.text()
-          console.error(`[OttoAdapter] Update quantities failed: ${errText}`)
+          if (!qRes.ok) {
+            const errText = await qRes.text()
+            console.error(`[OttoAdapter] Update quantities failed: ${errText}`)
+            throw new Error(`Otto API Fehler beim Bestandsabgleich: ${qRes.status} - ${errText}`)
+          }
         }
       }
 
@@ -876,20 +887,25 @@ export class OttoAdapter implements MarketplaceAdapter {
       }))
 
       if (priceUpdates.length > 0) {
-        console.log(`[OttoAdapter] Updating ${priceUpdates.length} prices via POST /v3/products...`)
-        const pRes = await fetch(`${this.baseUrl}/v3/products`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify(priceUpdates)
-        })
+        const chunkSize = 150
+        for (let i = 0; i < priceUpdates.length; i += chunkSize) {
+          const chunk = priceUpdates.slice(i, i + chunkSize)
+          console.log(`[OttoAdapter] Updating ${chunk.length} prices via POST /v3/products...`)
+          const pRes = await fetch(`${this.baseUrl}/v3/products`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify(chunk)
+          })
 
-        if (!pRes.ok) {
-          const errText = await pRes.text()
-          console.error(`[OttoAdapter] Update prices failed: ${errText}`)
+          if (!pRes.ok) {
+            const errText = await pRes.text()
+            console.error(`[OttoAdapter] Update prices failed: ${errText}`)
+            throw new Error(`Otto API Fehler beim Preisabgleich: ${pRes.status} - ${errText}`)
+          }
         }
       }
 
