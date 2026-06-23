@@ -554,25 +554,31 @@ export class AboutYouAdapter implements MarketplaceAdapter {
 
       console.log(`[AboutYouAdapter] Pushing full payload for ${validItems.length} products...`)
 
-      // Send the batch update
-      const response = await fetch(`${this.baseUrl}/products/`, {
-        method: 'POST',
-        headers: {
-          'X-API-Key': this.config.apiKey,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({ items: validItems })
-      })
+      // About You API accepts a maximum of 100 items per batch
+      const postChunkSize = 100
+      for (let i = 0; i < validItems.length; i += postChunkSize) {
+        const postChunk = validItems.slice(i, i + postChunkSize)
+        console.log(`[AboutYouAdapter] Sending batch ${Math.floor(i / postChunkSize) + 1} with ${postChunk.length} items...`)
 
-      if (!response.ok) {
-        const errText = await response.text()
-        console.error(`[AboutYouAdapter] Update failed: ${response.status} - ${errText}`)
-        throw new Error(`About You API Fehler beim Bestandsabgleich: ${response.status} - ${errText}`)
+        const response = await fetch(`${this.baseUrl}/products/`, {
+          method: 'POST',
+          headers: {
+            'X-API-Key': this.config.apiKey,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({ items: postChunk })
+        })
+
+        if (!response.ok) {
+          const errText = await response.text()
+          console.error(`[AboutYouAdapter] Update failed: ${response.status} - ${errText}`)
+          throw new Error(`About You API Fehler beim Bestandsabgleich: ${response.status} - ${errText}`)
+        }
+
+        const result = await response.json()
+        console.log(`[AboutYouAdapter] Update successful, batchRequestId:`, result.batchRequestId || result)
       }
-
-      const result = await response.json()
-      console.log(`[AboutYouAdapter] Update successful, batchRequestId:`, result.batchRequestId || result)
 
     } catch (error) {
       console.error(`[AboutYouAdapter] Error updating listings:`, error)
