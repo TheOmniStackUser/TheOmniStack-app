@@ -239,7 +239,8 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
       console.log(`[ProductSync] Pushing ${mpUpdates.length} updates to ${marketplace}...`)
       await adapter.updateListings(companyId, mpUpdates)
       totalUpdatesSent += mpUpdates.length
-      const displayName = integration.name || marketplace
+      const meta = integration.metadata as any
+      const displayName = meta?.customName || marketplace
       if (!activeMarketplaces.includes(displayName)) {
         activeMarketplaces.push(displayName)
       }
