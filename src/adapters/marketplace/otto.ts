@@ -134,7 +134,7 @@ export class OttoAdapter implements MarketplaceAdapter {
         },
         body: new URLSearchParams({
           grant_type: 'client_credentials',
-          scope: 'orders products shipments returns receipts availability'
+          scope: 'orders products shipments returns receipts availability price-reduction'
         }).toString(),
         signal: AbortSignal.timeout(15000)
       })
@@ -458,6 +458,48 @@ export class OttoAdapter implements MarketplaceAdapter {
   }
 
   
+
+  async getRefundReceipt(marketplaceOrderId: string): Promise<{ pdfBuffer: Buffer, receiptNumber: string } | null> {
+    console.log(`[OttoAdapter] Fetching REFUND receipts list for salesOrderId ${marketplaceOrderId}...`)
+    try {
+      const accessToken = await this.getAccessToken()
+      
+      const listUrl = `${this.baseUrl}/v3/receipts?salesOrderId=${marketplaceOrderId}`
+      const response = await fetch(listUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Accept': 'application/json'
+        }
+      })
+
+      if (!response.ok) return null
+
+      const data = await response.json()
+      // Find the most recent REFUND receipt
+      const refundReceipts = (data.resources || []).filter((r: any) => r.receiptType === 'REFUND')
+      if (refundReceipts.length === 0) return null
+      
+      // Sort by receiptDate descending
+      refundReceipts.sort((a: any, b: any) => new Date(b.receiptDate).getTime() - new Date(a.receiptDate).getTime())
+      const refundReceipt = refundReceipts[0]
+      
+      const downloadUrl = `${this.baseUrl}/v3/receipts/${refundReceipt.receiptNumber}.pdf`
+      const pdfResponse = await fetch(downloadUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Accept': 'application/pdf'
+        }
+      })
+      if (!pdfResponse.ok) return null
+      const arrayBuffer = await pdfResponse.arrayBuffer()
+      return { pdfBuffer: Buffer.from(arrayBuffer), receiptNumber: refundReceipt.receiptNumber }
+    } catch (error) {
+      console.error('[OttoAdapter] Error getting refund receipt:', error)
+      return null
+    }
+  }
 
   /**
    * Apply a price reduction (partial refund) to a specific position item
