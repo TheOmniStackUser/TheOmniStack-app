@@ -240,7 +240,14 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
       await adapter.updateListings(companyId, mpUpdates)
       totalUpdatesSent += mpUpdates.length
       const meta = integration.metadata as any
-      const displayName = meta?.customName || marketplace
+      const fallbackNames: Record<string, string> = {
+        'otto': 'Otto',
+        'mirakl_decathlon': 'Decathlon',
+        'aboutyou': 'About You',
+        'amazon': 'Amazon',
+        'kaufland': 'Kaufland'
+      }
+      const displayName = meta?.customName || fallbackNames[marketplace] || marketplace
       if (!activeMarketplaces.includes(displayName)) {
         activeMarketplaces.push(displayName)
       }
