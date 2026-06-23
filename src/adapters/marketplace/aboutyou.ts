@@ -537,6 +537,11 @@ export class AboutYouAdapter implements MarketplaceAdapter {
                 existingProduct.prices = [{ country_code: 'DE', retail_price: u.price }]
               }
             }
+            // The About You API strictly limits the number of images to 10 per product update
+            if (existingProduct.images && existingProduct.images.length > 10) {
+              existingProduct.images = existingProduct.images.slice(0, 10)
+            }
+
             return existingProduct
           } catch (e) {
             console.error(`[AboutYouAdapter] Failed to fetch existing product for ${targetSku}:`, e)
