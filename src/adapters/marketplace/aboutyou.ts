@@ -528,8 +528,10 @@ export class AboutYouAdapter implements MarketplaceAdapter {
                 const dePrice = existingProduct.prices.find((p: any) => p.country_code === 'DE')
                 if (dePrice) {
                   dePrice.retail_price = u.price
+                  delete dePrice.sale_price // Remove sale_price to prevent validation errors if it's >= new retail_price
                 } else {
                   existingProduct.prices[0].retail_price = u.price
+                  delete existingProduct.prices[0].sale_price
                 }
               } else {
                 existingProduct.prices = [{ country_code: 'DE', retail_price: u.price }]
