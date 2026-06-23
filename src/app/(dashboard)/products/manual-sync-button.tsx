@@ -19,9 +19,15 @@ export function ManualSyncButton() {
       
       const count = result?.totalUpdatesSent || 0
       const mkts = result?.activeMarketplaces?.join(', ') || ''
-      const msg = count > 0 
+      const fails = result?.failedMarketplaces?.map((f: any) => `${f.name} (${f.error})`).join(', ') || ''
+      
+      let msg = count > 0 
         ? `Es wurden ${count} Listings erfolgreich an ${result?.activeMarketplaces?.length || 0} Marktplätze (${mkts}) gesendet!`
-        : 'Es wurden keine zu synchronisierenden Listings gefunden (entweder keine Mappings oder Sync ist deaktiviert).'
+        : 'Sync wurde angestoßen, aber es gab keine Bestand/Preis Änderungen.'
+
+      if (fails) {
+        msg += `\nFehler bei: ${fails}`
+      }
 
       setModalState({
         isOpen: true,

@@ -227,6 +227,7 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
 
   let totalUpdatesSent = 0
   const activeMarketplaces: string[] = []
+  const failedMarketplaces: { name: string, error: string }[] = []
 
   for (const [marketplace, mpUpdates] of Object.entries(updatesByMarketplace)) {
     const integration = activeIntegrations.find(i => i.type === marketplace)
@@ -235,29 +236,29 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
     const adapter = getAdapterForIntegration(integration)
     if (!adapter || !adapter.updateListings) continue
 
+    const meta = integration.metadata as any
+    const fallbackNames: Record<string, string> = {
+      'otto': 'Otto',
+      'mirakl_decathlon': 'Decathlon',
+      'aboutyou': 'About You',
+      'amazon': 'Amazon',
+      'kaufland': 'Kaufland',
+      'mirakl_custom': 'Limango'
+    }
+    const displayName = meta?.customName || fallbackNames[marketplace] || marketplace
+
     try {
       console.log(`[ProductSync] Pushing ${mpUpdates.length} updates to ${marketplace}...`)
       await adapter.updateListings(companyId, mpUpdates)
       totalUpdatesSent += mpUpdates.length
-      const meta = integration.metadata as any
-      const fallbackNames: Record<string, string> = {
-        'otto': 'Otto',
-        'mirakl_decathlon': 'Decathlon',
-        'aboutyou': 'About You',
-        'amazon': 'Amazon',
-        'kaufland': 'Kaufland'
-      }
-      const displayName = meta?.customName || fallbackNames[marketplace] || marketplace
       if (!activeMarketplaces.includes(displayName)) {
         activeMarketplaces.push(displayName)
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(`[ProductSync] Failed to push updates to ${marketplace}:`, error)
+      failedMarketplaces.push({ name: displayName, error: error.message || 'Unbekannter Fehler' })
     }
   }
 
-  return {
-    totalUpdatesSent,
-    activeMarketplaces
-  }
+  return { totalUpdatesSent, activeMarketplaces, failedMarketplaces }
 }
