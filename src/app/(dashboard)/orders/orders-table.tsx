@@ -1623,7 +1623,7 @@ export function OrdersTable({
       <th
         scope="col"
         onClick={() => handleSort(field)}
-        className={`px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 hover:text-gray-700 select-none transition-colors group ${
+        className={`px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 hover:text-gray-700 select-none transition-colors group ${
           align === 'right' ? 'text-right' : 'text-left'
         }`}
       >
@@ -2120,10 +2120,10 @@ export function OrdersTable({
             {orders.length === 0 ? 'Noch keine Bestellungen importiert.' : 'Keine Bestellungen entsprechen den Filtern.'}
           </div>
         ) : (
-          <table className="min-w-[1500px] w-full divide-y divide-gray-200">
+          <table className="min-w-[1100px] w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                   <input
                     type="checkbox"
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
@@ -2139,8 +2139,8 @@ export function OrdersTable({
                 {renderSortableHeader('Land', 'land')}
                 {renderSortableHeader('Umsatz', 'umsatz', 'right')}
                 {renderSortableHeader('Versanddatum', 'versanddatum')}
-                <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Verlauf</th>
-                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50 shadow-[-4px_0_4px_-2px_rgba(0,0,0,0.05)]">Aktion</th>
+                <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Verlauf</th>
+                <th scope="col" className="px-3 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50 shadow-[-4px_0_4px_-2px_rgba(0,0,0,0.05)]">Aktion</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -2173,7 +2173,7 @@ export function OrdersTable({
                       className={`group hover:bg-gray-50 transition-colors cursor-pointer ${isSelected ? 'bg-blue-50 hover:bg-blue-100/50' : ''}`}
                       onClick={() => toggleExpand(order.id)}
                     >
-                      <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                      <td className="px-3 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
                           className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
@@ -2181,16 +2181,16 @@ export function OrdersTable({
                           onChange={() => toggleOne(order.id)}
                         />
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500" suppressHydrationWarning>
+                      <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-500" suppressHydrationWarning>
                         {formattedBestellDate}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 py-4 whitespace-nowrap">
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize" 
                           style={getMarketplaceBadgeStyle(formatMarketplaceName(order.marketplace, order.shippingCountry))}>
                           {formatMarketplaceName(order.marketplace, order.shippingCountry)}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 py-4 whitespace-nowrap">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
                           getDisplayStatus(order.status) === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                           getDisplayStatus(order.status) === 'later_shipment' ? 'bg-purple-100 text-purple-800' :
@@ -2200,16 +2200,16 @@ export function OrdersTable({
                           {getDisplayStatus(order.status) === 'later_shipment' ? 'Späterer Versand' : getDisplayStatus(order.status)}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {orderNumber}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-500">
+                      <td className="px-3 py-4 text-sm text-gray-500">
                         <div style={{ whiteSpace: 'pre-line' }}>
                           {/* @ts-ignore */}
                           {formatCustomerName(order.buyerName || order.buyer?.name || 'Unbekannt')}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 py-4 whitespace-nowrap">
                         {(() => {
                           const raw = order.shippingCountry ?? ''
                           const iso3to2: Record<string, string> = {
@@ -2225,10 +2225,10 @@ export function OrdersTable({
                           ) : <span className="text-gray-300 text-xs">—</span>
                         })()}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">
+                      <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">
                         {formattedTotal}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500" suppressHydrationWarning>
+                      <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-500" suppressHydrationWarning>
                         <div>{formattedVersandDate}</div>
                         {order.trackingNumber && (
                           <div className="mt-1">
@@ -2248,10 +2248,10 @@ export function OrdersTable({
                           </div>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-500">
                         {renderOrderProgress(order, customMiraklIntegrations)}
                       </td>
-                      <td className={`px-6 py-4 whitespace-nowrap text-right text-sm font-medium sticky right-0 transition-colors shadow-[-4px_0_4px_-2px_rgba(0,0,0,0.05)] ${
+                      <td className={`px-3 py-4 whitespace-nowrap text-right text-sm font-medium sticky right-0 transition-colors shadow-[-4px_0_4px_-2px_rgba(0,0,0,0.05)] ${
                         openMenuOrderId === order.id ? 'z-50 shadow-2xl' : 'z-10'
                       } ${
                         isSelected 
