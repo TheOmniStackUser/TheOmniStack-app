@@ -496,60 +496,44 @@ export class AboutYouAdapter implements MarketplaceAdapter {
     console.log(`[AboutYouAdapter] Updating listings for company ${companyId}:`, updates)
     try {
       // About You Seller Center API requires the FULL product payload for an update.
-      // We must fetch the existing product by SKU, update stock/price, and push it back.
+      // We fetch ALL existing products via fetchProducts to avoid hitting Vercel serverless function timeouts
+      // which would happen if we fetched 200+ products sequentially.
+      const existingProducts = await this.fetchProducts(companyId)
       const validItems: any[] = []
 
-      // Process in chunks of 5 to avoid rate limits
-      const chunkSize = 5
-      for (let i = 0; i < updates.length; i += chunkSize) {
-        const chunk = updates.slice(i, i + chunkSize)
+      for (const u of updates) {
+        const targetSku = u.sku || u.marketplaceProductId
+        const existing = existingProducts.find(p => p.sku === targetSku || p.marketplaceProductId === targetSku)
         
-        const chunkResults = await Promise.all(chunk.map(async (u) => {
-          const targetSku = u.sku || u.marketplaceProductId
-          try {
-            const res = await fetch(`${this.baseUrl}/products/?sku=${targetSku}`, {
-              headers: {
-                'X-API-Key': this.config.apiKey,
-                'Accept': 'application/json'
-              }
-            })
-            if (!res.ok) return null
-            const result = await res.json()
-            const existingProduct = result.items?.[0]
-            if (!existingProduct) return null
-            
-            // Merge updates
-            if (u.stock !== undefined) {
-              existingProduct.quantity = u.stock
+        if (!existing || !existing.rawPayload) continue
+        
+        const existingProduct = existing.rawPayload
+        
+        // Merge updates
+        if (u.stock !== undefined) {
+          existingProduct.quantity = u.stock
+        }
+        if (u.price !== undefined) {
+          // Maintain existing prices array, just update 'DE' or the first one
+          if (existingProduct.prices && existingProduct.prices.length > 0) {
+            const dePrice = existingProduct.prices.find((p: any) => p.country_code === 'DE')
+            if (dePrice) {
+              dePrice.retail_price = u.price
+              delete dePrice.sale_price // Remove sale_price to prevent validation errors if it's >= new retail_price
+            } else {
+              existingProduct.prices[0].retail_price = u.price
+              delete existingProduct.prices[0].sale_price
             }
-            if (u.price !== undefined) {
-              // Maintain existing prices array, just update 'DE' or the first one
-              if (existingProduct.prices && existingProduct.prices.length > 0) {
-                const dePrice = existingProduct.prices.find((p: any) => p.country_code === 'DE')
-                if (dePrice) {
-                  dePrice.retail_price = u.price
-                  delete dePrice.sale_price // Remove sale_price to prevent validation errors if it's >= new retail_price
-                } else {
-                  existingProduct.prices[0].retail_price = u.price
-                  delete existingProduct.prices[0].sale_price
-                }
-              } else {
-                existingProduct.prices = [{ country_code: 'DE', retail_price: u.price }]
-              }
-            }
-            // The About You API strictly limits the number of images to 10 per product update
-            if (existingProduct.images && existingProduct.images.length > 10) {
-              existingProduct.images = existingProduct.images.slice(0, 10)
-            }
-
-            return existingProduct
-          } catch (e) {
-            console.error(`[AboutYouAdapter] Failed to fetch existing product for ${targetSku}:`, e)
-            return null
+          } else {
+            existingProduct.prices = [{ country_code: 'DE', retail_price: u.price }]
           }
-        }))
-        
-        validItems.push(...chunkResults.filter(Boolean))
+        }
+        // The About You API strictly limits the number of images to 10 per product update
+        if (existingProduct.images && existingProduct.images.length > 10) {
+          existingProduct.images = existingProduct.images.slice(0, 10)
+        }
+
+        validItems.push(existingProduct)
       }
 
       if (validItems.length === 0) {

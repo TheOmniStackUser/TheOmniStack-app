@@ -239,8 +239,9 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
       console.log(`[ProductSync] Pushing ${mpUpdates.length} updates to ${marketplace}...`)
       await adapter.updateListings(companyId, mpUpdates)
       totalUpdatesSent += mpUpdates.length
-      if (!activeMarketplaces.includes(marketplace)) {
-        activeMarketplaces.push(marketplace)
+      const displayName = integration.name || marketplace
+      if (!activeMarketplaces.includes(displayName)) {
+        activeMarketplaces.push(displayName)
       }
     } catch (error) {
       console.error(`[ProductSync] Failed to push updates to ${marketplace}:`, error)
