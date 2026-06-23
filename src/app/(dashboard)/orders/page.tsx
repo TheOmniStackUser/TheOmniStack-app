@@ -105,6 +105,7 @@ export default async function OrdersPage() {
         billing_zip_code: raw.billing_zip_code,
         billing_city: raw.billing_city,
         billing_country_code: raw.billing_country_code,
+        positionItems: raw.positionItems, // Required for OttoRefundModal
       }
     }
     return {
