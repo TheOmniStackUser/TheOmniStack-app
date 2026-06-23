@@ -1250,6 +1250,39 @@ export class MiraklAdapter implements MarketplaceAdapter {
         url += `?shop_id=${this.config.shopId}`
       }
 
+      // Check if any updates are missing the price field (Mirakl OF01 requires price)
+      const needsPriceFetch = updates.some(u => u.price === undefined)
+      const currentOffersMap: Record<string, number> = {}
+
+      if (needsPriceFetch) {
+        console.log(`[MiraklAdapter:${this.marketplace}] Some updates are missing price. Fetching existing offers to fill mandatory price field...`)
+        try {
+          let offset = 0
+          while (true) {
+            const fetchUrl = url.includes('?') 
+              ? `${url}&max=100&offset=${offset}`
+              : `${url}?max=100&offset=${offset}`
+              
+            const res = await fetch(fetchUrl, { headers })
+            if (!res.ok) break
+            const data = await res.json()
+            if (!data.offers || data.offers.length === 0) break
+            
+            for (const offer of data.offers) {
+              if (offer.shop_sku && offer.price !== undefined) {
+                currentOffersMap[offer.shop_sku] = offer.price
+              }
+            }
+            
+            if (data.offers.length < 100) break
+            offset += 100
+          }
+          console.log(`[MiraklAdapter:${this.marketplace}] Fetched ${Object.keys(currentOffersMap).length} existing offers.`)
+        } catch (e) {
+          console.warn(`[MiraklAdapter:${this.marketplace}] Failed to fetch existing offers for price fallback:`, e)
+        }
+      }
+
       // Format payload for Mirakl OF01
       const offers = updates.map(update => {
         const offer: any = {
@@ -1257,7 +1290,14 @@ export class MiraklAdapter implements MarketplaceAdapter {
           update_delete: 'update'
         }
         if (update.stock !== undefined) offer.quantity = update.stock
-        if (update.price !== undefined) offer.price = update.price
+        
+        // Price is mandatory in Mirakl OF01
+        if (update.price !== undefined) {
+          offer.price = update.price
+        } else if (currentOffersMap[update.sku] !== undefined) {
+          offer.price = currentOffersMap[update.sku]
+        }
+        
         return offer
       })
 
