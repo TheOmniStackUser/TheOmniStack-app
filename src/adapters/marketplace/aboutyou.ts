@@ -507,7 +507,7 @@ export class AboutYouAdapter implements MarketplaceAdapter {
         
         if (!existing || !existing.rawPayload) continue
         
-        const existingProduct = existing.rawPayload
+        const existingProduct = existing.rawPayload as any
         
         // Merge updates
         if (u.stock !== undefined) {
