@@ -111,12 +111,11 @@ export function OttoRefundModal({ order, onClose, onSuccess }: OttoRefundModalPr
               >
                 {positionItems.length === 0 && <option value="">Keine Artikeldaten gefunden</option>}
                 {positionItems.map((item: any) => {
-                  const title = item.product?.productTitle || 'Unbekannter Artikel'
                   const sku = item.product?.sku || item.positionItemId
                   const grossPrice = item.itemValueGrossPrice?.amount
                   return (
                     <option key={item.positionItemId} value={item.positionItemId}>
-                      {sku} {grossPrice ? `(${grossPrice} €)` : ''} - {title}
+                      {sku} {grossPrice ? `(${grossPrice} €)` : ''}
                     </option>
                   )
                 })}
