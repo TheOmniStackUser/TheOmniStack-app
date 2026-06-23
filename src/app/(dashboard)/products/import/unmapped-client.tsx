@@ -130,6 +130,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
   const [deleteConfirmation, setDeleteConfirmation] = useState<{ isOpen: boolean, type: 'single' | 'bulk', id?: string }>({ isOpen: false, type: 'single' })
   const [mapConfirmation, setMapConfirmation] = useState<{ isOpen: boolean, products: UnmappedMarketplaceProduct[] }>({ isOpen: false, products: [] })
   const [searchQuery, setSearchQuery] = useState('')
+  const [searchQueryField, setSearchQueryField] = useState<'all' | 'sku' | 'ean' | 'title'>('all')
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
@@ -168,7 +169,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
       if (searchQuery.length >= 2) {
         setIsSearching(true)
         try {
-          const results = await searchProducts(searchQuery)
+          const results = await searchProducts(searchQuery, searchQueryField)
           setSearchResults(results)
           if (results.length === 1) {
             setSelectedProductId(results[0].id)
@@ -185,7 +186,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
       }
     }, 300)
     return () => clearTimeout(timer)
-  }, [searchQuery, mapConfirmation.isOpen])
+  }, [searchQuery, searchQueryField, mapConfirmation.isOpen])
 
   useEffect(() => {
     setLocalProducts(unmappedProducts)
@@ -333,6 +334,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
   const handleMapSingle = async (product: UnmappedMarketplaceProduct) => {
     setMapConfirmation({ isOpen: true, products: [product] })
     setSearchQuery(search)
+    setSearchQueryField(searchField)
     setIsLoadingSuggestions(true)
     setSuggestions([])
     try {
@@ -354,6 +356,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
     const productsToMap = localProducts.filter(p => selectedIds.includes(p.id))
     setMapConfirmation({ isOpen: true, products: productsToMap })
     setSearchQuery(search)
+    setSearchQueryField(searchField)
     setIsLoadingSuggestions(true)
     setSuggestions([])
     try {
@@ -879,26 +882,38 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
           })()}
 
           <div>
-            <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Suche nach Stammprodukt (Name oder SKU)..."
-                className="w-full pl-9 pr-12 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-900 placeholder:text-slate-500 bg-white"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className={`absolute top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors focus:outline-none ${isSearching ? 'right-9' : 'right-3'}`}
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-              {isSearching && (
-                <Loader2 className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 animate-spin" />
-              )}
+            <div className="relative flex shadow-sm rounded-lg">
+              <select
+                className="border border-r-0 border-slate-200 rounded-l-lg bg-slate-50 text-sm py-2.5 pl-3 pr-8 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700 font-medium"
+                value={searchQueryField}
+                onChange={(e) => setSearchQueryField(e.target.value as any)}
+              >
+                <option value="all">Alle Felder</option>
+                <option value="sku">SKU</option>
+                <option value="ean">EAN</option>
+                <option value="title">Titel</option>
+              </select>
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Suche nach Stammprodukt (Name oder SKU)..."
+                  className="w-full pl-9 pr-12 py-2.5 border border-slate-200 rounded-r-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-900 placeholder:text-slate-500 bg-white"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className={`absolute top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors focus:outline-none ${isSearching ? 'right-9' : 'right-3'}`}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+                {isSearching && (
+                  <Loader2 className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 animate-spin" />
+                )}
+              </div>
             </div>
 
             <div className="mt-4 max-h-60 overflow-y-auto border border-slate-100 rounded-lg divide-y divide-slate-100 custom-scrollbar">

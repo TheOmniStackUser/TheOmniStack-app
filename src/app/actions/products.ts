@@ -386,7 +386,7 @@ export async function getImportSyncStatus(integrationId: string) {
   return status
 }
 
-export async function searchProducts(query: string) {
+export async function searchProducts(query: string, field: 'all' | 'sku' | 'ean' | 'title' = 'all') {
   const auth = await requireAuth()
   if (!query) return []
   
@@ -404,11 +404,11 @@ export async function searchProducts(query: string) {
         and(
           eq(products.companyId, auth.activeCompanyId),
           or(
-            ilike(products.sku, `%${term}%`),
-            ilike(products.title, `%${term}%`),
-            ilike(products.ean, `%${term}%`),
-            ilike(productMappings.marketplaceSku, `%${term}%`),
-            ilike(productMappings.ean, `%${term}%`)
+            (field === 'all' || field === 'sku') ? ilike(products.sku, `%${term}%`) : undefined,
+            (field === 'all' || field === 'title') ? ilike(products.title, `%${term}%`) : undefined,
+            (field === 'all' || field === 'ean') ? ilike(products.ean, `%${term}%`) : undefined,
+            (field === 'all' || field === 'sku') ? ilike(productMappings.marketplaceSku, `%${term}%`) : undefined,
+            (field === 'all' || field === 'ean') ? ilike(productMappings.ean, `%${term}%`) : undefined
           )
         )
       )
