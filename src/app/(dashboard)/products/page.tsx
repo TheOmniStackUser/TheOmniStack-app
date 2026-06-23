@@ -61,17 +61,20 @@ export default async function ProductsPage() {
             </span>
           </h1>
           <p className="text-slate-500 mt-2 font-medium">Verwalten Sie Ihre {productList.length} Produkte und Marktplatz-Listings zentral.</p>
-          <div className="mt-4 flex gap-3 p-3 bg-blue-50/50 border border-blue-100 rounded-xl max-w-3xl">
-            <div className="shrink-0 text-blue-500 pt-0.5">
-              <Info className="w-5 h-5" />
-            </div>
-            <div className="text-sm text-blue-800/90 leading-relaxed">
-              <strong>TheOmniStack ist Ihr Master-System.</strong> Bitte passen Sie manuelle Bestände und Preise immer hier an. 
+          <details className="mt-4 group bg-blue-50/50 border border-blue-100 rounded-xl max-w-3xl overflow-hidden cursor-pointer">
+            <summary className="flex gap-3 p-3 text-sm text-blue-800/90 items-center font-medium select-none outline-none">
+              <div className="shrink-0 text-blue-500">
+                <Info className="w-5 h-5" />
+              </div>
+              <span><strong>TheOmniStack ist Ihr Master-System.</strong> (Klicken für Details)</span>
+            </summary>
+            <div className="px-3 pb-3 pt-1 text-sm text-blue-800/90 leading-relaxed border-t border-blue-100/50 ml-11">
+              Bitte passen Sie manuelle Bestände und Preise immer hier an. 
               Diese werden dann automatisch an alle angebundenen Marktplätze (Otto, About You, etc.) gepusht. 
               <br/><br/>
               <em>Hinweis zu Verkäufen:</em> Eingehende Bestellungen aus den Marktplätzen reduzieren den Bestand hier in TheOmniStack natürlich vollautomatisch. Nur <strong>manuelle Änderungen</strong>, die direkt in Fremdportalen vorgenommen werden, überträgt das System nicht zurück.
             </div>
-          </div>
+          </details>
         </div>
 
         <div className="flex flex-wrap gap-3">
