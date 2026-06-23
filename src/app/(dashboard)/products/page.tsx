@@ -3,7 +3,7 @@ import { db } from '@/db/client'
 import { products, productMappings } from '@/db/schema/products'
 import { eq, isNull } from 'drizzle-orm'
 import Link from 'next/link'
-import { Plus, Package, Settings, ServerCrash, AlertTriangle } from 'lucide-react'
+import { Plus, Package, Settings, ServerCrash, AlertTriangle, Info } from 'lucide-react'
 import { CsvActions } from './csv-actions'
 import { ProductsClient } from './products-client'
 import { ManualSyncButton } from './manual-sync-button'
@@ -61,6 +61,16 @@ export default async function ProductsPage() {
             </span>
           </h1>
           <p className="text-slate-500 mt-2 font-medium">Verwalten Sie Ihre {productList.length} Produkte und Marktplatz-Listings zentral.</p>
+          <div className="mt-4 flex gap-3 p-3 bg-blue-50/50 border border-blue-100 rounded-xl max-w-3xl">
+            <div className="shrink-0 text-blue-500 pt-0.5">
+              <Info className="w-5 h-5" />
+            </div>
+            <div className="text-sm text-blue-800/90 leading-relaxed">
+              <strong>TheOmniStack ist Ihr Master-System.</strong> Bitte passen Sie Bestände und Preise immer hier an. 
+              Diese werden dann automatisch an alle angebundenen Marktplätze (Otto, About You, etc.) gepusht. 
+              <em>Hinweis:</em> Manuelle Änderungen direkt in Fremdportalen werden nicht nach TheOmniStack zurücksynchronisiert.
+            </div>
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-3">
