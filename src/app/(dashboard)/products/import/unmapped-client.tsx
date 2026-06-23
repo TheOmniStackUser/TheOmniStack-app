@@ -121,6 +121,7 @@ const getEanFromPayload = (payload: any) => {
 export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClientProps) {
   const router = useRouter()
   const [search, setSearch] = useState('')
+  const [searchField, setSearchField] = useState<'all' | 'sku' | 'ean' | 'title'>('all')
   const [marketplaceFilter, setMarketplaceFilter] = useState<string>('all')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -243,15 +244,15 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
       if (deferredSearch) {
         const terms = deferredSearch.toLowerCase().trim().split(/\s+/).filter(Boolean)
         for (const term of terms) {
-          const matchTitle = p.title?.toLowerCase().includes(term) || false
-          const matchSku = p.marketplaceSku?.toLowerCase().includes(term) || false
-          const matchEan = p.parsedEan ? String(p.parsedEan).toLowerCase().includes(term) : false
+          const matchTitle = (searchField === 'all' || searchField === 'title') ? (p.title?.toLowerCase().includes(term) || false) : false
+          const matchSku = (searchField === 'all' || searchField === 'sku') ? (p.marketplaceSku?.toLowerCase().includes(term) || false) : false
+          const matchEan = (searchField === 'all' || searchField === 'ean') ? (p.parsedEan ? String(p.parsedEan).toLowerCase().includes(term) : false) : false
           if (!matchTitle && !matchSku && !matchEan) return false
         }
       }
       return true
     })
-  }, [enrichedProducts, deferredSearch, marketplaceFilter])
+  }, [enrichedProducts, deferredSearch, marketplaceFilter, searchField])
 
   useEffect(() => {
     setDisplayCount(50)
@@ -513,23 +514,35 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 items-center">
-          <div className="relative flex-1 w-full">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Suche nach Name, SKU oder EAN..."
-              className="w-full pl-9 pr-10 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-900 placeholder:text-slate-500 bg-white"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            {search && (
-              <button
-                onClick={() => setSearch('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors focus:outline-none"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
+          <div className="relative flex-1 w-full flex shadow-sm rounded-lg">
+            <select
+              className="border border-r-0 border-slate-200 rounded-l-lg bg-slate-50 text-sm py-2 pl-3 pr-8 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700 font-medium"
+              value={searchField}
+              onChange={(e) => setSearchField(e.target.value as any)}
+            >
+              <option value="all">Alle Felder</option>
+              <option value="sku">SKU</option>
+              <option value="ean">EAN</option>
+              <option value="title">Titel</option>
+            </select>
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Suchen..."
+                className="w-full pl-9 pr-10 py-2 border border-slate-200 rounded-r-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-900 placeholder:text-slate-500 bg-white"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors focus:outline-none"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
           </div>
           
           <div className="flex items-center gap-2 w-full sm:w-auto">
