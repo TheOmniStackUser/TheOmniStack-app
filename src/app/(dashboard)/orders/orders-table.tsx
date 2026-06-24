@@ -11,7 +11,7 @@ import type { Invoice, InvoiceLog } from '@/db/schema/invoices'
 import type { DhlConfig } from '@/app/(dashboard)/integrations/dhl-form'
 import { OttoRefundModal } from '@/components/orders/OttoRefundModal'
 
-export type OrderWithItems = Order & { items: OrderItem[], invoice?: (Invoice & { logs?: InvoiceLog[] }) | null }
+export type OrderWithItems = Order & { items: OrderItem[], returns?: any[], invoice?: (Invoice & { logs?: InvoiceLog[] }) | null }
 
 type SearchSuggestion = {
   label: string
@@ -2952,25 +2952,60 @@ export function OrdersTable({
                               <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Bestellte Produkte</h4>
                               <div className="bg-white rounded-md border border-gray-200 overflow-hidden mb-4">
                                 <ul className="divide-y divide-gray-200">
-                                  {order.items?.map((item) => (
-                                    <li key={item.id} className="p-3 hover:bg-gray-50 flex items-start gap-3">
-                                      <div className="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-1 rounded-md mt-0.5">
-                                        {item.quantity}x
-                                      </div>
-                                      <div className="flex-1">
-                                        <p className="text-sm font-medium text-gray-900 line-clamp-2">{item.title}</p>
-                                        <p className="text-xs text-gray-500 mt-1">SKU: {item.sku}</p>
-                                      </div>
-                                      <div className="text-right whitespace-nowrap">
-                                        <div className="text-sm font-medium text-gray-900">
-                                          {new Intl.NumberFormat('de-DE', { style: 'currency', currency: order.currency }).format(Number(item.unitPrice) * Number(item.quantity))}
+                                  {order.items?.map((item) => {
+                                    const refundedCount = order.returns?.reduce((acc, ret) => {
+                                      if (ret.status === 'bearbeitet' && ret.metadata?.refundedItems) {
+                                        const matched = (ret.metadata.refundedItems as any[]).find((r: any) => r.sku === item.sku)
+                                        if (matched && matched.quantity) {
+                                          return acc + Number(matched.quantity)
+                                        }
+                                      }
+                                      return acc
+                                    }, 0) || 0
+
+                                    const isFullyRefunded = refundedCount >= Number(item.quantity)
+                                    const isPartiallyRefunded = refundedCount > 0 && refundedCount < Number(item.quantity)
+
+                                    return (
+                                      <li key={item.id} className={`p-3 hover:bg-gray-50 flex items-start gap-3 ${isFullyRefunded ? 'opacity-75 bg-red-50/30' : ''}`}>
+                                        <div className={`text-xs font-bold px-2 py-1 rounded-md mt-0.5 ${isFullyRefunded ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
+                                          {item.quantity}x
                                         </div>
-                                        <div className="text-xs text-gray-500 mt-1">
-                                          inkl. {Number(item.taxRate) * 100}% MwSt.
+                                        <div className="flex-1">
+                                          <div className="flex flex-wrap items-center gap-2">
+                                            <p className={`text-sm font-medium text-gray-900 line-clamp-2 ${isFullyRefunded ? 'line-through text-gray-500' : ''}`}>
+                                              {item.title}
+                                            </p>
+                                            {isFullyRefunded && (
+                                              <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/10">
+                                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z" />
+                                                </svg>
+                                                Erstattet
+                                              </span>
+                                            )}
+                                            {isPartiallyRefunded && (
+                                              <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-700 ring-1 ring-inset ring-orange-600/10">
+                                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z" />
+                                                </svg>
+                                                Teilerstattet ({refundedCount}x)
+                                              </span>
+                                            )}
+                                          </div>
+                                          <p className="text-xs text-gray-500 mt-1">SKU: {item.sku}</p>
                                         </div>
-                                      </div>
-                                    </li>
-                                  ))}
+                                        <div className="text-right whitespace-nowrap">
+                                          <div className={`text-sm font-medium text-gray-900 ${isFullyRefunded ? 'line-through text-gray-500' : ''}`}>
+                                            {new Intl.NumberFormat('de-DE', { style: 'currency', currency: order.currency }).format(Number(item.unitPrice) * Number(item.quantity))}
+                                          </div>
+                                          <div className="text-xs text-gray-500 mt-1">
+                                            inkl. {Number(item.taxRate) * 100}% MwSt.
+                                          </div>
+                                        </div>
+                                      </li>
+                                    )
+                                  })}
                                   {(!order.items || order.items.length === 0) && (
                                     <li className="p-4 text-sm text-gray-500 text-center">Keine Produkte gefunden.</li>
                                   )}

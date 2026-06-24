@@ -2,6 +2,7 @@ import { requireAuth } from '@/lib/session'
 import { db } from '@/db/client'
 import { orders, orderItems } from '@/db/schema/orders'
 import { invoices, invoiceLogs } from '@/db/schema/invoices'
+import { returnsLog } from '@/db/schema/returns'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { eq, desc, and, ne, inArray } from 'drizzle-orm'
 import { OrdersTable } from './orders-table'
@@ -40,10 +41,11 @@ export default async function OrdersPage() {
   const invoiceIds = baseOrders.map(o => o.invoiceId).filter((id): id is string => id !== null)
 
   // Fetch relations in parallel
-  const [items, allInvoices, allLogs] = await Promise.all([
+  const [items, allInvoices, allLogs, allReturnsLogs] = await Promise.all([
     db.select().from(orderItems).where(eq(orderItems.companyId, auth.activeCompanyId)),
     db.select().from(invoices).where(eq(invoices.companyId, auth.activeCompanyId)),
-    db.select().from(invoiceLogs).where(eq(invoiceLogs.companyId, auth.activeCompanyId))
+    db.select().from(invoiceLogs).where(eq(invoiceLogs.companyId, auth.activeCompanyId)),
+    db.select().from(returnsLog).where(eq(returnsLog.companyId, auth.activeCompanyId))
   ])
 
   // Stitch them together in memory (O(N) operations, extremely fast)
@@ -59,6 +61,14 @@ export default async function OrdersPage() {
     return acc
   }, {} as Record<string, any[]>)
 
+  const returnsByOrderId = allReturnsLogs.reduce((acc, ret) => {
+    if (ret.orderId) {
+      acc[ret.orderId] = acc[ret.orderId] || []
+      acc[ret.orderId].push(ret)
+    }
+    return acc
+  }, {} as Record<string, any[]>)
+
   const invoiceById = allInvoices.reduce((acc, inv) => {
     acc[inv.id] = inv
     return acc
@@ -69,6 +79,7 @@ export default async function OrdersPage() {
     return {
       ...o,
       items: itemsByOrderId[o.id] || [],
+      returns: returnsByOrderId[o.id] || [],
       invoice: inv ? { ...inv, logs: logsByInvoiceId[inv.id] || [] } : null
     }
   })
