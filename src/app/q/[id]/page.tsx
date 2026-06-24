@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
 import { QuoteActions } from './quote-actions'
-import { CheckCircle2, XCircle } from 'lucide-react'
+import { CheckCircle2, XCircle, FileText } from 'lucide-react'
 
 export const metadata = {
   title: 'Angebot prüfen',
