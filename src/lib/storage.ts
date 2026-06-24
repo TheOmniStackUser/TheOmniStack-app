@@ -34,7 +34,18 @@ const s3SigningClient = new S3Client({
 })
 
 function getBucketName() {
-  return (process.env.S3_BUCKET_NAME || process.env.AWS_BUCKET_NAME)!
+  const bucket = process.env.S3_BUCKET_NAME || 
+                 process.env.AWS_BUCKET_NAME || 
+                 process.env.AWS_S3_BUCKET_NAME || 
+                 process.env.AWS_S3_BUCKET ||
+                 process.env.BUCKET_NAME
+
+  if (!bucket) {
+    console.error('[Storage] ERROR: No S3 bucket name configured in environment variables. Falling back to default "profifaktura-storage".')
+    return 'profifaktura-storage'
+  }
+
+  return bucket
 }
 
 let isBucketReady = false
