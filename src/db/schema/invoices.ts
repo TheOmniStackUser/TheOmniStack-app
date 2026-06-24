@@ -69,6 +69,7 @@ export const invoices = pgTable('invoices', {
   // Quote Confirmation
   quoteAcceptedAt: timestamp('quote_accepted_at', { withTimezone: true }),
   quoteRejectedAt: timestamp('quote_rejected_at', { withTimezone: true }),
+  quoteRejectedReason: text('quote_rejected_reason'),
 
   // Cancellation chain
   isCreditNote: boolean('is_credit_note').notNull().default(false),

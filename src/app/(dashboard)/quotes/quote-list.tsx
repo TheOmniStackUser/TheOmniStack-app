@@ -21,6 +21,7 @@ interface Quote {
   draftName: string | null
   quoteAcceptedAt: Date | null
   quoteRejectedAt: Date | null
+  quoteRejectedReason: string | null
   emailSentAt: Date | null
 }
 
@@ -944,6 +945,15 @@ export function QuoteList({
                             </span>
                           </div>
                         </div>
+
+                        {details.invoice.quoteRejectedAt && details.invoice.quoteRejectedReason && (
+                          <div className="mt-4 bg-rose-50 border border-rose-100 rounded-xl p-4 text-xs font-medium font-sans">
+                            <h4 className="text-rose-800 font-bold uppercase tracking-wider mb-2">Begründung für Ablehnung</h4>
+                            <p className="text-rose-700 italic leading-relaxed whitespace-pre-wrap">
+                              "{details.invoice.quoteRejectedReason}"
+                            </p>
+                          </div>
+                        )}
                       </div>
 
                       <div className="h-[1px] bg-slate-100" />

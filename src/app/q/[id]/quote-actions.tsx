@@ -9,6 +9,7 @@ export function QuoteActions({ quoteId, pdfUrl }: { quoteId: string, pdfUrl: str
   const [isRejecting, setIsRejecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirmAction, setConfirmAction] = useState<'accept' | 'reject' | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
 
   const handleAction = async (action: 'accept' | 'reject') => {
     setConfirmAction(null)
@@ -19,7 +20,7 @@ export function QuoteActions({ quoteId, pdfUrl }: { quoteId: string, pdfUrl: str
     }
     setError(null)
     try {
-      await respondToQuoteAction(quoteId, action)
+      await respondToQuoteAction(quoteId, action, action === 'reject' ? rejectReason : undefined)
     } catch (err: any) {
       setError(err.message || 'Ein Fehler ist aufgetreten.')
     } finally {
@@ -94,12 +95,24 @@ export function QuoteActions({ quoteId, pdfUrl }: { quoteId: string, pdfUrl: str
               <p className="text-slate-500 font-medium leading-relaxed">
                 {confirmAction === 'accept' 
                   ? 'Möchten Sie dieses Angebot wirklich verbindlich annehmen?' 
-                  : 'Möchten Sie dieses Angebot wirklich ablehnen?'}
+                  : 'Bitte teilen Sie uns kurz mit, warum Sie das Angebot ablehnen möchten (optional):'}
               </p>
+              {confirmAction === 'reject' && (
+                <textarea
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  placeholder="Ihre Begründung..."
+                  rows={3}
+                  className="mt-4 w-full p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 font-medium text-slate-800 text-sm resize-none"
+                />
+              )}
             </div>
             <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-3">
               <button
-                onClick={() => setConfirmAction(null)}
+                onClick={() => {
+                  setConfirmAction(null)
+                  setRejectReason('')
+                }}
                 className="flex-1 px-4 py-2.5 rounded-xl font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 transition-all"
               >
                 Abbrechen
