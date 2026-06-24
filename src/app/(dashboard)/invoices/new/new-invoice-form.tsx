@@ -265,7 +265,13 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
       })
       setCustomText(invoice.customText || '')
       setShowDraftsList(false)
-      setNotification({ message: 'Entwurf geladen!', type: 'success' })
+      
+      if (invoice.status === 'draft') {
+        setNotification({ message: 'Entwurf geladen!', type: 'success' })
+      } else {
+        setNotification({ message: invoice.documentType === 'quote' ? 'Angebot geladen!' : 'Dokument geladen!', type: 'success' })
+      }
+      
       setTimeout(() => setNotification(null), 5000)
     } catch (error) {
       setNotification({ message: 'Fehler beim Laden des Entwurfs', type: 'error' })

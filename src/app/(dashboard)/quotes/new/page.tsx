@@ -2,8 +2,14 @@ import { Suspense } from 'react'
 import { requireAuth } from '@/lib/session'
 import { NewInvoiceForm } from '@/app/(dashboard)/invoices/new/new-invoice-form'
 
-export default async function NewQuotePage() {
+export default async function NewQuotePage({
+  searchParams
+}: {
+  searchParams: { [key: string]: string | string[] | undefined }
+}) {
   await requireAuth()
+  
+  const isEditing = !!searchParams.edit
 
   return (
     <div className="py-8 px-4 md:px-0">
@@ -14,10 +20,14 @@ export default async function NewQuotePage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
           </div>
-          <h1 className="text-3xl font-bold text-slate-900">Neues Angebot erstellen</h1>
+          <h1 className="text-3xl font-bold text-slate-900">
+            {isEditing ? 'Angebot bearbeiten' : 'Neues Angebot erstellen'}
+          </h1>
         </div>
         <p className="text-slate-500">
-          Erstelle ein Angebot. Es kann anschließend per Klick beliebig oft in eine Rechnung oder einen Lieferschein umgewandelt werden.
+          {isEditing 
+            ? 'Bearbeite ein bestehendes Angebot.' 
+            : 'Erstelle ein Angebot. Es kann anschließend per Klick beliebig oft in eine Rechnung oder einen Lieferschein umgewandelt werden.'}
         </p>
       </div>
 
