@@ -19,6 +19,8 @@ interface Quote {
   pdfStorageKey: string | null
   status: string
   draftName: string | null
+  quoteAcceptedAt: Date | null
+  quoteRejectedAt: Date | null
 }
 
 const formatCountry = (code?: string | null) => {
@@ -232,11 +234,13 @@ export function QuoteList({
         ? company.smtpSettings.fromEmail
         : 'noreply@theomnistack.de'
 
+      const quoteUrl = `${window.location.origin}/q/${quoteId}`
+
       const resolvedText = emailTemplate
         .split('{Empfänger}').join(inv.recipientName || 'Kunde')
         .split('{Nummer}').join(invNumber)
         .split('{Datum}').join(invDate)
-        .split('{Link}').join(downloadUrl)
+        .split('{Link}').join(quoteUrl)
 
       setSendDate(invDate)
       setSenderEmail(defaultSender)
@@ -299,8 +303,12 @@ export function QuoteList({
       
       let templateText = messageText
       
+      const quoteUrl = `${window.location.origin}/q/${selectedQuoteId}`
+      if (quoteUrl) {
+        templateText = templateText.split(quoteUrl).join('{Link}')
+      }
       if (pdfUrl) {
-        templateText = templateText.split(pdfUrl).join('{Link}')
+        templateText = templateText.split(pdfUrl).join('{Link}') // Fallback for old templates
       }
       if (recipientVal) {
         templateText = templateText.split(recipientVal).join('{Empfänger}')
@@ -477,13 +485,23 @@ export function QuoteList({
                     {format(new Date(quote.createdAt), 'dd.MM.yyyy', { locale: de })}
                   </td>
                   <td className="px-5 py-4">
-                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
-                       quote.status === 'issued'
-                         ? 'bg-emerald-100 text-emerald-700'
-                         : 'bg-amber-100 text-amber-700'
-                    }`}>
-                      {quote.status === 'issued' ? 'Fertig' : 'Entwurf'}
-                    </span>
+                    {quote.quoteAcceptedAt ? (
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">
+                        Angenommen
+                      </span>
+                    ) : quote.quoteRejectedAt ? (
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-rose-100 text-rose-700">
+                        Abgelehnt
+                      </span>
+                    ) : (
+                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                         quote.status === 'issued'
+                           ? 'bg-blue-100 text-blue-700'
+                           : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        {quote.status === 'issued' ? 'Gesendet' : 'Entwurf'}
+                      </span>
+                    )}
                   </td>
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-2 justify-end">

@@ -314,6 +314,8 @@ export async function getQuotesAction() {
       pdfStorageKey: invoices.pdfStorageKey,
       status: invoices.status,
       draftName: invoices.draftName,
+      quoteAcceptedAt: invoices.quoteAcceptedAt,
+      quoteRejectedAt: invoices.quoteRejectedAt,
     })
     .from(invoices)
     .where(and(

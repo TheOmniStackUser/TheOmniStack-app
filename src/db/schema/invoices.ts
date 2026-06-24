@@ -65,6 +65,11 @@ export const invoices = pgTable('invoices', {
   // Payment tracking — set when user clicks "Als bezahlt markieren"
   // Used by the dunning worker to skip already-paid invoices efficiently.
   paidAt: timestamp('paid_at', { withTimezone: true }),
+  
+  // Quote Confirmation
+  quoteAcceptedAt: timestamp('quote_accepted_at', { withTimezone: true }),
+  quoteRejectedAt: timestamp('quote_rejected_at', { withTimezone: true }),
+
   // Cancellation chain
   isCreditNote: boolean('is_credit_note').notNull().default(false),
   cancelsInvoiceId: uuid('cancels_invoice_id'), // self-reference
