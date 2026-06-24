@@ -500,13 +500,13 @@ export function QuoteList({
                         Abgelehnt
                       </span>
                     ) : quote.emailSentAt ? (
-                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-700">
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-700">
                         Gesendet
                       </span>
                     ) : (
                       <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
                          quote.status === 'issued'
-                           ? 'bg-emerald-100 text-emerald-700'
+                           ? 'bg-blue-100 text-blue-700'
                            : 'bg-amber-100 text-amber-700'
                       }`}>
                         {quote.status === 'issued' ? 'Offen' : 'Entwurf'}
