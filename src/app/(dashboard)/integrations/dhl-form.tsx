@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useActionState } from 'react'
+import { useState, useActionState, useEffect, useMemo } from 'react'
 import { saveDhlIntegrationAction } from '@/app/actions/integrations'
 import { Settings, Globe, Hash, Package, RefreshCw } from 'lucide-react'
 
@@ -323,11 +323,63 @@ export function DhlIntegrationForm({
   const [defaultWidth, setDefaultWidth] = useState(initialConfig?.defaultWidthCm ?? 20)
   const [defaultHeight, setDefaultHeight] = useState(initialConfig?.defaultHeightCm ?? 10)
 
-  const [zones, setZones] = useState<DhlShippingZone[]>(initialConfig?.zones ?? DEFAULT_ZONES)
+  const getInitialZones = useMemo(() => {
+    return (config?: DhlConfig) => {
+      if (!config?.zones || config.zones.length === 0) return DEFAULT_ZONES
+      
+      const existingZones = config.zones
+      
+      // Merge existing zones with default zones to ensure all fields are present
+      const merged = DEFAULT_ZONES.map(defaultZone => {
+        const existing = existingZones.find(z => z.id === defaultZone.id)
+        if (existing) {
+          return {
+            ...defaultZone,
+            ...existing,
+            // Fallback to default productCode if missing or empty
+            productCode: existing.productCode || defaultZone.productCode
+          }
+        }
+        return defaultZone
+      })
+
+      // Append custom zones
+      const customZones = existingZones.filter(z => !DEFAULT_ZONE_IDS.includes(z.id))
+      return [...merged, ...customZones]
+    }
+  }, [])
+
+  const [zones, setZones] = useState<DhlShippingZone[]>(getInitialZones(initialConfig))
+  
   const [products, setProducts] = useState<DhlProduct[]>(initialConfig?.products ?? [
     { id: generateId(), productCode: 'V01PAK', name: 'DHL Paket', returnType: 'V07PAK', exportAllowed: false, additionalServices: ['Paketankündigung'] },
     { id: generateId(), productCode: 'V07PAK', name: 'DHL Retoure Online', returnType: '', exportAllowed: false, additionalServices: [] },
   ])
+
+  // Sync state when initialConfig updates from server (e.g. after save)
+  useEffect(() => {
+    if (initialConfig) {
+      setUsername(initialConfig.username ?? '')
+      setPassword(initialConfig.password ?? '')
+      setApiKey(initialConfig.apiKey ?? '')
+      setApiSecret(initialConfig.apiSecret ?? '')
+      setAccountNumber(initialConfig.accountNumber ?? '')
+      setEnv(initialConfig.environment ?? 'production')
+      setDefaultWeight(initialConfig.defaultWeight ?? 1)
+      setDefaultWeightWarenpost(initialConfig.defaultWeightWarenpost ?? 0.2)
+      setDefaultWeightWarenpostInternational(initialConfig.defaultWeightWarenpostInternational ?? 0.2)
+      setDefaultWeightKleinpaket(initialConfig.defaultWeightKleinpaket ?? 0.5)
+      setDefaultWeightKleinpaketInternational(initialConfig.defaultWeightKleinpaketInternational ?? 0.5)
+      setDefaultLength(initialConfig.defaultLengthCm ?? 30)
+      setDefaultWidth(initialConfig.defaultWidthCm ?? 20)
+      setDefaultHeight(initialConfig.defaultHeightCm ?? 10)
+      setZones(getInitialZones(initialConfig))
+      if (initialConfig.products) setProducts(initialConfig.products)
+      if (initialConfig.platformReturns) {
+        setPlatformReturns(prev => ({ ...prev, ...initialConfig.platformReturns }))
+      }
+    }
+  }, [initialConfig, getInitialZones])
 
   const getInitialPlatformReturns = () => {
     const defaults: Record<string, 'none' | 'online' | 'enclosed_with_label' | 'enclosed_without_label'> = {}
