@@ -283,6 +283,7 @@ export async function createManualInvoiceAction(data: {
 
   const redirectTarget = data.documentType === 'quote' ? '/quotes' : (data.documentType === 'delivery_note' ? '/delivery-notes' : '/invoices')
   if (data.status !== 'draft') {
+    revalidatePath(redirectTarget)
     redirect(redirectTarget)
   }
   

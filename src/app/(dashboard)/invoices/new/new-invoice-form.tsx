@@ -574,7 +574,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
       setIsSavingDraft(false)
     } catch (error: any) {
       if (error.message === 'NEXT_REDIRECT' || error.digest?.includes('NEXT_REDIRECT')) {
-        return
+        throw error
       }
       setNotification({ 
         message: status === 'issued' ? 'Fehler beim Erstellen der Rechnung' : 'Fehler beim Speichern des Entwurfs', 
