@@ -958,7 +958,7 @@ export async function editManualInvoiceAction(data: {
       throw new Error('Nur manuell erstellte Rechnungen können bearbeitet werden.')
     }
 
-    if (!data.internalNote?.trim()) {
+    if (!data.internalNote?.trim() && invoice.documentType !== 'quote') {
       throw new Error('Ein interner Vermerk ist für die Bearbeitung zwingend erforderlich.')
     }
 
@@ -989,7 +989,7 @@ export async function editManualInvoiceAction(data: {
         invoiceId: invoice.id,
         companyId,
         userId: auth.userId,
-        note: data.internalNote,
+        note: data.internalNote?.trim() || (invoice.documentType === 'quote' ? 'Angebot bearbeitet' : 'Dokument bearbeitet'),
         action: 'edited'
       })
 

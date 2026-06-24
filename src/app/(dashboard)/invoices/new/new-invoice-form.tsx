@@ -474,7 +474,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
 
     try {
       if (editId) {
-        if (!internalNote.trim()) {
+        if (!internalNote.trim() && documentType !== 'quote') {
           setNotification({ message: 'Bitte gib einen internen Vermerk für die Bearbeitung an.', type: 'error' })
           setIsSubmitting(false)
           setIsSavingDraft(false)
@@ -1132,7 +1132,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
             <div><label className="block text-xs font-bold text-slate-600 uppercase mb-2">Externe ID</label><input className="w-full px-4 py-3 border border-slate-300 rounded-xl font-bold text-slate-900 outline-none" value={settings.externalId} onChange={e => setSettings({ ...settings, externalId: e.target.value })} placeholder="Ext-789" /></div>
           </div>
           
-          {editId && (
+          {editId && documentType !== 'quote' && (
             <div className="pt-6 border-t border-slate-100 mt-4">
               <label className="block text-xs font-black text-red-600 uppercase mb-2 tracking-widest">Interner Vermerk (Warum wurde die Rechnung bearbeitet?)</label>
               <textarea 
