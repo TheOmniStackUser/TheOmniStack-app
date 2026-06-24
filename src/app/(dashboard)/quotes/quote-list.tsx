@@ -286,6 +286,11 @@ export function QuoteList({
 
       const updated = await getInvoiceDetailsAction(selectedQuoteId)
       setDetails(updated as any)
+      setQuotes(prev => prev.map(q => 
+        q.id === selectedQuoteId 
+          ? { ...q, emailSentAt: new Date() } 
+          : q
+      ))
       setShowSendModal(false)
       showToast('Angebot wurde erfolgreich versendet.', 'success')
     } catch (error: any) {
