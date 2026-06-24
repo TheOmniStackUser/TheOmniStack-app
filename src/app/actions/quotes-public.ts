@@ -82,7 +82,7 @@ export async function respondToQuoteAction(quoteId: string, action: 'accept' | '
   // Send email to company if rejected
   if (action === 'reject' && quote.company?.email) {
     try {
-      const { sendEmail } = await import('@/lib/email')
+      const { sendInvoiceEmail } = await import('@/lib/email')
       const emailHtml = `
         <div style="font-family: sans-serif; line-height: 1.5; color: #333;">
           <h2 style="color: #dc2626;">Angebot abgelehnt</h2>
@@ -91,8 +91,9 @@ export async function respondToQuoteAction(quoteId: string, action: 'accept' | '
           <p><a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://app.theomnistack.de'}/quotes">Zum Angebot im Dashboard</a></p>
         </div>
       `
-      await sendEmail({
-        to: quote.company.email,
+      await sendInvoiceEmail({
+        toEmail: quote.company.email,
+        replyTo: 'noreply@theomnistack.de',
         subject: `Angebot abgelehnt: ${quote.invoiceNumber || quote.draftName}`,
         html: emailHtml,
       })
