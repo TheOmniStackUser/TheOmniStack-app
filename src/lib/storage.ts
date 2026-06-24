@@ -33,7 +33,10 @@ const s3SigningClient = new S3Client({
   },
 })
 
-const BUCKET = (process.env.S3_BUCKET_NAME || process.env.AWS_BUCKET_NAME)!
+function getBucketName() {
+  return (process.env.S3_BUCKET_NAME || process.env.AWS_BUCKET_NAME)!
+}
+
 let isBucketReady = false
 
 /**
@@ -41,12 +44,13 @@ let isBucketReady = false
  */
 async function ensureBucketExists() {
   if (isBucketReady) return
-  console.log(`[Storage] Checking bucket: "${BUCKET}" at endpoint: "${process.env.S3_ENDPOINT}"`)
+  const bucket = getBucketName()
+  console.log(`[Storage] Checking bucket: "${bucket}" at endpoint: "${process.env.S3_ENDPOINT}"`)
   try {
     // Try to create the bucket directly. If it exists, it might throw an error depending on the S3 provider.
     // MinIO and AWS S3 behave slightly differently here.
-    await s3UploadClient.send(new CreateBucketCommand({ Bucket: BUCKET }))
-    console.log(`[Storage] Bucket "${BUCKET}" created.`)
+    await s3UploadClient.send(new CreateBucketCommand({ Bucket: bucket }))
+    console.log(`[Storage] Bucket "${bucket}" created.`)
     isBucketReady = true
   } catch (error: any) {
     // Ignore errors if the bucket already exists
@@ -58,13 +62,13 @@ async function ensureBucketExists() {
       isBucketReady = true
     } else if (error.$metadata?.httpStatusCode === 403) {
       // Permission denied - maybe it exists but we can't 'create' it, which is fine for existing buckets
-      console.warn(`[Storage] Permission denied when creating bucket "${BUCKET}". Assuming it exists.`)
+      console.warn(`[Storage] Permission denied when creating bucket "${bucket}". Assuming it exists.`)
       isBucketReady = true
     } else {
-      console.error(`[Storage] Unexpected error during bucket check/creation for "${BUCKET}":`, error)
+      console.error(`[Storage] Unexpected error during bucket check/creation for "${bucket}":`, error)
       try {
         const fs = require('fs')
-        const logMsg = `[${new Date().toISOString()}] Error: ${error.message}\nStack: ${error.stack}\nBucket: ${BUCKET}\nEndpoint: ${process.env.S3_ENDPOINT}\n---\n`
+        const logMsg = `[${new Date().toISOString()}] Error: ${error.message}\nStack: ${error.stack}\nBucket: ${bucket}\nEndpoint: ${process.env.S3_ENDPOINT}\n---\n`
         fs.appendFileSync('storage-debug.log', logMsg)
       } catch (e) {
         console.error('Failed to write to debug log:', e)
@@ -89,7 +93,7 @@ export async function uploadDocument(
   const normalizedBuffer = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer)
   await s3UploadClient.send(
     new PutObjectCommand({
-      Bucket: BUCKET,
+      Bucket: getBucketName(),
       Key: key,
       Body: normalizedBuffer,
       ContentLength: normalizedBuffer.byteLength,
@@ -106,7 +110,7 @@ export async function downloadDocument(key: string): Promise<Buffer> {
   await ensureBucketExists()
   const response = await s3UploadClient.send(
     new GetObjectCommand({
-      Bucket: BUCKET,
+      Bucket: getBucketName(),
       Key: key,
     })
   )
@@ -125,7 +129,7 @@ export async function documentExists(key: string): Promise<boolean> {
     await ensureBucketExists()
     await s3UploadClient.send(
       new HeadObjectCommand({
-        Bucket: BUCKET,
+        Bucket: getBucketName(),
         Key: key,
       })
     )
@@ -146,7 +150,7 @@ export async function deleteDocument(key: string): Promise<boolean> {
     await ensureBucketExists()
     await s3UploadClient.send(
       new DeleteObjectCommand({
-        Bucket: BUCKET,
+        Bucket: getBucketName(),
         Key: key,
       })
     )
@@ -165,7 +169,7 @@ export async function getDocumentUrl(
   expiresInSeconds = 3600
 ): Promise<string> {
   const command = new GetObjectCommand({ 
-    Bucket: BUCKET, 
+    Bucket: getBucketName(), 
     Key: key,
     ResponseContentType: 'application/pdf',
     ResponseContentDisposition: 'inline'
