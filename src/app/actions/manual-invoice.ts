@@ -317,7 +317,7 @@ export async function getQuotesAction() {
       quoteAcceptedAt: invoices.quoteAcceptedAt,
       quoteRejectedAt: invoices.quoteRejectedAt,
       quoteRejectedReason: invoices.quoteRejectedReason,
-      emailSentAt: sql<Date | null>`(SELECT created_at FROM invoice_logs WHERE invoice_id = ${invoices.id} AND action = 'email' ORDER BY created_at DESC LIMIT 1)`.as('emailSentAt')
+      emailSentAt: sql<Date | null>`(SELECT created_at FROM invoice_logs WHERE invoice_id = invoices.id AND action = 'email' ORDER BY created_at DESC LIMIT 1)`.as('emailSentAt')
     })
     .from(invoices)
     .where(and(
