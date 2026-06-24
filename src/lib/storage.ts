@@ -15,8 +15,20 @@ const s3UploadClient = new S3Client({
   endpoint: process.env.S3_ENDPOINT,
   forcePathStyle: process.env.S3_FORCE_PATH_STYLE === 'true',
   credentials: {
-    accessKeyId: (process.env.S3_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID)!,
-    secretAccessKey: (process.env.S3_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY)!,
+    accessKeyId: (
+      process.env.S3_ACCESS_KEY_ID ?? 
+      process.env.AWS_ACCESS_KEY_ID ?? 
+      process.env.S3_ACCESS_KEY ?? 
+      process.env.AWS_ACCESS_KEY ?? 
+      'missing-access-key'
+    ) as string,
+    secretAccessKey: (
+      process.env.S3_SECRET_ACCESS_KEY ?? 
+      process.env.AWS_SECRET_ACCESS_KEY ?? 
+      process.env.S3_SECRET_KEY ?? 
+      process.env.AWS_SECRET_KEY ?? 
+      'missing-secret-key'
+    ) as string,
   },
 })
 
@@ -28,8 +40,20 @@ const s3SigningClient = new S3Client({
   endpoint: process.env.S3_PUBLIC_ENDPOINT || process.env.S3_ENDPOINT,
   forcePathStyle: process.env.S3_FORCE_PATH_STYLE === 'true',
   credentials: {
-    accessKeyId: (process.env.S3_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID)!,
-    secretAccessKey: (process.env.S3_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY)!,
+    accessKeyId: (
+      process.env.S3_ACCESS_KEY_ID ?? 
+      process.env.AWS_ACCESS_KEY_ID ?? 
+      process.env.S3_ACCESS_KEY ?? 
+      process.env.AWS_ACCESS_KEY ?? 
+      'missing-access-key'
+    ) as string,
+    secretAccessKey: (
+      process.env.S3_SECRET_ACCESS_KEY ?? 
+      process.env.AWS_SECRET_ACCESS_KEY ?? 
+      process.env.S3_SECRET_KEY ?? 
+      process.env.AWS_SECRET_KEY ?? 
+      'missing-secret-key'
+    ) as string,
   },
 })
 
