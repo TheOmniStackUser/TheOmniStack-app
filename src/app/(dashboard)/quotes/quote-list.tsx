@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
 import { getInvoiceDownloadUrl, getInvoiceDetailsAction, sendInvoiceEmailAction, addInvoiceLogAction } from '@/app/actions/invoices'
@@ -140,6 +140,31 @@ export function QuoteList({
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
+
+  // Sorting state
+  type SortField = 'date' | 'amount' | 'status' | 'country' | 'recipient' | 'invoiceNumber'
+  const [sortConfig, setSortConfig] = useState<{ key: SortField, direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' })
+
+  const handleSort = (key: SortField) => {
+    setSortConfig(current => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc'
+    }))
+  }
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortConfig.key !== field) return <span className="inline-block w-4 opacity-0 group-hover:opacity-50 transition-opacity">↕</span>
+    return <span className="inline-block w-4 text-amber-600">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
+  }
+
+  // Filtering state
+  const [showFilters, setShowFilters] = useState(false)
+  const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [filterCountry, setFilterCountry] = useState<string>('all')
+  const [filterMinAmount, setFilterMinAmount] = useState<string>('')
+  const [filterMaxAmount, setFilterMaxAmount] = useState<string>('')
+  const [filterDateFrom, setFilterDateFrom] = useState<string>('')
+  const [filterDateTo, setFilterDateTo] = useState<string>('')
 
   // Detailed Split View state
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null)
@@ -366,13 +391,100 @@ export function QuoteList({
     }
   }
 
-  const filtered = quotes.filter(q => {
-    const s = search.toLowerCase()
-    return (
-      q.invoiceNumber.toLowerCase().includes(s) ||
-      (q.recipientName || '').toLowerCase().includes(s)
-    )
-  })
+  const getQuoteStatus = (quote: Quote) => {
+    if (quote.quoteAcceptedAt) return 'accepted'
+    if (quote.quoteRejectedAt) return 'rejected'
+    if (quote.quoteRevisedAt) return 'revised'
+    if (quote.emailSentAt) return 'sent'
+    return quote.status === 'issued' ? 'open' : 'draft'
+  }
+
+  const filteredAndSorted = useMemo(() => {
+    let result = [...quotes]
+
+    // 1. Search
+    if (search) {
+      const s = search.toLowerCase()
+      result = result.filter(q => 
+        q.invoiceNumber.toLowerCase().includes(s) ||
+        (q.recipientName || '').toLowerCase().includes(s)
+      )
+    }
+
+    // 2. Filters
+    if (filterStatus !== 'all') {
+      result = result.filter(q => getQuoteStatus(q) === filterStatus)
+    }
+    if (filterCountry !== 'all') {
+      result = result.filter(q => formatCountry(q.recipientCountry) === filterCountry)
+    }
+    if (filterMinAmount) {
+      const min = parseFloat(filterMinAmount)
+      if (!isNaN(min)) result = result.filter(q => parseFloat(q.totalAmount) >= min)
+    }
+    if (filterMaxAmount) {
+      const max = parseFloat(filterMaxAmount)
+      if (!isNaN(max)) result = result.filter(q => parseFloat(q.totalAmount) <= max)
+    }
+    if (filterDateFrom) {
+      const from = new Date(filterDateFrom)
+      from.setHours(0, 0, 0, 0)
+      result = result.filter(q => new Date(q.createdAt) >= from)
+    }
+    if (filterDateTo) {
+      const to = new Date(filterDateTo)
+      to.setHours(23, 59, 59, 999)
+      result = result.filter(q => new Date(q.createdAt) <= to)
+    }
+
+    // 3. Sort
+    result.sort((a, b) => {
+      let valA: any
+      let valB: any
+
+      switch (sortConfig.key) {
+        case 'date':
+          valA = new Date(a.createdAt).getTime()
+          valB = new Date(b.createdAt).getTime()
+          break
+        case 'amount':
+          valA = parseFloat(a.totalAmount)
+          valB = parseFloat(b.totalAmount)
+          break
+        case 'status':
+          valA = getQuoteStatus(a)
+          valB = getQuoteStatus(b)
+          break
+        case 'country':
+          valA = formatCountry(a.recipientCountry)
+          valB = formatCountry(b.recipientCountry)
+          break
+        case 'recipient':
+          valA = (a.recipientName || '').toLowerCase()
+          valB = (b.recipientName || '').toLowerCase()
+          break
+        case 'invoiceNumber':
+          valA = a.invoiceNumber.toLowerCase()
+          valB = b.invoiceNumber.toLowerCase()
+          break
+        default:
+          valA = a.id
+          valB = b.id
+      }
+
+      if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1
+      if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1
+      return 0
+    })
+
+    return result
+  }, [quotes, search, filterStatus, filterCountry, filterMinAmount, filterMaxAmount, filterDateFrom, filterDateTo, sortConfig])
+
+  const filtered = filteredAndSorted
+
+  const uniqueCountries = useMemo(() => {
+    return Array.from(new Set(quotes.map(q => formatCountry(q.recipientCountry)))).sort()
+  }, [quotes])
 
   return (
     <div>
@@ -403,8 +515,8 @@ export function QuoteList({
         </div>
       )}
 
-      {/* Search */}
-      <div className="mb-5">
+      {/* Search & Filters */}
+      <div className="mb-6 space-y-4">
         <div className="flex flex-col sm:flex-row gap-4 items-center">
           <div className="flex-1 w-full flex gap-2">
             <div className="relative flex-1 max-w-xs">
@@ -428,12 +540,96 @@ export function QuoteList({
                 </button>
               )}
             </div>
-            <button
-              type="button"
-              className="px-5 py-2.5 bg-amber-600 text-white text-sm font-semibold rounded-lg hover:bg-amber-700 transition-colors shadow-sm whitespace-nowrap"
+            {(filterStatus !== 'all' || filterCountry !== 'all' || filterMinAmount || filterMaxAmount || filterDateFrom || filterDateTo) && (
+              <button
+                onClick={() => {
+                  setFilterStatus('all')
+                  setFilterCountry('all')
+                  setFilterMinAmount('')
+                  setFilterMaxAmount('')
+                  setFilterDateFrom('')
+                  setFilterDateTo('')
+                }}
+                className="px-4 py-2.5 bg-slate-100 text-slate-600 text-sm font-semibold rounded-lg hover:bg-slate-200 transition-colors shadow-sm whitespace-nowrap"
+              >
+                Filter zurücksetzen
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Permanent Filters Row */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 p-4 bg-slate-50 border border-slate-100 rounded-xl">
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Status</label>
+            <select
+              value={filterStatus}
+              onChange={e => setFilterStatus(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 bg-white text-slate-800"
             >
-              Suchen
-            </button>
+              <option value="all">Alle</option>
+              <option value="draft">Entwurf</option>
+              <option value="open">Offen</option>
+              <option value="accepted">Angenommen</option>
+              <option value="rejected">Abgelehnt</option>
+              <option value="revised">Überarbeitet</option>
+              <option value="sent">Gesendet</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Land</label>
+            <select
+              value={filterCountry}
+              onChange={e => setFilterCountry(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 bg-white text-slate-800"
+            >
+              <option value="all">Alle</option>
+              {uniqueCountries.map(country => (
+                <option key={country} value={country}>{country === 'DE' ? 'Deutschland (DE)' : country}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Min Betrag</label>
+              <input
+                type="number"
+                placeholder="0.00"
+                value={filterMinAmount}
+                onChange={e => setFilterMinAmount(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 bg-white text-slate-900 placeholder:text-slate-400"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Max Betrag</label>
+              <input
+                type="number"
+                placeholder="0.00"
+                value={filterMaxAmount}
+                onChange={e => setFilterMaxAmount(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 bg-white text-slate-900 placeholder:text-slate-400"
+              />
+            </div>
+          </div>
+          <div className="flex gap-2 lg:col-span-2">
+            <div className="flex-1">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Datum von</label>
+              <input
+                type="date"
+                value={filterDateFrom}
+                onChange={e => setFilterDateFrom(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 bg-white text-slate-800"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Datum bis</label>
+              <input
+                type="date"
+                value={filterDateTo}
+                onChange={e => setFilterDateTo(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 bg-white text-slate-800"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -443,12 +639,12 @@ export function QuoteList({
         <table className="w-full text-sm">
           <thead className="bg-slate-50 border-b border-slate-100">
             <tr>
-              <th className="text-left px-5 py-3.5 font-semibold text-slate-600 text-xs tracking-wide uppercase">Ang.-Nr.</th>
-              <th className="text-left px-5 py-3.5 font-semibold text-slate-600 text-xs tracking-wide uppercase">Empfänger</th>
-              <th className="text-left px-5 py-3.5 font-semibold text-slate-600 text-xs tracking-wide uppercase">Land</th>
-              <th className="text-right px-5 py-3.5 font-semibold text-slate-600 text-xs tracking-wide uppercase">Betrag</th>
-              <th className="text-left px-5 py-3.5 font-semibold text-slate-600 text-xs tracking-wide uppercase">Erstellt</th>
-              <th className="text-left px-5 py-3.5 font-semibold text-slate-600 text-xs tracking-wide uppercase">Status</th>
+              <th className="text-left px-5 py-3.5 font-semibold text-slate-600 text-xs tracking-wide uppercase cursor-pointer hover:bg-slate-100 group transition-colors" onClick={() => handleSort('invoiceNumber')}>Ang.-Nr. <SortIcon field="invoiceNumber" /></th>
+              <th className="text-left px-5 py-3.5 font-semibold text-slate-600 text-xs tracking-wide uppercase cursor-pointer hover:bg-slate-100 group transition-colors" onClick={() => handleSort('recipient')}>Empfänger <SortIcon field="recipient" /></th>
+              <th className="text-left px-5 py-3.5 font-semibold text-slate-600 text-xs tracking-wide uppercase cursor-pointer hover:bg-slate-100 group transition-colors" onClick={() => handleSort('country')}>Land <SortIcon field="country" /></th>
+              <th className="text-right px-5 py-3.5 font-semibold text-slate-600 text-xs tracking-wide uppercase cursor-pointer hover:bg-slate-100 group transition-colors" onClick={() => handleSort('amount')}>Betrag <SortIcon field="amount" /></th>
+              <th className="text-left px-5 py-3.5 font-semibold text-slate-600 text-xs tracking-wide uppercase cursor-pointer hover:bg-slate-100 group transition-colors" onClick={() => handleSort('date')}>Erstellt <SortIcon field="date" /></th>
+              <th className="text-left px-5 py-3.5 font-semibold text-slate-600 text-xs tracking-wide uppercase cursor-pointer hover:bg-slate-100 group transition-colors" onClick={() => handleSort('status')}>Status <SortIcon field="status" /></th>
               <th className="px-5 py-3.5"></th>
             </tr>
           </thead>
