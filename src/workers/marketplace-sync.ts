@@ -697,11 +697,11 @@ export async function generateOrDownloadDeliveryNote(
   }
 
   let pdfBuffer: Buffer
-  if (order.marketplace === 'aboutyou' && adapter && 'getDeliveryNote' in adapter && typeof (adapter as any).getDeliveryNote === 'function') {
+  if ((order.marketplace === 'aboutyou' || order.marketplace === 'limango') && adapter && 'getDeliveryNote' in adapter && typeof (adapter as any).getDeliveryNote === 'function') {
     try {
       pdfBuffer = await (adapter as any).getDeliveryNote(order.marketplaceOrderId, order.rawPayload)
     } catch (err) {
-      console.error(`[Worker] Failed to download delivery note from About You for order ${order.marketplaceOrderId}:`, err)
+      console.error(`[Worker] Failed to download delivery note from ${order.marketplace} for order ${order.marketplaceOrderId}:`, err)
       return
     }
   } else {

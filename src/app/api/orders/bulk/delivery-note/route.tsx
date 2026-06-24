@@ -76,27 +76,41 @@ export async function GET(request: Request) {
       itemsByOrderId.get(item.orderId)!.push(item)
     }
 
-    // 4. Check for About You integration if needed
-    const hasAboutYou = sortedOrders.some(o => o.marketplace === 'aboutyou')
-    let aboutYouAdapter: any = null
-    if (hasAboutYou) {
+    // 4. Check for Marketplace Integrations (About You, Mirakl)
+    const hasMarketplaceDocs = sortedOrders.some(o => o.marketplace === 'aboutyou' || o.marketplace === 'limango')
+    let adaptersByMarketplace: Record<string, any> = {}
+    
+    if (hasMarketplaceDocs) {
       const { marketplaceIntegrations } = await import('@/db/schema/integrations')
-      const [integration] = await db
+      const activeIntegrations = await db
         .select()
         .from(marketplaceIntegrations)
         .where(and(
           eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
-          eq(marketplaceIntegrations.type, 'aboutyou'),
           eq(marketplaceIntegrations.isActive, true)
         ))
-        .limit(1)
 
-      if (integration?.apiKey) {
-        const { AboutYouAdapter } = await import('@/adapters/marketplace/aboutyou')
-        aboutYouAdapter = new AboutYouAdapter({
-          apiKey: integration.apiKey,
-          environment: (integration.environment as any) || 'production'
-        })
+      for (const integration of activeIntegrations) {
+        if (integration.type === 'aboutyou' && integration.apiKey) {
+          const { AboutYouAdapter } = await import('@/adapters/marketplace/aboutyou')
+          adaptersByMarketplace['aboutyou'] = new AboutYouAdapter({
+            apiKey: integration.apiKey,
+            environment: (integration.environment as any) || 'production'
+          })
+        } else if ((integration.type.startsWith('mirakl_') || integration.type === 'mirakl_custom') && integration.clientId) {
+          const { MiraklAdapter } = await import('@/adapters/marketplace/mirakl')
+          const customName = integration.type === 'mirakl_custom'
+            ? ((integration.metadata as any)?.customName || 'mirakl_custom')
+            : integration.type
+          adaptersByMarketplace[customName.toLowerCase()] = new MiraklAdapter({
+            instance: customName.toLowerCase() as any,
+            baseUrl: integration.environment!,
+            clientId: integration.clientId,
+            clientSecret: integration.clientSecret || '',
+            apiKey: integration.apiKey || undefined,
+            shopId: (integration.metadata as any)?.shopId || undefined
+          })
+        }
       }
     }
 
@@ -160,35 +174,47 @@ export async function GET(request: Request) {
         console.warn(`[DeliveryNoteRoute] Cache check failed for order ${order.id}:`, cacheErr)
       }
 
-      if (order.marketplace === 'aboutyou') {
-        if (!aboutYouAdapter) {
+      if (order.marketplace === 'aboutyou' || order.marketplace === 'limango') {
+        const adapter = adaptersByMarketplace[order.marketplace.toLowerCase()]
+        if (adapter && adapter.getDeliveryNote) {
+          try {
+            const pdfBuffer = await adapter.getDeliveryNote(order.marketplaceOrderId)
+            if (pdfBuffer) {
+              pdfBuffers.push(pdfBuffer)
+              
+              // Cache the fetched PDF
+              try {
+                await uploadDocument(cacheKey, pdfBuffer)
+              } catch (uploadErr) {
+                console.warn(`[DeliveryNoteRoute] Cache save failed for marketplace order ${order.id}:`, uploadErr)
+              }
+              continue // Successfully added the marketplace pdf, skip local generation
+            } else {
+              console.log(`[DeliveryNoteRoute] No official delivery note found for order ${order.marketplaceOrderId}. Falling back to local generation.`)
+            }
+          } catch (adapterError: any) {
+            console.error(`[DeliveryNoteRoute] Error fetching marketplace doc for ${order.marketplaceOrderId}:`, adapterError)
+            if (order.marketplace === 'aboutyou') {
+              return new Response(`Original-Lieferschein von About You für Bestellung ${order.marketplaceOrderId} konnte nicht geladen werden: ${adapterError.message}`, { status: 502 })
+            } else {
+              console.log(`[DeliveryNoteRoute] Falling back to local generation for Mirakl order ${order.id}.`)
+            }
+          }
+        } else if (order.marketplace === 'aboutyou') {
           return new Response(`About You Integration ist nicht konfiguriert für Bestellung ${order.marketplaceOrderId}`, { status: 400 })
         }
-        try {
-          const pdfBuffer = await aboutYouAdapter.getDeliveryNote(order.marketplaceOrderId)
-          pdfBuffers.push(pdfBuffer)
-          
-          // Cache the fetched About You PDF
-          try {
-            await uploadDocument(cacheKey, pdfBuffer)
-          } catch (uploadErr) {
-            console.warn(`[DeliveryNoteRoute] Cache save failed for About You order ${order.id}:`, uploadErr)
-          }
-        } catch (aboutYouError: any) {
-          console.error(`[DeliveryNoteRoute] Error fetching About You doc for ${order.marketplaceOrderId}:`, aboutYouError)
-          return new Response(`Original-Lieferschein von About You für Bestellung ${order.marketplaceOrderId} konnte nicht geladen werden: ${aboutYouError.message}`, { status: 502 })
-        }
-      } else {
-        const stream = await renderToStream(<DeliveryNoteDocument order={order} company={company} />)
-        const pdfBuffer = await streamToBuffer(stream)
-        pdfBuffers.push(pdfBuffer)
+      }
 
-        // Cache the newly generated PDF
-        try {
-          await uploadDocument(cacheKey, pdfBuffer)
-        } catch (uploadErr) {
-          console.warn(`[DeliveryNoteRoute] Cache save failed for generated order ${order.id}:`, uploadErr)
-        }
+      // Local Generation (Fallback or default)
+      const stream = await renderToStream(<DeliveryNoteDocument order={order} company={company} />)
+      const pdfBuffer = await streamToBuffer(stream)
+      pdfBuffers.push(pdfBuffer)
+
+      // Cache the newly generated PDF
+      try {
+        await uploadDocument(cacheKey, pdfBuffer)
+      } catch (uploadErr) {
+        console.warn(`[DeliveryNoteRoute] Cache save failed for generated order ${order.id}:`, uploadErr)
       }
     }
 

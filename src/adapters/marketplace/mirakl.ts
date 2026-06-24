@@ -348,6 +348,104 @@ export class MiraklAdapter implements MarketplaceAdapter {
   }
 
   /**
+   * Download a delivery note document from Mirakl.
+   * Finds the first document of type DELIVERY_SLIP, PACKING_SLIP, etc. and downloads it.
+   */
+  async getDeliveryNote(marketplaceOrderId: string): Promise<Buffer> {
+    try {
+      const token = await this.getAccessToken()
+      const headers: Record<string, string> = {
+        'Accept': 'application/json'
+      }
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      } else {
+        headers['Authorization'] = this.config.clientId
+        headers['X-Mirakl-Api-Key'] = this.config.clientId
+      }
+
+      // 1. Get the list of documents for this order
+      const docsUrl = `${this.config.baseUrl}/api/orders/${marketplaceOrderId}/documents`
+      console.log(`[MiraklAdapter:${this.marketplace}] Fetching documents list for order ${marketplaceOrderId} via GET ${docsUrl}...`)
+      
+      const docsResponse = await fetch(docsUrl, {
+        method: 'GET',
+        headers
+      })
+
+      if (!docsResponse.ok) {
+        const errText = await docsResponse.text()
+        throw new Error(`Failed to fetch documents list (${docsResponse.status}): ${errText}`)
+      }
+
+      const docsData = await docsResponse.json()
+      const docs = docsData.order_documents || []
+
+      // 2. Find the delivery note document
+      // Mirakl might use various type_codes for delivery notes depending on the instance.
+      const deliveryDoc = docs.find((d: any) => {
+        const typeCode = (d.type_code || '').toUpperCase()
+        return typeCode === 'DELIVERY_SLIP' || 
+               typeCode === 'PACKING_SLIP' || 
+               typeCode === 'DELIVERY' ||
+               typeCode === 'PACKING' ||
+               typeCode === 'LIEFERSCHEIN' ||
+               typeCode === 'SLIP' ||
+               typeCode.includes('LIEFERSCHEIN') ||
+               typeCode.includes('DELIVERY')
+      })
+
+      if (!deliveryDoc) {
+        throw new Error(`No delivery note document found for order ${marketplaceOrderId}. Available types: ${docs.map((d: any) => d.type_code).join(', ')}`)
+      }
+
+      const docId = deliveryDoc.id
+
+      // 3. Download the actual document
+      let downloadUrl = ''
+      if (this.config.baseUrl.includes('decathlon')) {
+        // Decathlon specific download URL structure if different
+        downloadUrl = `${this.config.baseUrl}/orders/documents/download?document_ids=${docId}`
+      } else if (this.config.baseUrl.includes('kaufland')) {
+        downloadUrl = `${this.config.baseUrl}/api/v1/orders/documents/download?document_ids=${docId}`
+      } else if (this.config.baseUrl.includes('mediamarkt') || this.config.baseUrl.includes('saturn')) {
+        downloadUrl = `${this.config.baseUrl}/orders/documents/download?document_ids=${docId}`
+      } else {
+        // Standard Mirakl PA11/12
+        downloadUrl = `${this.config.baseUrl}/api/orders/documents/download?document_ids=${docId}`
+      }
+
+      if (this.config.shopId) {
+        downloadUrl += `&shop_id=${this.config.shopId}`
+      }
+
+      console.log(`[MiraklAdapter:${this.marketplace}] Downloading delivery note document ${docId} for order ${marketplaceOrderId} via GET ${downloadUrl}...`)
+
+      // For downloading files, we don't use 'Accept: application/json'
+      const downloadHeaders = { ...headers }
+      delete downloadHeaders['Accept']
+
+      const downloadResponse = await fetch(downloadUrl, {
+        method: 'GET',
+        headers: downloadHeaders
+      })
+
+      if (!downloadResponse.ok) {
+        const errText = await downloadResponse.text()
+        throw new Error(`Failed to download delivery note document (${downloadResponse.status}): ${errText}`)
+      }
+
+      const arrayBuffer = await downloadResponse.arrayBuffer()
+      return Buffer.from(arrayBuffer)
+
+    } catch (error: any) {
+      console.error(`[MiraklAdapter:${this.marketplace}] Error downloading delivery note for order ${marketplaceOrderId}:`, error)
+      throw error
+    }
+  }
+
+  /**
    * Accept specific order lines for an order in WAITING_ACCEPTANCE.
    * Uses OR21 endpoint: PUT /api/orders/{order_id}/accept
    */

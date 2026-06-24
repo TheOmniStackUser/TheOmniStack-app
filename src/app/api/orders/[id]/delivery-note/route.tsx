@@ -71,46 +71,80 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       return new Response('Company not found', { status: 404 })
     }
 
-    // ─── Special Case: About You ─────────────────────────────────────────────
-    // About You requires using their official delivery documents.
-    if (order.marketplace === 'aboutyou') {
+    // ─── Special Case: Marketplace Integrations with Delivery Notes ──────────
+    // About You and Mirakl (e.g. Limango) can provide official delivery documents.
+    if (order.marketplace === 'aboutyou' || order.marketplace === 'limango') {
       const { marketplaceIntegrations } = await import('@/db/schema/integrations')
-      const [integration] = await db
+      
+      const activeIntegrations = await db
         .select()
         .from(marketplaceIntegrations)
         .where(and(
           eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
-          eq(marketplaceIntegrations.type, 'aboutyou'),
           eq(marketplaceIntegrations.isActive, true)
         ))
-        .limit(1)
 
-      if (integration?.apiKey) {
-        const { AboutYouAdapter } = await import('@/adapters/marketplace/aboutyou')
-        const adapter = new AboutYouAdapter({
-          apiKey: integration.apiKey,
-          environment: (integration.environment as any) || 'production'
-        })
-        
-        try {
-          const pdfBuffer = await adapter.getDeliveryNote(order.marketplaceOrderId)
-          
-          // Cache the fetched PDF
-          try {
-            await uploadDocument(cacheKey, pdfBuffer)
-          } catch (uploadErr) {
-            console.warn(`[DeliveryNoteRoute] Cache save failed for About You order ${id}:`, uploadErr)
-          }
+      const integration = activeIntegrations.find(i => 
+        i.type === order.marketplace || 
+        (i.type === 'mirakl_custom' && ((i.metadata as any)?.customName || '').toLowerCase() === order.marketplace.toLowerCase())
+      )
 
-          return new Response(new Uint8Array(pdfBuffer), {
-            headers: {
-              'Content-Type': 'application/pdf',
-              'Content-Disposition': `inline; filename="AboutYou_Lieferschein_${order.marketplaceOrderId}.pdf"`,
-            },
+      if (integration) {
+        let adapter: any = null
+        if (integration.type === 'aboutyou' && integration.apiKey) {
+          const { AboutYouAdapter } = await import('@/adapters/marketplace/aboutyou')
+          adapter = new AboutYouAdapter({
+            apiKey: integration.apiKey,
+            environment: (integration.environment as any) || 'production'
           })
-        } catch (aboutYouError) {
-          console.error('[DeliveryNoteRoute] Error fetching About You doc:', aboutYouError)
-          return new Response('Original-Lieferschein von About You konnte nicht geladen werden.', { status: 502 })
+        } else if ((integration.type.startsWith('mirakl_') || integration.type === 'mirakl_custom') && integration.clientId) {
+          const { MiraklAdapter } = await import('@/adapters/marketplace/mirakl')
+          const customName = integration.type === 'mirakl_custom'
+            ? ((integration.metadata as any)?.customName || 'mirakl_custom')
+            : integration.type
+          adapter = new MiraklAdapter({
+            instance: customName.toLowerCase() as any,
+            baseUrl: integration.environment!,
+            clientId: integration.clientId,
+            clientSecret: integration.clientSecret || '',
+            apiKey: integration.apiKey || undefined,
+            shopId: (integration.metadata as any)?.shopId || undefined
+          })
+        }
+
+        if (adapter && adapter.getDeliveryNote) {
+          try {
+            const pdfBuffer = await adapter.getDeliveryNote(order.marketplaceOrderId)
+            
+            if (pdfBuffer) {
+              // Cache the fetched PDF
+              try {
+                await uploadDocument(cacheKey, pdfBuffer)
+              } catch (uploadErr) {
+                console.warn(`[DeliveryNoteRoute] Cache save failed for marketplace order ${id}:`, uploadErr)
+              }
+
+              const displayMarketplace = integration.type === 'mirakl_custom' 
+                ? ((integration.metadata as any)?.customName || 'Mirakl') 
+                : (integration.type === 'aboutyou' ? 'AboutYou' : 'Mirakl')
+
+              return new Response(new Uint8Array(pdfBuffer), {
+                headers: {
+                  'Content-Type': 'application/pdf',
+                  'Content-Disposition': `inline; filename="${displayMarketplace}_Lieferschein_${order.marketplaceOrderId}.pdf"`,
+                },
+              })
+            } else {
+              console.log(`[DeliveryNoteRoute] No official delivery note found for order ${id}. Falling back to local generation.`)
+            }
+          } catch (adapterError) {
+            console.error('[DeliveryNoteRoute] Error fetching marketplace doc:', adapterError)
+            if (integration.type === 'aboutyou') {
+              return new Response('Original-Lieferschein von About You konnte nicht geladen werden.', { status: 502 })
+            } else {
+              console.log(`[DeliveryNoteRoute] Falling back to local generation for Mirakl order ${id}.`)
+            }
+          }
         }
       }
     }
