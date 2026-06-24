@@ -77,7 +77,7 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ id
           <div className="p-8 md:p-12 border-b border-slate-100 bg-gradient-to-b from-slate-50/50 to-white">
             <div className="flex flex-col md:flex-row justify-between gap-8 mb-12">
               <div>
-                <span className="text-xs font-black uppercase tracking-widest text-amber-500 mb-2 block">An</span>
+                <span className="text-xs font-black uppercase tracking-widest text-slate-400 mb-2 block">An</span>
                 <p className="font-bold text-slate-900 text-lg mb-1">{quote.recipientName}</p>
                 {quote.recipientCompany && <p className="text-slate-600">{quote.recipientCompany}</p>}
                 <p className="text-slate-600">{quote.recipientStreet}</p>
