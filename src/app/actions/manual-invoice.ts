@@ -317,6 +317,7 @@ export async function getQuotesAction() {
       quoteAcceptedAt: invoices.quoteAcceptedAt,
       quoteRejectedAt: invoices.quoteRejectedAt,
       quoteRejectedReason: invoices.quoteRejectedReason,
+      quoteRevisedAt: invoices.quoteRevisedAt,
       emailSentAt: sql<Date | null>`(SELECT created_at FROM invoice_logs WHERE invoice_id = invoices.id AND action = 'email' ORDER BY created_at DESC LIMIT 1)`.as('emailSentAt')
     })
     .from(invoices)
@@ -994,7 +995,7 @@ export async function editManualInvoiceAction(data: {
       })
 
       // b) Update Invoice Record
-      await tx.update(invoices).set({
+      const updateData: any = {
         recipientName: data.customer.name,
         recipientCompany: (data.customer as any).companyName || '',
         recipientStreet: data.customer.street,
@@ -1010,7 +1011,15 @@ export async function editManualInvoiceAction(data: {
         dueAt: data.dueDate || new Date(),
         currency: data.currency,
         issuedAt: invoice.issuedAt || new Date()
-      }).where(eq(invoices.id, invoice.id))
+      }
+
+      if (invoice.documentType === 'quote') {
+        updateData.quoteRejectedAt = null
+        updateData.quoteRejectedReason = null
+        updateData.quoteRevisedAt = new Date()
+      }
+
+      await tx.update(invoices).set(updateData).where(eq(invoices.id, invoice.id))
 
       // c) Refresh Items (Delete and Re-insert)
       await tx.delete(invoiceItems).where(eq(invoiceItems.invoiceId, invoice.id))

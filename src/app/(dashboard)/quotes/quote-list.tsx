@@ -21,6 +21,7 @@ interface Quote {
   draftName: string | null
   quoteAcceptedAt: Date | null
   quoteRejectedAt: Date | null
+  quoteRevisedAt: Date | null
   quoteRejectedReason: string | null
   emailSentAt: Date | null
 }
@@ -504,6 +505,10 @@ export function QuoteList({
                     ) : quote.quoteRejectedAt ? (
                       <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-rose-100 text-rose-700">
                         Abgelehnt
+                      </span>
+                    ) : quote.quoteRevisedAt ? (
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-purple-100 text-purple-700">
+                        Überarbeitet
                       </span>
                     ) : quote.emailSentAt ? (
                       <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-700">
