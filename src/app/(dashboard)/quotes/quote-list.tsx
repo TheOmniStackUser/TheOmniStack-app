@@ -258,6 +258,11 @@ export function QuoteList({
     }
   }
 
+  const handleQuickSend = async (quoteId: string) => {
+    await handleSelectQuote(quoteId)
+    setShowSendModal(true)
+  }
+
   const handleSendEmail = async () => {
     if (!selectedQuoteId) return
     try {
@@ -499,7 +504,7 @@ export function QuoteList({
                            ? 'bg-blue-100 text-blue-700'
                            : 'bg-amber-100 text-amber-700'
                       }`}>
-                        {quote.status === 'issued' ? 'Gesendet' : 'Entwurf'}
+                        {quote.status === 'issued' ? 'Offen' : 'Entwurf'}
                       </span>
                     )}
                   </td>
@@ -523,6 +528,20 @@ export function QuoteList({
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                             </svg>
                           )}
+                        </button>
+                      )}
+
+                      {/* Quick Send Email */}
+                      {quote.status !== 'draft' && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleQuickSend(quote.id); }}
+                          disabled={detailsLoading && selectedQuoteId === quote.id}
+                          title="Per E-Mail versenden"
+                          className="p-2 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-all"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                          </svg>
                         </button>
                       )}
 
