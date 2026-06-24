@@ -21,6 +21,7 @@ interface Quote {
   draftName: string | null
   quoteAcceptedAt: Date | null
   quoteRejectedAt: Date | null
+  emailSentAt: Date | null
 }
 
 const formatCountry = (code?: string | null) => {
@@ -498,10 +499,14 @@ export function QuoteList({
                       <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-rose-100 text-rose-700">
                         Abgelehnt
                       </span>
+                    ) : quote.emailSentAt ? (
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-700">
+                        Gesendet
+                      </span>
                     ) : (
                       <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
                          quote.status === 'issued'
-                           ? 'bg-blue-100 text-blue-700'
+                           ? 'bg-emerald-100 text-emerald-700'
                            : 'bg-amber-100 text-amber-700'
                       }`}>
                         {quote.status === 'issued' ? 'Offen' : 'Entwurf'}
