@@ -66,21 +66,6 @@ export default async function AdminMerchantDetailPage({
     .leftJoin(users, eq(companyMembers.userId, users.id))
     .where(eq(companyMembers.companyId, id))
 
-  // Recent orders
-  const recentOrders = await db
-    .select({
-      id: orders.id,
-      marketplaceOrderId: orders.marketplaceOrderId,
-      marketplace: orders.marketplace,
-      status: orders.status,
-      totalAmount: orders.totalAmount,
-      currency: orders.currency,
-      createdAt: orders.createdAt,
-    })
-    .from(orders)
-    .where(eq(orders.companyId, id))
-    .orderBy(sql`${orders.createdAt} desc`)
-    .limit(10)
 
   const [totalOrdersRow] = await db.select({ count: count() }).from(orders).where(eq(orders.companyId, id))
   const maxCount = Math.max(...monthlyData.map(m => m.count), 1)
@@ -166,42 +151,7 @@ export default async function AdminMerchantDetailPage({
         </div>
       </div>
 
-      {/* Recent Orders */}
-      <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-white/10">
-          <h2 className="text-sm font-semibold text-white">Letzte Bestellungen</h2>
-        </div>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-white/5">
-              <th className="text-left px-6 py-3 text-xs text-white/30">Bestellnr.</th>
-              <th className="text-left px-6 py-3 text-xs text-white/30">Marktplatz</th>
-              <th className="text-left px-6 py-3 text-xs text-white/30">Status</th>
-              <th className="text-right px-6 py-3 text-xs text-white/30">Betrag</th>
-              <th className="text-right px-6 py-3 text-xs text-white/30">Datum</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-white/5">
-            {recentOrders.map(order => (
-              <tr key={order.id} className="hover:bg-white/5 transition-colors">
-                <td className="px-6 py-3 text-white/70 text-xs font-mono">{order.marketplaceOrderId}</td>
-                <td className="px-6 py-3 text-white/50 text-xs capitalize">{order.marketplace}</td>
-                <td className="px-6 py-3">
-                  <span className="text-xs px-2 py-0.5 rounded bg-white/10 text-white/60 capitalize">{order.status}</span>
-                </td>
-                <td className="px-6 py-3 text-right text-white/70 text-xs">
-                  {order.totalAmount
-                    ? new Intl.NumberFormat('de-DE', { style: 'currency', currency: order.currency }).format(Number(order.totalAmount))
-                    : '–'}
-                </td>
-                <td className="px-6 py-3 text-right text-white/30 text-xs">
-                  {new Date(order.createdAt).toLocaleDateString('de-DE')}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+
     </div>
   )
 }
