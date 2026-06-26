@@ -12,7 +12,7 @@ import { orders, orderItems } from '@/db/schema/orders'
 import { companies } from '@/db/schema/companies'
 import { vatSettings } from '@/db/schema/vat-settings'
 import { auditLog } from '@/lib/audit'
-import { eq, and, desc, isNull, inArray, gte, sql } from 'drizzle-orm'
+import { eq, and, desc, isNull, inArray, gte, sql, notInArray } from 'drizzle-orm'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { invoices, invoiceItems, invoiceLogs } from '@/db/schema/invoices'
 import { returnsLog, returnedItems } from '@/db/schema/returns'
@@ -382,6 +382,11 @@ export function createMarketplaceSyncWorker() {
         // Also sync returns for Mirakl integrations
         if (integration.type.startsWith('mirakl_') || integration.type === 'mirakl_custom') {
           await syncMiraklReturns(companyId, integration, adapter as MiraklAdapter)
+        }
+
+        // Auto-download credit notes for Otto
+        if (integration.type === 'otto') {
+          await syncOttoCreditNotes(companyId, integration, adapter as OttoAdapter)
         }
 
         if (!isInvoiceSync) {
@@ -938,6 +943,118 @@ export async function downloadAndSaveMarketplaceInvoice(
       return 'RATE_LIMIT'
     }
     return false
+  }
+}
+
+/**
+ * Auto-download Otto credit notes.
+ */
+export async function syncOttoCreditNotes(
+  companyId: string,
+  integration: any,
+  adapter: OttoAdapter
+) {
+  const downloadInvoice = !!(integration.metadata as any)?.downloadInvoice
+  if (!downloadInvoice) {
+    return
+  }
+
+  console.log(`[OttoCreditNoteSync] Checking for missing credit notes for integration ${integration.id}...`)
+
+  try {
+    // Find all invoiceIds that are canceled by a credit note
+    const creditNotes = await db.select({ cancelsInvoiceId: invoices.cancelsInvoiceId })
+      .from(invoices)
+      .where(and(eq(invoices.companyId, companyId), eq(invoices.isCreditNote, true)));
+    const canceledInvoiceIds = creditNotes.map(cn => cn.cancelsInvoiceId).filter(Boolean) as string[];
+
+    // We only check orders from the last 60 days to prevent overloading the API
+    const thresholdDate = new Date();
+    thresholdDate.setDate(thresholdDate.getDate() - 60);
+
+    let query: any = and(
+      eq(orders.companyId, companyId),
+      eq(orders.marketplace, 'otto'),
+      gte(orders.createdAt, thresholdDate)
+    );
+
+    if (canceledInvoiceIds.length > 0) {
+       query = and(query, notInArray(orders.invoiceId, canceledInvoiceIds));
+    }
+
+    const candidateOrders = await db.select().from(orders).where(query);
+
+    const ordersToCheck = candidateOrders.filter(o => !o.invoiceId || !canceledInvoiceIds.includes(o.invoiceId)).slice(0, 50);
+
+    if (ordersToCheck.length === 0) {
+      console.log(`[OttoCreditNoteSync] No candidate orders found for ${integration.id}.`);
+      return;
+    }
+
+    console.log(`[OttoCreditNoteSync] Checking ${ordersToCheck.length} orders for credit notes...`);
+
+    let downloadedCount = 0;
+    for (const order of ordersToCheck) {
+      try {
+        const result = await adapter.getRefundReceipt(order.marketplaceOrderId);
+        if (result && result.pdfBuffer) {
+          console.log(`[OttoCreditNoteSync] Successfully downloaded credit note ${result.receiptNumber} for ${order.marketplaceOrderId}.`);
+
+          const originalInvoice = order.invoiceId ? await db.query.invoices.findFirst({
+            where: eq(invoices.id, order.invoiceId)
+          }) : null;
+
+          const creditNoteNumber = result.receiptNumber || `GS-OTTO-${order.marketplaceOrderId}`;
+          const storageKey = buildInvoiceKey(companyId, creditNoteNumber);
+          await uploadDocument(storageKey, result.pdfBuffer);
+
+          await db.transaction(async (tx) => {
+            const [newInvoice] = await tx.insert(invoices).values({
+              companyId,
+              documentType: 'invoice',
+              invoiceNumber: creditNoteNumber,
+              status: 'issued',
+              recipientName: originalInvoice ? originalInvoice.recipientName : (order.shippingName || order.buyerName || 'Kunde'),
+              recipientStreet: originalInvoice ? originalInvoice.recipientStreet : (order.shippingStreet || ''),
+              recipientZip: originalInvoice ? originalInvoice.recipientZip : (order.shippingZip || ''),
+              recipientCity: originalInvoice ? originalInvoice.recipientCity : (order.shippingCity || ''),
+              recipientCountry: originalInvoice ? originalInvoice.recipientCountry : (order.shippingCountry || 'DE'),
+              recipientEmail: originalInvoice ? originalInvoice.recipientEmail : (order.buyerEmail || null),
+              currency: order.currency || 'EUR',
+              subtotalAmount: '0.00',
+              taxAmount: '0.00',
+              totalAmount: '0.00',
+              taxRate: '0.0000',
+              isCreditNote: true,
+              cancelsInvoiceId: originalInvoice ? originalInvoice.id : null,
+              dueAt: new Date(),
+              pdfStorageKey: storageKey,
+              pdfGeneratedAt: new Date(),
+              issuedAt: new Date(),
+              paidAt: new Date()
+            }).returning({ id: invoices.id });
+
+            await tx.insert(invoiceItems).values({
+              invoiceId: newInvoice.id,
+              companyId,
+              position: '1',
+              sku: 'REFUND',
+              description: `Vom Marktplatz heruntergeladene Gutschrift für ${order.marketplaceOrderId}`,
+              quantity: '1',
+              unitPrice: '0.00',
+              taxRate: '0.00',
+              lineTotal: '0.00',
+            });
+          });
+          downloadedCount++;
+        }
+      } catch (err) {
+        console.warn(`[OttoCreditNoteSync] Failed to fetch credit note for order ${order.marketplaceOrderId}:`, err);
+      }
+    }
+    console.log(`[OttoCreditNoteSync] Finished checking. Downloaded ${downloadedCount} credit notes.`);
+  } catch (error) {
+    console.error(`[OttoCreditNoteSync] Error checking for Otto credit notes:`, error);
   }
 }
 
