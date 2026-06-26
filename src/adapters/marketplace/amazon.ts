@@ -91,7 +91,7 @@ export class AmazonAdapter implements MarketplaceAdapter {
   private normalizeOrder(rawOrder: any, rawItems: any[]): NormalizedOrder {
     const totalAmount = parseFloat(rawOrder.OrderTotal?.Amount || '0')
     // Default tax calculation if not provided by SP-API
-    const taxAmount = totalAmount * 0.1596 // Naive 19% back-calculation or 0 if unknown
+    const taxAmount = totalAmount - (totalAmount / 1.19) // Exact 19% back-calculation or 0 if unknown
 
     return {
       marketplaceOrderId: rawOrder.AmazonOrderId,

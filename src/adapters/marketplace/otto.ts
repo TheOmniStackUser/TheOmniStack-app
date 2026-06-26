@@ -250,8 +250,11 @@ export class OttoAdapter implements MarketplaceAdapter {
       const itemPrice = item.itemValueReducedGrossPrice?.amount || item.itemValueGrossPrice?.amount || 0
       const qty = item.quantity || 1
       
-      totalAmount += itemPrice * qty
-      taxAmount += (itemPrice * qty) * (item.product?.vatRate ? item.product.vatRate / 100 : 0.19)
+      const vatRate = item.product?.vatRate ? item.product.vatRate / 100 : 0.19
+      const itemGrossTotal = itemPrice * qty
+
+      totalAmount += itemGrossTotal
+      taxAmount += itemGrossTotal - (itemGrossTotal / (1 + vatRate))
       
       // Otto v4: product might have weight in grams or kg
       const w = item.product?.weight || 0

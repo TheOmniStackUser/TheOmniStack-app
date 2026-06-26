@@ -240,8 +240,9 @@ export class MiraklAdapter implements MarketplaceAdapter {
       const taxRates = line.taxes || []
       const taxRate = taxRates.length > 0 ? (taxRates[0].rate || 19) / 100 : 0.19
       
-      totalAmount += line.total_price || (price * qty)
-      taxAmount += line.total_tax || ((price * qty) * taxRate)
+      const itemGrossTotal = line.total_price || (price * qty)
+      totalAmount += itemGrossTotal
+      taxAmount += line.total_tax || (itemGrossTotal - (itemGrossTotal / (1 + taxRate)))
 
       return {
         sku: line.offer_sku || line.product_sku || 'UNKNOWN',
