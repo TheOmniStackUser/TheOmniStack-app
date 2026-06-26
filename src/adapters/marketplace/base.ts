@@ -87,6 +87,14 @@ export interface MarketplaceAdapter {
   ): Promise<Buffer | { pdfBuffer: Buffer; receiptNumber?: string } | null>
 
   /**
+   * Fetches the official credit note PDF from the marketplace.
+   */
+  getCreditNote?(
+    marketplaceOrderId: string,
+    rawOrderPayload?: unknown
+  ): Promise<Buffer | { pdfBuffer: Buffer; receiptNumber?: string } | null>
+
+  /**
    * Fetches the official delivery note PDF from the marketplace.
    */
   getDeliveryNote?(
