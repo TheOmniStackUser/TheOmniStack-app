@@ -845,7 +845,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
               </div>
               <div className="flex items-center gap-3 pt-6">
                 <label className={`flex items-center gap-3 ${settings.taxOption === 'standard' ? 'cursor-pointer' : 'cursor-not-allowed opacity-40'} group`}>
-                  <div className={`w-12 h-6 rounded-full transition-all relative ${settings.isOss ? 'bg-blue-600' : 'bg-slate-200'}`}>
+                  <div className={`w-12 h-6 shrink-0 rounded-full transition-all relative ${settings.isOss ? 'bg-blue-600' : 'bg-slate-200'}`}>
                     <input 
                       type="checkbox" 
                       checked={settings.isOss} 
@@ -858,7 +858,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                           taxCountry: active ? settings.destinationCountry : settings.taxCountry
                         })
                       }} 
-                      className="hidden" 
+                      className="sr-only" 
                     />
                     <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all ${settings.isOss ? 'left-7' : 'left-1'}`} />
                   </div>
@@ -867,7 +867,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
               </div>
               <div className="flex items-center gap-3 pt-4">
                 <label className="flex items-center gap-3 cursor-pointer group">
-                  <div className={`w-12 h-6 rounded-full transition-all relative ${settings.showServiceDateNote ? 'bg-blue-600' : 'bg-slate-200'}`}>
+                  <div className={`w-12 h-6 shrink-0 rounded-full transition-all relative ${settings.showServiceDateNote ? 'bg-blue-600' : 'bg-slate-200'}`}>
                     <input 
                       type="checkbox" 
                       checked={settings.showServiceDateNote} 
@@ -878,7 +878,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                           localStorage.setItem('billing_app_showServiceDateNote', checked.toString())
                         }
                       }} 
-                      className="hidden" 
+                      className="sr-only" 
                     />
                     <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all ${settings.showServiceDateNote ? 'left-7' : 'left-1'}`} />
                   </div>
