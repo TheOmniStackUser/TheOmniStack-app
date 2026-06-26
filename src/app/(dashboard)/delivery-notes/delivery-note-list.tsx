@@ -100,6 +100,9 @@ const getMarketplaceBadgeStyle = (mp: string | null) => {
   if (norm === 'manual') {
     return { backgroundColor: '#f3f4f6', color: '#374151' }
   }
+  if (norm.includes('decathlon')) {
+    return { backgroundColor: '#e3f2fd', color: '#0d47a1' }
+  }
   switch (norm) {
     case 'otto':
       return { backgroundColor: '#ffebee', color: '#c62828' }
@@ -107,8 +110,6 @@ const getMarketplaceBadgeStyle = (mp: string | null) => {
       return { backgroundColor: '#f3e5f5', color: '#6a1b9a' }
     case 'shopify':
       return { backgroundColor: '#e8f5e9', color: '#2e7d32' }
-    case 'mirakl_decathlon':
-    case 'mirakl_decathlon_eu':
     case 'mirakl_mediamarkt':
       return { backgroundColor: '#e3f2fd', color: '#0d47a1' }
     case 'amazon':
@@ -118,7 +119,7 @@ const getMarketplaceBadgeStyle = (mp: string | null) => {
     case 'ebay':
       return { backgroundColor: '#e8f0fe', color: '#1967d2' }
     default:
-      return { backgroundColor: '#f3f4f6', color: '#374151' }
+      return { backgroundColor: '#e8f5e9', color: '#1b5e20' }
   }
 }
 
@@ -513,13 +514,13 @@ export function DeliveryNoteList({
         const isDirect = ['otto', 'aboutyou', 'shopify', 'kaufland', 'ebay', 'amazon'].includes(dnMp)
         if (!isDirect) return false
       } else if (targetMp === 'group_decathlon') {
-        const isDecathlon = dnMp === 'mirakl_decathlon' || dnMp === 'mirakl_decathlon_eu' || dnMp.startsWith('decathlon')
+        const isDecathlon = dnMp === 'mirakl_decathlon' || dnMp === 'mirakl_decathlon_eu' || dnMp.startsWith('decathlon') || dnMp === 'mirakl_custom'
         if (!isDecathlon) return false
       } else if (targetMp === 'group_secret_sales') {
         const isSecretSales = dnMp.startsWith('secret sales')
         if (!isSecretSales) return false
       } else if (targetMp === 'group_other') {
-        const isDecathlon = dnMp === 'mirakl_decathlon' || dnMp === 'mirakl_decathlon_eu' || dnMp.startsWith('decathlon')
+        const isDecathlon = dnMp === 'mirakl_decathlon' || dnMp === 'mirakl_decathlon_eu' || dnMp.startsWith('decathlon') || dnMp === 'mirakl_custom'
         const isSecretSales = dnMp.startsWith('secret sales')
         const isDirect = ['otto', 'aboutyou', 'shopify', 'kaufland', 'ebay', 'amazon'].includes(dnMp)
         if (dnMp === 'manual' || dnMp === '' || isDecathlon || isSecretSales || isDirect) return false

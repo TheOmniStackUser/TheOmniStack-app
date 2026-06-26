@@ -157,7 +157,7 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
           </h5>
           <ul className="list-disc list-inside space-y-1.5 text-blue-800 leading-relaxed pl-1">
             <li>
-              <strong>Auto-Rechnung / Auto-Download:</strong> Rechnungen werden automatisch erzeugt bzw. vom Marktplatz abgerufen, sobald Sie ein Versandlabel (DHL oder Hermes) drucken, oder im Hintergrund, wenn die Bestellung als versendet synchronisiert wird. Beim Import einer neuen Bestellung (Status: <em>Pending</em>) wird noch <strong>keine</strong> Rechnungsaktion durchgeführt.
+              <strong>Auto-Rechnung / Auto-Download:</strong> Rechnungen werden automatisch erzeugt bzw. vom Marktplatz abgerufen, sobald Sie ein Versandlabel (DHL oder Hermes) drucken, oder im Hintergrund, wenn die Bestellung als versendet synchronisiert wird. <strong>Wichtig:</strong> "Auto-Download" bedeutet auch, dass neben Rechnungen automatisch Gutschriften vom Marktplatz heruntergeladen werden. Beim Import einer neuen Bestellung (Status: <em>Pending</em>) wird noch <strong>keine</strong> Rechnungsaktion durchgeführt.
             </li>
             <li>
               <strong>Auto-Upload:</strong> Sobald die Rechnung erstellt bzw. heruntergeladen wurde, wird sie automatisch an den Marktplatz (z. B. Decathlon, Kaufland, eBay, Amazon) hochgeladen.

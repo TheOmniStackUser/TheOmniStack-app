@@ -880,18 +880,18 @@ export function OrdersTable({
           return false
         }
       } else if (targetMp === 'group_decathlon') {
-        const isDecathlon = formattedOrderMp.startsWith('decathlon') || orderMp === 'mirakl_decathlon_eu'
+        const isDecathlon = formattedOrderMp.startsWith('decathlon') || orderMp === 'mirakl_decathlon_eu' || orderMp === 'mirakl_custom' || orderMp === 'mirakl_decathlon'
         if (!isDecathlon) {
           return false
         }
       } else if (targetMp === 'group_secret_sales') {
-        const isSecretSales = orderMp.startsWith('secret sales')
+        const isSecretSales = orderMp.startsWith('secret sales') || formattedOrderMp.startsWith('secret sales')
         if (!isSecretSales) {
           return false
         }
       } else if (targetMp === 'group_other') {
-        const isDecathlon = formattedOrderMp.startsWith('decathlon') || orderMp === 'mirakl_decathlon_eu'
-        const isSecretSales = orderMp.startsWith('secret sales')
+        const isDecathlon = formattedOrderMp.startsWith('decathlon') || orderMp === 'mirakl_decathlon_eu' || orderMp === 'mirakl_custom' || orderMp === 'mirakl_decathlon'
+        const isSecretSales = orderMp.startsWith('secret sales') || formattedOrderMp.startsWith('secret sales')
         const isDirect = ['otto', 'aboutyou', 'shopify', 'kaufland', 'ebay', 'amazon'].includes(orderMp)
         if (orderMp === 'manual' || orderMp === '' || isDecathlon || isSecretSales || isDirect) {
           return false

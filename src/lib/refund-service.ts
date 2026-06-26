@@ -73,9 +73,9 @@ export async function executeRefund({
     return false
   })
 
-  // Get autoCreditNote setting
   let autoCreditNote = integration ? !!(integration.metadata as any)?.autoCreditNote : false
-  if (order.marketplace === 'aboutyou' || order.marketplace === 'otto') {
+  if (order.marketplace === 'otto') {
+    // Otto credit notes are downloaded via sync worker, do not auto-generate
     autoCreditNote = false
   }
 
@@ -475,7 +475,6 @@ export async function executeRefund({
   if (!autoCreditNote) {
     const existingMetadata = (returnEntry.metadata as Record<string, any>) || {}
     creditNoteNumber = 'Keine generiert (Auto-Gutschrift aus)'
-    if (order.marketplace === 'aboutyou') creditNoteNumber = 'Von About You erstellt'
     if (order.marketplace === 'otto') creditNoteNumber = 'Von Otto erstellt'
 
     await db.update(returnsLog)
