@@ -2997,7 +2997,7 @@ export function OrdersTable({
                                         </div>
                                         <div className="text-right whitespace-nowrap">
                                           <div className={`text-sm font-medium text-gray-900 ${isFullyRefunded ? 'line-through text-gray-500' : ''}`}>
-                                            {new Intl.NumberFormat('de-DE', { style: 'currency', currency: order.currency }).format(Number(item.unitPrice) * Number(item.quantity))}
+                                            {new Intl.NumberFormat('de-DE', { style: 'currency', currency: order.currency }).format(Number(item.unitPrice) * Number(item.quantity) * (1 + Number(item.taxRate)))}
                                           </div>
                                           <div className="text-xs text-gray-500 mt-1">
                                             inkl. {Number(item.taxRate) * 100}% MwSt.
