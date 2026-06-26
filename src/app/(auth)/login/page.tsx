@@ -73,8 +73,8 @@ export default function LoginPage() {
           </div>
 
           <div className="mt-6">
-            <button
-              type="button"
+            <a
+              href="/api/auth/google/login"
               className="w-full inline-flex justify-center items-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-semibold text-gray-900 hover:bg-gray-50"
             >
               <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -84,7 +84,7 @@ export default function LoginPage() {
                 <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
               </svg>
               <span className="ml-2">Mit Google anmelden</span>
-            </button>
+            </a>
           </div>
         </div>        <div className="mt-6 text-center text-sm">
           <p className="text-gray-600">

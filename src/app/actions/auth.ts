@@ -36,6 +36,19 @@ const DetailsSchema = z.object({
   companyLegalName: z.string().min(2, { message: 'Rechtlicher Name ist erforderlich.' }).trim(),
 })
 
+const ForgotPasswordSchema = z.object({
+  email: z.string().email({ message: 'Bitte gib eine gültige E-Mail ein.' }).trim(),
+})
+
+const ResetPasswordSchema = z.object({
+  token: z.string().min(1, 'Token ist erforderlich'),
+  password: z
+    .string()
+    .min(8, { message: 'Passwort muss mindestens 8 Zeichen lang sein.' })
+    .regex(/[A-Z]/, { message: 'Muss einen Großbuchstaben enthalten.' })
+    .regex(/[0-9]/, { message: 'Muss eine Zahl enthalten.' }),
+})
+
 export type AuthFormState =
   | { errors?: Record<string, string[]>; message?: string; fields?: Record<string, string> }
   | undefined
@@ -83,7 +96,7 @@ export async function loginAction(
     .where(eq(users.email, email.toLowerCase()))
     .limit(1)
 
-  if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+  if (!user || !user.passwordHash || !(await bcrypt.compare(password, user.passwordHash))) {
     return { message: 'Ungültige E-Mail oder Passwort.' }
   }
 
@@ -698,4 +711,123 @@ export async function acceptInvitationAction(
 
   // Redirect to dashboard
   redirect('/dashboard')
+}
+
+// ─── Forgot Password ─────────────────────────────────────────────────────────
+export async function forgotPasswordAction(
+  _state: AuthFormState,
+  formData: FormData
+): Promise<AuthFormState> {
+  const validated = ForgotPasswordSchema.safeParse({
+    email: formData.get('email'),
+  })
+
+  if (!validated.success) {
+    return { errors: validated.error.flatten().fieldErrors }
+  }
+
+  const { email } = validated.data
+
+  const hdrs = await headers()
+  const ip = hdrs.get('x-forwarded-for') ?? 'unknown'
+  const rateKey = `reset_${ip}_${email.toLowerCase()}`
+  const now = Date.now()
+
+  const limit = rateLimitMap.get(rateKey)
+  if (limit && now < limit.resetAt) {
+    if (limit.count >= 3) {
+      return { message: 'Zu viele Anfragen. Bitte versuche es in 15 Minuten erneut.' }
+    }
+    limit.count++
+  } else {
+    rateLimitMap.set(rateKey, { count: 1, resetAt: now + 15 * 60 * 1000 })
+  }
+
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, email.toLowerCase()))
+    .limit(1)
+
+  // We return a generic success message even if the user doesn't exist to prevent email enumeration
+  if (!user || !user.isActive) {
+    return { message: 'Falls ein Konto mit dieser E-Mail-Adresse existiert, haben wir dir einen Link zum Zurücksetzen gesendet.', fields: { success: 'true' } }
+  }
+
+  const token = crypto.randomBytes(32).toString('hex')
+  const expiresAt = new Date(Date.now() + 3600 * 1000) // 1 hour
+
+  await db
+    .insert(verificationTokens)
+    .values({
+      identifier: email.toLowerCase(),
+      token,
+      expiresAt,
+    })
+    .onConflictDoUpdate({
+      target: verificationTokens.token,
+      set: { expiresAt, createdAt: new Date() }
+    })
+
+  const { sendPasswordResetEmail } = await import('@/lib/email')
+  await sendPasswordResetEmail(email.toLowerCase(), token)
+
+  return { message: 'Falls ein Konto mit dieser E-Mail-Adresse existiert, haben wir dir einen Link zum Zurücksetzen gesendet.', fields: { success: 'true' } }
+}
+
+// ─── Reset Password ──────────────────────────────────────────────────────────
+export async function resetPasswordAction(
+  _state: AuthFormState,
+  formData: FormData
+): Promise<AuthFormState> {
+  const token = formData.get('token') as string
+  const password = formData.get('password') as string
+
+  const validated = ResetPasswordSchema.safeParse({ token, password })
+  if (!validated.success) {
+    return { errors: validated.error.flatten().fieldErrors }
+  }
+
+  // Find verification token
+  const [tokenRecord] = await db
+    .select()
+    .from(verificationTokens)
+    .where(
+      and(
+        eq(verificationTokens.token, token),
+        gt(verificationTokens.expiresAt, new Date())
+      )
+    )
+    .limit(1)
+
+  if (!tokenRecord) {
+    return { message: 'Der Link zum Zurücksetzen ist ungültig oder abgelaufen.' }
+  }
+
+  const email = tokenRecord.identifier.toLowerCase()
+
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, email))
+    .limit(1)
+
+  if (!user) {
+    return { message: 'Benutzerkonto wurde nicht gefunden.' }
+  }
+
+  const passwordHash = await bcrypt.hash(password, 12)
+
+  await db
+    .update(users)
+    .set({
+      passwordHash,
+    })
+    .where(eq(users.id, user.id))
+
+  await db
+    .delete(verificationTokens)
+    .where(eq(verificationTokens.id, tokenRecord.id))
+
+  return { message: 'Dein Passwort wurde erfolgreich geändert. Du kannst dich jetzt einloggen.', fields: { success: 'true' } }
 }

@@ -268,6 +268,10 @@ export async function updateCurrentUserAction(formData: FormData) {
         return { error: 'Das neue Passwort und die Bestätigung stimmen nicht überein.' }
       }
 
+      if (!user.passwordHash) {
+        return { error: 'Passwortänderung ist für dieses Konto nicht möglich (z.B. Google Login).' }
+      }
+
       // Compare current password
       const isCorrect = await bcrypt.compare(currentPassword, user.passwordHash)
       if (!isCorrect) {

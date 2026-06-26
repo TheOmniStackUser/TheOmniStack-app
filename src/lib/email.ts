@@ -2,6 +2,7 @@ import { Resend } from 'resend'
 import { VerificationEmail } from '@/emails/VerificationEmail'
 import { InvitationEmail } from '@/emails/InvitationEmail'
 import { CompanyEmailVerificationEmail } from '@/emails/CompanyEmailVerificationEmail'
+import { PasswordResetEmail } from '@/emails/PasswordResetEmail'
 
 // Initialize Resend. 
 // If no API key is provided (e.g. in local dev), it won't crash but sending will fail.
@@ -55,6 +56,30 @@ export async function sendInvitationEmail(toEmail: string, inviterName: string, 
     return { success: true, data }
   } catch (error) {
     console.error('[Email Service] Fatal error sending invitation email:', error)
+    return { success: false, error }
+  }
+}
+
+export async function sendPasswordResetEmail(toEmail: string, token: string) {
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    const resetLink = `${baseUrl}/reset-password?token=${token}`
+
+    const { data, error } = await resend.emails.send({
+      from: DEFAULT_SENDER,
+      to: [toEmail],
+      subject: 'Passwort zurücksetzen – TheOmniStack',
+      react: PasswordResetEmail({ resetLink }),
+    })
+
+    if (error) {
+      console.error('[Email Service] Error sending password reset email:', error)
+      return { success: false, error }
+    }
+
+    return { success: true, data }
+  } catch (error) {
+    console.error('[Email Service] Fatal error sending password reset email:', error)
     return { success: false, error }
   }
 }

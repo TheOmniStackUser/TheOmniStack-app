@@ -459,6 +459,27 @@ export class OttoAdapter implements MarketplaceAdapter {
 
   
 
+  async getReceiptPdfByNumber(receiptNumber: string): Promise<{ pdfBuffer: Buffer, receiptNumber: string } | null> {
+    console.log(`[OttoAdapter] Downloading PDF for receipt ${receiptNumber}...`)
+    try {
+      const accessToken = await this.getAccessToken()
+      const downloadUrl = `${this.baseUrl}/v3/receipts/${receiptNumber}.pdf`
+      const pdfResponse = await fetch(downloadUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Accept': 'application/pdf'
+        }
+      })
+      if (!pdfResponse.ok) return null
+      const arrayBuffer = await pdfResponse.arrayBuffer()
+      return { pdfBuffer: Buffer.from(arrayBuffer), receiptNumber }
+    } catch (error) {
+      console.error('[OttoAdapter] Error getting receipt PDF:', error)
+      return null
+    }
+  }
+
   async getRefundReceipt(marketplaceOrderId: string): Promise<{ pdfBuffer: Buffer, receiptNumber: string } | null> {
     console.log(`[OttoAdapter] Fetching REFUND receipts list for salesOrderId ${marketplaceOrderId}...`)
     try {
@@ -484,17 +505,7 @@ export class OttoAdapter implements MarketplaceAdapter {
       refundReceipts.sort((a: any, b: any) => new Date(b.receiptDate).getTime() - new Date(a.receiptDate).getTime())
       const refundReceipt = refundReceipts[0]
       
-      const downloadUrl = `${this.baseUrl}/v3/receipts/${refundReceipt.receiptNumber}.pdf`
-      const pdfResponse = await fetch(downloadUrl, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Accept': 'application/pdf'
-        }
-      })
-      if (!pdfResponse.ok) return null
-      const arrayBuffer = await pdfResponse.arrayBuffer()
-      return { pdfBuffer: Buffer.from(arrayBuffer), receiptNumber: refundReceipt.receiptNumber }
+      return this.getReceiptPdfByNumber(refundReceipt.receiptNumber)
     } catch (error) {
       console.error('[OttoAdapter] Error getting refund receipt:', error)
       return null

@@ -12,7 +12,8 @@ import { companyMembers } from './companies'
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   email: text('email').notNull().unique(),
-  passwordHash: text('password_hash').notNull(),
+  googleId: text('google_id').unique(),
+  passwordHash: text('password_hash'),
   name: text('name').notNull(),
   isActive: boolean('is_active').notNull().default(true),
   isSuperAdmin: boolean('is_super_admin').notNull().default(false),
@@ -36,7 +37,7 @@ export const verificationTokens = pgTable('verification_tokens', {
 export const pendingRegistrations = pgTable('pending_registrations', {
   id: uuid('id').primaryKey().defaultRandom(),
   email: text('email').notNull().unique(),
-  passwordHash: text('password_hash').notNull(),
+  passwordHash: text('password_hash'),
   token: text('token').notNull().unique(),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
