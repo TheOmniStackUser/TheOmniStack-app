@@ -220,73 +220,138 @@ export async function bulkCreateProductsFromUnmapped(unmappedProductIds: string[
       )
     )
 
-  for (const unmapped of selectedUnmapped) {
-    // Check if the sku already exists as a central product
-    const [existing] = await db
-      .select()
+  if (selectedUnmapped.length === 0) {
+    return { success: true }
+  }
+
+  const chunkSize = 500
+  for (let i = 0; i < selectedUnmapped.length; i += chunkSize) {
+    const chunk = selectedUnmapped.slice(i, i + chunkSize)
+    const chunkSkus = [...new Set(chunk.map(u => u.marketplaceSku))]
+
+    // 1. Fetch existing products for this chunk
+    const existingProducts = await db
+      .select({ id: products.id, sku: products.sku, ean: products.ean })
       .from(products)
       .where(
         and(
           eq(products.companyId, auth.activeCompanyId),
-          eq(products.sku, unmapped.marketplaceSku)
+          inArray(products.sku, chunkSkus)
         )
       )
-      .limit(1)
 
-    let productId = existing?.id
-    let mappingEan = existing?.ean ? existing.ean.split(',')[0].trim() : null
+    const existingSkuMap = new Map(existingProducts.map(p => [p.sku, p]))
+    
+    // 2. Prepare new products to insert
+    const newProductsToInsert = []
+    const seenSkusToInsert = new Set<string>()
 
-    if (!existing) {
-      // Create new central product
-      const ean = getEanFromPayload(unmapped.rawPayload);
-      mappingEan = ean || null
-      const description = getDescriptionFromPayload(unmapped.rawPayload);
-      const originPrice = getOriginPriceFromPayload(unmapped.rawPayload);
-      const category = getCategoryFromPayload(unmapped.rawPayload);
-      const brand = getBrandFromPayload(unmapped.rawPayload);
-      
-      // Dynamically check for salePrice in rawPayload
-      let actualPrice = unmapped.price;
-      const payload: any = unmapped.rawPayload;
-      if (payload && typeof payload === 'object') {
-        if (payload.salePrice && payload.salePrice.amount !== undefined) {
-           actualPrice = String(payload.salePrice.amount);
-        } else if (payload.pricing && payload.pricing.salePrice && payload.pricing.salePrice.amount !== undefined) {
-           actualPrice = String(payload.pricing.salePrice.amount);
+    for (const unmapped of chunk) {
+      if (!existingSkuMap.has(unmapped.marketplaceSku) && !seenSkusToInsert.has(unmapped.marketplaceSku)) {
+        seenSkusToInsert.add(unmapped.marketplaceSku)
+        
+        const ean = getEanFromPayload(unmapped.rawPayload);
+        const description = getDescriptionFromPayload(unmapped.rawPayload);
+        const originPrice = getOriginPriceFromPayload(unmapped.rawPayload);
+        const category = getCategoryFromPayload(unmapped.rawPayload);
+        const brand = getBrandFromPayload(unmapped.rawPayload);
+        
+        let actualPrice = unmapped.price;
+        const payload: any = unmapped.rawPayload;
+        if (payload && typeof payload === 'object') {
+          if (payload.salePrice && payload.salePrice.amount !== undefined) {
+             actualPrice = String(payload.salePrice.amount);
+          } else if (payload.pricing && payload.pricing.salePrice && payload.pricing.salePrice.amount !== undefined) {
+             actualPrice = String(payload.pricing.salePrice.amount);
+          }
         }
+
+        let safePrice = '0'
+        if (actualPrice) {
+          const parsed = parseFloat(String(actualPrice).replace(',', '.'))
+          if (!isNaN(parsed)) safePrice = String(parsed)
+        }
+
+        let safeStock = '0'
+        if (unmapped.stock) {
+           const parsed = parseInt(String(unmapped.stock), 10)
+           if (!isNaN(parsed)) safeStock = String(parsed)
+        }
+
+        let safeMsrp = null
+        if (originPrice) {
+           const parsed = parseFloat(String(originPrice).replace(',', '.'))
+           if (!isNaN(parsed)) safeMsrp = String(parsed)
+        }
+
+        newProductsToInsert.push({
+          companyId: auth.activeCompanyId,
+          sku: unmapped.marketplaceSku,
+          title: unmapped.title || unmapped.marketplaceSku || 'Ohne Titel',
+          description: description || null,
+          price: safePrice,
+          currentStock: safeStock,
+          ean: ean || null,
+          msrp: safeMsrp,
+          category: category || null,
+          brand: brand || null,
+        })
       }
-      
-      const [newProduct] = await db.insert(products).values({
-        companyId: auth.activeCompanyId,
-        sku: unmapped.marketplaceSku,
-        title: unmapped.title,
-        description: description || null,
-        price: actualPrice || '0',
-        currentStock: unmapped.stock || '0',
-        ean: ean || null,
-        msrp: originPrice || null,
-        category: category || null,
-        brand: brand || null,
-      }).returning({ id: products.id })
-      productId = newProduct.id
     }
 
-    if (productId) {
-      // Create mapping
-      await db.insert(productMappings).values({
-        companyId: auth.activeCompanyId,
-        productId,
-        marketplace: unmapped.marketplace,
-        marketplaceSku: unmapped.marketplaceSku,
-        marketplaceProductId: unmapped.marketplaceProductId,
-        syncStock: true,
-        syncPrice: false,
-        ean: mappingEan,
-      }).onConflictDoNothing() // Ignore if already mapped
+    // 3. Bulk insert new products
+    let insertedProducts: { id: string, sku: string }[] = []
+    if (newProductsToInsert.length > 0) {
+      insertedProducts = await db.insert(products).values(newProductsToInsert).returning({ id: products.id, sku: products.sku })
+    }
 
-      // Delete from unmapped
-      await db.delete(unmappedMarketplaceProducts)
-        .where(eq(unmappedMarketplaceProducts.id, unmapped.id))
+    // Combine existing and newly inserted to get all Product IDs
+    const skuToProductId = new Map<string, string>()
+    for (const p of existingProducts) skuToProductId.set(p.sku, p.id)
+    for (const p of insertedProducts) skuToProductId.set(p.sku, p.id)
+
+    const skuToEan = new Map<string, string | null>()
+    for (const p of existingProducts) skuToEan.set(p.sku, p.ean ? p.ean.split(',')[0].trim() : null)
+    for (const p of newProductsToInsert) skuToEan.set(p.sku, p.ean || null)
+
+    // 4. Prepare mappings to insert
+    const mappingsToInsert = []
+    const seenMappings = new Set<string>()
+
+    for (const unmapped of chunk) {
+      const productId = skuToProductId.get(unmapped.marketplaceSku)
+      if (productId) {
+        const mappingKey = `${unmapped.marketplace}-${unmapped.marketplaceSku}`
+        if (!seenMappings.has(mappingKey)) {
+          seenMappings.add(mappingKey)
+          mappingsToInsert.push({
+            companyId: auth.activeCompanyId,
+            productId,
+            marketplace: unmapped.marketplace,
+            marketplaceSku: unmapped.marketplaceSku,
+            marketplaceProductId: unmapped.marketplaceProductId,
+            syncStock: true,
+            syncPrice: false,
+            ean: skuToEan.get(unmapped.marketplaceSku) || null,
+          })
+        }
+      }
+    }
+
+    // 5. Bulk insert mappings
+    if (mappingsToInsert.length > 0) {
+      await db.insert(productMappings).values(mappingsToInsert).onConflictDoNothing()
+    }
+
+    // 6. Delete chunk from unmapped marketplace products
+    const chunkIds = chunk.map(u => u.id)
+    if (chunkIds.length > 0) {
+      await db.delete(unmappedMarketplaceProducts).where(
+        and(
+          eq(unmappedMarketplaceProducts.companyId, auth.activeCompanyId),
+          inArray(unmappedMarketplaceProducts.id, chunkIds)
+        )
+      )
     }
   }
 
