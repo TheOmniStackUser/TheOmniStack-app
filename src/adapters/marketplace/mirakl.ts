@@ -240,7 +240,7 @@ export class MiraklAdapter implements MarketplaceAdapter {
       const taxRates = line.taxes || []
       const taxRate = taxRates.length > 0 ? (taxRates[0].rate || 19) / 100 : 0.19
       
-      const itemGrossTotal = line.total_price || (price * qty)
+      const itemGrossTotal = price * qty
       totalAmount += itemGrossTotal
       taxAmount += line.total_tax || (itemGrossTotal - (itemGrossTotal / (1 + taxRate)))
 
@@ -261,6 +261,8 @@ export class MiraklAdapter implements MarketplaceAdapter {
       // Calculate shipping tax if not explicitly provided in order_taxes
       const shippingTaxAmount = shippingPrice - (shippingPrice / (1 + defaultTaxRate))
       taxAmount += shippingTaxAmount
+      totalAmount += shippingPrice
+
       
       items.push({
         sku: 'SHIPPING',
