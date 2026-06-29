@@ -206,6 +206,7 @@ function PriceEditor({ product }: { product: Product }) {
 export function ProductsClient({ initialProducts }: { initialProducts: Product[] }) {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
+  const [searchField, setSearchField] = useState<'all' | 'sku' | 'title' | 'ean'>('all')
   const [sortColumn, setSortColumn] = useState<string>('createdAt')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
@@ -271,13 +272,22 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
     if (searchQuery.trim()) {
       const terms = searchQuery.toLowerCase().trim().split(/\s+/).filter(Boolean)
       result = result.filter(p => {
-        return terms.every(term => 
-          (p.sku && p.sku.toLowerCase().includes(term)) || 
-          (p.title && p.title.toLowerCase().includes(term)) || 
-          (p.ean && p.ean.toLowerCase().includes(term)) ||
-          (p.mappingSkus && p.mappingSkus.toLowerCase().includes(term)) ||
-          (p.mappingEans && p.mappingEans.toLowerCase().includes(term))
-        )
+        return terms.every(term => {
+          if (searchField === 'sku') {
+            return (p.sku && p.sku.toLowerCase().includes(term)) || (p.mappingSkus && p.mappingSkus.toLowerCase().includes(term))
+          }
+          if (searchField === 'title') {
+            return (p.title && p.title.toLowerCase().includes(term))
+          }
+          if (searchField === 'ean') {
+            return (p.ean && p.ean.toLowerCase().includes(term)) || (p.mappingEans && p.mappingEans.toLowerCase().includes(term))
+          }
+          return (p.sku && p.sku.toLowerCase().includes(term)) || 
+            (p.title && p.title.toLowerCase().includes(term)) || 
+            (p.ean && p.ean.toLowerCase().includes(term)) ||
+            (p.mappingSkus && p.mappingSkus.toLowerCase().includes(term)) ||
+            (p.mappingEans && p.mappingEans.toLowerCase().includes(term))
+        })
       })
     }
 
@@ -324,23 +334,35 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
       <div className="p-4 border-b border-slate-100 flex gap-4 items-center">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input 
-            type="text"
-            placeholder="SKU, Titel oder EAN suchen..." 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all text-slate-900 placeholder:text-slate-500"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-0.5 rounded-full hover:bg-slate-200"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
+        <div className="relative flex-1 max-w-2xl flex items-center gap-2">
+          <select
+            value={searchField}
+            onChange={(e) => setSearchField(e.target.value as any)}
+            className="w-36 py-2 pl-3 pr-8 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all text-slate-900"
+          >
+            <option value="all">Alle Felder</option>
+            <option value="sku">SKU</option>
+            <option value="title">Titel</option>
+            <option value="ean">EAN</option>
+          </select>
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input 
+              type="text"
+              placeholder={searchField === 'all' ? "SKU, Titel oder EAN suchen..." : `${searchField.toUpperCase()} suchen...`} 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all text-slate-900 placeholder:text-slate-500"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-0.5 rounded-full hover:bg-slate-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
         
         {selectedProductIds.size > 0 && (
