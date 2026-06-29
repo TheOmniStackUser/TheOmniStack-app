@@ -139,6 +139,13 @@ const getDescriptionFromPayload = (payload: any) => {
 const getOriginPriceFromPayload = (payload: any) => {
   if (!payload || typeof payload !== 'object') return null;
 
+  if (payload.pricing?.msrp?.amount !== undefined) {
+    return String(payload.pricing.msrp.amount);
+  }
+  if (payload.pricing?.standardPrice?.amount !== undefined) {
+    return String(payload.pricing.standardPrice.amount);
+  }
+
   // Otto v5 standard price
   if (payload.standardPrice && payload.standardPrice.amount !== undefined) {
     return String(payload.standardPrice.amount);
@@ -330,7 +337,7 @@ export async function bulkCreateProductsFromUnmapped(unmappedProductIds: string[
             marketplace: unmapped.marketplace,
             marketplaceSku: unmapped.marketplaceSku,
             marketplaceProductId: unmapped.marketplaceProductId,
-            syncStock: true,
+            syncStock: unmapped.stock !== null && unmapped.stock !== undefined,
             syncPrice: false,
             ean: skuToEan.get(unmapped.marketplaceSku) || null,
           })
@@ -575,7 +582,7 @@ export async function mapUnmappedProductToExisting(unmappedProductId: string, pr
     marketplace: unmapped.marketplace,
     marketplaceSku: unmapped.marketplaceSku,
     marketplaceProductId: unmapped.marketplaceProductId,
-    syncStock: true,
+    syncStock: unmapped.stock !== null && unmapped.stock !== undefined,
     syncPrice: false,
     ean: unmappedEan || null,
   }).onConflictDoNothing()
@@ -691,6 +698,31 @@ export async function updateProductStockInline(productId: string, newStock: numb
   await pushUpdatesToMarketplaces(auth.activeCompanyId, [{
     sku: product.sku,
     stock: newStock
+  }])
+
+  return { success: true }
+}
+
+export async function updateProductPriceInline(productId: string, newPrice: number) {
+  const auth = await requireAuth()
+
+  // Verify and get the product
+  const [product] = await db.select()
+    .from(products)
+    .where(and(eq(products.id, productId), eq(products.companyId, auth.activeCompanyId)))
+
+  if (!product) throw new Error("Product not found")
+
+  // Update central price
+  await db.update(products)
+    .set({ price: newPrice.toString(), updatedAt: new Date() })
+    .where(eq(products.id, productId))
+
+  // Trigger sync
+  const { pushUpdatesToMarketplaces } = await import('@/workers/product-sync')
+  await pushUpdatesToMarketplaces(auth.activeCompanyId, [{
+    sku: product.sku,
+    price: newPrice
   }])
 
   return { success: true }

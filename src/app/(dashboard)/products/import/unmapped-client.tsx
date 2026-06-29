@@ -420,7 +420,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
       headers.join(';'),
       ...filteredProducts.map(p => {
         const title = p.title ? `"${p.title.replace(/"/g, '""')}"` : '""'
-        return `${getMarketplaceDisplayName(p.marketplace)};${p.marketplaceSku};${title};${p.price || 0};${p.stock || 0}`
+        return `${getMarketplaceDisplayName(p.marketplace)};${p.marketplaceSku};${title};${p.price || 0};${p.stock !== null ? p.stock : 'Unbekannt'}`
       })
     ].join('\n')
 
@@ -666,7 +666,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
                     <h3 className="text-lg font-bold text-slate-900">{p.title}</h3>
                     <div className="flex gap-4 mt-2 text-sm text-slate-500 font-medium">
                       <span>Preis: {p.price} €</span>
-                      <span>Bestand: {p.stock}</span>
+                      <span>Bestand: {p.stock !== null ? p.stock : 'Unbekannt'}</span>
                     </div>
                   </div>
                 </div>
@@ -747,7 +747,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
                {/* Extract UVP, Category, & Brand from raw payload for display */}
                {(() => {
                  const raw = detailsProduct.rawPayload as any;
-                 const uvp = raw?.discount?.origin_price || raw?.origin_price || raw?.msrp;
+                 const uvp = raw?.pricing?.msrp?.amount || raw?.pricing?.standardPrice?.amount || raw?.discount?.origin_price || raw?.origin_price || raw?.msrp;
                  const category = raw?.category_label || raw?.category || raw?.product_type;
                  
                  let brand = null;
@@ -790,7 +790,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
 
                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col">
                  <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Bestand</p>
-                 <p className="font-bold text-slate-900 text-base">{detailsProduct.stock}</p>
+                 <p className="font-bold text-slate-900 text-base">{detailsProduct.stock !== null ? detailsProduct.stock : 'Unbekannt'}</p>
                </div>
             </div>
             
