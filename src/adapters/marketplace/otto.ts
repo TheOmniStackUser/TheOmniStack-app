@@ -359,25 +359,44 @@ export class OttoAdapter implements MarketplaceAdapter {
       const requestBody = JSON.stringify(shipmentPayload)
       console.log(`[OttoAdapter] Shipment payload:`, requestBody)
 
-      const response = await fetch(`${this.baseUrl}/v1/shipments`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: requestBody
-      })
+      let response: Response | undefined;
+      let retries = 5;
+      let delay = 2000;
+      let errText = '';
 
-      if (!response.ok) {
-        const errText = await response.text()
-        console.error(`[OttoAdapter] Failed to confirm shipment: ${response.status} - ${errText}`)
+      while (retries > 0) {
+        response = await fetch(`${this.baseUrl}/v1/shipments`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: requestBody
+        });
+
+        if (response.ok) break;
+
+        errText = await response.text();
+        
+        if (response.status >= 400 && response.status < 500 && response.status !== 429) {
+          break; // Don't retry on client errors like 400, 401, 403, 404
+        }
+
+        console.warn(`[OttoAdapter] confirmShipment returned ${response.status}. Retrying in ${delay}ms...`);
+        await new Promise(r => setTimeout(r, delay));
+        retries--;
+        delay = delay * 2 + Math.floor(Math.random() * 1000); // exponential backoff with jitter
+      }
+
+      if (!response || !response.ok) {
+        console.error(`[OttoAdapter] Failed to confirm shipment: ${response?.status} - ${errText}`)
         
         if (errText.includes('POSITION_ITEM_INCLUDED_IN_OTHER_SHIPMENT')) {
           throw new Error(`Bestellung wurde bereits auf Otto als versendet markiert.`)
         }
 
-        let message = `HTTP ${response.status}`
+        let message = `HTTP ${response?.status}`
         try {
           const parsed = JSON.parse(errText)
           message = parsed.message || parsed.errors?.[0]?.message || parsed.detail || errText
