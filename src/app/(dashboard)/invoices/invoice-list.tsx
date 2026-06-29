@@ -53,15 +53,10 @@ type SearchSuggestion = {
   detail: string
 }
 
+import { get2LetterCountryCode } from '@/lib/countries'
+
 const formatCountry = (code?: string | null) => {
-  if (!code) return 'DE'
-  const map: Record<string, string> = {
-    'DEU': 'DE', 'AUT': 'AT', 'CHE': 'CH', 'FRA': 'FR',
-    'ITA': 'IT', 'ESP': 'ES', 'NLD': 'NL', 'BEL': 'BE',
-    'POL': 'PL', 'DNK': 'DK', 'SWE': 'SE', 'NOR': 'NO',
-    'FIN': 'FI', 'GBR': 'GB'
-  }
-  return map[code.toUpperCase()] || code.toUpperCase()
+  return get2LetterCountryCode(code)
 }
 
 const formatMarketplaceName = (mp: string | null, shippingCountry?: string | null) => {
