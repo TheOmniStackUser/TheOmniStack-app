@@ -482,14 +482,22 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
     }
   }
 
+  const [autoMapProgress, setAutoMapProgress] = useState<{ current: number, total: number } | null>(null)
+
   const handleConfirmAutoMap = async () => {
     if (filteredAutoMapMatches.length === 0) return
     setIsSubmitting(true)
+    setAutoMapProgress({ current: 0, total: filteredAutoMapMatches.length })
     try {
-      await bulkAutoMapProducts(filteredAutoMapMatches.map(m => ({
-        unmappedId: m.unmappedId,
-        matchedProductId: m.matchedProductId
-      })))
+      const BATCH_SIZE = 25;
+      for (let i = 0; i < filteredAutoMapMatches.length; i += BATCH_SIZE) {
+        const batch = filteredAutoMapMatches.slice(i, i + BATCH_SIZE);
+        await bulkAutoMapProducts(batch.map(m => ({
+          unmappedId: m.unmappedId,
+          matchedProductId: m.matchedProductId
+        })));
+        setAutoMapProgress({ current: Math.min(i + BATCH_SIZE, filteredAutoMapMatches.length), total: filteredAutoMapMatches.length })
+      }
       setAutoMapState({ isOpen: false, matches: [], isLoading: false })
       router.refresh()
       showAlert(`${filteredAutoMapMatches.length} Produkte wurden erfolgreich gemappt!`, 'Erfolg')
@@ -498,6 +506,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
       showAlert('Fehler beim Auto-Mappen der Produkte.', 'Fehler')
     } finally {
       setIsSubmitting(false)
+      setAutoMapProgress(null)
     }
   }
 
@@ -1102,7 +1111,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
                 </button>
                 <button onClick={handleConfirmAutoMap} className="px-6 py-2.5 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 shadow-sm shadow-indigo-600/20 transition-all flex items-center gap-2 disabled:opacity-50" disabled={isSubmitting || filteredAutoMapMatches.length === 0}>
                   {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckSquare className="w-4 h-4" />}
-                  Alle {filteredAutoMapMatches.length} Produkte mappen
+                  {isSubmitting && autoMapProgress ? `Mappe ${autoMapProgress.current} von ${autoMapProgress.total}...` : `Alle ${filteredAutoMapMatches.length} Produkte mappen`}
                 </button>
               </div>
             </>
