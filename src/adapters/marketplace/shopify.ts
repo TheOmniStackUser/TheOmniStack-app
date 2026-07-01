@@ -47,7 +47,8 @@ export class ShopifyAdapter implements MarketplaceAdapter {
       headers: {
         'X-Shopify-Access-Token': token,
         'Content-Type': 'application/json',
-      }
+      },
+      cache: 'no-store'
     })
 
     if (!res.ok) {
@@ -359,7 +360,10 @@ export class ShopifyAdapter implements MarketplaceAdapter {
 
       while (productsUrl) {
         console.log(`[Shopify] Fetching products via GET ${productsUrl}...`)
-        const response: Response = await fetch(productsUrl, { headers })
+        const response: Response = await fetch(productsUrl, { 
+          headers,
+          cache: 'no-store'
+        })
 
         if (!response.ok) {
           const errText = await response.text()
