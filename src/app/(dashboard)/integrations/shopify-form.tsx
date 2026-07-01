@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { HelpCircle } from 'lucide-react'
+import { ConfirmModal } from '@/components/confirm-modal'
 
 export function ShopifyIntegrationForm({ initialData }: { initialData?: any }) {
   const [shopDomain, setShopDomain] = useState(initialData?.environment || '')
@@ -26,6 +27,13 @@ export function ShopifyIntegrationForm({ initialData }: { initialData?: any }) {
     window.location.href = `/api/auth/shopify/install?shop=${encodeURIComponent(cleanDomain)}`
   }
 
+  const [isDisconnectModalOpen, setIsDisconnectModalOpen] = useState(false)
+
+  const handleDisconnect = async () => {
+    const { disconnectShopifyAction } = await import('@/app/actions/integrations')
+    await disconnectShopifyAction()
+  }
+
   // If already connected, show connection status instead of input
   if (initialData?.accessToken) {
     return (
@@ -34,16 +42,22 @@ export function ShopifyIntegrationForm({ initialData }: { initialData?: any }) {
           TheOmniStack ist erfolgreich mit <strong>{initialData.environment}</strong> verknüpft.
         </p>
         <button
-          onClick={async () => {
-            if(confirm('Möchtest du die Verbindung zu Shopify wirklich trennen?')) {
-              const { disconnectShopifyAction } = await import('@/app/actions/integrations')
-              await disconnectShopifyAction()
-            }
-          }}
+          onClick={() => setIsDisconnectModalOpen(true)}
           className="w-full py-2.5 px-4 border border-red-300 rounded-md shadow-sm text-sm font-bold text-red-600 bg-white hover:bg-red-50 focus:outline-none transition-colors"
         >
           Verbindung trennen
         </button>
+
+        <ConfirmModal
+          isOpen={isDisconnectModalOpen}
+          onClose={() => setIsDisconnectModalOpen(false)}
+          onConfirm={handleDisconnect}
+          title="Verbindung trennen"
+          message="Möchtest du die Verbindung zu Shopify wirklich trennen?"
+          confirmText="Ja, trennen"
+          cancelText="Abbrechen"
+          isDestructive={true}
+        />
       </div>
     )
   }

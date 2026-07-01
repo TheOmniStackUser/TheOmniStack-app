@@ -23,11 +23,28 @@ export async function GET(request: Request) {
   
   const payload = await getSession()
   
-  const [existing] = await db
-    .select()
-    .from(marketplaceIntegrations)
-    .where(eq(marketplaceIntegrations.environment, shop))
-    .limit(1)
+  let existing = null
+
+  if (payload?.activeCompanyId) {
+    const [found] = await db
+      .select()
+      .from(marketplaceIntegrations)
+      .where(
+        and(
+          eq(marketplaceIntegrations.environment, shop),
+          eq(marketplaceIntegrations.companyId, payload.activeCompanyId)
+        )
+      )
+      .limit(1)
+    existing = found
+  } else {
+    const [found] = await db
+      .select()
+      .from(marketplaceIntegrations)
+      .where(eq(marketplaceIntegrations.environment, shop))
+      .limit(1)
+    existing = found
+  }
 
   // If already installed and user is logged in, redirect straight to dashboard
   if (existing && payload?.userId) {
