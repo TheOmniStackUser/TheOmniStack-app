@@ -310,6 +310,9 @@ export async function triggerManualSyncAction(data: { marketplace: string, fromD
       }
     } catch (error) {
       console.error(`Error manually syncing ${integration.type}:`, error)
+      if (data.marketplace !== 'all') {
+        return { error: error instanceof Error ? error.message : String(error) }
+      }
       // Continue to next integration even if one fails
     }
   }
