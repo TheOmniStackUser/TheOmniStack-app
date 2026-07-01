@@ -125,6 +125,75 @@ export async function GET(request: Request) {
         })
       }
 
+      // 5.5 Register Webhooks
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+      const webhookUrl = appUrl.startsWith('http://localhost')
+        ? appUrl.replace('http', 'https') + '/api/webhooks/shopify/events'
+        : `${appUrl}/api/webhooks/shopify/events`
+
+      const webhookTopics = ['orders/create', 'orders/updated', 'products/create', 'products/update']
+      
+      for (const topic of webhookTopics) {
+        try {
+          const webhookRes = await fetch(`https://${shop}/admin/api/2024-01/webhooks.json`, {
+            method: 'POST',
+            headers: {
+              'X-Shopify-Access-Token': accessToken,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              webhook: {
+                topic,
+                address: webhookUrl,
+                format: 'json'
+              }
+            })
+          })
+          if (!webhookRes.ok) {
+            const errText = await webhookRes.text()
+            console.error(`[Shopify OAuth] Failed to register webhook for ${topic}:`, errText)
+          } else {
+            console.log(`[Shopify OAuth] Successfully registered webhook for ${topic}`)
+          }
+        } catch (e) {
+          console.error(`[Shopify OAuth] Error registering webhook for ${topic}:`, e)
+        }
+      }
+
+      // 5.6 Trigger Initial Sync
+      try {
+        const { marketplaceSyncQueue } = await import('@/workers/marketplace-sync')
+        const [insertedOrUpdated] = await db
+          .select()
+          .from(marketplaceIntegrations)
+          .where(
+            and(
+              eq(marketplaceIntegrations.companyId, companyId),
+              eq(marketplaceIntegrations.type, 'shopify')
+            )
+          )
+          .limit(1)
+
+        if (insertedOrUpdated) {
+          await marketplaceSyncQueue.add(
+            `sync-shopify`,
+            {
+              companyId,
+              marketplace: 'shopify',
+              triggeredByUserId: null,
+              integrationId: insertedOrUpdated.id,
+              marketplaceDisplayName: 'Shopify',
+            },
+            {
+              jobId: `sync-shopify-${companyId}-${Date.now()}`
+            }
+          )
+          console.log(`[Shopify OAuth] Initial data sync triggered for company ${companyId}`)
+        }
+      } catch (e) {
+        console.error('[Shopify OAuth] Failed to trigger initial sync:', e)
+      }
+
       // 6. Cleanup CSRF cookie and redirect to Shopify Admin (Shopify App Review Requirement)
       cookieStore.delete('shopify_oauth_nonce')
       const clientId = process.env.SHOPIFY_CLIENT_ID
