@@ -499,33 +499,84 @@ export class ShopifyAdapter implements MarketplaceAdapter {
   }
 
   private async getAccessToken(integration: any): Promise<string> {
-    if (integration.accessToken) return integration.accessToken;
-    if (integration.clientSecret && integration.clientSecret.startsWith('shpat_')) return integration.clientSecret;
-    
-    if (!integration.clientId || !integration.clientSecret) {
-      throw new Error(`Shopify: Missing credentials for token exchange`);
+    const now = new Date();
+    // Use token if it exists and (has no expiry, or expires more than 1 min from now)
+    if (integration.accessToken && (!integration.expiresAt || integration.expiresAt > new Date(now.getTime() + 60000))) {
+      return integration.accessToken;
     }
 
     let shopUrl = integration.environment
     if (!shopUrl.startsWith('http')) shopUrl = `https://${shopUrl}`
     shopUrl = shopUrl.replace(/\/$/, '')
 
-    const tokenRes = await fetch(`${shopUrl}/admin/oauth/access_token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        client_id: integration.clientId,
-        client_secret: integration.clientSecret,
-        grant_type: 'client_credentials'
-      })
-    })
-    
-    if (!tokenRes.ok) {
-      const errText = await tokenRes.text()
-      throw new Error(`Shopify Auth Fehler: ${tokenRes.status} - ${errText}`)
+    // If we have a refresh token (expiring offline token flow), we MUST refresh it
+    if (integration.refreshToken) {
+      const clientId = process.env.SHOPIFY_CLIENT_ID || integration.clientId;
+      const clientSecret = process.env.SHOPIFY_CLIENT_SECRET || integration.clientSecret;
+
+      if (!clientId || !clientSecret) {
+        throw new Error(`Shopify: Missing credentials for token refresh`);
+      }
+
+      console.log(`[Shopify] Refreshing expired access token for ${shopUrl}...`);
+      const refreshRes = await fetch(`${shopUrl}/admin/oauth/access_token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_id: clientId,
+          client_secret: clientSecret,
+          grant_type: 'refresh_token',
+          refresh_token: integration.refreshToken
+        })
+      });
+
+      if (!refreshRes.ok) {
+        const errText = await refreshRes.text();
+        throw new Error(`Shopify Refresh Fehler: ${refreshRes.status} - ${errText}`);
+      }
+
+      const refreshData = await refreshRes.json();
+      const newAccessToken = refreshData.access_token;
+      const newRefreshToken = refreshData.refresh_token;
+      const newExpiresAt = refreshData.expires_in ? new Date(Date.now() + refreshData.expires_in * 1000) : null;
+
+      // Persist the new tokens (crucial: old refresh token is voided immediately)
+      await db.update(marketplaceIntegrations)
+        .set({
+          accessToken: newAccessToken,
+          refreshToken: newRefreshToken,
+          expiresAt: newExpiresAt,
+          updatedAt: new Date()
+        })
+        .where(eq(marketplaceIntegrations.id, integration.id));
+
+      return newAccessToken;
     }
-    
-    const data = await tokenRes.json()
-    return data.access_token;
+
+    // Fallback for custom apps using client_credentials
+    if (integration.clientId && integration.clientSecret && !integration.clientSecret.startsWith('shpat_')) {
+      const tokenRes = await fetch(`${shopUrl}/admin/oauth/access_token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_id: integration.clientId,
+          client_secret: integration.clientSecret,
+          grant_type: 'client_credentials'
+        })
+      })
+      
+      if (!tokenRes.ok) {
+        const errText = await tokenRes.text()
+        throw new Error(`Shopify Auth Fehler: ${tokenRes.status} - ${errText}`)
+      }
+      
+      const data = await tokenRes.json()
+      return data.access_token;
+    }
+
+    // Fallback for static tokens
+    if (integration.clientSecret && integration.clientSecret.startsWith('shpat_')) return integration.clientSecret;
+
+    throw new Error(`Shopify: Missing credentials for token exchange`);
   }
 }

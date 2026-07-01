@@ -61,7 +61,8 @@ export async function GET(request: Request) {
       body: JSON.stringify({
         client_id: process.env.SHOPIFY_CLIENT_ID,
         client_secret: secret,
-        code
+        code,
+        expiring: true
       })
     })
 
@@ -71,6 +72,8 @@ export async function GET(request: Request) {
 
     const tokenData = await tokenResponse.json()
     const accessToken = tokenData.access_token
+    const refreshToken = tokenData.refresh_token
+    const expiresAt = tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000) : null
 
     // 4.5 Make an API call to Shopify to satisfy "App must use Shopify API" requirement
     let shopMetadata = {}
@@ -109,6 +112,8 @@ export async function GET(request: Request) {
           .set({
             environment: shop, // Store the shop domain here (e.g. "my-shop.myshopify.com")
             accessToken: accessToken,
+            refreshToken: refreshToken || null,
+            expiresAt: expiresAt || null,
             isActive: true,
             updatedAt: new Date(),
             metadata: { ...((existing.metadata as any) || {}), shop: shopMetadata }
@@ -120,6 +125,8 @@ export async function GET(request: Request) {
           type: 'shopify',
           environment: shop,
           accessToken: accessToken,
+          refreshToken: refreshToken || null,
+          expiresAt: expiresAt || null,
           isActive: true,
           metadata: { shop: shopMetadata }
         })
