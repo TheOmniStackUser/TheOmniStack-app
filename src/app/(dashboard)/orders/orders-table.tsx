@@ -2657,7 +2657,12 @@ export function OrdersTable({
                                         Manuell versenden
                                       </button>
                                     )}
+                                  </div>
+                                </div>
 
+                                <div className="mt-4">
+                                  <span className="font-medium">Ersatzlabels & Erstattungen:</span>
+                                  <div className="flex flex-wrap gap-2 mt-1">
                                     {dhlConfig && (
                                       <button 
                                         onClick={(e) => {
@@ -2693,6 +2698,17 @@ export function OrdersTable({
                                     >
                                       <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
                                       {order.status === 'shipped' ? 'Hermes-Ersatzlabel' : 'Hermes-Label'}
+                                    </button>
+
+                                    <button 
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleOpenRefundItems(order)
+                                      }}
+                                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 transition-all shadow-sm"
+                                    >
+                                      <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                      Retourenerstattung
                                     </button>
                                   </div>
                                 </div>
