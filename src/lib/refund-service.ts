@@ -73,11 +73,12 @@ export async function executeRefund({
     return false
   })
 
-  let autoCreditNote = integration ? !!(integration.metadata as any)?.autoCreditNote : false
-  if (order.marketplace === 'otto') {
-    // Otto credit notes are downloaded via sync worker, do not auto-generate
-    autoCreditNote = false
-  }
+  const isLimango = integration?.type === 'mirakl_custom' && ((integration.metadata as any)?.customName || '').toLowerCase().includes('limango')
+  const isAboutYou = integration?.type === 'aboutyou'
+  const isOtto = integration?.type === 'otto'
+  
+  // Otto, Limango & AboutYou generate their own credit notes. For Decathlon and the rest WE generate them locally.
+  let autoCreditNote = !(isLimango || isAboutYou || isOtto)
 
   // 3. Resolve EAN to actual marketplace SKUs if needed
   const resolvedItemsToRefund: RefundItemInput[] = []

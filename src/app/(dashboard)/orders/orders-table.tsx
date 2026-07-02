@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, Fragment, ReactNode, useEffect, useMemo } from 'react'
+import { useState, Fragment, ReactNode, useEffect, useMemo, useTransition } from 'react'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { generateHermesLabelsAction, generateDhlLabelsAction } from '@/app/actions/shipping'
-import { archiveOrderAction, archiveOrdersBulkAction, updateOrderStatusAction, updateOrderAddressAction, updateOrderBillingAddressAction, generateOrDownloadInvoicesBulkAction, markOrderAsShippedManuallyAction, getOrderLabelsAction, updateOrderNotesAction } from '@/app/actions/orders'
+import { archiveOrderAction, archiveOrdersBulkAction, updateOrderStatusAction, updateOrderAddressAction, updateOrderBillingAddressAction, generateOrDownloadInvoicesBulkAction, markOrderAsShippedManuallyAction, getOrderLabelsAction, updateOrderNotesAction, refundOrderAction, refundOrderPartialAction } from '@/app/actions/orders'
 import { getInvoiceDownloadUrl } from '@/app/actions/invoices'
 import type { Order, OrderItem } from '@/db/schema/orders'
 import type { Invoice, InvoiceLog } from '@/db/schema/invoices'
@@ -387,9 +388,15 @@ export function OrdersTable({
   const [dhlSelections, setDhlSelections] = useState<Record<string, { productCode: string; weight: number }>>({})
 
   const [deleteModalConfig, setDeleteModalConfig] = useState<{ show: boolean, isBulk: boolean, orderId?: string }>({ show: false, isBulk: false })
+  const [refundModalConfig, setRefundModalConfig] = useState<{ show: boolean, orderId?: string }>({ show: false })
+  const [isRefunding, setIsRefunding] = useState(false)
+
+  const [refundOrder, setRefundOrder] = useState<any | null>(null)
+  const [refundItemsInput, setRefundItemsInput] = useState<{ sku: string; title: string; orderQty: number; returnedQty: number; refundQty: number }[]>([])
+  const [isRefundingItems, startRefundItemsTransition] = useTransition()
 
   // Manual shipping states
-  const [showManualShipModal, setShowManualShipModal] = useState<OrderWithItems | null>(null)
+  const [showManualShipModal, setShowManualShipModal] = useState<any | null>(null)
   const [showOttoRefundModal, setShowOttoRefundModal] = useState<OrderWithItems | null>(null)
   const [manualTrackingNumber, setManualTrackingNumber] = useState('')
   const [manualCarrier, setManualCarrier] = useState('DHL')
@@ -863,6 +870,92 @@ export function OrdersTable({
       setIsUpdatingStatus(null)
     }
   }
+
+  const handleOpenRefundItems = (order: any) => {
+    const inputs = order.items.map((orderItem: any) => {
+      const refundedCount = order.returns?.reduce((acc: number, ret: any) => {
+        if (ret.status === 'bearbeitet' && ret.metadata?.refundedItems) {
+          const matched = (ret.metadata.refundedItems as any[]).find((r: any) => r.sku === orderItem.sku)
+          if (matched) return acc + (Number(matched.quantity) || 0)
+        }
+        return acc
+      }, 0) || 0
+  
+      const orderQty = parseInt(orderItem.quantity) || 1
+  
+      return {
+        sku: orderItem.sku || 'N/A',
+        title: orderItem.title,
+        orderQty,
+        returnedQty: refundedCount,
+        refundQty: Math.max(0, orderQty - refundedCount)
+      }
+    })
+    
+    setRefundItemsInput(inputs)
+    setRefundOrder(order)
+  }
+  
+  const handleRefundQtyChange = (index: number, val: number) => {
+    const next = [...refundItemsInput]
+    next[index].refundQty = Math.max(0, Math.min(next[index].orderQty - next[index].returnedQty, val))
+    setRefundItemsInput(next)
+  }
+  
+  const handleRefundAllToggle = (refundAll: boolean) => {
+    const next = refundItemsInput.map(item => ({
+      ...item,
+      refundQty: refundAll ? Math.max(0, item.orderQty - item.returnedQty) : 0
+    }))
+    setRefundItemsInput(next)
+  }
+  
+  const handleExecutePartialRefund = async () => {
+    if (!refundOrder) return
+    const payload = refundItemsInput.filter(item => item.refundQty > 0).map(item => ({ sku: item.sku, quantity: item.refundQty }))
+    if (payload.length === 0) {
+      showToast('Bitte wähle mindestens einen Artikel mit einer Menge größer als 0 aus.', 'error')
+      return
+    }
+    startRefundItemsTransition(async () => {
+      try {
+        const res = await refundOrderPartialAction(refundOrder.id, payload)
+        if ('success' in res && res.success && 'creditNoteNumber' in res) {
+          showToast(`Erstattung erfolgreich veranlasst (Gutschrift: ${res.creditNoteNumber}).`, 'success')
+          setRefundOrder(null)
+        } else if ('error' in res && res.error) {
+          showToast(res.error || 'Fehler bei der Rückerstattung.', 'error')
+        } else {
+          showToast('Ein unbekannter Fehler ist aufgetreten.', 'error')
+        }
+      } catch (err: any) {
+        showToast(err.message || 'Fehler bei der Rückerstattung.', 'error')
+      }
+    })
+  }
+
+  const handleGenerateInvoicesBulk = async () => {
+    if (!dhlConfig) {
+      showToast('DHL ist nicht konfiguriert. Bitte richte die DHL-Verbindung unter Integrationen ein.', 'error')
+      return
+    }
+
+    const filteredOrders = orders.filter(o => selectedIds.has(o.id))
+    setIsGeneratingInvoices(true)
+    try {
+      const result = await generateOrDownloadInvoicesBulkAction(filteredOrders.map(o => o.id))
+      if (result.error) {
+        showToast(result.error, 'error')
+      } else {
+        showToast(result.message, 'success')
+      }
+    } catch (e) {
+      showToast('Fehler beim Erstellen der Rechnungen.', 'error')
+    } finally {
+      setIsGeneratingInvoices(false)
+    }
+  }
+
   const filteredOrders = orders.filter(order => {
     // Filter by Marketplace
     if (activeFilters.marketplace !== 'all') {
@@ -1534,6 +1627,28 @@ export function OrdersTable({
       } finally {
         setDeleteModalConfig({ show: false, isBulk: false })
       }
+    }
+  }
+
+  const handleRefund = (orderId: string) => {
+    setRefundModalConfig({ show: true, orderId })
+  }
+
+  const confirmRefund = async () => {
+    if (!refundModalConfig.orderId) return
+    setIsRefunding(true)
+    try {
+      const result = await refundOrderAction(refundModalConfig.orderId)
+      if (result.error) {
+        showToast(result.error, 'error')
+      } else {
+        showToast(result.message, 'success')
+      }
+    } catch (e) {
+      showToast('Fehler bei der Rückerstattung.', 'error')
+    } finally {
+      setIsRefunding(false)
+      setRefundModalConfig({ show: false })
     }
   }
 
@@ -2371,6 +2486,15 @@ export function OrdersTable({
                                 {order.status === 'shipped' ? 'Hermes-Ersatzlabel erstellen' : 'Hermes-Label erstellen'}
                               </button>
 
+                              <button
+                                type="button"
+                                onClick={() => handleOpenRefundItems(order)}
+                                className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors whitespace-nowrap"
+                              >
+                                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                Retourenerstattung
+                              </button>
+
                               {/* 6. Manuell versenden */}
                               {order.status !== 'shipped' ? (
                                 <button
@@ -3011,7 +3135,16 @@ export function OrdersTable({
                                   )}
                                 </ul>
                               </div>
-                              <div className="flex justify-end">
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  onClick={() => handleRefund(order.id)}
+                                  className="text-sm text-orange-600 hover:text-orange-800 font-medium px-3 py-1.5 border border-orange-200 hover:bg-orange-50 rounded-md transition-colors flex items-center gap-2"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z" />
+                                  </svg>
+                                  Bestellung erstatten
+                                </button>
                                 <button
                                   onClick={() => handleDelete(order.id)}
                                   className="text-sm text-red-600 hover:text-red-800 font-medium px-3 py-1.5 border border-red-200 hover:bg-red-50 rounded-md transition-colors flex items-center gap-2"
@@ -3230,6 +3363,203 @@ export function OrdersTable({
                 ) : (
                   'Ja, löschen'
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Refund Confirmation Modal */}
+      {refundModalConfig.show && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => !isRefunding && setRefundModalConfig({ show: false })}></div>
+          <div className="relative bg-white rounded-2xl p-6 shadow-2xl w-full max-w-md border border-slate-200 flex flex-col">
+            <div className="mb-6 flex flex-col items-center text-center">
+              <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center mb-4">
+                <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-2">
+                Bestellung vollständig erstatten?
+              </h3>
+              <p className="text-slate-500 text-sm">
+                Möchtest du diese Bestellung vollständig erstatten? Es wird eine Retoure angelegt und eine Gutschrift über alle Artikel erzeugt. Diese Aktion kann nicht rückgängig gemacht werden.
+              </p>
+            </div>
+            
+            <div className="flex gap-3 justify-end mt-4">
+              <button
+                onClick={() => setRefundModalConfig({ show: false })}
+                disabled={isRefunding}
+                className="flex-1 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors disabled:opacity-50"
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={confirmRefund}
+                disabled={isRefunding}
+                className="flex-1 flex justify-center items-center px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-medium transition-colors shadow-sm shadow-orange-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isRefunding ? (
+                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : (
+                  'Ja, erstatten'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Partial Refund Modal Dialog */}
+      {refundOrder && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white w-full max-w-3xl rounded-2xl border border-slate-200 shadow-2xl overflow-hidden animate-scale-in">
+            {/* Header */}
+            <div className="p-6 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Retourenerstattung veranlassen</h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Veranlasse eine Erstattung für Bestellung <span className="font-bold">{refundOrder.marketplaceOrderId}</span>. Es wird eine entsprechende Gutschrift (Credit Note) generiert.
+                </p>
+              </div>
+              <button
+                onClick={() => !isRefundingItems && setRefundOrder(null)}
+                disabled={isRefundingItems}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all disabled:opacity-50"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Content Form */}
+            <div className="p-6 space-y-6 max-h-[60vh] overflow-y-auto">
+              
+              {/* Internal Order Note Alert */}
+              {refundOrder.notes && (
+                <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-xl flex items-start gap-3 shadow-sm mb-2">
+                  <div className="bg-amber-100 p-2 rounded-lg shrink-0">
+                    <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-amber-900">Achtung: Interne Notiz zur Bestellung liegt vor!</h4>
+                    <p className="text-sm text-amber-800 mt-1 whitespace-pre-wrap">{refundOrder.notes}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Quick Actions */}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleRefundAllToggle(true)}
+                  className="px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-bold transition-all"
+                >
+                  Alles erstatten (Komplett-Storno)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleRefundAllToggle(false)}
+                  className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all"
+                >
+                  Auswahl aufheben
+                </button>
+              </div>
+
+              {/* Items List */}
+              <div className="space-y-4">
+                <div className="grid grid-cols-12 gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider pb-2 border-b border-slate-100">
+                  <div className="col-span-5">Artikel / SKU</div>
+                  <div className="col-span-2 text-center">Bestellt</div>
+                  <div className="col-span-2 text-center">Bereits erstattet</div>
+                  <div className="col-span-3 text-right">Menge Erstatten</div>
+                </div>
+
+                <div className="space-y-3">
+                  {refundItemsInput.map((item, idx) => (
+                    <div key={idx} className="grid grid-cols-12 gap-2 items-center text-sm py-2 bg-slate-50 rounded-lg px-3 border border-slate-100 hover:border-slate-200 transition-colors">
+                      <div className="col-span-5">
+                        <div className="font-bold text-slate-900 truncate" title={item.title}>{item.title}</div>
+                        <div className="text-xs text-slate-500 mt-0.5 font-mono">{item.sku}</div>
+                      </div>
+                      
+                      <div className="col-span-2 text-center">
+                        <span className="inline-flex items-center justify-center min-w-[28px] h-7 bg-white border border-slate-200 rounded font-bold text-slate-700">
+                          {item.orderQty}
+                        </span>
+                      </div>
+                      
+                      <div className="col-span-2 text-center">
+                        <span className={`inline-flex items-center justify-center min-w-[28px] h-7 rounded font-bold border ${item.returnedQty > 0 ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-white border-slate-200 text-slate-400'}`}>
+                          {item.returnedQty}
+                        </span>
+                      </div>
+                      
+                      <div className="col-span-3 text-right flex justify-end">
+                        <div className="flex items-center border border-indigo-200 rounded-lg bg-white overflow-hidden shadow-sm">
+                          <button
+                            type="button"
+                            onClick={() => handleRefundQtyChange(idx, item.refundQty - 1)}
+                            className="px-3 py-1.5 hover:bg-indigo-50 text-indigo-600 transition-colors"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 12H4" /></svg>
+                          </button>
+                          <input
+                            type="number"
+                            min="0"
+                            max={item.orderQty - item.returnedQty}
+                            value={item.refundQty}
+                            onChange={(e) => handleRefundQtyChange(idx, parseInt(e.target.value) || 0)}
+                            className="w-12 text-center border-x border-indigo-100 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-bold !text-slate-900"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRefundQtyChange(idx, item.refundQty + 1)}
+                            className="px-3 py-1.5 hover:bg-indigo-50 text-indigo-600 transition-colors"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 rounded-b-2xl">
+              <button
+                type="button"
+                onClick={() => setRefundOrder(null)}
+                disabled={isRefundingItems}
+                className="px-5 py-2.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-sm font-bold hover:bg-slate-50 transition-colors disabled:opacity-50"
+              >
+                Abbrechen
+              </button>
+              <button
+                type="button"
+                onClick={handleExecutePartialRefund}
+                disabled={isRefundingItems || refundItemsInput.every(i => i.refundQty === 0)}
+                className="px-5 py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 shadow-sm shadow-indigo-200 flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isRefundingItems ? (
+                  <>
+                    <svg className="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Verarbeite...
+                  </>
+                ) : 'Erstattung ausführen'}
               </button>
             </div>
           </div>

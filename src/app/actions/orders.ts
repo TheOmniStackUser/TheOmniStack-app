@@ -209,10 +209,11 @@ export async function generateOrDownloadInvoicesBulkAction(orderIds: string[]) {
       // Allow manual override: If the user clicked the button, they want to generate/download invoices
       // regardless of the automation settings.
       if (!downloadInvoice && !autoInvoice) {
-        const cannotCreateInvoice = integration.type === 'otto' || integration.type === 'aboutyou'
-        const isMirakl = integration.type.startsWith('mirakl_') || integration.type === 'mirakl_custom'
+        const isOtto = integration.type === 'otto'
+        const isAboutYou = integration.type === 'aboutyou'
+        const isLimango = integration.type === 'mirakl_custom' && ((integration.metadata as any)?.customName || '').toLowerCase().includes('limango')
         
-        if (cannotCreateInvoice || isMirakl) {
+        if (isOtto || isAboutYou || isLimango) {
           downloadInvoice = true
         } else {
           autoInvoice = true
@@ -600,5 +601,150 @@ export async function updateOrderNotesAction(orderId: string, notes: string | nu
   } catch (error) {
     console.error('Error updating order notes:', error)
     return { error: 'Fehler beim Speichern der Notiz.' }
+  }
+}
+
+export async function refundOrderAction(orderId: string) {
+  try {
+    const auth = await requireAuth()
+
+    const order = await db.query.orders.findFirst({
+      where: and(
+        eq(orders.id, orderId),
+        eq(orders.companyId, auth.activeCompanyId)
+      ),
+      with: { items: true }
+    })
+
+    if (!order) {
+      return { error: 'Bestellung nicht gefunden.' }
+    }
+
+    if (!order.items || order.items.length === 0) {
+      return { error: 'Bestellung hat keine Artikel, die erstattet werden können.' }
+    }
+
+    const { returnsLog, returnedItems } = await import('@/db/schema/returns')
+
+    // Create a new return log for this manual refund
+    const [newReturn] = await db.insert(returnsLog).values({
+      companyId: auth.activeCompanyId,
+      orderId: order.id,
+      orderNumber: order.marketplaceOrderId,
+      customerName: order.buyerName || 'Unbekannt',
+      status: 'offen', // Will be set to 'bearbeitet' by executeRefund
+      marketplace: order.marketplace,
+      notes: 'Manuelle vollständige Erstattung aus dem Dashboard',
+      scannedAt: new Date(),
+      receivedAt: new Date()
+    }).returning({ id: returnsLog.id })
+
+    // Insert all items
+    await db.insert(returnedItems).values(
+      order.items.map(item => ({
+        returnLogId: newReturn.id,
+        skuOrProductName: item.sku || 'UNKNOWN',
+        quantity: Number(item.quantity),
+        condition: 'new',
+        notes: 'Manuelle vollständige Erstattung'
+      }))
+    )
+
+    const { executeRefund } = await import('@/lib/refund-service')
+    const itemsToRefund = order.items.map(item => ({
+      sku: item.sku || 'UNKNOWN',
+      quantity: Number(item.quantity) || 1
+    }))
+
+    const result = await executeRefund({
+      companyId: auth.activeCompanyId,
+      returnLogId: newReturn.id,
+      itemsToRefund,
+      userId: auth.userId
+    })
+
+    revalidatePath('/orders')
+    revalidatePath('/returns')
+
+    if (!result.success) {
+      return { error: result.error || 'Fehler bei der Rückerstattung.' }
+    }
+
+    return { 
+      success: true, 
+      message: `Rückerstattung veranlasst.${result.creditNoteNumber ? ` Gutschrift ${result.creditNoteNumber} wurde erzeugt.` : ''}` 
+    }
+  } catch (error: any) {
+    console.error('Error refunding order manually:', error)
+    return { error: error.message || 'Fehler bei der Rückerstattung.' }
+  }
+}
+
+export async function refundOrderPartialAction(orderId: string, itemsToRefund: { sku: string; quantity: number }[]) {
+  try {
+    const auth = await requireAuth()
+
+    const order = await db.query.orders.findFirst({
+      where: and(
+        eq(orders.id, orderId),
+        eq(orders.companyId, auth.activeCompanyId)
+      ),
+      with: { items: true }
+    })
+
+    if (!order) {
+      return { error: 'Bestellung nicht gefunden.' }
+    }
+
+    if (!order.items || order.items.length === 0) {
+      return { error: 'Bestellung hat keine Artikel, die erstattet werden können.' }
+    }
+
+    const { returnsLog, returnedItems } = await import('@/db/schema/returns')
+
+    // Create a new return log for this partial refund
+    const [newReturn] = await db.insert(returnsLog).values({
+      companyId: auth.activeCompanyId,
+      orderId: order.id,
+      orderNumber: order.marketplaceOrderId,
+      customerName: order.buyerName || 'Unbekannt',
+      status: 'offen', // Will be set to 'bearbeitet' by executeRefund
+      marketplace: order.marketplace,
+      notes: 'Erstattung aus dem Dashboard',
+      scannedAt: new Date(),
+      receivedAt: new Date()
+    }).returning({ id: returnsLog.id })
+
+    // Insert the refunded items into returnedItems
+    await db.insert(returnedItems).values(
+      itemsToRefund.map(item => ({
+        returnLogId: newReturn.id,
+        skuOrProductName: item.sku || 'UNKNOWN',
+        quantity: Number(item.quantity),
+        condition: 'new',
+        notes: 'Erstattung aus dem Dashboard'
+      }))
+    )
+
+    const { executeRefund } = await import('@/lib/refund-service')
+
+    const result = await executeRefund({
+      companyId: auth.activeCompanyId,
+      returnLogId: newReturn.id,
+      itemsToRefund,
+      userId: auth.userId
+    })
+
+    revalidatePath('/orders')
+    revalidatePath('/returns')
+
+    if (!result.success) {
+      return { error: result.error || 'Fehler bei der Rückerstattung.' }
+    }
+
+    return result
+  } catch (error: any) {
+    console.error('Error refunding order manually:', error)
+    return { error: error.message || 'Fehler bei der Rückerstattung.' }
   }
 }

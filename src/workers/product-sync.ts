@@ -78,7 +78,7 @@ export async function syncProductsForCompany(companyId: string, integrationId?: 
             marketplaceProductId: String(mpProduct.marketplaceProductId),
             title: mpProduct.title,
             price: mpProduct.price?.toString() || '0',
-            stock: mpProduct.stock?.toString() || '0',
+            stock: mpProduct.stock !== undefined && mpProduct.stock !== null ? mpProduct.stock.toString() : null,
             rawPayload: mpProduct.rawPayload
           })
         }
