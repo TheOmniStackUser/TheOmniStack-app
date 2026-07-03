@@ -59,7 +59,11 @@ export function ReturnsList({
     if (lowerKey === 'mirakl_mediamarkt') return 'MediaMarkt';
     if (lowerKey === 'mirakl_decathlon' || lowerKey === 'mirakl_decathlon_eu') return 'Decathlon';
     
-    return mpKey.charAt(0).toUpperCase() + mpKey.slice(1);
+    // Auto-capitalize words for things like "decathlon pl" -> "Decathlon PL", "secret sales se" -> "Secret Sales SE"
+    return mpKey.split(' ').map(word => {
+      if (word.length <= 2 && word.match(/^[a-zA-Z]+$/)) return word.toUpperCase(); // uppercase country codes like "pl", "se", "hu"
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    }).join(' ');
   };
 
   const marketplaceOptions = React.useMemo(() => {
@@ -76,13 +80,18 @@ export function ReturnsList({
     initialLogs.forEach(log => {
       if (log.marketplace) {
         const key = log.marketplace.toLowerCase();
+        // Skip shipping providers that might have been mistakenly tracked as marketplaces
+        if (key === 'dhl' || key === 'hermes' || key === 'dpd' || key === 'gls' || key === 'ups') return;
+        
+        // Deduplicate by normalizing names that are essentially the same (like "decathlon pl" vs "mirakl_decathlon")
+        // But since we use lowerKey as map key, "Decathlon pl" and "decathlon pl" will be deduplicated.
         if (!mpMap.has(key)) {
           mpMap.set(key, { value: log.marketplace, label: getMarketplaceDisplayName(log.marketplace) });
         }
       }
     });
     
-    return Array.from(mpMap.values());
+    return Array.from(mpMap.values()).sort((a, b) => a.label.localeCompare(b.label));
   }, [activeMarketplaces, initialLogs]);
 
   const [logs, setLogs] = useState<ReturnLog[]>(

@@ -46,20 +46,22 @@ export default async function ReturnsPage() {
       .where(eq(marketplaceIntegrations.companyId, auth.activeCompanyId))
   ])
 
-  const activeMarketplaces = integrations.map(i => {
-    if (i.type === 'mirakl_custom') {
-      return { id: 'mirakl_custom', name: (i.metadata as any)?.customName || 'Mirakl' };
-    }
-    const name = i.type === 'aboutyou' ? 'About You' :
-                 i.type === 'mirakl_decathlon' || i.type === 'mirakl_decathlon_eu' ? 'Decathlon' :
-                 i.type === 'mirakl_mediamarkt' ? 'MediaMarkt' :
-                 i.type === 'shopify' ? 'Shopify' :
-                 i.type === 'woocommerce' ? 'WooCommerce' :
-                 i.type === 'shopware' ? 'Shopware' :
-                 i.type === 'ebay' ? 'eBay' :
-                 i.type.charAt(0).toUpperCase() + i.type.slice(1);
-    return { id: i.type, name };
-  });
+  const activeMarketplaces = integrations
+    .filter(i => i.type !== 'hermes' && i.type !== 'dhl')
+    .map(i => {
+      if (i.type === 'mirakl_custom') {
+        return { id: 'mirakl_custom', name: (i.metadata as any)?.customName || 'Mirakl' };
+      }
+      const name = i.type === 'aboutyou' ? 'About You' :
+                   i.type === 'mirakl_decathlon' || i.type === 'mirakl_decathlon_eu' ? 'Decathlon' :
+                   i.type === 'mirakl_mediamarkt' ? 'MediaMarkt' :
+                   i.type === 'shopify' ? 'Shopify' :
+                   i.type === 'woocommerce' ? 'WooCommerce' :
+                   i.type === 'shopware' ? 'Shopware' :
+                   i.type === 'ebay' ? 'eBay' :
+                   i.type.charAt(0).toUpperCase() + i.type.slice(1);
+      return { id: i.type, name };
+    });
 
   return (
     <div className="space-y-8">
