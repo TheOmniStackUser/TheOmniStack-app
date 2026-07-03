@@ -20,10 +20,12 @@ export async function getInvoiceSettingsAction(documentType: 'invoice' | 'quote'
 
   let templates: (typeof invoiceTextTemplates.$inferSelect)[] = []
   try {
-    templates = await db
+    const allTemplates = await db
       .select()
       .from(invoiceTextTemplates)
       .where(eq(invoiceTextTemplates.companyId, companyId))
+    
+    templates = allTemplates.filter(t => !t.name.startsWith('email_'))
   } catch (error) {
     console.error('Database table for templates might be missing', error)
   }
