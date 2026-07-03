@@ -46,10 +46,20 @@ export default async function ReturnsPage() {
       .where(eq(marketplaceIntegrations.companyId, auth.activeCompanyId))
   ])
 
-  const hasKauflandIntegration = integrations.some(i => i.type === 'kaufland' && i.clientId && i.clientSecret)
-  const hasEbayIntegration = integrations.some(i => i.type === 'ebay' && i.clientId && i.clientSecret)
-  const customMiraklIntegration = integrations.find(i => i.type === 'mirakl_custom')
-  const customMiraklName = customMiraklIntegration?.metadata ? (customMiraklIntegration.metadata as any).customName : null
+  const activeMarketplaces = integrations.map(i => {
+    if (i.type === 'mirakl_custom') {
+      return { id: 'mirakl_custom', name: (i.metadata as any)?.customName || 'Mirakl' };
+    }
+    const name = i.type === 'aboutyou' ? 'About You' :
+                 i.type === 'mirakl_decathlon' || i.type === 'mirakl_decathlon_eu' ? 'Decathlon' :
+                 i.type === 'mirakl_mediamarkt' ? 'MediaMarkt' :
+                 i.type === 'shopify' ? 'Shopify' :
+                 i.type === 'woocommerce' ? 'WooCommerce' :
+                 i.type === 'shopware' ? 'Shopware' :
+                 i.type === 'ebay' ? 'eBay' :
+                 i.type.charAt(0).toUpperCase() + i.type.slice(1);
+    return { id: i.type, name };
+  });
 
   return (
     <div className="space-y-8">
@@ -60,9 +70,7 @@ export default async function ReturnsPage() {
 
       <ReturnsList 
         initialLogs={logs} 
-        hasKauflandIntegration={hasKauflandIntegration}
-        hasEbayIntegration={hasEbayIntegration}
-        customMiraklName={customMiraklName}
+        activeMarketplaces={activeMarketplaces}
       />
     </div>
   )

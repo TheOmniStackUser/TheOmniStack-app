@@ -38,17 +38,53 @@ interface ReturnLog {
 
 interface ReturnsListProps {
   initialLogs: any[]
-  hasKauflandIntegration?: boolean
-  hasEbayIntegration?: boolean
-  customMiraklName?: string | null
+  activeMarketplaces?: { id: string; name: string }[]
 }
 
 export function ReturnsList({ 
   initialLogs,
-  hasKauflandIntegration = false,
-  hasEbayIntegration = false,
-  customMiraklName,
+  activeMarketplaces = [],
 }: ReturnsListProps) {
+  const getMarketplaceDisplayName = (mpKey: string | null) => {
+    if (!mpKey) return 'Direkt / Unbekannt';
+    const lowerKey = mpKey.toLowerCase();
+    
+    const found = activeMarketplaces.find(m => m.id.toLowerCase() === lowerKey);
+    if (found) return found.name;
+
+    if (lowerKey === 'aboutyou') return 'About You';
+    if (lowerKey === 'shopify') return 'Shopify';
+    if (lowerKey === 'woocommerce') return 'WooCommerce';
+    if (lowerKey === 'shopware') return 'Shopware';
+    if (lowerKey === 'mirakl_mediamarkt') return 'MediaMarkt';
+    if (lowerKey === 'mirakl_decathlon' || lowerKey === 'mirakl_decathlon_eu') return 'Decathlon';
+    
+    return mpKey.charAt(0).toUpperCase() + mpKey.slice(1);
+  };
+
+  const marketplaceOptions = React.useMemo(() => {
+    const mpMap = new Map<string, { value: string, label: string }>();
+    
+    mpMap.set('amazon', { value: 'Amazon', label: 'Amazon' });
+    mpMap.set('otto', { value: 'Otto', label: 'Otto' });
+    mpMap.set('zalando', { value: 'Zalando', label: 'Zalando' });
+    
+    activeMarketplaces.forEach(mp => {
+      mpMap.set(mp.id.toLowerCase(), { value: mp.id, label: mp.name });
+    });
+    
+    initialLogs.forEach(log => {
+      if (log.marketplace) {
+        const key = log.marketplace.toLowerCase();
+        if (!mpMap.has(key)) {
+          mpMap.set(key, { value: log.marketplace, label: getMarketplaceDisplayName(log.marketplace) });
+        }
+      }
+    });
+    
+    return Array.from(mpMap.values());
+  }, [activeMarketplaces, initialLogs]);
+
   const [logs, setLogs] = useState<ReturnLog[]>(
     initialLogs.map((l) => {
       let displayOrderNumber = l.orderNumber
@@ -255,8 +291,7 @@ export function ReturnsList({
     const matchesMarketplace =
       marketplaceFilter === 'all' ||
       (marketplaceFilter === 'direct' && !log.marketplace) ||
-      (log.marketplace?.toLowerCase() === marketplaceFilter.toLowerCase()) ||
-      (marketplaceFilter === 'Mirakl' && (log.marketplace?.toLowerCase().startsWith('mirakl') || log.marketplace?.toLowerCase() === 'mirakl_custom'))
+      (log.marketplace?.toLowerCase() === marketplaceFilter.toLowerCase())
 
     return matchesSearch && matchesStatus && matchesMarketplace
   })
@@ -275,8 +310,8 @@ export function ReturnsList({
       aValue = aValue ? new Date(aValue).getTime() : 0;
       bValue = bValue ? new Date(bValue).getTime() : 0;
     } else if (sortConfig.key === 'marketplace') {
-      aValue = aValue === 'Mirakl_custom' && customMiraklName ? customMiraklName : (aValue || '');
-      bValue = bValue === 'Mirakl_custom' && customMiraklName ? customMiraklName : (bValue || '');
+      aValue = getMarketplaceDisplayName(aValue);
+      bValue = getMarketplaceDisplayName(bValue);
     } else {
       aValue = aValue || '';
       bValue = bValue || '';
@@ -398,7 +433,8 @@ export function ReturnsList({
     setEditCustomerName(log.customerName || '')
     setEditShippingAddress(log.shippingAddress || '')
     setEditStatus(log.status || 'neu')
-    setEditMarketplace(log.marketplace || '')
+    const foundOption = log.marketplace ? marketplaceOptions.find(opt => opt.value.toLowerCase() === log.marketplace!.toLowerCase()) : null;
+    setEditMarketplace(foundOption ? foundOption.value : (log.marketplace || ''))
     setEditNotes(log.notes || '')
     setEditItems(log.items.map((i) => ({ ...i })))
     
@@ -530,12 +566,9 @@ export function ReturnsList({
           >
             <option value="all">Alle Kanäle</option>
             <option value="direct">Direkt / Kein Marktplatz</option>
-            <option value="Amazon">Amazon</option>
-            <option value="Otto">Otto</option>
-            <option value="Zalando">Zalando</option>
-            {hasKauflandIntegration && <option value="Kaufland">Kaufland</option>}
-            {hasEbayIntegration && <option value="eBay">eBay</option>}
-            <option value="Mirakl">{customMiraklName || 'Mirakl'}</option>
+            {marketplaceOptions.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
           </select>
 
           {/* Status Filters */}
@@ -771,7 +804,7 @@ export function ReturnsList({
                           ? 'bg-blue-50 text-blue-800 border-blue-200'
                           : 'bg-indigo-50 text-indigo-800 border-indigo-200'
                       }`}>
-                        {log.marketplace === 'Mirakl_custom' && customMiraklName ? customMiraklName : log.marketplace}
+                        {getMarketplaceDisplayName(log.marketplace)}
                       </span>
                     ) : (
                       <span className="text-xs text-slate-400 italic">Direkt / Unbekannt</span>
@@ -1226,12 +1259,9 @@ export function ReturnsList({
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-semibold text-slate-900 bg-white"
                   >
                     <option value="">Direkt / Unbekannt</option>
-                    <option value="Amazon">Amazon</option>
-                    <option value="Otto">Otto</option>
-                    <option value="Zalando">Zalando</option>
-                    {hasKauflandIntegration && <option value="Kaufland">Kaufland</option>}
-                    {hasEbayIntegration && <option value="eBay">eBay</option>}
-                    <option value="Mirakl">Mirakl</option>
+                    {marketplaceOptions.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
                   </select>
                 </div>
 
