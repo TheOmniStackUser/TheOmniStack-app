@@ -79,12 +79,13 @@ export function ReturnsList({
     
     initialLogs.forEach(log => {
       if (log.marketplace) {
-        const key = log.marketplace.toLowerCase();
+        const rawKey = log.marketplace.toLowerCase();
+        const key = rawKey.replace(/\s+/g, '');
         // Skip shipping providers that might have been mistakenly tracked as marketplaces
         if (key === 'dhl' || key === 'hermes' || key === 'dpd' || key === 'gls' || key === 'ups') return;
         
         // Deduplicate by normalizing names that are essentially the same (like "decathlon pl" vs "mirakl_decathlon")
-        // But since we use lowerKey as map key, "Decathlon pl" and "decathlon pl" will be deduplicated.
+        // We use space-stripped lowerKey to match things like 'About You' and 'aboutyou'
         if (!mpMap.has(key)) {
           mpMap.set(key, { value: log.marketplace, label: getMarketplaceDisplayName(log.marketplace) });
         }
@@ -297,10 +298,26 @@ export function ReturnsList({
     
     const matchesStatus = statusFilter === 'all' || log.status === statusFilter
     
-    const matchesMarketplace =
-      marketplaceFilter === 'all' ||
-      (marketplaceFilter === 'direct' && !log.marketplace) ||
-      (log.marketplace?.toLowerCase() === marketplaceFilter.toLowerCase())
+    let matchesMarketplace = false;
+    if (marketplaceFilter === 'all') {
+      matchesMarketplace = true;
+    } else if (marketplaceFilter === 'direct' && !log.marketplace) {
+      matchesMarketplace = true;
+    } else if (marketplaceFilter.startsWith('group_')) {
+      const label = getMarketplaceDisplayName(log.marketplace);
+      const directNames = ['Amazon', 'Otto', 'Zalando', 'Kaufland', 'eBay', 'About You', 'Shopify', 'WooCommerce', 'Shopware'];
+      if (marketplaceFilter === 'group_direct') {
+        matchesMarketplace = directNames.includes(label);
+      } else if (marketplaceFilter === 'group_decathlon') {
+        matchesMarketplace = label.startsWith('Decathlon');
+      } else if (marketplaceFilter === 'group_secret_sales') {
+        matchesMarketplace = label.startsWith('Secret Sales');
+      } else if (marketplaceFilter === 'group_other') {
+        matchesMarketplace = !directNames.includes(label) && !label.startsWith('Decathlon') && !label.startsWith('Secret Sales');
+      }
+    } else {
+      matchesMarketplace = log.marketplace?.toLowerCase() === marketplaceFilter.toLowerCase();
+    }
 
     return matchesSearch && matchesStatus && matchesMarketplace
   })
@@ -600,25 +617,25 @@ export function ReturnsList({
                 <>
                   {direct.length > 0 && (
                     <>
-                      <option value="group_direct" className="font-semibold bg-gray-50" disabled>Direkte Integrationen</option>
+                      <option value="group_direct" className="font-semibold bg-gray-50">Direkte Integrationen</option>
                       {direct.map(opt => <option key={opt.value} value={opt.value}>&nbsp;&nbsp;{opt.label}</option>)}
                     </>
                   )}
                   {decathlon.length > 0 && (
                     <>
-                      <option value="group_decathlon" className="font-semibold bg-gray-50" disabled>Decathlon Marktplätze</option>
+                      <option value="group_decathlon" className="font-semibold bg-gray-50">Decathlon Marktplätze</option>
                       {decathlon.map(opt => <option key={opt.value} value={opt.value}>&nbsp;&nbsp;{opt.label}</option>)}
                     </>
                   )}
                   {secretSales.length > 0 && (
                     <>
-                      <option value="group_secret_sales" className="font-semibold bg-gray-50" disabled>Secret Sales Marktplätze</option>
+                      <option value="group_secret_sales" className="font-semibold bg-gray-50">Secret Sales Marktplätze</option>
                       {secretSales.map(opt => <option key={opt.value} value={opt.value}>&nbsp;&nbsp;{opt.label}</option>)}
                     </>
                   )}
                   {other.length > 0 && (
                     <>
-                      <option value="group_other" className="font-semibold bg-gray-50" disabled>Weitere Marktplätze</option>
+                      <option value="group_other" className="font-semibold bg-gray-50">Weitere Marktplätze</option>
                       {other.map(opt => <option key={opt.value} value={opt.value}>&nbsp;&nbsp;{opt.label}</option>)}
                     </>
                   )}
