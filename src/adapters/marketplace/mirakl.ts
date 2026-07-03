@@ -1140,8 +1140,27 @@ export class MiraklAdapter implements MarketplaceAdapter {
             currency_iso_code: miraklOrder.currency_iso_code || 'EUR'
           }
 
+          if (line.taxes && line.taxes.length > 0) {
+            refundPayload.taxes = line.taxes.map((t: any) => {
+              const taxAmount = t.amount !== undefined ? t.amount : (t.rate ? (priceUnit - (priceUnit / (1 + (t.rate / 100)))) * line.quantity : 0)
+              return {
+                amount: parseFloat(((taxAmount / line.quantity) * qtyToRefund).toFixed(2)),
+                code: t.code || 'VAT'
+              }
+            })
+          }
+
           if (shippingAmountToRefund > 0) {
             refundPayload.shipping_amount = parseFloat(shippingAmountToRefund.toFixed(2))
+            
+            const shippingTaxes = line.shipping_taxes || miraklOrder.shipping_taxes || []
+            if (shippingTaxes.length > 0) {
+              refundPayload.shipping_taxes = shippingTaxes.map((st: any) => ({
+                amount: parseFloat(st.amount.toFixed(2)),
+                code: st.code || 'VAT'
+              }))
+            }
+            
             shippingAmountToRefund = 0 // Only attach to the first line
           }
 
@@ -1377,7 +1396,7 @@ export class MiraklAdapter implements MarketplaceAdapter {
       }
 
       const baseUrl = this.config.baseUrl.replace(/\/$/, '')
-      let url = `${baseUrl}/api/offers?max=100`
+      let url = `${baseUrl}/api/offers?max=100&locale=de_DE`
       if (this.config.shopId) {
         url += `&shop_id=${this.config.shopId}`
       }
