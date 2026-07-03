@@ -575,9 +575,56 @@ export function ReturnsList({
           >
             <option value="all">Alle Kanäle</option>
             <option value="direct">Direkt / Kein Marktplatz</option>
-            {marketplaceOptions.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
+            
+            {(() => {
+              const direct: {value: string, label: string}[] = [];
+              const decathlon: {value: string, label: string}[] = [];
+              const secretSales: {value: string, label: string}[] = [];
+              const other: {value: string, label: string}[] = [];
+              
+              const directNames = ['Amazon', 'Otto', 'Zalando', 'Kaufland', 'eBay', 'About You', 'Shopify', 'WooCommerce', 'Shopware'];
+              
+              marketplaceOptions.forEach(opt => {
+                if (directNames.includes(opt.label)) {
+                  direct.push(opt);
+                } else if (opt.label.startsWith('Decathlon')) {
+                  decathlon.push(opt);
+                } else if (opt.label.startsWith('Secret Sales')) {
+                  secretSales.push(opt);
+                } else {
+                  other.push(opt);
+                }
+              });
+
+              return (
+                <>
+                  {direct.length > 0 && (
+                    <>
+                      <option value="group_direct" className="font-semibold bg-gray-50" disabled>Direkte Integrationen</option>
+                      {direct.map(opt => <option key={opt.value} value={opt.value}>&nbsp;&nbsp;{opt.label}</option>)}
+                    </>
+                  )}
+                  {decathlon.length > 0 && (
+                    <>
+                      <option value="group_decathlon" className="font-semibold bg-gray-50" disabled>Decathlon Marktplätze</option>
+                      {decathlon.map(opt => <option key={opt.value} value={opt.value}>&nbsp;&nbsp;{opt.label}</option>)}
+                    </>
+                  )}
+                  {secretSales.length > 0 && (
+                    <>
+                      <option value="group_secret_sales" className="font-semibold bg-gray-50" disabled>Secret Sales Marktplätze</option>
+                      {secretSales.map(opt => <option key={opt.value} value={opt.value}>&nbsp;&nbsp;{opt.label}</option>)}
+                    </>
+                  )}
+                  {other.length > 0 && (
+                    <>
+                      <option value="group_other" className="font-semibold bg-gray-50" disabled>Weitere Marktplätze</option>
+                      {other.map(opt => <option key={opt.value} value={opt.value}>&nbsp;&nbsp;{opt.label}</option>)}
+                    </>
+                  )}
+                </>
+              );
+            })()}
           </select>
 
           {/* Status Filters */}
@@ -1268,9 +1315,55 @@ export function ReturnsList({
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-semibold text-slate-900 bg-white"
                   >
                     <option value="">Direkt / Unbekannt</option>
-                    {marketplaceOptions.map(opt => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
+                    {(() => {
+                      const direct: {value: string, label: string}[] = [];
+                      const decathlon: {value: string, label: string}[] = [];
+                      const secretSales: {value: string, label: string}[] = [];
+                      const other: {value: string, label: string}[] = [];
+                      
+                      const directNames = ['Amazon', 'Otto', 'Zalando', 'Kaufland', 'eBay', 'About You', 'Shopify', 'WooCommerce', 'Shopware'];
+                      
+                      marketplaceOptions.forEach(opt => {
+                        if (directNames.includes(opt.label)) {
+                          direct.push(opt);
+                        } else if (opt.label.startsWith('Decathlon')) {
+                          decathlon.push(opt);
+                        } else if (opt.label.startsWith('Secret Sales')) {
+                          secretSales.push(opt);
+                        } else {
+                          other.push(opt);
+                        }
+                      });
+
+                      return (
+                        <>
+                          {direct.length > 0 && (
+                            <>
+                              <option value="group_direct" className="font-semibold bg-gray-50" disabled>Direkte Integrationen</option>
+                              {direct.map(opt => <option key={opt.value} value={opt.value}>&nbsp;&nbsp;{opt.label}</option>)}
+                            </>
+                          )}
+                          {decathlon.length > 0 && (
+                            <>
+                              <option value="group_decathlon" className="font-semibold bg-gray-50" disabled>Decathlon Marktplätze</option>
+                              {decathlon.map(opt => <option key={opt.value} value={opt.value}>&nbsp;&nbsp;{opt.label}</option>)}
+                            </>
+                          )}
+                          {secretSales.length > 0 && (
+                            <>
+                              <option value="group_secret_sales" className="font-semibold bg-gray-50" disabled>Secret Sales Marktplätze</option>
+                              {secretSales.map(opt => <option key={opt.value} value={opt.value}>&nbsp;&nbsp;{opt.label}</option>)}
+                            </>
+                          )}
+                          {other.length > 0 && (
+                            <>
+                              <option value="group_other" className="font-semibold bg-gray-50" disabled>Weitere Marktplätze</option>
+                              {other.map(opt => <option key={opt.value} value={opt.value}>&nbsp;&nbsp;{opt.label}</option>)}
+                            </>
+                          )}
+                        </>
+                      );
+                    })()}
                   </select>
                 </div>
 
