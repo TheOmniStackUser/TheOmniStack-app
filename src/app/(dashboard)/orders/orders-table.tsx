@@ -21,8 +21,8 @@ type SearchSuggestion = {
 }
 
 const getOrderNumber = (order: OrderWithItems) => {
-  const source = order as OrderWithItems & { rawPayload?: { orderNumber?: unknown } | null }
-  return String(source.rawPayload?.orderNumber || order.marketplaceOrderId || '')
+  const source = order as OrderWithItems & { rawPayload?: { orderNumber?: unknown, name?: unknown } | null }
+  return String(source.rawPayload?.name || source.rawPayload?.orderNumber || order.marketplaceOrderId || '')
 }
 
 const getOrderBuyerName = (order: OrderWithItems) => {
@@ -1098,10 +1098,8 @@ export function OrdersTable({
         valB = (b.status === 'later_shipment' ? 'Späterer Versand' : (b.status || '')).toLowerCase()
         break
       case 'orderNumber': {
-        // @ts-ignore
-        const numA = String(a.rawPayload?.orderNumber || a.marketplaceOrderId)
-        // @ts-ignore
-        const numB = String(b.rawPayload?.orderNumber || b.marketplaceOrderId)
+        const numA = getOrderNumber(a as any)
+        const numB = getOrderNumber(b as any)
         valA = numA
         valB = numB
         break
@@ -2274,8 +2272,7 @@ export function OrdersTable({
                 const isSelected = selectedIds.has(order.id)
                 const isExpanded = expandedIds.has(order.id)
                 
-                // @ts-ignore - JSON field
-                const orderNumber = order.rawPayload?.orderNumber || order.marketplaceOrderId
+                const orderNumber = getOrderNumber(order as any)
 
                 const formatCustomerName = (name: string) => {
                   if (name.length <= 20) return name;
@@ -2316,7 +2313,12 @@ export function OrdersTable({
                         </span>
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {orderNumber}
+                        <div className="flex flex-col">
+                          <span>{orderNumber}</span>
+                          {orderNumber !== order.marketplaceOrderId && (
+                            <span className="text-xs text-slate-500 font-normal mt-0.5">System-ID: {order.marketplaceOrderId}</span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-3 py-4 text-sm text-gray-500">
                         <div style={{ whiteSpace: 'pre-line' }}>
@@ -3273,7 +3275,7 @@ export function OrdersTable({
             
             <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar">
               {orders.filter(o => o.id in hermesSelections).map((order) => {
-                const orderNum = (order.rawPayload as any)?.orderNumber || order.marketplaceOrderId
+                const orderNum = getOrderNumber(order as any)
                 const currentSize = hermesSelections[order.id] || 'S'
                 const skus = order.items?.map(item => item.sku).filter(Boolean) || []
                 
@@ -3597,7 +3599,7 @@ export function OrdersTable({
             
             <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar">
               {orders.filter(o => o.id in dhlSelections).map((order) => {
-                const orderNum = (order.rawPayload as any)?.orderNumber || order.marketplaceOrderId
+                const orderNum = getOrderNumber(order as any)
                 const selection = dhlSelections[order.id] || { productCode: getDefaultDhlProductCode(order.shippingCountry, dhlConfig), weight: 1 }
                 const skus = order.items?.map(item => item.sku).filter(Boolean) || []
                 
@@ -3701,7 +3703,7 @@ export function OrdersTable({
                 Versand bestätigen
               </h3>
               <p className="text-slate-500 text-sm mt-1">
-                Markiere Bestellung <strong className="text-slate-800 font-bold">{(showManualShipModal.rawPayload as any)?.orderNumber || showManualShipModal.marketplaceOrderId}</strong> manuell als versendet.
+                Markiere Bestellung <strong className="text-slate-800 font-bold">{getOrderNumber(showManualShipModal as any)}</strong> manuell als versendet.
               </p>
             </div>
             
