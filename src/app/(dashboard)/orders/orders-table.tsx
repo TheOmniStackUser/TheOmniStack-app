@@ -21,8 +21,17 @@ type SearchSuggestion = {
 }
 
 const getOrderNumber = (order: OrderWithItems) => {
-  const source = order as OrderWithItems & { rawPayload?: { orderNumber?: unknown, name?: unknown } | null }
-  return String(source.rawPayload?.name || source.rawPayload?.orderNumber || order.marketplaceOrderId || '')
+  const source = order as OrderWithItems & { rawPayload?: { orderNumber?: unknown, name?: unknown } | string | null }
+  let payload = source.rawPayload
+  if (typeof payload === 'string') {
+    try {
+      payload = JSON.parse(payload)
+    } catch (e) {
+      // ignore
+    }
+  }
+  const parsedPayload = payload as { orderNumber?: unknown, name?: unknown } | null
+  return String(parsedPayload?.name || parsedPayload?.orderNumber || order.marketplaceOrderId || '')
 }
 
 const getOrderBuyerName = (order: OrderWithItems) => {
