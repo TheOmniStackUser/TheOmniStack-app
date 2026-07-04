@@ -1406,10 +1406,18 @@ export class MiraklAdapter implements MarketplaceAdapter {
       let allOffers: any[] = []
       let offset = 0
       let hasMore = true
+      let retryCount = 0
 
       while (hasMore) {
         const pagedUrl = `${url}&offset=${offset}`
         const response = await fetch(pagedUrl, { method: 'GET', headers })
+
+        if (response.status === 429 && retryCount < 3) {
+          console.warn(`[MiraklAdapter:${this.marketplace}] Rate limited (429). Retrying after 2s...`)
+          await new Promise(resolve => setTimeout(resolve, 2000))
+          retryCount++
+          continue
+        }
 
         if (!response.ok) {
           const errText = await response.text()
@@ -1425,6 +1433,9 @@ export class MiraklAdapter implements MarketplaceAdapter {
           hasMore = false
         } else {
           offset += 100
+          retryCount = 0 // Reset retry count for next page
+          // Small delay to prevent rapid-fire requests
+          await new Promise(resolve => setTimeout(resolve, 500))
         }
       }
 
