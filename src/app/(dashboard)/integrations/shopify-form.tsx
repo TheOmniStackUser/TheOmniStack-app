@@ -24,7 +24,7 @@ export function ShopifyIntegrationForm({ initialData }: { initialData?: any }) {
 
     setIsLoading(true)
     // Redirect to our install API route
-    window.location.href = `/api/auth/shopify/install?shop=${encodeURIComponent(cleanDomain)}`
+    window.location.href = `/api/auth/shopify/install?shop=${encodeURIComponent(cleanDomain)}&t=${Date.now()}`
   }
 
   const [isDisconnectModalOpen, setIsDisconnectModalOpen] = useState(false)
