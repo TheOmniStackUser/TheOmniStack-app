@@ -1396,7 +1396,7 @@ export class MiraklAdapter implements MarketplaceAdapter {
       }
 
       const baseUrl = this.config.baseUrl.replace(/\/$/, '')
-      let url = `${baseUrl}/api/offers?max=100&locale=de_DE`
+      let url = `${baseUrl}/api/offers?max=100`
       if (this.config.shopId) {
         url += `&shop_id=${this.config.shopId}`
       }
