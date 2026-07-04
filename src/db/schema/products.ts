@@ -14,6 +14,7 @@ import {
 import { relations } from 'drizzle-orm'
 import { companies } from './companies'
 import { marketplaceEnum } from './orders'
+import { marketplaceIntegrations } from './integrations'
 
 export const priceModifierTypeEnum = pgEnum('price_modifier_type', [
   'none',
@@ -70,6 +71,7 @@ export const productMappings = pgTable('product_mappings', {
     .references(() => companies.id, { onDelete: 'cascade' }),
   
   marketplace: marketplaceEnum('marketplace').notNull(),
+  integrationId: uuid('integration_id').references(() => marketplaceIntegrations.id, { onDelete: 'cascade' }),
   marketplaceSku: text('marketplace_sku').notNull(),
   marketplaceProductId: text('marketplace_product_id'), // Some marketplaces have an internal ID (e.g. Shopify Item ID)
   ean: text('ean'),
@@ -85,7 +87,7 @@ export const productMappings = pgTable('product_mappings', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({
   // A specific listing on a marketplace should only be mapped once per company
-  unqMarketplaceListing: unique('unq_company_marketplace_listing').on(t.companyId, t.marketplace, t.marketplaceSku),
+  unqMarketplaceListing: unique('unq_company_marketplace_listing').on(t.companyId, t.integrationId, t.marketplaceSku),
   productMappingIdx: index('product_mappings_product_idx').on(t.productId),
 }))
 
@@ -112,6 +114,7 @@ export const unmappedMarketplaceProducts = pgTable('unmapped_marketplace_product
     .references(() => companies.id, { onDelete: 'cascade' }),
   
   marketplace: marketplaceEnum('marketplace').notNull(),
+  integrationId: uuid('integration_id').references(() => marketplaceIntegrations.id, { onDelete: 'cascade' }),
   marketplaceSku: text('marketplace_sku').notNull(),
   marketplaceProductId: text('marketplace_product_id'),
   
@@ -124,7 +127,7 @@ export const unmappedMarketplaceProducts = pgTable('unmapped_marketplace_product
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({
-  unqUnmappedListing: unique('unq_company_marketplace_unmapped_sku').on(t.companyId, t.marketplace, t.marketplaceSku),
+  unqUnmappedListing: unique('unq_company_marketplace_unmapped_sku').on(t.companyId, t.integrationId, t.marketplaceSku),
   companyUnmappedIdx: index('unmapped_company_idx').on(t.companyId),
 }))
 

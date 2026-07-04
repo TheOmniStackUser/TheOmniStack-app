@@ -58,7 +58,7 @@ export async function syncProductsForCompany(companyId: string, integrationId?: 
       await updateSyncStatus(integration.id, { isRunning: true, status: 'processing', message: `Bereite ${totalCount} Produkte vor...`, progress: 0, total: totalCount })
 
       // Bulk Load existing data
-      const existingMappings = await db.select().from(productMappings).where(and(eq(productMappings.companyId, companyId), eq(productMappings.marketplace, integration.type as any)))
+      const existingMappings = await db.select().from(productMappings).where(and(eq(productMappings.companyId, companyId), eq(productMappings.integrationId, integration.id)))
       const existingProducts = await db.select().from(products).where(eq(products.companyId, companyId))
 
       const mappedSkus = new Set(existingMappings.map(m => m.marketplaceSku))
@@ -74,6 +74,7 @@ export async function syncProductsForCompany(companyId: string, integrationId?: 
           toUpsertUnmapped.push({
             companyId,
             marketplace: integration.type as any,
+            integrationId: integration.id,
             marketplaceSku: String(mpProduct.sku),
             marketplaceProductId: String(mpProduct.marketplaceProductId),
             title: mpProduct.title,
@@ -112,7 +113,7 @@ export async function syncProductsForCompany(companyId: string, integrationId?: 
           await db.insert(unmappedMarketplaceProducts).values(chunk).onConflictDoUpdate({
             target: [
               unmappedMarketplaceProducts.companyId,
-              unmappedMarketplaceProducts.marketplace,
+              unmappedMarketplaceProducts.integrationId,
               unmappedMarketplaceProducts.marketplaceSku
             ],
             set: {
@@ -174,8 +175,8 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
       )
     )
 
-  // Group mappings by marketplace
-  const updatesByMarketplace: Record<string, { sku: string, marketplaceProductId?: string, stock?: number, price?: number }[]> = {}
+  // Group mappings by integrationId
+  const updatesByIntegration: Record<string, { sku: string, marketplaceProductId?: string, stock?: number, price?: number }[]> = {}
 
   for (const mapping of mappings) {
     const centralProduct = centralProducts.find(p => p.id === mapping.productId)
@@ -184,8 +185,11 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
     const updateDef = updates.find(u => u.sku === centralProduct.sku)
     if (!updateDef) continue
 
-    if (!updatesByMarketplace[mapping.marketplace]) {
-      updatesByMarketplace[mapping.marketplace] = []
+    const intId = mapping.integrationId
+    if (!intId) continue // skip if mapping has no integrationId
+
+    if (!updatesByIntegration[intId]) {
+      updatesByIntegration[intId] = []
     }
 
     const mUpdate: any = {
@@ -210,7 +214,7 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
     }
 
     if (mUpdate.stock !== undefined || mUpdate.price !== undefined) {
-      updatesByMarketplace[mapping.marketplace].push(mUpdate)
+      updatesByIntegration[intId].push(mUpdate)
     }
   }
 
@@ -229,10 +233,11 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
   const activeMarketplaces: string[] = []
   const failedMarketplaces: { name: string, error: string }[] = []
 
-  for (const [marketplace, mpUpdates] of Object.entries(updatesByMarketplace)) {
-    const integration = activeIntegrations.find(i => i.type === marketplace)
+  for (const [integrationId, mpUpdates] of Object.entries(updatesByIntegration)) {
+    const integration = activeIntegrations.find(i => i.id === integrationId)
     if (!integration) continue
 
+    const marketplace = integration.type
     const adapter = getAdapterForIntegration(integration)
     if (!adapter || !adapter.updateListings) continue
 

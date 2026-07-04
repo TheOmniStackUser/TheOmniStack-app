@@ -335,6 +335,7 @@ export async function bulkCreateProductsFromUnmapped(unmappedProductIds: string[
             companyId: auth.activeCompanyId,
             productId,
             marketplace: unmapped.marketplace,
+            integrationId: unmapped.integrationId,
             marketplaceSku: unmapped.marketplaceSku,
             marketplaceProductId: unmapped.marketplaceProductId,
             syncStock: unmapped.stock !== null && unmapped.stock !== undefined,
@@ -580,6 +581,7 @@ export async function mapUnmappedProductToExisting(unmappedProductId: string, pr
     companyId: auth.activeCompanyId,
     productId: central.id,
     marketplace: unmapped.marketplace,
+    integrationId: unmapped.integrationId,
     marketplaceSku: unmapped.marketplaceSku,
     marketplaceProductId: unmapped.marketplaceProductId,
     syncStock: unmapped.stock !== null && unmapped.stock !== undefined,
@@ -625,8 +627,17 @@ export async function mapUnmappedProductToExisting(unmappedProductId: string, pr
   return { success: true }
 }
 
-export async function addManualMapping(productId: string, marketplace: string, sku: string, ean: string) {
+export async function addManualMapping(productId: string, integrationId: string, sku: string, ean: string) {
   const auth = await requireAuth()
+  
+  const [integration] = await db.select().from(marketplaceIntegrations).where(
+    and(
+      eq(marketplaceIntegrations.id, integrationId),
+      eq(marketplaceIntegrations.companyId, auth.activeCompanyId)
+    )
+  ).limit(1)
+
+  if (!integration) throw new Error('Integration nicht gefunden.')
   
   let finalEan = ean || null
   if (!finalEan) {
@@ -639,7 +650,8 @@ export async function addManualMapping(productId: string, marketplace: string, s
   await db.insert(productMappings).values({
     companyId: auth.activeCompanyId,
     productId,
-    marketplace: marketplace as any,
+    marketplace: integration.type as any,
+    integrationId: integration.id,
     marketplaceSku: sku,
     ean: finalEan,
     syncStock: true,

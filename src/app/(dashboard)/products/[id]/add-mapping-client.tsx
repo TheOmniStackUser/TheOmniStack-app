@@ -10,7 +10,7 @@ export function AddMappingClient({ productId, activeIntegrations }: { productId:
   const [isSubmitting, setIsSubmitting] = useState(false)
   const router = useRouter()
 
-  const [marketplace, setMarketplace] = useState(activeIntegrations[0]?.type || 'shopify')
+  const [integrationId, setIntegrationId] = useState(activeIntegrations[0]?.id || '')
   const [sku, setSku] = useState('')
   const [ean, setEan] = useState('')
 
@@ -19,7 +19,7 @@ export function AddMappingClient({ productId, activeIntegrations }: { productId:
     if (!sku.trim()) return
     setIsSubmitting(true)
     try {
-      await addManualMapping(productId, marketplace, sku, ean)
+      await addManualMapping(productId, integrationId, sku, ean)
       setIsOpen(false)
       setSku('')
       setEan('')
@@ -58,12 +58,12 @@ export function AddMappingClient({ productId, activeIntegrations }: { productId:
         <div className="space-y-1.5">
           <label className="text-xs font-semibold text-slate-700">Marktplatz</label>
           <select 
-            value={marketplace}
-            onChange={e => setMarketplace(e.target.value)}
+            value={integrationId}
+            onChange={e => setIntegrationId(e.target.value)}
             className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 text-slate-900"
           >
             {activeIntegrations.map(int => (
-              <option key={int.id} value={int.type}>
+              <option key={int.id} value={int.id}>
                 {int.type === 'mirakl_custom' && int.metadata?.customName ? int.metadata.customName : int.type}
               </option>
             ))}

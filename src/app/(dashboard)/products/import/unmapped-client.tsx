@@ -198,10 +198,12 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
     setAlertState({ isOpen: true, message, title })
   }
 
-  const getMarketplaceDisplayName = (type: string) => {
-    const integration = marketplaces.find(m => m.type === type)
-    if (integration && (integration.metadata as any)?.customName) {
-      return (integration.metadata as any).customName
+  const getMarketplaceDisplayName = (type: string, integrationId?: string) => {
+    if (integrationId) {
+      const integration = marketplaces.find(m => m.id === integrationId)
+      if (integration?.metadata?.customName) {
+        return integration.metadata.customName
+      }
     }
     const displayMap: Record<string, string> = {
       mirakl_decathlon: 'Decathlon',
@@ -222,10 +224,17 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
 
   // Get unique marketplaces for the filter dropdown
   const uniqueMarketplaces = useMemo(() => {
-    const types = new Set(localProducts.map(p => p.marketplace))
-    return Array.from(types).map(type => ({
-      type,
-      name: getMarketplaceDisplayName(type)
+    const integrationsMap = new Map<string, { type: string, id: string | null }>()
+    for (const p of localProducts) {
+      const key = (p as any).integrationId || p.marketplace
+      if (!integrationsMap.has(key)) {
+        integrationsMap.set(key, { type: p.marketplace, id: (p as any).integrationId || null })
+      }
+    }
+    return Array.from(integrationsMap.values()).map(int => ({
+      id: int.id || int.type,
+      type: int.type,
+      name: getMarketplaceDisplayName(int.type, int.id || undefined)
     }))
   }, [localProducts, marketplaces])
 
@@ -239,7 +248,15 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
   const filteredProducts = useMemo(() => {
     return enrichedProducts.filter(p => {
       // Filter by marketplace
-      if (marketplaceFilter !== 'all' && p.marketplace !== marketplaceFilter) return false
+      if (marketplaceFilter !== 'all') {
+        const pId = (p as any).integrationId
+        const pType = p.marketplace
+        if (pId) {
+          if (pId !== marketplaceFilter) return false
+        } else {
+          if (pType !== marketplaceFilter) return false
+        }
+      }
       
       // Filter by search (title, sku, or ean)
       if (deferredSearch) {
@@ -420,7 +437,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
       headers.join(';'),
       ...filteredProducts.map(p => {
         const title = p.title ? `"${p.title.replace(/"/g, '""')}"` : '""'
-        return `${getMarketplaceDisplayName(p.marketplace)};${p.marketplaceSku};${title};${p.price || 0};${p.stock !== null ? p.stock : 'Unbekannt'}`
+        return `${getMarketplaceDisplayName(p.marketplace, (p as any).integrationId)};${p.marketplaceSku};${title};${p.price || 0};${p.stock !== null ? p.stock : 'Unbekannt'}`
       })
     ].join('\n')
 
@@ -566,7 +583,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
             >
               <option value="all">Alle Marktplätze</option>
               {uniqueMarketplaces.map(m => (
-                <option key={m.type} value={m.type}>{m.name}</option>
+                <option key={m.id} value={m.id}>{m.name}</option>
               ))}
             </select>
           </div>
@@ -666,7 +683,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
                   <div>
                     <div className="flex items-center gap-3 mb-2">
                       <span className="px-2.5 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold rounded-md uppercase tracking-wider">
-                        {getMarketplaceDisplayName(p.marketplace)}
+                        {getMarketplaceDisplayName(p.marketplace, (p as any).integrationId)}
                       </span>
                       <span className="font-mono text-sm font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
                         {p.marketplaceSku}
@@ -726,7 +743,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
           <div className="space-y-6 text-sm">
             <div className="flex items-center gap-3">
                <span className="px-2.5 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold rounded-md uppercase tracking-wider">
-                 {getMarketplaceDisplayName(detailsProduct.marketplace)}
+                 {getMarketplaceDisplayName(detailsProduct.marketplace, (detailsProduct as any).integrationId)}
                </span>
                <h2 className="text-xl font-bold text-slate-900">{detailsProduct.title}</h2>
             </div>
@@ -858,7 +875,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
                   <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Zu mappendes Produkt</p>
                   <div className="flex flex-wrap items-center gap-3">
                     <span className="px-2.5 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold rounded-md uppercase tracking-wider">
-                      {getMarketplaceDisplayName(product.marketplace)}
+                      {getMarketplaceDisplayName(product.marketplace, (product as any).integrationId)}
                     </span>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-slate-500 font-semibold uppercase">SKU:</span>
