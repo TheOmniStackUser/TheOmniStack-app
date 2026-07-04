@@ -177,33 +177,31 @@ export class ShopifyAdapter implements MarketplaceAdapter {
        return
     }
 
-    const lineItemsByFulfillmentOrder = openFulfillmentOrders.map((fo: any) => ({
-      fulfillment_order_id: fo.id
-    }))
-
-    const fulfillmentPayload = {
-      fulfillment: {
-        message: 'The order has been shipped.',
-        notify_customer: true,
-        tracking_info: {
-          number: trackingNumber,
-          company: carrier,
-        },
-        line_items_by_fulfillment_order: lineItemsByFulfillmentOrder
+    for (const fo of openFulfillmentOrders) {
+      const fulfillmentPayload = {
+        fulfillment: {
+          message: 'The order has been shipped.',
+          notify_customer: true,
+          tracking_info: {
+            number: trackingNumber,
+            company: carrier,
+          },
+          line_items_by_fulfillment_order: [{ fulfillment_order_id: fo.id }]
+        }
       }
-    }
 
-    const fulfillRes = await fetch(`${shopUrl}/admin/api/2024-01/fulfillments.json`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(fulfillmentPayload)
-    })
+      const fulfillRes = await fetch(`${shopUrl}/admin/api/2024-01/fulfillments.json`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(fulfillmentPayload)
+      })
 
-    if (!fulfillRes.ok) {
-       console.error(`[Shopify] Failed to fulfill order ${marketplaceOrderId}: ${fulfillRes.statusText}`)
-       const errorText = await fulfillRes.text()
-       console.error(errorText)
-       throw new Error('Failed to confirm Shopify shipment')
+      if (!fulfillRes.ok) {
+         console.error(`[Shopify] Failed to fulfill order ${marketplaceOrderId} (FO: ${fo.id}): ${fulfillRes.statusText}`)
+         const errorText = await fulfillRes.text()
+         console.error(errorText)
+         // Don't throw immediately, try to fulfill others if there are multiple
+      }
     }
     
     console.log(`[Shopify] Shipment confirmed for order ${marketplaceOrderId}`)
