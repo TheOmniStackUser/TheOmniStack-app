@@ -121,12 +121,6 @@ export class ShopifyAdapter implements MarketplaceAdapter {
     returnTrackingNumber?: string,
     rawOrderPayload?: unknown
   ): Promise<void> {
-    const rawOrder = rawOrderPayload as any
-    if (!rawOrder || !rawOrder.id) {
-      console.warn(`[Shopify] Cannot confirm shipment for ${marketplaceOrderId} without raw order data.`)
-      return
-    }
-
     // 1. Get credentials (in a real app, you might pass companyId down, or lookup via DB)
     // To do this, we need companyId. Let's look it up via marketplaceOrderId if not provided
     const [orderRow] = await db
