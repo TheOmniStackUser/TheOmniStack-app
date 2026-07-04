@@ -80,16 +80,20 @@ export async function triggerProductImport(integrationId: string) {
   metadata.syncStatus = { isRunning: true, status: 'starting', message: 'Import wird im Hintergrund gestartet...', progress: 0, total: 0, lastUpdated: Date.now() }
   await db.update(marketplaceIntegrations).set({ metadata }).where(eq(marketplaceIntegrations.id, integrationId))
 
-  // Import sync function dynamically or statically
-  const { syncProductsForCompany } = await import('@/workers/product-sync')
+  // Dispatch to BullMQ worker instead of running in Next.js background
+  const { getProductSyncQueue, QUEUE_PRODUCT_SYNC } = await import('@/workers/product-sync')
   
-  // Use Next.js `after` to ensure the background execution is not paused
-  // by Vercel Serverless Function freezing when the response is sent.
-  after(() => {
-    syncProductsForCompany(auth.activeCompanyId, integrationId).catch(err => {
-      console.error(`[ProductsAction] Background sync failed for integration ${integrationId}:`, err)
-    })
-  })
+  await getProductSyncQueue().add(
+    `${QUEUE_PRODUCT_SYNC}-${auth.activeCompanyId}-${integrationId}`,
+    {
+      companyId: auth.activeCompanyId,
+      integrationId,
+    },
+    {
+      removeOnComplete: true,
+      removeOnFail: false,
+    }
+  )
 
   // To let the user see new products, we revalidate the import page
   revalidatePath('/products/import')

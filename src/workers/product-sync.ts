@@ -3,7 +3,53 @@ import { companies } from '@/db/schema/companies'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { products, productMappings, unmappedMarketplaceProducts } from '@/db/schema/products'
 import { eq, and, inArray, sql } from 'drizzle-orm'
+import { Worker, Queue, type Job } from 'bullmq'
+import IORedis from 'ioredis'
 import { getAdapterForIntegration } from '@/workers/marketplace-sync'
+
+export const QUEUE_PRODUCT_SYNC = process.env.NODE_ENV === 'production' ? 'product-sync' : 'product-sync-dev'
+
+let _redisConnection: IORedis | null = null
+function getRedisConnection(): IORedis {
+  if (!_redisConnection) {
+    _redisConnection = new IORedis(process.env.REDIS_URL ?? 'redis://localhost:6379', {
+      maxRetriesPerRequest: null,
+    })
+    _redisConnection.on('error', (err) => {
+      console.error('[Redis Error in product-sync]', err)
+    })
+  }
+  return _redisConnection
+}
+
+let _productSyncQueue: Queue | null = null
+export function getProductSyncQueue(): Queue {
+  if (!_productSyncQueue) {
+    _productSyncQueue = new Queue(QUEUE_PRODUCT_SYNC, { connection: getRedisConnection() })
+  }
+  return _productSyncQueue
+}
+
+export type ProductSyncJobData = {
+  companyId: string
+  integrationId: string
+}
+
+export function createProductSyncWorker() {
+  return new Worker<ProductSyncJobData>(
+    QUEUE_PRODUCT_SYNC,
+    async (job: Job<ProductSyncJobData>) => {
+      const { companyId, integrationId } = job.data
+      console.log(`[ProductSync Worker] Starting job ${job.id} for company ${companyId}, integration ${integrationId}`)
+      await syncProductsForCompany(companyId, integrationId)
+    },
+    {
+      connection: getRedisConnection(),
+      concurrency: 5,
+    }
+  )
+}
+
 
 /**
  * Syncs products from activated marketplaces to the central product catalog.
