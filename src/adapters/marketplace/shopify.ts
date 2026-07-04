@@ -519,15 +519,17 @@ export class ShopifyAdapter implements MarketplaceAdapter {
       }
 
       console.log(`[Shopify] Refreshing expired access token for ${shopUrl}...`);
+      const refreshBody = new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        grant_type: 'refresh_token',
+        refresh_token: integration.refreshToken
+      });
+
       const refreshRes = await fetch(`${shopUrl}/admin/oauth/access_token`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          client_id: clientId,
-          client_secret: clientSecret,
-          grant_type: 'refresh_token',
-          refresh_token: integration.refreshToken
-        })
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: refreshBody
       });
 
       if (!refreshRes.ok) {

@@ -55,15 +55,17 @@ export async function GET(request: Request) {
     }
 
     // 4. Exchange the temporary code for a permanent access token
+    const tokenBody = new URLSearchParams({
+      client_id: process.env.SHOPIFY_CLIENT_ID || '',
+      client_secret: secret,
+      code,
+      expiring: '1'
+    })
+
     const tokenResponse = await fetch(`https://${shop}/admin/oauth/access_token`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        client_id: process.env.SHOPIFY_CLIENT_ID,
-        client_secret: secret,
-        code,
-        expiring: true
-      })
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: tokenBody
     })
 
     if (!tokenResponse.ok) {
