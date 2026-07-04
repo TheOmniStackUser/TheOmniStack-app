@@ -2322,12 +2322,7 @@ export function OrdersTable({
                         </span>
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        <div className="flex flex-col">
-                          <span>{orderNumber}</span>
-                          {orderNumber !== order.marketplaceOrderId && (
-                            <span className="text-xs text-slate-500 font-normal mt-0.5">System-ID: {order.marketplaceOrderId}</span>
-                          )}
-                        </div>
+                        {orderNumber}
                       </td>
                       <td className="px-3 py-4 text-sm text-gray-500">
                         <div style={{ whiteSpace: 'pre-line' }}>
