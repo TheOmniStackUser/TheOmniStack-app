@@ -112,6 +112,12 @@ export async function sendInvoiceEmail({
   }
 }) {
   try {
+    const parseEmails = (emails: string | undefined) => 
+      emails ? emails.split(/[,;]/).map(e => e.trim()).filter(Boolean) : undefined;
+
+    const toEmailsArray = parseEmails(toEmail) || [];
+    const ccEmailsArray = parseEmails(ccEmail);
+
     if (smtpConfig && smtpConfig.host && smtpConfig.fromEmail) {
       const nodemailer = await import('nodemailer')
       const secure = smtpConfig.encryption === 'ssl' || smtpConfig.port === 465
@@ -142,8 +148,8 @@ export async function sendInvoiceEmail({
 
       const info = await transporter.sendMail({
         from,
-        to: toEmail,
-        cc: ccEmail,
+        to: toEmailsArray,
+        cc: ccEmailsArray,
         replyTo: replyTo || undefined,
         subject: subject,
         html: html.replace(/\n/g, '<br />'),
@@ -161,8 +167,8 @@ export async function sendInvoiceEmail({
 
       const { data, error } = await resend.emails.send({
         from: DEFAULT_SENDER,
-        to: [toEmail],
-        cc: ccEmail ? [ccEmail] : undefined,
+        to: toEmailsArray,
+        cc: ccEmailsArray,
         replyTo: replyTo,
         subject: subject,
         html: html.replace(/\n/g, '<br />'),
