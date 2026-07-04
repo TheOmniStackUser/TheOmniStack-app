@@ -505,7 +505,7 @@ export function getAdapterForIntegration(
     })
   }
   if (integration.type === 'shopify') {
-    if (!integration.environment || !integration.clientId || !integration.clientSecret) return null
+    if (!integration.environment) return null
     return new ShopifyAdapter()
   }
   if (integration.type === 'aboutyou') {
