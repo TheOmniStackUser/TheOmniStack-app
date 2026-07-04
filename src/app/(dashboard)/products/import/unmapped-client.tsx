@@ -235,7 +235,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
       id: int.id || int.type,
       type: int.type,
       name: getMarketplaceDisplayName(int.type, int.id || undefined)
-    }))
+    })).sort((a, b) => a.name.localeCompare(b.name))
   }, [localProducts, marketplaces])
 
   const enrichedProducts = useMemo(() => {
