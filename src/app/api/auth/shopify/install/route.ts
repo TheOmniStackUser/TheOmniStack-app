@@ -55,7 +55,7 @@ export async function GET(request: Request) {
   }
 
   // 2. Define required scopes for TheOmniStack
-  const scopes = 'read_orders,write_orders'
+  const scopes = 'read_orders,write_orders,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders'
   
   // 3. Generate CSRF protection nonce
   const nonce = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
