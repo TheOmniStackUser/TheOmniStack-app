@@ -43,6 +43,7 @@ interface Invoice {
   paidAt?: Date | string | null
   draftName?: string | null
   marketplaceOrderId?: string | null
+  displayOrderNumber?: string | null
   lastDunningStage?: string | null
   lastDunningSentAt?: Date | string | null
 }
@@ -1172,7 +1173,8 @@ export function InvoiceList({
       (invoice.invoiceNumber || '').toLowerCase().includes(q) ||
       (invoice.draftName || '').toLowerCase().includes(q) ||
       (invoice.recipientName || '').toLowerCase().includes(q) ||
-      (invoice.marketplaceOrderId || '').toLowerCase().includes(q)
+      (invoice.marketplaceOrderId || '').toLowerCase().includes(q) ||
+      (invoice.displayOrderNumber || '').toLowerCase().includes(q)
     )
   })
 
@@ -1663,7 +1665,7 @@ export function InvoiceList({
                     </div>
                   </td>
                   <td className="px-6 py-4 font-mono text-xs text-slate-600">
-                    {invoice.marketplaceOrderId || '–'}
+                    {invoice.displayOrderNumber || invoice.marketplaceOrderId || '–'}
                   </td>
                   <td className="px-6 py-4">
                     {(() => {

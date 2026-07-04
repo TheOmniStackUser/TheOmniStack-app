@@ -35,6 +35,7 @@ export default async function InvoicesPage() {
         pdfStorageKey: invoices.pdfStorageKey,
         marketplace: orders.marketplace,
         marketplaceOrderId: orders.marketplaceOrderId,
+        rawPayload: orders.rawPayload,
         cancelsInvoiceId: invoices.cancelsInvoiceId,
         isCreditNote: invoices.isCreditNote,
         documentType: invoices.documentType,
@@ -129,8 +130,12 @@ export default async function InvoicesPage() {
   // Map dunning stage info
   const invoicesWithDunning = uniqueInvoices.map((inv) => {
     const logs = companyDunningLogs.filter((log) => log.invoiceId === inv.id)
+    const raw = inv.rawPayload as { orderNumber?: unknown, name?: unknown } | null
+    const displayOrderNumber = String(raw?.name || raw?.orderNumber || inv.marketplaceOrderId || '')
+    
     return {
       ...inv,
+      displayOrderNumber,
       lastDunningStage: logs[0]?.stage || null,
       lastDunningSentAt: logs[0]?.sentAt || null,
     }
