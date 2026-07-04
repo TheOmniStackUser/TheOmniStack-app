@@ -148,8 +148,8 @@ export async function sendInvoiceEmail({
 
       const info = await transporter.sendMail({
         from,
-        to: toEmailsArray,
-        cc: ccEmailsArray,
+        to: toEmailsArray.join(', '),
+        cc: ccEmailsArray ? ccEmailsArray.join(', ') : undefined,
         replyTo: replyTo || undefined,
         subject: subject,
         html: html.replace(/\n/g, '<br />'),
@@ -167,8 +167,8 @@ export async function sendInvoiceEmail({
 
       const { data, error } = await resend.emails.send({
         from: DEFAULT_SENDER,
-        to: toEmailsArray,
-        cc: ccEmailsArray,
+        to: toEmailsArray.join(', '),
+        cc: ccEmailsArray ? ccEmailsArray.join(', ') : undefined,
         replyTo: replyTo,
         subject: subject,
         html: html.replace(/\n/g, '<br />'),
