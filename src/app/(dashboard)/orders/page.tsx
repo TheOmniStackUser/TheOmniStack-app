@@ -108,6 +108,7 @@ export default async function OrdersPage() {
     if (raw) {
       strippedPayload = {
         orderNumber: raw.orderNumber,
+        name: raw.name,
         financial_status: raw.financial_status,
         manualBillingAddress: raw.manualBillingAddress,
         invoiceAddress: raw.invoiceAddress,
