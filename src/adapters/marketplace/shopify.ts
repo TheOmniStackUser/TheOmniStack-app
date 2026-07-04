@@ -168,32 +168,38 @@ export class ShopifyAdapter implements MarketplaceAdapter {
       'Content-Type': 'application/json',
     }
 
-    // For fulfillment, we usually need the Location ID.
-    // Fetch locations
-    const locRes = await fetch(`${shopUrl}/admin/api/2024-01/locations.json`, { headers })
-    if (!locRes.ok) {
-       console.error(`[Shopify] Failed to fetch locations`)
+    // Fetch fulfillment orders for the order
+    const foRes = await fetch(`${shopUrl}/admin/api/2024-01/orders/${marketplaceOrderId}/fulfillment_orders.json`, { headers })
+    if (!foRes.ok) {
+       console.error(`[Shopify] Failed to fetch fulfillment orders for ${marketplaceOrderId}`)
        return
     }
-    const locData = await locRes.json()
-    const locationId = locData.locations[0]?.id
+    const foData = await foRes.json()
+    const fulfillmentOrders = foData.fulfillment_orders || []
+    const openFulfillmentOrders = fulfillmentOrders.filter((fo: any) => fo.status === 'open' || fo.status === 'in_progress')
 
-    if (!locationId) {
-       console.error(`[Shopify] No active location found`)
+    if (openFulfillmentOrders.length === 0) {
+       console.log(`[Shopify] No open fulfillment orders found for order ${marketplaceOrderId}. It may already be fulfilled.`)
        return
     }
 
-    // Post fulfillment
-    // https://shopify.dev/docs/api/admin-rest/2024-01/resources/fulfillment#post-orders-order_id-fulfillments
+    const lineItemsByFulfillmentOrder = openFulfillmentOrders.map((fo: any) => ({
+      fulfillment_order_id: fo.id
+    }))
+
     const fulfillmentPayload = {
       fulfillment: {
-        location_id: locationId,
-        tracking_number: trackingNumber,
-        tracking_company: carrier,
+        message: 'The order has been shipped.',
+        notify_customer: true,
+        tracking_info: {
+          number: trackingNumber,
+          company: carrier,
+        },
+        line_items_by_fulfillment_order: lineItemsByFulfillmentOrder
       }
     }
 
-    const fulfillRes = await fetch(`${shopUrl}/admin/api/2024-01/orders/${marketplaceOrderId}/fulfillments.json`, {
+    const fulfillRes = await fetch(`${shopUrl}/admin/api/2024-01/fulfillments.json`, {
       method: 'POST',
       headers,
       body: JSON.stringify(fulfillmentPayload)
