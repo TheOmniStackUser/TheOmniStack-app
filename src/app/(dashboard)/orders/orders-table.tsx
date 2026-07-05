@@ -2293,7 +2293,7 @@ export function OrdersTable({
                 {renderSortableHeader('Land', 'land')}
                 {renderSortableHeader('Umsatz', 'umsatz', 'right')}
                 {renderSortableHeader('Versanddatum', 'versanddatum')}
-                <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Versandstatus</th>
+                <th scope="col" className="px-3 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Versandstatus</th>
                 <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Verlauf</th>
                 <th scope="col" className="px-3 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50 shadow-[-4px_0_4px_-2px_rgba(0,0,0,0.05)]">Aktion</th>
               </tr>
@@ -2321,16 +2321,16 @@ export function OrdersTable({
                   return name.match(/.{1,20}(\s|$)/g)?.join('\n') || name;
                 };
 
-                const getShippingStatusLabel = (status: string | null | undefined) => {
+                const getShippingStatusDetails = (status: string | null | undefined) => {
                   switch (status) {
-                    case 'in_preparation': return '🛠️ In Vorbereitung'
-                    case 'in_transit': return '🚚 Unterwegs'
-                    case 'delivered': return '✅ Zugestellt'
-                    case 'ready_for_pickup': return '📬 Abholbereit'
-                    case 'delayed': return '⏳ Zustellung verzögert'
-                    case 'not_possible': return '🚫 Zustellung nicht möglich'
-                    case 'returned': return '🔄 Retoure'
-                    default: return '🛠️ In Vorbereitung'
+                    case 'in_preparation': return { icon: '🛠️', text: 'In Vorbereitung' }
+                    case 'in_transit': return { icon: '🚚', text: 'Unterwegs' }
+                    case 'delivered': return { icon: '✅', text: 'Zugestellt' }
+                    case 'ready_for_pickup': return { icon: '📬', text: 'Abholbereit' }
+                    case 'delayed': return { icon: '⏳', text: 'Zustellung verzögert' }
+                    case 'not_possible': return { icon: '🚫', text: 'Zustellung nicht möglich' }
+                    case 'returned': return { icon: '🔄', text: 'Retoure' }
+                    default: return { icon: '🛠️', text: 'In Vorbereitung' }
                   }
                 };
 
@@ -2415,9 +2415,12 @@ export function OrdersTable({
                           </div>
                         )}
                       </td>
-                      <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-700">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                          {getShippingStatusLabel((order as any).shippingStatus)}
+                      <td className="px-3 py-4 whitespace-nowrap text-center">
+                        <span 
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 text-lg border border-slate-200 shadow-sm cursor-help transition-transform hover:scale-110"
+                          title={getShippingStatusDetails((order as any).shippingStatus).text}
+                        >
+                          {getShippingStatusDetails((order as any).shippingStatus).icon}
                         </span>
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-500">
