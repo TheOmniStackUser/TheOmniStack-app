@@ -4,9 +4,10 @@ import { parseEInvoiceXml, ParsedInvoiceData } from '@/lib/e-invoice-parser'
 import { db } from '@/db/client'
 import { incomingInvoices } from '@/db/schema/incoming-invoices'
 import { invoices } from '@/db/schema/invoices'
-import { requireUser } from '@/lib/auth'
+import { getCurrentUser } from '@/lib/session'
 
 export async function parseUploadedInvoice(formData: FormData): Promise<{ success: boolean; data?: ParsedInvoiceData; error?: string }> {
+
   try {
     const file = formData.get('file') as File
     if (!file) {
@@ -49,7 +50,10 @@ export async function parseUploadedInvoice(formData: FormData): Promise<{ succes
 }
 
 export async function importEInvoice(data: ParsedInvoiceData & { importAs: 'incoming' | 'outgoing' }) {
-  const user = await requireUser()
+  const user = await getCurrentUser()
+  if (!user || !user.companyId) {
+    return { success: false, error: 'Nicht autorisiert.' }
+  }
   
   if (data.importAs === 'incoming') {
     await db.insert(incomingInvoices).values({
