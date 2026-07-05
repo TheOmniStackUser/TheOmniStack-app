@@ -1424,6 +1424,7 @@ export function InvoiceList({
                   </div>
                 )}
               </div>
+              </div>
               <button
                 type="button"
                 onClick={handleApplyFilters}
