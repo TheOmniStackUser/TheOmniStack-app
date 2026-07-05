@@ -25,6 +25,16 @@ export const orderStatusEnum = pgEnum('order_status', [
   'later_shipment',
 ])
 
+export const shippingStatusEnum = pgEnum('shipping_status', [
+  'in_preparation',
+  'in_transit',
+  'delivered',
+  'ready_for_pickup',
+  'delayed',
+  'not_possible',
+  'returned',
+])
+
 export const marketplaceEnum = pgEnum('marketplace', [
   'amazon',
   'otto',
@@ -73,6 +83,7 @@ export const orders = pgTable('orders', {
   rawPayload: jsonb('raw_payload'),
   // Status
   status: orderStatusEnum('status').notNull().default('pending'),
+  shippingStatus: shippingStatusEnum('shipping_status').default('in_preparation'),
   // Linked invoice (once created)
   invoiceId: uuid('invoice_id').references(() => invoices.id, { onDelete: 'cascade' }),
   isArchived: boolean('is_archived').notNull().default(false),

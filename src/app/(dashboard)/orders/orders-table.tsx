@@ -722,12 +722,14 @@ export function OrdersTable({
       invoice: 'all',
       label: 'all'
     } as Record<string, 'all' | 'yes' | 'no'>,
+    shippingStatus: 'all',
   })
 
   // Draft Filters (The state while typing/selecting)
   const [draftSearch, setDraftSearch] = useState('')
   const [draftMarketplace, setDraftMarketplace] = useState('all')
   const [draftStatus, setDraftStatus] = useState('all')
+  const [draftShippingStatus, setDraftShippingStatus] = useState('all')
   const [draftCountry, setDraftCountry] = useState('all')
   const [draftFromDate, setDraftFromDate] = useState('')
   const [draftToDate, setDraftToDate] = useState('')
@@ -802,6 +804,7 @@ export function OrdersTable({
       invoiceFilter: draftInvoiceFilter,
       dateType: draftDateType,
       progress: draftProgress,
+      shippingStatus: draftShippingStatus,
     })
     setCurrentPage(1)
   }
@@ -810,6 +813,7 @@ export function OrdersTable({
     setDraftSearch('')
     setDraftMarketplace('all')
     setDraftStatus('all')
+    setDraftShippingStatus('all')
     setDraftCountry('all')
     setDraftFromDate('')
     setDraftToDate('')
@@ -838,6 +842,7 @@ export function OrdersTable({
         invoice: 'all',
         label: 'all'
       },
+      shippingStatus: 'all',
     })
     setSortField(null)
     setSortDirection(null)
@@ -1010,6 +1015,13 @@ export function OrdersTable({
     // Filter by Status
     if (activeFilters.status !== 'all' && order.status !== activeFilters.status) {
       return false
+    }
+    // Filter by Shipping Status
+    if (activeFilters.shippingStatus !== 'all') {
+      const orderShippingStatus = (order as any).shippingStatus || 'in_preparation'
+      if (orderShippingStatus !== activeFilters.shippingStatus) {
+        return false
+      }
     }
     // Filter by Progress Status
     if (activeFilters.progress) {
@@ -2053,6 +2065,26 @@ export function OrdersTable({
             <option value="cancelled">Storniert</option>
           </select>
 
+          <select
+            value={draftShippingStatus}
+            onChange={(e) => {
+              const val = e.target.value
+              setDraftShippingStatus(val)
+              setActiveFilters(prev => ({ ...prev, shippingStatus: val }))
+              setCurrentPage(1)
+            }}
+            className="px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[150px] text-gray-900 font-medium text-sm"
+          >
+            <option value="all">Versandstatus (Alle)</option>
+            <option value="in_preparation">🛠️ In Vorbereitung</option>
+            <option value="in_transit">🚚 Unterwegs</option>
+            <option value="delivered">✅ Zugestellt</option>
+            <option value="ready_for_pickup">📬 Abholbereit</option>
+            <option value="delayed">⏳ Zustellung verzögert</option>
+            <option value="not_possible">🚫 Zustellung nicht möglich</option>
+            <option value="returned">🔄 Retoure</option>
+          </select>
+
           <div id="progress-dropdown-container" className="relative">
             <button
               type="button"
@@ -2261,6 +2293,7 @@ export function OrdersTable({
                 {renderSortableHeader('Land', 'land')}
                 {renderSortableHeader('Umsatz', 'umsatz', 'right')}
                 {renderSortableHeader('Versanddatum', 'versanddatum')}
+                <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Versandstatus</th>
                 <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Verlauf</th>
                 <th scope="col" className="px-3 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50 shadow-[-4px_0_4px_-2px_rgba(0,0,0,0.05)]">Aktion</th>
               </tr>
@@ -2286,6 +2319,19 @@ export function OrdersTable({
                 const formatCustomerName = (name: string) => {
                   if (name.length <= 20) return name;
                   return name.match(/.{1,20}(\s|$)/g)?.join('\n') || name;
+                };
+
+                const getShippingStatusLabel = (status: string | null | undefined) => {
+                  switch (status) {
+                    case 'in_preparation': return '🛠️ In Vorbereitung'
+                    case 'in_transit': return '🚚 Unterwegs'
+                    case 'delivered': return '✅ Zugestellt'
+                    case 'ready_for_pickup': return '📬 Abholbereit'
+                    case 'delayed': return '⏳ Zustellung verzögert'
+                    case 'not_possible': return '🚫 Zustellung nicht möglich'
+                    case 'returned': return '🔄 Retoure'
+                    default: return '🛠️ In Vorbereitung'
+                  }
                 };
 
                 return (
@@ -2368,6 +2414,11 @@ export function OrdersTable({
                             </a>
                           </div>
                         )}
+                      </td>
+                      <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-700">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                          {getShippingStatusLabel((order as any).shippingStatus)}
+                        </span>
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-500">
                         {renderOrderProgress(order, customMiraklIntegrations)}
