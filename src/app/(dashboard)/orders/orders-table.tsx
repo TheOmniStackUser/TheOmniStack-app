@@ -2066,25 +2066,7 @@ export function OrdersTable({
             <option value="cancelled">Storniert</option>
           </select>
 
-          <select
-            value={draftShippingStatus}
-            onChange={(e) => {
-              const val = e.target.value
-              setDraftShippingStatus(val)
-              setActiveFilters(prev => ({ ...prev, shippingStatus: val }))
-              setCurrentPage(1)
-            }}
-            className="px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[150px] text-gray-900 font-medium text-sm"
-          >
-            <option value="all">Versandstatus (Alle)</option>
-            <option value="in_preparation">🛠️ In Vorbereitung</option>
-            <option value="in_transit">🚚 Unterwegs</option>
-            <option value="delivered">✅ Zugestellt</option>
-            <option value="ready_for_pickup">📬 Abholbereit</option>
-            <option value="delayed">⏳ Zustellung verzögert</option>
-            <option value="not_possible">🚫 Zustellung nicht möglich</option>
-            <option value="returned">🔄 Retoure</option>
-          </select>
+          {/* Shipping status filter temporarily hidden per user request */}
 
           <div id="progress-dropdown-container" className="relative">
             <button
@@ -2294,7 +2276,7 @@ export function OrdersTable({
                 {renderSortableHeader('Land', 'land')}
                 {renderSortableHeader('Umsatz', 'umsatz', 'right')}
                 {renderSortableHeader('Versanddatum', 'versanddatum')}
-                <th scope="col" className="px-3 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Versandstatus</th>
+                {/* <th scope="col" className="px-3 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Versandstatus</th> */}
                 <th scope="col" className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Verlauf</th>
                 <th scope="col" className="px-3 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50 shadow-[-4px_0_4px_-2px_rgba(0,0,0,0.05)]">Aktion</th>
               </tr>
@@ -2416,20 +2398,19 @@ export function OrdersTable({
                           </div>
                         )}
                       </td>
-                      <td className="px-3 py-4 whitespace-nowrap text-center">
+                      {/* <td className="px-3 py-4 whitespace-nowrap text-center">
                         <div className="relative inline-flex group">
                           <span 
                             className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-lg border shadow-sm transition-transform hover:scale-110 cursor-pointer ${getShippingStatusDetails((order as any).shippingStatus).bg} ${getShippingStatusDetails((order as any).shippingStatus).border}`}
                           >
                             {getShippingStatusDetails((order as any).shippingStatus).icon}
                           </span>
-                          {/* Instant Tooltip */}
                           <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 bg-slate-800 text-white text-xs font-medium rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10 shadow-lg">
                             {getShippingStatusDetails((order as any).shippingStatus).text}
                             <svg className="absolute text-slate-800 h-2 w-full left-0 top-full" x="0px" y="0px" viewBox="0 0 255 255" xmlSpace="preserve"><polygon className="fill-current" points="0,0 127.5,127.5 255,0"/></svg>
                           </div>
                         </div>
-                      </td>
+                      </td> */}
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-500">
                         {renderOrderProgress(order, customMiraklIntegrations)}
                       </td>
