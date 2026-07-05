@@ -162,6 +162,13 @@
       "when": 1783163768385,
       "tag": "0022_smart_vampiro",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1783262298242,
+      "tag": "0023_safe_human_cannonball",
+      "breakpoints": true
     }
   ]
 }
