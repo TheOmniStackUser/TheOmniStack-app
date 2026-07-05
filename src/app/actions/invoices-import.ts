@@ -5,6 +5,7 @@ import { db } from '@/db/client'
 import { incomingInvoices } from '@/db/schema/incoming-invoices'
 import { invoices } from '@/db/schema/invoices'
 import { requireAuth } from '@/lib/session'
+import { eq, and } from 'drizzle-orm'
 
 export async function parseUploadedInvoice(formData: FormData): Promise<{ success: boolean; data?: ParsedInvoiceData; error?: string }> {
 
@@ -87,6 +88,31 @@ export async function importEInvoice(data: ParsedInvoiceData & { importAs: 'inco
       status: 'issued',
     })
   }
+
+  return { success: true }
+}
+
+export async function markIncomingAsPaidAction(id: string) {
+  const auth = await requireAuth()
+  if (!auth || !auth.activeCompanyId) {
+    return { success: false, error: 'Nicht autorisiert.' }
+  }
+
+  await db.update(incomingInvoices)
+    .set({ status: 'paid', paidAt: new Date() })
+    .where(and(eq(incomingInvoices.id, id), eq(incomingInvoices.companyId, auth.activeCompanyId)))
+
+  return { success: true }
+}
+
+export async function deleteIncomingInvoiceAction(id: string) {
+  const auth = await requireAuth()
+  if (!auth || !auth.activeCompanyId) {
+    return { success: false, error: 'Nicht autorisiert.' }
+  }
+
+  await db.delete(incomingInvoices)
+    .where(and(eq(incomingInvoices.id, id), eq(incomingInvoices.companyId, auth.activeCompanyId)))
 
   return { success: true }
 }

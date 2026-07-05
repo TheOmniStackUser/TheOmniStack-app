@@ -1,11 +1,13 @@
 import { requireAuth } from '@/lib/session'
 import { db } from '@/db/client'
 import { invoices } from '@/db/schema/invoices'
+import { incomingInvoices } from '@/db/schema/incoming-invoices'
 import { orders } from '@/db/schema/orders'
 import { eq, desc, and, ne, or } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import Link from 'next/link'
 import { InvoiceList } from './invoice-list'
+import { IncomingInvoiceList } from './incoming-invoice-list'
 import { GenerateMissingButton } from './generate-missing-button'
 import { DraftsDropdown } from './drafts-dropdown'
 import { getDraftsAction } from '@/app/actions/manual-invoice'
@@ -17,12 +19,20 @@ import { dunningLogs } from '@/db/schema/dunning'
 
 const originalInvoice = alias(invoices, 'original_invoice')
 
-export default async function InvoicesPage() {
+export default async function InvoicesPage({
+  searchParams,
+}: {
+  searchParams: { [key: string]: string | string[] | undefined }
+}) {
   const auth = await requireAuth()
   const drafts = await getDraftsAction()
+  
+  const isIncoming = searchParams.type === 'incoming'
 
-  const [allInvoices, companyDunningLogs, integrations, company, emailTemplate, currentUser] = await Promise.all([
-    db
+  // Fetch data concurrently based on tab
+  const [allInvoices, incomingInvs, companyDunningLogs, integrations, company, emailTemplate, currentUser] = await Promise.all([
+    // Only fetch outgoing if not on incoming tab
+    !isIncoming ? db
       .select({
         id: invoices.id,
         invoiceNumber: invoices.invoiceNumber,
@@ -52,7 +62,13 @@ export default async function InvoicesPage() {
         eq(invoices.companyId, auth.activeCompanyId),
         eq(invoices.documentType, 'invoice')
       ))
-      .orderBy(desc(invoices.createdAt)),
+      .orderBy(desc(invoices.createdAt)) : Promise.resolve([]),
+      
+    // Fetch incoming invoices if on incoming tab
+    isIncoming ? db.select().from(incomingInvoices)
+      .where(eq(incomingInvoices.companyId, auth.activeCompanyId))
+      .orderBy(desc(incomingInvoices.importedAt)) : Promise.resolve([]),
+
     db
       .select({
         invoiceId: dunningLogs.invoiceId,
@@ -143,10 +159,10 @@ export default async function InvoicesPage() {
 
   return (
     <div className="p-8">
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Rechnungen</h1>
-          <p className="text-slate-500">Übersicht aller generierten Rechnungen und Gutschriften.</p>
+          <p className="text-slate-500">Übersicht aller generierten Rechnungen und Ausgaben.</p>
         </div>
         <div className="flex gap-3">
           <Link 
@@ -171,23 +187,47 @@ export default async function InvoicesPage() {
           <GenerateMissingButton />
         </div>
       </div>
+      
+      {/* Tabs */}
+      <div className="flex space-x-1 bg-slate-100 p-1 rounded-2xl w-fit mb-8">
+        <Link
+          href="/invoices"
+          className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${
+            !isIncoming ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+          }`}
+        >
+          Ausgangsrechnungen
+        </Link>
+        <Link
+          href="/invoices?type=incoming"
+          className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${
+            isIncoming ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+          }`}
+        >
+          Eingangsrechnungen
+        </Link>
+      </div>
 
-      <InvoiceList 
-        initialInvoices={invoicesWithDunning} 
-        hasKauflandIntegration={hasKauflandIntegration}
-        hasEbayIntegration={hasEbayIntegration}
-        hasOttoIntegration={hasOttoIntegration}
-        hasAboutYouIntegration={hasAboutYouIntegration}
-        hasDecathlonIntegration={hasDecathlonIntegration}
-        hasDecathlonEuIntegration={hasDecathlonEuIntegration}
-        hasMediamarktIntegration={hasMediamarktIntegration}
-        hasAmazonIntegration={hasAmazonIntegration}
-        hasShopifyIntegration={hasShopifyIntegration}
-        customMiraklIntegrations={customMiraklIntegrations}
-        company={company ? { email: company.email, smtpSettings: company.smtpSettings } : undefined}
-        initialEmailTemplate={emailTemplate}
-        currentUserName={currentUser?.name || ''}
-      />
+      {isIncoming ? (
+        <IncomingInvoiceList initialInvoices={incomingInvs as any} />
+      ) : (
+        <InvoiceList 
+          initialInvoices={invoicesWithDunning} 
+          hasKauflandIntegration={hasKauflandIntegration}
+          hasEbayIntegration={hasEbayIntegration}
+          hasOttoIntegration={hasOttoIntegration}
+          hasAboutYouIntegration={hasAboutYouIntegration}
+          hasDecathlonIntegration={hasDecathlonIntegration}
+          hasDecathlonEuIntegration={hasDecathlonEuIntegration}
+          hasMediamarktIntegration={hasMediamarktIntegration}
+          hasAmazonIntegration={hasAmazonIntegration}
+          hasShopifyIntegration={hasShopifyIntegration}
+          customMiraklIntegrations={customMiraklIntegrations}
+          company={company ? { email: company.email, smtpSettings: company.smtpSettings } : undefined}
+          initialEmailTemplate={emailTemplate}
+          currentUserName={currentUser?.name || ''}
+        />
+      )}
     </div>
   )
 }
