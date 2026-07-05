@@ -2077,13 +2077,13 @@ export function OrdersTable({
             className="px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[150px] text-gray-900 font-medium text-sm"
           >
             <option value="all">Versandstatus (Alle)</option>
-            <option value="in_preparation">In Vorbereitung</option>
-            <option value="in_transit">Unterwegs</option>
-            <option value="delivered">Zugestellt</option>
-            <option value="ready_for_pickup">Abholbereit</option>
-            <option value="delayed">Zustellung verzögert</option>
-            <option value="not_possible">Zustellung nicht möglich</option>
-            <option value="returned">Retoure</option>
+            <option value="in_preparation">🛠️ In Vorbereitung</option>
+            <option value="in_transit">🚚 Unterwegs</option>
+            <option value="delivered">✅ Zugestellt</option>
+            <option value="ready_for_pickup">📬 Abholbereit</option>
+            <option value="delayed">⏳ Zustellung verzögert</option>
+            <option value="not_possible">🚫 Zustellung nicht möglich</option>
+            <option value="returned">🔄 Retoure</option>
           </select>
 
           <div id="progress-dropdown-container" className="relative">
@@ -2324,14 +2324,14 @@ export function OrdersTable({
 
                 const getShippingStatusDetails = (status: string | null | undefined) => {
                   switch (status) {
-                    case 'in_preparation': return { icon: <Package className="w-4 h-4 text-slate-500" />, text: 'In Vorbereitung', bg: 'bg-slate-100', border: 'border-slate-200' }
-                    case 'in_transit': return { icon: <Truck className="w-4 h-4 text-blue-500" />, text: 'Unterwegs', bg: 'bg-blue-50', border: 'border-blue-200' }
-                    case 'delivered': return { icon: <CheckCircle2 className="w-4 h-4 text-emerald-500" />, text: 'Zugestellt', bg: 'bg-emerald-50', border: 'border-emerald-200' }
-                    case 'ready_for_pickup': return { icon: <Store className="w-4 h-4 text-amber-500" />, text: 'Abholbereit', bg: 'bg-amber-50', border: 'border-amber-200' }
-                    case 'delayed': return { icon: <Clock className="w-4 h-4 text-purple-500" />, text: 'Zustellung verzögert', bg: 'bg-purple-50', border: 'border-purple-200' }
-                    case 'not_possible': return { icon: <XCircle className="w-4 h-4 text-rose-500" />, text: 'Zustellung nicht möglich', bg: 'bg-rose-50', border: 'border-rose-200' }
-                    case 'returned': return { icon: <RefreshCw className="w-4 h-4 text-orange-500" />, text: 'Retoure', bg: 'bg-orange-50', border: 'border-orange-200' }
-                    default: return { icon: <Package className="w-4 h-4 text-slate-400" />, text: 'In Vorbereitung', bg: 'bg-slate-100', border: 'border-slate-200' }
+                    case 'in_preparation': return { icon: '🛠️', text: 'In Vorbereitung', bg: 'bg-slate-50', border: 'border-slate-200' }
+                    case 'in_transit': return { icon: '🚚', text: 'Unterwegs', bg: 'bg-blue-50', border: 'border-blue-200' }
+                    case 'delivered': return { icon: '✅', text: 'Zugestellt', bg: 'bg-emerald-50', border: 'border-emerald-200' }
+                    case 'ready_for_pickup': return { icon: '📬', text: 'Abholbereit', bg: 'bg-amber-50', border: 'border-amber-200' }
+                    case 'delayed': return { icon: '⏳', text: 'Zustellung verzögert', bg: 'bg-purple-50', border: 'border-purple-200' }
+                    case 'not_possible': return { icon: '🚫', text: 'Zustellung nicht möglich', bg: 'bg-rose-50', border: 'border-rose-200' }
+                    case 'returned': return { icon: '🔄', text: 'Retoure', bg: 'bg-slate-50', border: 'border-slate-200' }
+                    default: return { icon: '🛠️', text: 'In Vorbereitung', bg: 'bg-slate-50', border: 'border-slate-200' }
                   }
                 };
 
@@ -2417,12 +2417,18 @@ export function OrdersTable({
                         )}
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap text-center">
-                        <span 
-                          className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-lg border shadow-sm cursor-help transition-transform hover:scale-110 ${getShippingStatusDetails((order as any).shippingStatus).bg} ${getShippingStatusDetails((order as any).shippingStatus).border}`}
-                          title={getShippingStatusDetails((order as any).shippingStatus).text}
-                        >
-                          {getShippingStatusDetails((order as any).shippingStatus).icon}
-                        </span>
+                        <div className="relative inline-flex group">
+                          <span 
+                            className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-lg border shadow-sm cursor-help transition-transform hover:scale-110 ${getShippingStatusDetails((order as any).shippingStatus).bg} ${getShippingStatusDetails((order as any).shippingStatus).border}`}
+                          >
+                            {getShippingStatusDetails((order as any).shippingStatus).icon}
+                          </span>
+                          {/* Instant Tooltip */}
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 bg-slate-800 text-white text-xs font-medium rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10 shadow-lg">
+                            {getShippingStatusDetails((order as any).shippingStatus).text}
+                            <svg className="absolute text-slate-800 h-2 w-full left-0 top-full" x="0px" y="0px" viewBox="0 0 255 255" xmlSpace="preserve"><polygon className="fill-current" points="0,0 127.5,127.5 255,0"/></svg>
+                          </div>
+                        </div>
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-500">
                         {renderOrderProgress(order, customMiraklIntegrations)}
