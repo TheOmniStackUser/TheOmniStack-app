@@ -46,6 +46,8 @@ interface Invoice {
   displayOrderNumber?: string | null
   lastDunningStage?: string | null
   lastDunningSentAt?: Date | string | null
+  trackingNumber?: string | null
+  returnTrackingNumber?: string | null
 }
 
 type SearchSuggestion = {
@@ -796,6 +798,7 @@ export function InvoiceList({
   // Applied Filters
   const [activeFilters, setActiveFilters] = useState({
     search: '',
+    searchScope: 'all',
     country: 'all',
     marketplace: 'all',
     documentType: 'all',
@@ -805,6 +808,7 @@ export function InvoiceList({
 
   // Draft Filters
   const [draftSearch, setDraftSearch] = useState('')
+  const [draftSearchScope, setDraftSearchScope] = useState('all')
   const [isSearchFocused, setIsSearchFocused] = useState(false)
   const [draftCountry, setDraftCountry] = useState('all')
   const [draftMarketplace, setDraftMarketplace] = useState('all')
@@ -939,6 +943,7 @@ export function InvoiceList({
   const handleApplyFilters = () => {
     setActiveFilters({
       search: draftSearch,
+      searchScope: draftSearchScope,
       country: draftCountry,
       marketplace: draftMarketplace,
       documentType: draftDocumentType,
@@ -950,6 +955,7 @@ export function InvoiceList({
 
   const handleResetFilters = () => {
     setDraftSearch('')
+    setDraftSearchScope('all')
     setDraftCountry('all')
     setDraftMarketplace('all')
     setDraftDocumentType('all')
@@ -957,6 +963,7 @@ export function InvoiceList({
     setDraftToDate('')
     setActiveFilters({
       search: '',
+      searchScope: 'all',
       country: 'all',
       marketplace: 'all',
       documentType: 'all',
@@ -1169,13 +1176,19 @@ export function InvoiceList({
 
     if (activeFilters.search.trim() === '') return true
     const q = activeFilters.search.trim().toLowerCase()
-    return (
-      (invoice.invoiceNumber || '').toLowerCase().includes(q) ||
-      (invoice.draftName || '').toLowerCase().includes(q) ||
-      (invoice.recipientName || '').toLowerCase().includes(q) ||
-      (invoice.marketplaceOrderId || '').toLowerCase().includes(q) ||
-      (invoice.displayOrderNumber || '').toLowerCase().includes(q)
-    )
+    const scope = activeFilters.searchScope
+
+    const matchInvoice = (invoice.invoiceNumber || '').toLowerCase().includes(q) || (invoice.draftName || '').toLowerCase().includes(q)
+    const matchCustomer = (invoice.recipientName || '').toLowerCase().includes(q)
+    const matchOrder = (invoice.marketplaceOrderId || '').toLowerCase().includes(q) || (invoice.displayOrderNumber || '').toLowerCase().includes(q)
+    const matchTracking = (invoice.trackingNumber || '').toLowerCase().includes(q) || (invoice.returnTrackingNumber || '').toLowerCase().includes(q)
+
+    if (scope === 'invoice') return matchInvoice
+    if (scope === 'customer') return matchCustomer
+    if (scope === 'order') return matchOrder
+    if (scope === 'tracking') return matchTracking
+
+    return matchInvoice || matchCustomer || matchOrder || matchTracking
   })
 
   // Apply tab status filter on top of search/filter
@@ -1330,18 +1343,44 @@ export function InvoiceList({
           {/* Row 1: Search */}
           <div className="flex flex-col sm:flex-row gap-4 items-center">
             <div className="flex-1 w-full flex gap-2">
-              <div className="relative flex-1">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </div>
-                <input
-                  type="text"
-                  id="search"
-                  placeholder="Rechnungsnummer oder Kunde suchen..."
-                  className="block w-full pl-10 pr-10 py-2.5 border border-slate-200 rounded-lg leading-5 bg-slate-50/30 text-slate-900 font-medium placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-all"
-                  value={draftSearch}
+              <div className="relative flex-1 flex shadow-sm">
+                <select
+                  value={draftSearchScope}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    setDraftSearchScope(val)
+                    setActiveFilters(prev => ({ ...prev, searchScope: val }))
+                    setCurrentPage(1)
+                  }}
+                  className="px-3 py-2.5 border border-slate-200 border-r-0 rounded-l-lg bg-slate-50/80 text-slate-700 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:z-10 transition-all cursor-pointer"
+                  style={{ 
+                    minWidth: '130px', 
+                    paddingRight: '2.25rem', 
+                    appearance: 'none',
+                    backgroundImage: 'url("data:image/svg+xml,%3csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3e%3cpath stroke=\'%236b7280\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M6 8l4 4 4-4\'/%3e%3c/svg%3e")', 
+                    backgroundPosition: 'right 0.5rem center', 
+                    backgroundRepeat: 'no-repeat', 
+                    backgroundSize: '1.5em 1.5em' 
+                  }}
+                >
+                  <option value="all">Alle Felder</option>
+                  <option value="invoice">Belegnummer</option>
+                  <option value="customer">Kunde</option>
+                  <option value="order">Bestellnummer</option>
+                  <option value="tracking">Tracking / Retoure</option>
+                </select>
+                <div className="relative flex-1">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                  <input
+                    type="text"
+                    id="search"
+                    placeholder="Suchbegriff eingeben..."
+                    className="block w-full pl-10 pr-10 py-2.5 border border-slate-200 rounded-r-lg leading-5 bg-white text-slate-900 font-medium placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-all focus:z-10 relative"
+                    value={draftSearch}
                   onChange={(e) => {
                     const val = e.target.value
                     setDraftSearch(val)

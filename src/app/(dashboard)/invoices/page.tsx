@@ -45,6 +45,8 @@ export default async function InvoicesPage({
         pdfStorageKey: invoices.pdfStorageKey,
         marketplace: orders.marketplace,
         marketplaceOrderId: orders.marketplaceOrderId,
+        trackingNumber: orders.trackingNumber,
+        returnTrackingNumber: orders.returnTrackingNumber,
         rawPayload: orders.rawPayload,
         cancelsInvoiceId: invoices.cancelsInvoiceId,
         isCreditNote: invoices.isCreditNote,
