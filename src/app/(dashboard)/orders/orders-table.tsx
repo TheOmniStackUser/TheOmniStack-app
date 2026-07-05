@@ -2419,7 +2419,7 @@ export function OrdersTable({
                       <td className="px-3 py-4 whitespace-nowrap text-center">
                         <div className="relative inline-flex group">
                           <span 
-                            className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-lg border shadow-sm cursor-help transition-transform hover:scale-110 ${getShippingStatusDetails((order as any).shippingStatus).bg} ${getShippingStatusDetails((order as any).shippingStatus).border}`}
+                            className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-lg border shadow-sm transition-transform hover:scale-110 cursor-default ${getShippingStatusDetails((order as any).shippingStatus).bg} ${getShippingStatusDetails((order as any).shippingStatus).border}`}
                           >
                             {getShippingStatusDetails((order as any).shippingStatus).icon}
                           </span>
