@@ -69,7 +69,7 @@ export async function importEInvoice(data: ParsedInvoiceData & { importAs: 'inco
       taxAmount: data.taxAmount.toString(),
       totalAmount: data.totalAmount.toString(),
       issuedAt: data.issueDate ? new Date(data.issueDate) : null,
-      importedBy: auth.user.id,
+      importedBy: auth.userId,
       status: 'pending_payment',
     })
   } else {
