@@ -3,19 +3,26 @@
 import { useState } from 'react'
 import { generateMissingInvoicesAction } from '@/app/actions/invoices'
 import { useRouter } from 'next/navigation'
-import { X, RefreshCcw, DownloadCloud, FileText } from 'lucide-react'
+import { X, RefreshCcw, DownloadCloud, FileText, Check } from 'lucide-react'
 
 export function GenerateMissingButton() {
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [result, setResult] = useState<string | null>(null)
+  
+  // Selection state
+  const [fetchMarketplace, setFetchMarketplace] = useState(true)
+  const [generateLocal, setGenerateLocal] = useState(true)
+
   const router = useRouter()
 
   const handleStart = async () => {
+    if (!fetchMarketplace && !generateLocal) return
+
     try {
       setIsLoading(true)
       setResult(null)
-      const res = await generateMissingInvoicesAction()
+      const res = await generateMissingInvoicesAction({ fetchMarketplace, generateLocal })
       setResult(res.message)
       router.refresh()
     } catch (err) {
@@ -46,7 +53,7 @@ export function GenerateMissingButton() {
               <div>
                 <h3 className="text-xl font-extrabold text-slate-900">Rechnungen abrufen / generieren</h3>
                 <p className="text-sm text-slate-500 mt-1">
-                  Synchronisiere fehlende Rechnungen für alle offenen Bestellungen.
+                  Wähle aus, welche Aktionen durchgeführt werden sollen.
                 </p>
               </div>
               <button 
@@ -59,26 +66,46 @@ export function GenerateMissingButton() {
             </div>
             
             <div className="px-6 py-6 bg-slate-50/50">
-              <div className="space-y-4">
-                <div className="flex gap-4">
-                  <div className="mt-1 bg-blue-100 text-blue-600 p-2 rounded-full h-fit">
-                    <DownloadCloud className="w-5 h-5" />
+              <div className="space-y-3">
+                
+                {/* Option 1: Marktplätze */}
+                <button 
+                  onClick={() => !isLoading && setFetchMarketplace(!fetchMarketplace)}
+                  disabled={isLoading}
+                  className={`w-full text-left flex gap-4 p-4 rounded-2xl border transition-all ${
+                    fetchMarketplace ? 'bg-white border-blue-200 shadow-sm ring-1 ring-blue-100' : 'bg-transparent border-slate-200 hover:bg-slate-100/50'
+                  }`}
+                >
+                  <div className={`mt-0.5 shrink-0 w-5 h-5 rounded flex items-center justify-center transition-colors ${
+                    fetchMarketplace ? 'bg-blue-600 text-white' : 'border-2 border-slate-300'
+                  }`}>
+                    {fetchMarketplace && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                   </div>
                   <div>
                     <h4 className="font-bold text-slate-900 text-sm">Von Marktplätzen abrufen</h4>
-                    <p className="text-sm text-slate-600 mt-0.5">Lädt Rechnungen von Marktplätzen herunter (z.B. Kaufland, Mirakl, Amazon VCS), falls konfiguriert.</p>
+                    <p className="text-sm text-slate-500 mt-0.5 leading-snug">Lädt Rechnungen von Marktplätzen herunter (z.B. Kaufland, Mirakl, Amazon VCS), falls konfiguriert.</p>
                   </div>
-                </div>
+                </button>
                 
-                <div className="flex gap-4">
-                  <div className="mt-1 bg-emerald-100 text-emerald-600 p-2 rounded-full h-fit">
-                    <FileText className="w-5 h-5" />
+                {/* Option 2: Lokal */}
+                <button 
+                  onClick={() => !isLoading && setGenerateLocal(!generateLocal)}
+                  disabled={isLoading}
+                  className={`w-full text-left flex gap-4 p-4 rounded-2xl border transition-all ${
+                    generateLocal ? 'bg-white border-emerald-200 shadow-sm ring-1 ring-emerald-100' : 'bg-transparent border-slate-200 hover:bg-slate-100/50'
+                  }`}
+                >
+                  <div className={`mt-0.5 shrink-0 w-5 h-5 rounded flex items-center justify-center transition-colors ${
+                    generateLocal ? 'bg-emerald-600 text-white' : 'border-2 border-slate-300'
+                  }`}>
+                    {generateLocal && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                   </div>
                   <div>
                     <h4 className="font-bold text-slate-900 text-sm">Fehlende generieren</h4>
-                    <p className="text-sm text-slate-600 mt-0.5">Erstellt automatisch TheOmniStack-Rechnungen für alle anderen Bestellungen ohne Beleg.</p>
+                    <p className="text-sm text-slate-500 mt-0.5 leading-snug">Erstellt automatisch TheOmniStack-Rechnungen für alle anderen Bestellungen ohne Beleg.</p>
                   </div>
-                </div>
+                </button>
+                
               </div>
 
               {result && (
@@ -99,7 +126,7 @@ export function GenerateMissingButton() {
               {!result && (
                 <button
                   onClick={handleStart}
-                  disabled={isLoading}
+                  disabled={isLoading || (!fetchMarketplace && !generateLocal)}
                   className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors disabled:opacity-50"
                 >
                   {isLoading ? (

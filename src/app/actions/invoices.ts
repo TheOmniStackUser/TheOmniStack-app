@@ -114,7 +114,7 @@ export async function getInvoiceXmlAction(invoiceId: string) {
  * Manually trigger invoice generation for all orders that are missing one.
  * Can be called from a button in the UI for recovery scenarios.
  */
-export async function generateMissingInvoicesAction() {
+export async function generateMissingInvoicesAction(options: { fetchMarketplace?: boolean, generateLocal?: boolean } = { fetchMarketplace: true, generateLocal: true }) {
   const auth = await requireAuth()
   const companyId = auth.activeCompanyId
 
@@ -170,6 +170,7 @@ export async function generateMissingInvoicesAction() {
       }
 
       if (downloadInvoice && integration) {
+        if (!options.fetchMarketplace) continue;
         // Skip downloading invoice if the order has not been shipped yet
         if (order.status !== 'shipped') {
           console.log(`[Action] Skipping invoice download for order ${order.marketplaceOrderId} because it is not shipped yet (status: ${order.status}).`)
@@ -237,6 +238,7 @@ export async function generateMissingInvoicesAction() {
           throw new Error(`Adapter konnte für ${order.marketplace} nicht initialisiert werden (fehlende Anmeldedaten).`)
         }
       } else {
+        if (!options.generateLocal) continue;
         const result = await createInvoiceForOrder(order.id, companyId, { txContext: undefined })
         if (result && !result.skipped) {
           generated++
