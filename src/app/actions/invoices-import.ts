@@ -4,7 +4,7 @@ import { parseEInvoiceXml, ParsedInvoiceData } from '@/lib/e-invoice-parser'
 import { db } from '@/db/client'
 import { incomingInvoices } from '@/db/schema/incoming-invoices'
 import { invoices } from '@/db/schema/invoices'
-import { getCurrentUser } from '@/lib/session'
+import { requireAuth } from '@/lib/session'
 
 export async function parseUploadedInvoice(formData: FormData): Promise<{ success: boolean; data?: ParsedInvoiceData; error?: string }> {
 
@@ -50,14 +50,14 @@ export async function parseUploadedInvoice(formData: FormData): Promise<{ succes
 }
 
 export async function importEInvoice(data: ParsedInvoiceData & { importAs: 'incoming' | 'outgoing' }) {
-  const user = await getCurrentUser()
-  if (!user || !user.companyId) {
+  const auth = await requireAuth()
+  if (!auth || !auth.activeCompanyId) {
     return { success: false, error: 'Nicht autorisiert.' }
   }
   
   if (data.importAs === 'incoming') {
     await db.insert(incomingInvoices).values({
-      companyId: user.companyId,
+      companyId: auth.activeCompanyId,
       supplierName: data.supplierName,
       supplierVatId: data.supplierVatId,
       supplierEmail: data.supplierEmail,
@@ -69,13 +69,13 @@ export async function importEInvoice(data: ParsedInvoiceData & { importAs: 'inco
       taxAmount: data.taxAmount.toString(),
       totalAmount: data.totalAmount.toString(),
       issuedAt: data.issueDate ? new Date(data.issueDate) : null,
-      importedBy: user.id,
+      importedBy: auth.user.id,
       status: 'pending_payment',
     })
   } else {
     // Import as outgoing invoice
     await db.insert(invoices).values({
-      companyId: user.companyId,
+      companyId: auth.activeCompanyId,
       invoiceNumber: data.invoiceNumber,
       recipientName: data.supplierName, // The buyer in an outgoing invoice
       recipientEmail: data.supplierEmail,
