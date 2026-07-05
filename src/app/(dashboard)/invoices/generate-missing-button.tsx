@@ -3,12 +3,14 @@
 import { useState } from 'react'
 import { generateMissingInvoicesAction } from '@/app/actions/invoices'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { X, RefreshCcw, DownloadCloud, FileText, Check } from 'lucide-react'
 
 export function GenerateMissingButton() {
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [result, setResult] = useState<string | null>(null)
+  const [errors, setErrors] = useState<{ orderId: string, marketplaceOrderId: string, message: string }[]>([])
   
   // Selection state
   const [fetchMarketplace, setFetchMarketplace] = useState(true)
@@ -22,8 +24,12 @@ export function GenerateMissingButton() {
     try {
       setIsLoading(true)
       setResult(null)
+      setErrors([])
       const res = await generateMissingInvoicesAction({ fetchMarketplace, generateLocal })
       setResult(res.message)
+      if (res.errors) {
+        setErrors(res.errors)
+      }
       router.refresh()
     } catch (err) {
       setResult(err instanceof Error ? err.message : 'Unbekannter Fehler')
@@ -109,8 +115,26 @@ export function GenerateMissingButton() {
               </div>
 
               {result && (
-                <div className="mt-6 p-4 bg-emerald-50 text-emerald-800 rounded-xl border border-emerald-200 text-sm font-medium">
+                <div className={`mt-6 p-4 rounded-xl border text-sm font-medium ${errors.length > 0 ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-emerald-50 text-emerald-800 border-emerald-200'}`}>
                   {result}
+                  {errors.length > 0 && (
+                    <div className="mt-4 border-t border-amber-200/50 pt-3">
+                      <p className="text-xs font-bold text-amber-900 mb-2">Details zu den Fehlern:</p>
+                      <div className="bg-white/60 rounded-lg text-xs font-mono max-h-48 overflow-y-auto divide-y divide-amber-100">
+                        {errors.map((err, i) => (
+                          <div key={i} className="p-2.5 flex flex-col gap-1 hover:bg-white/80 transition-colors">
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-amber-900">{err.marketplaceOrderId || err.orderId}</span>
+                              <Link href={`/orders/${err.orderId}`} target="_blank" className="text-blue-600 hover:text-blue-800 hover:underline">
+                                Bestellung ansehen &rarr;
+                              </Link>
+                            </div>
+                            <span className="text-slate-600 whitespace-pre-wrap">{err.message}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

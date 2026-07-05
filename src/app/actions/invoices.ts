@@ -150,7 +150,7 @@ export async function generateMissingInvoicesAction(options: { fetchMarketplace?
 
   let generated = 0
   let failed = 0
-  const errors: string[] = []
+  const errors: { orderId: string, marketplaceOrderId: string, message: string }[] = []
 
   for (const order of ordersWithoutInvoice) {
     try {
@@ -246,7 +246,11 @@ export async function generateMissingInvoicesAction(options: { fetchMarketplace?
       }
     } catch (err) {
       failed++
-      errors.push(`${order.marketplaceOrderId}: ${err instanceof Error ? err.message : String(err)}`)
+      errors.push({
+        orderId: order.id,
+        marketplaceOrderId: order.marketplaceOrderId || '',
+        message: err instanceof Error ? err.message : String(err)
+      })
       console.error(`[Action] Failed to process invoice for order ${order.marketplaceOrderId}:`, err)
     }
   }
