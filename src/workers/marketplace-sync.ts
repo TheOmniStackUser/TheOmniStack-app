@@ -90,7 +90,7 @@ async function reportChildResult(
   companyName: string,
   syncNotificationEmail: string,
   syncGroupId: string,
-  result: { marketplace: string; success: boolean; count?: number; error?: string }
+  result: { marketplace: string; success: boolean; count?: number; newCount?: number; error?: string }
 ) {
   const redis = getRedisConnection()
   const groupKey = `sync-group:${companyId}:${syncGroupId}`
@@ -312,6 +312,7 @@ export function createMarketplaceSyncWorker() {
         }
 
         let rawOrders: NormalizedOrder[] = []
+        let newlyImportedCount = 0
         const adapter = getAdapterForIntegration(integration)
 
         if (!adapter) {
@@ -370,7 +371,7 @@ export function createMarketplaceSyncWorker() {
             throw new Error(`Adapter for ${marketplace} is not fully implemented yet`)
           }
 
-          let newlyImportedCount = 0
+
           if (rawOrders.length > 0) {
             const isManualSync = job.name.startsWith('manual-sync')
             const result = await persistOrders(companyId, rawOrders, isManualSync, integration, adapter)
