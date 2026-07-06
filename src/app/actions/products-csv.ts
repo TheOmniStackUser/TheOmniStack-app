@@ -91,7 +91,10 @@ export async function importProductsCsvAction(csvString: string) {
       return isNaN(Number(parsed)) ? null : parsed
     }
     
-    const currentStock = parseNumber(row['Bestand']) || '0'
+    let currentStock = parseNumber(row['Bestand']) || '0'
+    if (parseFloat(currentStock) < 0) {
+      currentStock = '0'
+    }
     const price = parseNumber(row['Preis']) || '0'
     const msrp = parseNumber(row['UVP'])
     const reducedPrice = parseNumber(row['Reduzierter Preis'])

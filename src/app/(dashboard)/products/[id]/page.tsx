@@ -82,7 +82,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       price: (formData.get('price') as string) || '0',
       purchasePrice: (formData.get('purchasePrice') as string) || null,
       msrp: (formData.get('msrp') as string) || null,
-      currentStock: (formData.get('currentStock') as string) || '0',
+      currentStock: Math.max(0, parseInt((formData.get('currentStock') as string) || '0', 10)).toString(),
       weight: (formData.get('weight') as string) || null,
       storageLocation: (formData.get('storageLocation') as string) || null,
       updatedAt: new Date()
@@ -198,7 +198,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700">Lagerbestand</label>
-                <input type="number" name="currentStock" defaultValue={Number(product.currentStock)} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all font-bold text-lg text-slate-900 placeholder:text-slate-500" />
+                <input type="number" min="0" name="currentStock" defaultValue={Number(product.currentStock)} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all font-bold text-lg text-slate-900 placeholder:text-slate-500" />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700">Gewicht (kg)</label>

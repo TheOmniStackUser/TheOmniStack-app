@@ -698,6 +698,8 @@ export async function deleteMapping(mappingId: string) {
 export async function updateProductStockInline(productId: string, newStock: number) {
   const auth = await requireAuth()
 
+  const safeStock = Math.max(0, newStock)
+
   // Verify and get the product
   const [product] = await db.select()
     .from(products)
@@ -707,14 +709,14 @@ export async function updateProductStockInline(productId: string, newStock: numb
 
   // Update central stock
   await db.update(products)
-    .set({ currentStock: newStock.toString(), updatedAt: new Date() })
+    .set({ currentStock: safeStock.toString(), updatedAt: new Date() })
     .where(eq(products.id, productId))
 
   // Trigger sync
   const { pushUpdatesToMarketplaces } = await import('@/workers/product-sync')
   await pushUpdatesToMarketplaces(auth.activeCompanyId, [{
     sku: product.sku,
-    stock: newStock
+    stock: safeStock
   }])
 
   return { success: true }

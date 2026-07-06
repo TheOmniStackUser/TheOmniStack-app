@@ -1776,7 +1776,7 @@ export async function persistOrders(
           
           await tx.execute(sql`
             UPDATE ${products}
-            SET current_stock = current_stock - ${item.quantity}
+            SET current_stock = GREATEST(0, current_stock - ${item.quantity})
             WHERE company_id = ${companyId} AND sku = ${item.sku}
           `);
         }
