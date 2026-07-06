@@ -17,6 +17,7 @@ type SyncResult = {
   marketplace: string;
   success: boolean;
   count?: number;
+  newCount?: number;
   error?: string;
 };
 
@@ -32,7 +33,8 @@ export const SyncNotificationEmail = ({
   date = new Date().toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })
 }: SyncNotificationEmailProps) => {
   const allSuccess = results.every(r => r.success);
-  const totalOrders = results.reduce((acc, curr) => acc + (curr.count || 0), 0);
+  const totalNewOrders = results.reduce((acc, curr) => acc + (curr.newCount !== undefined ? curr.newCount : (curr.count || 0)), 0);
+  const totalFetchedOrders = results.reduce((acc, curr) => acc + (curr.count || 0), 0);
 
   return (
     <Html>
@@ -85,7 +87,9 @@ export const SyncNotificationEmail = ({
                       </Text>
                       {result.success ? (
                         <Text className="m-0 text-[14px] text-green-600 font-medium">
-                          ✅ Erfolgreich: {result.count} neue {result.count === 1 ? 'Bestellung' : 'Bestellungen'}
+                          ✅ Erfolgreich: {result.newCount !== undefined 
+                            ? `${result.newCount} neue ${result.newCount === 1 ? 'Bestellung' : 'Bestellungen'} importiert (von ${result.count} abgerufenen)` 
+                            : `${result.count} neue ${result.count === 1 ? 'Bestellung' : 'Bestellungen'}`}
                         </Text>
                       ) : (
                         <Text className="m-0 text-[14px] text-red-600 font-medium">
@@ -99,7 +103,7 @@ export const SyncNotificationEmail = ({
 
               <Section className="mb-[32px]">
                 <Text className="text-gray-700 text-[14px] font-medium leading-[24px] text-center">
-                  Insgesamt wurden <span className="font-bold">{totalOrders}</span> neue {totalOrders === 1 ? 'Bestellung' : 'Bestellungen'} importiert.
+                  Insgesamt wurden <span className="font-bold">{totalNewOrders}</span> neue {totalNewOrders === 1 ? 'Bestellung' : 'Bestellungen'} importiert (von {totalFetchedOrders} abgerufenen).
                 </Text>
               </Section>
 

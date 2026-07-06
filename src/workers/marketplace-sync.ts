@@ -370,9 +370,11 @@ export function createMarketplaceSyncWorker() {
             throw new Error(`Adapter for ${marketplace} is not fully implemented yet`)
           }
 
+          let newlyImportedCount = 0
           if (rawOrders.length > 0) {
             const isManualSync = job.name.startsWith('manual-sync')
-            await persistOrders(companyId, rawOrders, isManualSync, integration, adapter)
+            const result = await persistOrders(companyId, rawOrders, isManualSync, integration, adapter)
+            newlyImportedCount = result.affected
           }
         }
 
@@ -406,13 +408,13 @@ export function createMarketplaceSyncWorker() {
                 companySettings.name, 
                 companySettings.syncNotificationEmail, 
                 job.data.syncGroupId, 
-                { marketplace: job.data.marketplaceDisplayName || marketplace || 'Unbekannt', success: true, count: rawOrders.length }
+                { marketplace: job.data.marketplaceDisplayName || marketplace || 'Unbekannt', success: true, count: rawOrders.length, newCount: newlyImportedCount }
               )
             } else {
               await sendSyncNotificationEmail({
                 toEmail: companySettings.syncNotificationEmail,
                 companyName: companySettings.name,
-                results: [{ marketplace: job.data.marketplaceDisplayName || marketplace || 'Unbekannt', success: true, count: rawOrders.length }]
+                results: [{ marketplace: job.data.marketplaceDisplayName || marketplace || 'Unbekannt', success: true, count: rawOrders.length, newCount: newlyImportedCount }]
               })
             }
           }
