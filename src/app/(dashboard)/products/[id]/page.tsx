@@ -113,6 +113,15 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       )
     }
     
+    const { pushUpdatesToMarketplaces } = await import('@/workers/product-sync')
+    await pushUpdatesToMarketplaces(auth.activeCompanyId, [{
+      sku: formData.get('sku') as string,
+      stock: Math.max(0, parseInt((formData.get('currentStock') as string) || '0', 10)),
+      price: parseFloat((formData.get('price') as string) || '0')
+    }]).catch(e => {
+      console.error('Failed to sync product updates:', e)
+    })
+    
     revalidatePath(`/products/${product.id}`)
     revalidatePath('/products')
   }

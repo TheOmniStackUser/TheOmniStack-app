@@ -72,6 +72,7 @@ export async function importProductsCsvAction(csvString: string) {
   const rows = result.data as Record<string, string>[]
   
   let imported = 0
+  const updatesForSync: { sku: string, stock?: number, price?: number }[] = []
   
   for (const row of rows) {
     const sku = row['SKU']?.trim()
@@ -133,6 +134,8 @@ export async function importProductsCsvAction(csvString: string) {
       }
     }).returning({ id: products.id })
     
+    updatesForSync.push({ sku, stock: parseInt(currentStock, 10), price: parseFloat(price) })
+    
     // Process Mappings
     const mappingKeys = Object.keys(row).filter(key => key.startsWith('Mapping: '))
     for (const mappingKey of mappingKeys) {
@@ -173,6 +176,13 @@ export async function importProductsCsvAction(csvString: string) {
     }
     
     imported++
+  }
+  
+  if (updatesForSync.length > 0) {
+    const { pushUpdatesToMarketplaces } = await import('@/workers/product-sync')
+    await pushUpdatesToMarketplaces(auth.activeCompanyId, updatesForSync).catch(e => {
+      console.error('Failed to sync products after CSV import:', e)
+    })
   }
   
   return { success: true, count: imported }
