@@ -679,12 +679,13 @@ export async function deleteMapping(mappingId: string) {
   await db.insert(unmappedMarketplaceProducts).values({
     companyId: auth.activeCompanyId,
     marketplace: mappingToDelete.marketplace,
+    integrationId: mappingToDelete.integrationId,
     marketplaceSku: mappingToDelete.marketplaceSku,
     marketplaceProductId: mappingToDelete.marketplaceProductId,
     title: mappingToDelete.marketplaceSku, // Fallback title
     updatedAt: new Date()
   }).onConflictDoUpdate({
-    target: [unmappedMarketplaceProducts.companyId, unmappedMarketplaceProducts.marketplace, unmappedMarketplaceProducts.marketplaceSku],
+    target: [unmappedMarketplaceProducts.companyId, unmappedMarketplaceProducts.integrationId, unmappedMarketplaceProducts.marketplaceSku],
     set: {
       updatedAt: new Date()
     }

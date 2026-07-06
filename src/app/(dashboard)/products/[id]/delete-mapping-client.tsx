@@ -4,22 +4,25 @@ import React, { useState } from 'react'
 import { Trash2, Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { deleteMapping } from '@/app/actions/products'
+import { AlertModal } from '@/components/alert-modal'
 
 export function DeleteMappingClient({ mappingId }: { mappingId: string }) {
   const [isDeleting, setIsDeleting] = useState(false)
   const router = useRouter()
 
   const [showConfirm, setShowConfirm] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const handleDelete = async () => {
     setIsDeleting(true)
+    setError(null)
     try {
       await deleteMapping(mappingId)
       setShowConfirm(false)
       router.refresh()
     } catch (e) {
       console.error(e)
-      alert('Fehler beim Löschen des Mappings.')
+      setError('Fehler beim Löschen des Mappings.')
       setIsDeleting(false)
     }
   }
@@ -64,6 +67,13 @@ export function DeleteMappingClient({ mappingId }: { mappingId: string }) {
           </div>
         </div>
       )}
+
+      <AlertModal 
+        isOpen={!!error}
+        onClose={() => setError(null)}
+        title="Fehler"
+        message={error}
+      />
     </>
   )
 }
