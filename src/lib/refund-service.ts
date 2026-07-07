@@ -81,7 +81,15 @@ export async function executeRefund({
   let autoCreditNote = !(isLimango || isAboutYou || isOtto)
 
   // 3. Resolve EAN to actual marketplace SKUs if needed
+  const itemConditions: Record<string, string> = {}
+  for (const item of returnEntry.items) {
+    if (item.skuOrProductName) {
+      itemConditions[item.skuOrProductName.toLowerCase()] = item.condition || 'new'
+    }
+  }
+
   const resolvedItemsToRefund: RefundItemInput[] = []
+  const resolvedConditions: Record<string, string> = {} // maps resolved SKU to condition
   
   for (const refundItem of itemsToRefund) {
     if (refundItem.quantity <= 0) continue
@@ -120,15 +128,20 @@ export async function executeRefund({
       }
     }
 
+    const originalCondition = itemConditions[refundItem.sku.toLowerCase()] || 'new'
+
     if (matchedOrderItem) {
        // Update SKU to the exact one from the order to prevent downstream mismatches
+       const resolvedSku = matchedOrderItem.sku || refundItem.sku
        resolvedItemsToRefund.push({
-         sku: matchedOrderItem.sku || refundItem.sku,
+         sku: resolvedSku,
          quantity: refundItem.quantity
        })
+       resolvedConditions[resolvedSku.toLowerCase()] = originalCondition
     } else {
        // Keep original if not matched, maybe the API adapter can handle it
        resolvedItemsToRefund.push(refundItem)
+       resolvedConditions[refundItem.sku.toLowerCase()] = originalCondition
     }
   }
 
@@ -491,5 +504,47 @@ export async function executeRefund({
   }
 
   console.log(`[RefundService] Refund execution completed successfully for returnLog ${returnLogId}`)
+
+  // 9. Auto-Restock and push to marketplaces
+  try {
+    const { products } = await import('@/db/schema/products')
+    const { pushUpdatesToMarketplaces } = await import('@/workers/product-sync')
+    const stockUpdates: { sku: string, stock: number }[] = []
+
+    for (const refundItem of itemsToRefund) {
+      if (refundItem.quantity <= 0) continue
+      
+      const condition = resolvedConditions[refundItem.sku.toLowerCase()] || 'new'
+      if (condition.toLowerCase() === 'new' || condition.toLowerCase() === 'neu') {
+        const [product] = await db.select().from(products)
+          .where(and(eq(products.sku, refundItem.sku), eq(products.companyId, companyId)))
+          .limit(1)
+
+        if (product) {
+          const currentStock = parseInt(product.currentStock?.toString() || '0', 10)
+          const newStock = currentStock + refundItem.quantity
+
+          await db.update(products)
+            .set({ currentStock: newStock.toString(), updatedAt: new Date() })
+            .where(eq(products.id, product.id))
+
+          console.log(`[RefundService] Restocked ${refundItem.quantity}x ${refundItem.sku}. New stock: ${newStock}`)
+          stockUpdates.push({ sku: refundItem.sku, stock: newStock })
+        } else {
+          console.log(`[RefundService] Could not find product with SKU ${refundItem.sku} in DB for restock.`)
+        }
+      } else {
+        console.log(`[RefundService] Skipping restock for ${refundItem.sku} due to condition: ${condition}`)
+      }
+    }
+
+    if (stockUpdates.length > 0) {
+      console.log(`[RefundService] Triggering marketplace sync for ${stockUpdates.length} restocked items...`)
+      await pushUpdatesToMarketplaces(companyId, stockUpdates)
+    }
+  } catch (restockErr) {
+    console.error(`[RefundService] Error during auto-restock:`, restockErr)
+  }
+
   return { success: true, creditNoteNumber, creditNoteId: newCreditNoteInvoiceId || undefined }
 }
