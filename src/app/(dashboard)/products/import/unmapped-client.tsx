@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useDeferredValue } from 'react'
 import { Database, Search, Filter, Loader2, CheckSquare, Square, X, Info, AlertTriangle, Trash2, Download } from 'lucide-react'
-import { bulkCreateProductsFromUnmapped, deleteUnmappedProducts, searchProducts, mapUnmappedProductToExisting, getSuggestedProducts, getAutoMappableProducts, bulkAutoMapProducts } from '@/app/actions/products'
+import { bulkCreateProductsFromUnmapped, deleteUnmappedProducts, searchProducts, mapUnmappedProductToExisting, getSuggestedProducts, getAutoMappableProducts, bulkAutoMapProducts, undoUnmappedAction } from '@/app/actions/products'
 import { useRouter } from 'next/navigation'
 import { UnmappedMarketplaceProduct } from '@/db/schema/products'
 import { AlertModal } from '@/components/alert-modal'
@@ -139,6 +139,25 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
   
   const [autoMapState, setAutoMapState] = useState<{ isOpen: boolean, matches: any[], isLoading: boolean }>({ isOpen: false, matches: [], isLoading: false })
   const [autoMapOptions, setAutoMapOptions] = useState({ matchEan: true, matchSku: true })
+
+  const [lastAction, setLastAction] = useState<{ type: 'delete'|'map'|'create', restoredUnmapped: any[], createdProductIds?: string[], createdMappingIds?: string[], description: string } | null>(null)
+  const [isUndoing, setIsUndoing] = useState(false)
+
+  const handleUndo = async () => {
+    if (!lastAction) return
+    setIsUndoing(true)
+    try {
+      await undoUnmappedAction(lastAction)
+      setLastAction(null)
+      router.refresh()
+      showAlert('Aktion erfolgreich rückgängig gemacht.', 'Erfolg')
+    } catch (err) {
+      console.error(err)
+      showAlert('Fehler beim Rückgängigmachen der Aktion', 'Fehler')
+    } finally {
+      setIsUndoing(false)
+    }
+  }
 
   const filteredAutoMapMatches = useMemo(() => {
     return autoMapState.matches.filter(m => {
@@ -294,7 +313,10 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
     if (selectedIds.length === 0) return
     setIsSubmitting(true)
     try {
-      await bulkCreateProductsFromUnmapped(selectedIds)
+      const res = await bulkCreateProductsFromUnmapped(selectedIds)
+      if (res.deletedUnmapped) {
+        setLastAction({ type: 'create', restoredUnmapped: res.deletedUnmapped, createdProductIds: res.createdProductIds, description: `${res.deletedUnmapped.length} Produkte als Neu angelegt` })
+      }
       setSelectedIds([])
       router.refresh()
     } catch (error) {
@@ -309,7 +331,10 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
     if (selectedIds.length === 0) return
     setIsSubmitting(true)
     try {
-      await deleteUnmappedProducts(selectedIds)
+      const res = await deleteUnmappedProducts(selectedIds)
+      if (res.deletedUnmapped) {
+        setLastAction({ type: 'delete', restoredUnmapped: res.deletedUnmapped, description: `${res.deletedUnmapped.length} Produkte gelöscht` })
+      }
       setSelectedIds([])
       setDeleteConfirmation({ isOpen: false, type: 'single' })
       router.refresh()
@@ -324,7 +349,10 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
   const handleDeleteSingle = async (id: string) => {
     setIsSubmitting(true)
     try {
-      await deleteUnmappedProducts([id])
+      const res = await deleteUnmappedProducts([id])
+      if (res.deletedUnmapped) {
+        setLastAction({ type: 'delete', restoredUnmapped: res.deletedUnmapped, description: `1 Produkt gelöscht` })
+      }
       setDeleteConfirmation({ isOpen: false, type: 'single' })
       router.refresh()
     } catch (error) {
@@ -338,7 +366,10 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
   const handleCreateSingle = async (id: string) => {
     setIsSubmitting(true)
     try {
-      await bulkCreateProductsFromUnmapped([id])
+      const res = await bulkCreateProductsFromUnmapped([id])
+      if (res.deletedUnmapped) {
+        setLastAction({ type: 'create', restoredUnmapped: res.deletedUnmapped, createdProductIds: res.createdProductIds, description: `1 Produkt als Neu angelegt` })
+      }
       router.refresh()
     } catch (error) {
       console.error(error)
@@ -395,9 +426,18 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
     if (mapConfirmation.products.length === 0 || !selectedProductId) return
     setIsSubmitting(true)
     try {
-      await Promise.all(
+      const results = await Promise.all(
         mapConfirmation.products.map(p => mapUnmappedProductToExisting(p.id, selectedProductId))
       )
+      const allDeletedUnmapped: any[] = []
+      const allCreatedMappingIds: string[] = []
+      for (const res of results) {
+         if (res.deletedUnmapped) allDeletedUnmapped.push(...res.deletedUnmapped)
+         if (res.createdMappingIds) allCreatedMappingIds.push(...res.createdMappingIds)
+      }
+      if (allDeletedUnmapped.length > 0) {
+        setLastAction({ type: 'map', restoredUnmapped: allDeletedUnmapped, createdMappingIds: allCreatedMappingIds, description: `${allDeletedUnmapped.length} Produkte gemappt` })
+      }
       setMapConfirmation({ isOpen: false, products: [] })
       setSelectedIds([])
       router.refresh()
@@ -413,7 +453,10 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
     if (mapConfirmation.products.length === 0) return
     setIsSubmitting(true)
     try {
-      await bulkCreateProductsFromUnmapped(mapConfirmation.products.map(p => p.id))
+      const res = await bulkCreateProductsFromUnmapped(mapConfirmation.products.map(p => p.id))
+      if (res.deletedUnmapped) {
+        setLastAction({ type: 'create', restoredUnmapped: res.deletedUnmapped, createdProductIds: res.createdProductIds, description: `${res.deletedUnmapped.length} Produkte als Neu angelegt` })
+      }
       setMapConfirmation({ isOpen: false, products: [] })
       setSelectedIds([])
       router.refresh()
@@ -507,13 +550,20 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
     setAutoMapProgress({ current: 0, total: filteredAutoMapMatches.length })
     try {
       const BATCH_SIZE = 25;
+      const allDeletedUnmapped: any[] = []
+      const allCreatedMappingIds: string[] = []
       for (let i = 0; i < filteredAutoMapMatches.length; i += BATCH_SIZE) {
         const batch = filteredAutoMapMatches.slice(i, i + BATCH_SIZE);
-        await bulkAutoMapProducts(batch.map(m => ({
+        const res = await bulkAutoMapProducts(batch.map(m => ({
           unmappedId: m.unmappedId,
           matchedProductId: m.matchedProductId
         })));
+        if (res.deletedUnmapped) allDeletedUnmapped.push(...res.deletedUnmapped)
+        if (res.createdMappingIds) allCreatedMappingIds.push(...res.createdMappingIds)
         setAutoMapProgress({ current: Math.min(i + BATCH_SIZE, filteredAutoMapMatches.length), total: filteredAutoMapMatches.length })
+      }
+      if (allDeletedUnmapped.length > 0) {
+        setLastAction({ type: 'map', restoredUnmapped: allDeletedUnmapped, createdMappingIds: allCreatedMappingIds, description: `${allDeletedUnmapped.length} Produkte automatisch gemappt` })
       }
       setAutoMapState({ isOpen: false, matches: [], isLoading: false })
       router.refresh()
@@ -1135,6 +1185,39 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
           )}
         </div>
       </Modal>
+
+      {lastAction && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-bottom-5 fade-in duration-300">
+          <div className="bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-4 border border-slate-800">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center">
+                <Info className="w-4 h-4 text-slate-300" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold">{lastAction.description}</p>
+                <p className="text-xs text-slate-400">Aktion ausgeführt</p>
+              </div>
+            </div>
+            <div className="w-px h-8 bg-slate-800 mx-2"></div>
+            <div className="flex gap-2 items-center">
+              <button 
+                onClick={handleUndo} 
+                disabled={isUndoing}
+                className="text-sm font-bold text-white bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {isUndoing && <Loader2 className="w-4 h-4 animate-spin" />}
+                Rückgängig
+              </button>
+              <button 
+                onClick={() => setLastAction(null)}
+                className="p-2 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-slate-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

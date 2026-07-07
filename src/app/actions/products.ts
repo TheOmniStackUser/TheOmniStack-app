@@ -236,6 +236,7 @@ export async function bulkCreateProductsFromUnmapped(unmappedProductIds: string[
   }
 
   const chunkSize = 500
+  const allInsertedProductIds: string[] = []
   for (let i = 0; i < selectedUnmapped.length; i += chunkSize) {
     const chunk = selectedUnmapped.slice(i, i + chunkSize)
     const chunkSkus = [...new Set(chunk.map(u => u.marketplaceSku))]
@@ -314,6 +315,7 @@ export async function bulkCreateProductsFromUnmapped(unmappedProductIds: string[
     let insertedProducts: { id: string, sku: string }[] = []
     if (newProductsToInsert.length > 0) {
       insertedProducts = await db.insert(products).values(newProductsToInsert).returning({ id: products.id, sku: products.sku })
+      allInsertedProductIds.push(...insertedProducts.map(p => p.id))
     }
 
     // Combine existing and newly inserted to get all Product IDs
@@ -370,7 +372,7 @@ export async function bulkCreateProductsFromUnmapped(unmappedProductIds: string[
   revalidatePath('/products')
   revalidatePath('/products/import')
   
-  return { success: true }
+  return { success: true, deletedUnmapped: selectedUnmapped, createdProductIds: allInsertedProductIds }
 }
 
 export async function deleteProduct(productId: string) {
@@ -408,15 +410,15 @@ export async function deleteUnmappedProducts(unmappedProductIds: string[]) {
 
   if (!unmappedProductIds || unmappedProductIds.length === 0) return { success: true }
 
-  await db.delete(unmappedMarketplaceProducts).where(
+  const deletedUnmapped = await db.delete(unmappedMarketplaceProducts).where(
     and(
       eq(unmappedMarketplaceProducts.companyId, auth.activeCompanyId),
       inArray(unmappedMarketplaceProducts.id, unmappedProductIds)
     )
-  )
+  ).returning()
 
   revalidatePath('/products/import')
-  return { success: true }
+  return { success: true, deletedUnmapped }
 }
 
 export async function getImportSyncStatus(integrationId: string) {
@@ -581,7 +583,7 @@ export async function mapUnmappedProductToExisting(unmappedProductId: string, pr
   const unmappedEan = getEanFromPayload(unmapped.rawPayload);
 
   // Create mapping
-  await db.insert(productMappings).values({
+  const insertedMapping = await db.insert(productMappings).values({
     companyId: auth.activeCompanyId,
     productId: central.id,
     marketplace: unmapped.marketplace,
@@ -591,7 +593,7 @@ export async function mapUnmappedProductToExisting(unmappedProductId: string, pr
     syncStock: unmapped.stock !== null && unmapped.stock !== undefined,
     syncPrice: false,
     ean: unmappedEan || null,
-  }).onConflictDoNothing()
+  }).onConflictDoNothing().returning({ id: productMappings.id })
 
   if (unmappedEan) {
     const existingEans = central.ean ? central.ean.split(',').map((s: string) => s.trim()) : [];
@@ -628,7 +630,7 @@ export async function mapUnmappedProductToExisting(unmappedProductId: string, pr
   revalidatePath('/products')
   revalidatePath('/products/import')
   
-  return { success: true }
+  return { success: true, deletedUnmapped: [unmapped], createdMappingIds: insertedMapping.map(m => m.id) }
 }
 
 export async function addManualMapping(productId: string, integrationId: string, sku: string, ean: string) {
@@ -760,7 +762,7 @@ export async function triggerGlobalMarketplaceSync() {
     .from(products)
     .where(eq(products.companyId, auth.activeCompanyId))
 
-  if (allProducts.length === 0) return { totalUpdatesSent: 0, activeMarketplaces: [] }
+  if (allProducts.length === 0) return { totalUpdatesSent: 0, activeMarketplaces: [], failedMarketplaces: [] }
 
   // Prepare updates payload
   const updates = allProducts.map(p => ({
@@ -859,12 +861,60 @@ export async function getAutoMappableProducts() {
 export async function bulkAutoMapProducts(mappings: { unmappedId: string, matchedProductId: string }[]) {
   const auth = await requireAuth()
 
+  const allDeletedUnmapped: any[] = []
+  const allCreatedMappingIds: string[] = []
+
   for (const mapping of mappings) {
      try {
-       await mapUnmappedProductToExisting(mapping.unmappedId, mapping.matchedProductId)
+       const res = await mapUnmappedProductToExisting(mapping.unmappedId, mapping.matchedProductId)
+       if (res.deletedUnmapped) allDeletedUnmapped.push(...res.deletedUnmapped)
+       if (res.createdMappingIds) allCreatedMappingIds.push(...res.createdMappingIds)
      } catch (err) {
        console.error('Failed to auto-map:', err)
      }
   }
+  return { success: true, deletedUnmapped: allDeletedUnmapped, createdMappingIds: allCreatedMappingIds }
+}
+
+export async function undoUnmappedAction(payload: {
+  type: 'delete' | 'map' | 'create';
+  restoredUnmapped: any[];
+  createdProductIds?: string[];
+  createdMappingIds?: string[];
+}) {
+  const auth = await requireAuth()
+  if (!payload || !payload.restoredUnmapped || payload.restoredUnmapped.length === 0) {
+    return { success: true }
+  }
+
+  // 1. Restore the unmapped products
+  const valuesToInsert = payload.restoredUnmapped.map((p: any) => ({
+    ...p,
+    createdAt: new Date(p.createdAt),
+    updatedAt: new Date(),
+  }))
+  await db.insert(unmappedMarketplaceProducts).values(valuesToInsert).onConflictDoNothing()
+
+  // 2. Revert side-effects
+  if (payload.type === 'map' && payload.createdMappingIds && payload.createdMappingIds.length > 0) {
+    await db.delete(productMappings).where(
+      and(
+        eq(productMappings.companyId, auth.activeCompanyId),
+        inArray(productMappings.id, payload.createdMappingIds)
+      )
+    )
+  }
+
+  if (payload.type === 'create' && payload.createdProductIds && payload.createdProductIds.length > 0) {
+    await db.delete(products).where(
+      and(
+        eq(products.companyId, auth.activeCompanyId),
+        inArray(products.id, payload.createdProductIds)
+      )
+    )
+  }
+
+  revalidatePath('/products/import')
+  revalidatePath('/products')
   return { success: true }
 }
