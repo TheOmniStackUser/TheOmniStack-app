@@ -88,7 +88,7 @@ export const SyncNotificationEmail = ({
                       {result.success ? (
                         <Text className="m-0 text-[14px] text-green-600 font-medium">
                           ✅ Erfolgreich: {result.newCount !== undefined 
-                            ? `${result.newCount} neue ${result.newCount === 1 ? 'Bestellung' : 'Bestellungen'} importiert (von ${result.count} abgerufenen)` 
+                            ? `${result.newCount} neue ${result.newCount === 1 ? 'Bestellung' : 'Bestellungen'} importiert (${result.count} total offene Bestellungen)` 
                             : `${result.count} neue ${result.count === 1 ? 'Bestellung' : 'Bestellungen'}`}
                         </Text>
                       ) : (
@@ -103,7 +103,7 @@ export const SyncNotificationEmail = ({
 
               <Section className="mb-[32px]">
                 <Text className="text-gray-700 text-[14px] font-medium leading-[24px] text-center">
-                  Insgesamt wurden <span className="font-bold">{totalNewOrders}</span> neue {totalNewOrders === 1 ? 'Bestellung' : 'Bestellungen'} importiert (von {totalFetchedOrders} abgerufenen).
+                  Insgesamt wurden <span className="font-bold">{totalNewOrders}</span> neue {totalNewOrders === 1 ? 'Bestellung' : 'Bestellungen'} importiert ({totalFetchedOrders} total offene Bestellungen).
                 </Text>
               </Section>
 
