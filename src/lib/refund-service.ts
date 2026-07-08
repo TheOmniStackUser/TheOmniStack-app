@@ -467,14 +467,14 @@ export async function executeRefund({
           console.log(`[RefundService] Uploading credit note ${creditNoteNumber} to marketplace...`)
           const isMirakl = order.marketplace.startsWith('mirakl_') || integration.type === 'mirakl_custom'
           if (isMirakl) {
-            await (adapter as any).uploadInvoice(
+            await (adapter as any).uploadInvoice?.(
               order.marketplaceOrderId,
               pdfBuffer,
               `${creditNoteNumber}.pdf`,
               true // isCreditNote = true
             )
           } else {
-            await adapter.uploadInvoice(
+            await adapter.uploadInvoice?.(
               order.marketplaceOrderId,
               pdfBuffer,
               `${creditNoteNumber}.pdf`
