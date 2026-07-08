@@ -9,6 +9,7 @@ import { buildInvoiceKey, uploadDocument } from '@/lib/storage'
 import { createInvoiceForOrder, getDefaultSettings, formatDocumentNumber } from '@/lib/invoice-service'
 import { getAdapterForIntegration } from '@/workers/marketplace-sync'
 import React from 'react'
+import { after } from 'next/server'
 
 export type RefundItemInput = {
   sku: string
@@ -461,27 +462,29 @@ export async function executeRefund({
     }
 
     if (autoCreditNote && pdfBuffer && integration.uploadInvoice && adapter && adapter.uploadInvoice) {
-      try {
-        console.log(`[RefundService] Uploading credit note ${creditNoteNumber} to marketplace...`)
-        const isMirakl = order.marketplace.startsWith('mirakl_') || integration.type === 'mirakl_custom'
-        if (isMirakl) {
-          await (adapter as any).uploadInvoice(
-            order.marketplaceOrderId,
-            pdfBuffer,
-            `${creditNoteNumber}.pdf`,
-            true // isCreditNote = true
-          )
-        } else {
-          await adapter.uploadInvoice(
-            order.marketplaceOrderId,
-            pdfBuffer,
-            `${creditNoteNumber}.pdf`
-          )
+      after(async () => {
+        try {
+          console.log(`[RefundService] Uploading credit note ${creditNoteNumber} to marketplace...`)
+          const isMirakl = order.marketplace.startsWith('mirakl_') || integration.type === 'mirakl_custom'
+          if (isMirakl) {
+            await (adapter as any).uploadInvoice(
+              order.marketplaceOrderId,
+              pdfBuffer,
+              `${creditNoteNumber}.pdf`,
+              true // isCreditNote = true
+            )
+          } else {
+            await adapter.uploadInvoice(
+              order.marketplaceOrderId,
+              pdfBuffer,
+              `${creditNoteNumber}.pdf`
+            )
+          }
+          console.log(`[RefundService] Credit note uploaded successfully to marketplace.`)
+        } catch (err) {
+          console.error(`[RefundService] Failed to upload credit note PDF:`, err)
         }
-        console.log(`[RefundService] Credit note uploaded successfully to marketplace.`)
-      } catch (err) {
-        console.error(`[RefundService] Failed to upload credit note PDF:`, err)
-      }
+      })
     }
   }
 
@@ -540,7 +543,13 @@ export async function executeRefund({
 
     if (stockUpdates.length > 0) {
       console.log(`[RefundService] Triggering marketplace sync for ${stockUpdates.length} restocked items...`)
-      await pushUpdatesToMarketplaces(companyId, stockUpdates)
+      after(async () => {
+        try {
+          await pushUpdatesToMarketplaces(companyId, stockUpdates)
+        } catch (err) {
+          console.error(`[RefundService] Error during background marketplace sync:`, err)
+        }
+      })
     }
   } catch (restockErr) {
     console.error(`[RefundService] Error during auto-restock:`, restockErr)
