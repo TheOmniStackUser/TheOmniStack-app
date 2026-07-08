@@ -74,8 +74,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
     const isTaxExempt = ['kleinunternehmer', 'drittland', 'eu_vat_id', 'reverse_charge', 'innergemeinschaftlich', 'ausfuhr', 'sonstige', 'innenumsatz'].includes(settings.taxOption)
     if (isTaxExempt) return [0]
     
-    const allEqual = settings.taxCountry === settings.shippingCountry && settings.shippingCountry === settings.destinationCountry
-    const targetCountryCode = allEqual ? settings.taxCountry : (settings.isOss ? settings.destinationCountry : 'DE')
+    const targetCountryCode = settings.taxCountry || 'DE'
     
     const countryData = EU_COUNTRIES.find(c => c.code === targetCountryCode)
     if (countryData) {
@@ -1155,7 +1154,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
             </div>
           )}
           
-          {documentType !== 'quote' && (
+          {documentType !== 'quote' && process.env.NEXT_PUBLIC_APP_VARIANT !== 'craft' && (
             <div className="pt-6 flex items-center gap-4 border-t border-slate-100 mt-4">
               <button 
                 type="button"
