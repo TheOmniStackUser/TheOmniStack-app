@@ -19,7 +19,7 @@ compliance_topics = [
 uri = "https://app.theomnistack.de/api/webhooks/shopify/gdpr"
 
 [access_scopes]
-scopes = "read_orders,write_orders"
+scopes = "read_orders,write_orders,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders"
 
 [auth]
 redirect_urls = [

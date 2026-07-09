@@ -317,10 +317,50 @@ export async function executeRefund({
       }) as any
     )
 
+    // 7. API Refund Trigger
+    let apiSuccess = false
+    if (integration) {
+      const adapter = getAdapterForIntegration(integration)
+      if (adapter && adapter.refundOrder) {
+        try {
+          let receiveResult: boolean | 'ACCEPTED' = false
+          if (adapter.receiveReturnItems) {
+            console.log(`[RefundService] Attempting to mark return items as received on marketplace...`)
+            receiveResult = await adapter.receiveReturnItems(order.marketplaceOrderId, itemsToRefund, order.rawPayload)
+          }
+
+          if (receiveResult === 'ACCEPTED') {
+            console.log(`[RefundService] Return was received and accepted (refunded) successfully via Returns API. Skipping Order Refund API.`)
+            apiSuccess = true
+          } else {
+            console.log(`[RefundService] Triggering API refund for marketplace ${order.marketplace}...`)
+            apiSuccess = await adapter.refundOrder(
+              order.marketplaceOrderId,
+              itemsToRefund,
+              order.rawPayload
+            )
+          }
+          if (apiSuccess) {
+            console.log(`[RefundService] API refund processed successfully on marketplace.`)
+          } else {
+            console.warn(`[RefundService] API refund call returned false status.`)
+          }
+        } catch (err: any) {
+          console.error(`[RefundService] Failed to trigger API refund on marketplace:`, err)
+          return { 
+            success: false, 
+            error: `Fehler bei der Kommunikation mit ${order.marketplace}: ${err?.message || 'Unbekannter Fehler'}`
+          }
+        }
+      } else {
+        console.log(`[RefundService] Adapter for ${order.marketplace} does not support refundOrder.`)
+      }
+    }
+
     const storageKey = buildInvoiceKey(companyId, creditNoteNumber)
     await uploadDocument(storageKey, pdfBuffer)
 
-    // 7. Save to DB under transaction
+    // 8. Save to DB under transaction
     await db.transaction(async (tx) => {
       const [dbCompany] = await tx
         .select()
@@ -419,72 +459,35 @@ export async function executeRefund({
         }
       ])
     })
-  }
 
-  // 8. API Refund Trigger & Upload Credit Note
-  let apiSuccess = false
-  if (integration) {
-    const adapter = getAdapterForIntegration(integration)
-    if (adapter && adapter.refundOrder) {
-      try {
-        let receiveResult: boolean | 'ACCEPTED' = false
-        if (adapter.receiveReturnItems) {
-          console.log(`[RefundService] Attempting to mark return items as received on marketplace...`)
-          receiveResult = await adapter.receiveReturnItems(order.marketplaceOrderId, itemsToRefund, order.rawPayload)
-        }
-
-        if (receiveResult === 'ACCEPTED') {
-          console.log(`[RefundService] Return was received and accepted (refunded) successfully via Returns API. Skipping Order Refund API.`)
-          apiSuccess = true
-        } else {
-          console.log(`[RefundService] Triggering API refund for marketplace ${order.marketplace}...`)
-          apiSuccess = await adapter.refundOrder(
-            order.marketplaceOrderId,
-            itemsToRefund,
-            order.rawPayload
-          )
-        }
-        if (apiSuccess) {
-          console.log(`[RefundService] API refund processed successfully on marketplace.`)
-        } else {
-          console.warn(`[RefundService] API refund call returned false status.`)
-        }
-      } catch (err: any) {
-        console.error(`[RefundService] Failed to trigger API refund on marketplace:`, err)
-        const prefix = autoCreditNote ? `Gutschrift ${creditNoteNumber} erstellt, ABER ` : ''
-        return { 
-          success: false, 
-          error: `${prefix}Fehler bei der Kommunikation mit ${order.marketplace}: ${err?.message || 'Unbekannter Fehler'}`
-        }
-      }
-    } else {
-      console.log(`[RefundService] Adapter for ${order.marketplace} does not support refundOrder.`)
-    }
-
-    if (autoCreditNote && pdfBuffer && integration.uploadInvoice && adapter && adapter.uploadInvoice) {
-      after(async () => {
-        try {
-          console.log(`[RefundService] Uploading credit note ${creditNoteNumber} to marketplace...`)
-          const isMirakl = order.marketplace.startsWith('mirakl_') || integration.type === 'mirakl_custom'
-          if (isMirakl) {
-            await (adapter as any).uploadInvoice?.(
-              order.marketplaceOrderId,
-              pdfBuffer,
-              `${creditNoteNumber}.pdf`,
-              true // isCreditNote = true
-            )
-          } else {
-            await adapter.uploadInvoice?.(
-              order.marketplaceOrderId,
-              pdfBuffer,
-              `${creditNoteNumber}.pdf`
-            )
+    if (autoCreditNote && pdfBuffer && integration && integration.uploadInvoice) {
+      const adapter = getAdapterForIntegration(integration)
+      if (adapter && adapter.uploadInvoice) {
+        const pdfToUpload = pdfBuffer // capture for typescript narrowing
+        after(async () => {
+          try {
+            console.log(`[RefundService] Uploading credit note ${creditNoteNumber} to marketplace...`)
+            const isMirakl = order.marketplace.startsWith('mirakl_') || integration.type === 'mirakl_custom'
+            if (isMirakl) {
+              await (adapter as any).uploadInvoice?.(
+                order.marketplaceOrderId,
+                pdfToUpload,
+                `${creditNoteNumber}.pdf`,
+                true // isCreditNote = true
+              )
+            } else {
+              await adapter.uploadInvoice?.(
+                order.marketplaceOrderId,
+                pdfToUpload,
+                `${creditNoteNumber}.pdf`
+              )
+            }
+            console.log(`[RefundService] Credit note uploaded successfully to marketplace.`)
+          } catch (err) {
+            console.error(`[RefundService] Failed to upload credit note PDF:`, err)
           }
-          console.log(`[RefundService] Credit note uploaded successfully to marketplace.`)
-        } catch (err) {
-          console.error(`[RefundService] Failed to upload credit note PDF:`, err)
-        }
-      })
+        })
+      }
     }
   }
 

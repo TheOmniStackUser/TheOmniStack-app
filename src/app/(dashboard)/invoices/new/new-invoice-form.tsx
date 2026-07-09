@@ -252,7 +252,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
         skontoDays: (invoice as any).skontoDays || 7,
         shippingCountry: get2LetterCountryCode((invoice as any).shippingCountry),
         destinationCountry: get2LetterCountryCode((invoice as any).destinationCountry || invoice.recipientCountry),
-        taxCountry: get2LetterCountryCode((invoice as any).taxCountry || invoice.recipientCountry),
+        taxCountry: get2LetterCountryCode((invoice as any).destinationCountry || invoice.recipientCountry),
         orderNumber: (invoice as any).orderNumber || '',
         orderDate: (invoice as any).orderDate || '',
         buyerReference: (invoice as any).buyerReference || '',
@@ -309,7 +309,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
         skontoDays: invoice.skontoDays || 7,
         shippingCountry: isCreditNoteParam === 'true' ? 'DE' : get2LetterCountryCode(invoice.shippingCountry),
         destinationCountry: get2LetterCountryCode(invoice.destinationCountry || invoice.recipientCountry),
-        taxCountry: get2LetterCountryCode(invoice.taxCountry || invoice.recipientCountry),
+        taxCountry: get2LetterCountryCode(invoice.destinationCountry || invoice.recipientCountry),
         orderNumber: invoice.orderNumber || '',
         orderDate: isCreditNoteParam === 'true' ? new Date().toISOString().split('T')[0] : (invoice.orderDate || ''),
         buyerReference: invoice.buyerReference || '',
@@ -392,7 +392,11 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
       vatId: c.vatId || '',
       customerNumber: c.customerNumber || ''
     })
-    setSettings(prev => ({ ...prev, destinationCountry: c.country || 'DE' }))
+    setSettings(prev => ({ 
+      ...prev, 
+      destinationCountry: c.country || 'DE',
+      taxCountry: EU_COUNTRIES.some(eu => eu.code === (c.country || 'DE')) ? (c.country || 'DE') : 'DE'
+    }))
     setVatCheckStatus({ 
       status: c.vatCheckResult === 'VALID' ? 'valid' : (c.vatCheckResult === 'INVALID' ? 'invalid' : 'idle'),
       lastChecked: c.lastVatCheckAt
@@ -1029,7 +1033,11 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
               <select className="w-full px-4 py-3 border border-slate-300 rounded-xl font-bold text-slate-900 outline-none bg-white" value={customer.country} onChange={e => {
                 const newCountry = e.target.value
                 setCustomer({ ...customer, country: newCountry })
-                setSettings({ ...settings, destinationCountry: newCountry })
+                setSettings({ 
+                  ...settings, 
+                  destinationCountry: newCountry,
+                  taxCountry: EU_COUNTRIES.some(eu => eu.code === newCountry) ? newCountry : 'DE'
+                })
               }}>
                 {WORLD_COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
               </select>
@@ -1113,7 +1121,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                 setSettings({ 
                   ...settings, 
                   destinationCountry: newCountry,
-                  taxCountry: settings.isOss ? newCountry : settings.taxCountry
+                  taxCountry: EU_COUNTRIES.some(eu => eu.code === newCountry) ? newCountry : 'DE'
                 })
                 setCustomer({ ...customer, country: newCountry })
               }}>

@@ -43,10 +43,10 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
     .from(marketplaceIntegrations)
     .where(eq(marketplaceIntegrations.companyId, auth.activeCompanyId))
 
-  const getMarketplaceName = (marketplace: string) => {
-    const lower = marketplace.toLowerCase()
+  const getMarketplaceName = (mapping: typeof mappings[0]) => {
+    const lower = mapping.marketplace.toLowerCase()
     if (lower === 'mirakl_custom') {
-      const customInt = integrations.find(i => i.type === 'mirakl_custom')
+      const customInt = integrations.find(i => i.id === mapping.integrationId)
       if (customInt?.metadata && typeof customInt.metadata === 'object' && 'customName' in customInt.metadata) {
         return customInt.metadata.customName as string
       }
@@ -65,7 +65,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       woocommerce: 'WooCommerce',
       shopware: 'Shopware',
     }
-    return map[lower] || marketplace
+    return map[lower] || mapping.marketplace
   }
 
   const saveProduct = async (formData: FormData) => {
@@ -245,7 +245,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                     <div className="flex justify-between items-start mb-3">
                       <div>
                         <span className="uppercase text-xs font-bold tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
-                          {getMarketplaceName(mapping.marketplace)}
+                          {getMarketplaceName(mapping)}
                         </span>
                         <div className="mt-1 flex flex-wrap items-center gap-2">
                           <p className="font-mono text-sm font-bold text-slate-700">{mapping.marketplaceSku}</p>
