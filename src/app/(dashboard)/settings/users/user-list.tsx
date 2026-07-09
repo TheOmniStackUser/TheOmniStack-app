@@ -29,6 +29,12 @@ export function UserList({
     trialExpiresAt: Date | null
     canceledAt: Date | null
     cancelEffectiveDate: Date | null
+    isProfifaktura: boolean
+    currentUsage: number
+    currentPeriodStart: Date
+    currentPeriodEnd: Date
+    isTrialPeriod: boolean
+    nextBillingDate: Date
   }
 }) {
   const [isAdding, setIsAdding] = useState(false)
@@ -493,18 +499,24 @@ export function UserList({
                     Deine Testphase läuft am {new Date(subscriptionDetails.trialExpiresAt).toLocaleDateString('de-DE')} ab.
                     Danach beginnt die reguläre monatliche Abrechnung.
                   </p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Testzeitraum: {new Date(subscriptionDetails.currentPeriodStart).toLocaleDateString('de-DE')} – {new Date(subscriptionDetails.currentPeriodEnd).toLocaleDateString('de-DE')}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Bisherige {subscriptionDetails.isProfifaktura ? 'Rechnungen' : 'Bestellungen'} im Testzeitraum: <strong className="text-slate-700">{subscriptionDetails.currentUsage}</strong>
+                  </p>
                 </>
               ) : (
                 <>
                   <p className="text-sm text-emerald-600 font-medium mt-0.5">Aktiv (Monatliche Abrechnung)</p>
                   <p className="text-xs text-slate-500 mt-1">
-                    Nächste Abrechnung am: {
-                      (() => {
-                        const now = new Date();
-                        const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-                        return nextMonth.toLocaleDateString('de-DE');
-                      })()
-                    }
+                    Nächste Abrechnung am: {subscriptionDetails?.nextBillingDate ? new Date(subscriptionDetails.nextBillingDate).toLocaleDateString('de-DE') : '-'}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Aktueller Abrechnungszeitraum: {subscriptionDetails?.currentPeriodStart ? new Date(subscriptionDetails.currentPeriodStart).toLocaleDateString('de-DE') : '-'} – {subscriptionDetails?.currentPeriodEnd ? new Date(subscriptionDetails.currentPeriodEnd).toLocaleDateString('de-DE') : '-'}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Bisherige {subscriptionDetails?.isProfifaktura ? 'Rechnungen' : 'Bestellungen'} in diesem Zeitraum: <strong className="text-slate-700">{subscriptionDetails?.currentUsage || 0}</strong>
                   </p>
                 </>
               )}
