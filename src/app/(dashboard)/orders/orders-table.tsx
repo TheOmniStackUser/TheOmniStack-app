@@ -3201,7 +3201,7 @@ export function OrdersTable({
                               </div>
                               <div className="flex justify-end gap-2">
                                 <button
-                                  onClick={() => handleRefund(order.id)}
+                                  onClick={() => handleOpenRefundItems(order)}
                                   className="text-sm text-orange-600 hover:text-orange-800 font-medium px-3 py-1.5 border border-orange-200 hover:bg-orange-50 rounded-md transition-colors flex items-center gap-2"
                                 >
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
