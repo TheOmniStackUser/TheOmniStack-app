@@ -19,11 +19,17 @@ interface Member {
 export function UserList({ 
   initialMembers, 
   currentUserRole,
-  currentUserId 
+  currentUserId,
+  subscriptionDetails
 }: { 
   initialMembers: Member[]
   currentUserRole: string
   currentUserId: string
+  subscriptionDetails?: {
+    trialExpiresAt: Date | null
+    canceledAt: Date | null
+    cancelEffectiveDate: Date | null
+  }
 }) {
   const [isAdding, setIsAdding] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -473,14 +479,44 @@ export function UserList({
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex justify-between items-center">
             <div>
               <p className="font-bold text-slate-900">Aktuelles Paket</p>
-              <p className="text-sm text-slate-500">Du nutzt derzeit alle freigeschalteten Funktionen.</p>
+              {subscriptionDetails?.canceledAt ? (
+                <>
+                  <p className="text-sm text-red-600 font-medium mt-0.5">Gekündigt</p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Dein Abonnement läuft am {subscriptionDetails.cancelEffectiveDate ? new Date(subscriptionDetails.cancelEffectiveDate).toLocaleDateString('de-DE') : 'unbekannt'} ab.
+                  </p>
+                </>
+              ) : subscriptionDetails?.trialExpiresAt && new Date(subscriptionDetails.trialExpiresAt) > new Date() ? (
+                <>
+                  <p className="text-sm text-blue-600 font-medium mt-0.5">Testphase</p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Deine Testphase läuft am {new Date(subscriptionDetails.trialExpiresAt).toLocaleDateString('de-DE')} ab.
+                    Danach beginnt die reguläre monatliche Abrechnung.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-emerald-600 font-medium mt-0.5">Aktiv (Monatliche Abrechnung)</p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Nächste Abrechnung am: {
+                      (() => {
+                        const now = new Date();
+                        const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+                        return nextMonth.toLocaleDateString('de-DE');
+                      })()
+                    }
+                  </p>
+                </>
+              )}
             </div>
-            <button
-              onClick={() => setIsCancelModalOpen(true)}
-              className="px-4 py-2 bg-white border border-slate-300 text-slate-700 font-bold rounded-lg hover:bg-slate-50 hover:text-red-600 transition-all shadow-sm cursor-pointer"
-            >
-              Paket kündigen
-            </button>
+            {!subscriptionDetails?.canceledAt && (
+              <button
+                onClick={() => setIsCancelModalOpen(true)}
+                className="px-4 py-2 bg-white border border-slate-300 text-slate-700 font-bold rounded-lg hover:bg-slate-50 hover:text-red-600 transition-all shadow-sm cursor-pointer"
+              >
+                Paket kündigen
+              </button>
+            )}
           </div>
         </div>
       )}

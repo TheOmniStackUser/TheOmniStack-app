@@ -1,6 +1,6 @@
 import { requireAuth } from '@/lib/session'
 import { db } from '@/db/client'
-import { companyMembers } from '@/db/schema/companies'
+import { companyMembers, companies } from '@/db/schema/companies'
 import { users, verificationTokens } from '@/db/schema/auth'
 import { eq, gt } from 'drizzle-orm'
 import { UserList } from './user-list'
@@ -8,7 +8,7 @@ import { UserList } from './user-list'
 export default async function UserManagementPage() {
   const auth = await requireAuth()
 
-  const [members, tokens] = await Promise.all([
+  const [members, tokens, company] = await Promise.all([
     db
       .select({
         id: users.id,
@@ -27,7 +27,17 @@ export default async function UserManagementPage() {
         token: verificationTokens.token,
       })
       .from(verificationTokens)
-      .where(gt(verificationTokens.expiresAt, new Date()))
+      .where(gt(verificationTokens.expiresAt, new Date())),
+    db
+      .select({
+        trialExpiresAt: companies.trialExpiresAt,
+        canceledAt: companies.canceledAt,
+        cancelEffectiveDate: companies.cancelEffectiveDate,
+      })
+      .from(companies)
+      .where(eq(companies.id, auth.activeCompanyId))
+      .limit(1)
+      .then(res => res[0])
   ])
 
   const enrichedMembers = members.map((m) => {
@@ -54,7 +64,12 @@ export default async function UserManagementPage() {
         </div>
       </div>
 
-      <UserList initialMembers={enrichedMembers} currentUserRole={auth.role} currentUserId={auth.userId} />
+      <UserList 
+        initialMembers={enrichedMembers} 
+        currentUserRole={auth.role} 
+        currentUserId={auth.userId} 
+        subscriptionDetails={company}
+      />
     </div>
   )
 }
