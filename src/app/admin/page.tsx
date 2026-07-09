@@ -34,6 +34,20 @@ export default async function AdminDashboardPage() {
     .orderBy(sql`count(${orders.id}) desc`)
     .limit(5)
 
+  // Canceled companies
+  const canceledCompanies = await db
+    .select({
+      id: companies.id,
+      name: companies.name,
+      canceledAt: companies.canceledAt,
+      cancelEffectiveDate: companies.cancelEffectiveDate,
+      cancelReason: companies.cancelReason,
+    })
+    .from(companies)
+    .where(sql`${companies.canceledAt} IS NOT NULL`)
+    .orderBy(sql`${companies.canceledAt} DESC`)
+    .limit(10)
+
   const monthName = now.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })
 
   return (
@@ -112,6 +126,59 @@ export default async function AdminDashboardPage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* Recently Canceled */}
+      <div className="bg-white/5 border border-red-500/20 rounded-2xl p-6 mt-8">
+        <h2 className="text-base font-semibold text-red-400 mb-4 flex items-center gap-2">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7a4 4 0 11-8 0 4 4 0 018 0zM9 14a6 6 0 00-6 6v1h12v-1a6 6 0 00-6-6zM21 12h-6" />
+          </svg>
+          Kürzlich gekündigte Mandanten
+        </h2>
+        {canceledCompanies.length === 0 ? (
+          <p className="text-white/30 text-sm">Keine Kündigungen verzeichnet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-white/10 text-xs text-white/50 uppercase">
+                  <th className="pb-3 pr-4 font-medium">Mandant</th>
+                  <th className="pb-3 px-4 font-medium">Eingegangen am</th>
+                  <th className="pb-3 px-4 font-medium">Wirksam zum</th>
+                  <th className="pb-3 pl-4 font-medium">Grund</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {canceledCompanies.map((c) => {
+                  const reason = c.cancelReason as { category: string; subReason?: string; details?: string } | null
+                  return (
+                    <tr key={c.id} className="text-sm">
+                      <td className="py-3 pr-4 text-white font-medium">{c.name}</td>
+                      <td className="py-3 px-4 text-white/70">
+                        {c.canceledAt ? new Date(c.canceledAt).toLocaleDateString('de-DE') : '-'}
+                      </td>
+                      <td className="py-3 px-4 font-bold text-red-400">
+                        {c.cancelEffectiveDate ? new Date(c.cancelEffectiveDate).toLocaleDateString('de-DE') : '-'}
+                      </td>
+                      <td className="py-3 pl-4 text-white/70 max-w-[300px]">
+                        {reason ? (
+                          <div>
+                            <span className="text-white font-medium">{reason.category}</span>
+                            {reason.subReason && <span className="text-white/50"> - {reason.subReason}</span>}
+                            {reason.details && <div className="text-xs text-white/40 truncate mt-0.5">{reason.details}</div>}
+                          </div>
+                        ) : (
+                          '-'
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

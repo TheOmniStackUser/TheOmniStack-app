@@ -128,6 +128,15 @@ export const companies = pgTable('companies', {
   featuresReturnsEnabled: boolean('features_returns_enabled').notNull().default(false),
   featuresProductsEnabled: boolean('features_products_enabled').notNull().default(false),
 
+  // Cancellation
+  canceledAt: timestamp('canceled_at', { withTimezone: true }),
+  cancelEffectiveDate: timestamp('cancel_effective_date', { withTimezone: true }),
+  cancelReason: jsonb('cancel_reason').$type<{
+    category: string;
+    subReason?: string;
+    details?: string;
+  }>(),
+
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })

@@ -122,9 +122,9 @@ export default async function DashboardLayout({
                 <span className="group-[.collapsed]/sidebar:hidden">Mobile App & API</span>
               </Link>
               
-              <Link href="/settings/users" title={canManage ? 'Team-Verwaltung' : 'Mein Profil'} className="flex items-center px-3 py-2 text-sm font-medium rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all group-[.collapsed]/sidebar:justify-center group-[.collapsed]/sidebar:px-0">
+              <Link href="/settings/users" title={canManage ? 'Team & Paket' : 'Mein Profil'} className="flex items-center px-3 py-2 text-sm font-medium rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all group-[.collapsed]/sidebar:justify-center group-[.collapsed]/sidebar:px-0">
                 <UsersIcon size={18} className="mr-3 group-[.collapsed]/sidebar:mr-0" />
-                <span className="group-[.collapsed]/sidebar:hidden">{canManage ? 'Team-Verwaltung' : 'Mein Profil'}</span>
+                <span className="group-[.collapsed]/sidebar:hidden">{canManage ? 'Team & Paket' : 'Mein Profil'}</span>
               </Link>
 
               <a 

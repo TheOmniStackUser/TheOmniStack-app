@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { addUserAction, removeUserAction, getOrCreateInviteLinkAction, updateCurrentUserAction } from '@/app/actions/users'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
+import { CancelModal } from './cancel-modal'
 
 interface Member {
   id: string
@@ -31,6 +32,8 @@ export function UserList({
   const [copiedLink, setCopiedLink] = useState(false)
 
   const [emailError, setEmailError] = useState<string | null>(null)
+  
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
 
   const currentUser = initialMembers.find((m) => m.id === currentUserId)
   
@@ -451,6 +454,38 @@ export function UserList({
           </div>
         </>
       )}
+
+      {/* Subscription Management (Owner Only) */}
+      {currentUserRole === 'owner' && (
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 mt-8">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-3 rounded-xl bg-slate-50 text-slate-600">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-slate-900">Abonnement & Paket</h3>
+              <p className="text-sm text-slate-500">Verwalte dein aktuelles TheOmniStack Paket.</p>
+            </div>
+          </div>
+          
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex justify-between items-center">
+            <div>
+              <p className="font-bold text-slate-900">Aktuelles Paket</p>
+              <p className="text-sm text-slate-500">Du nutzt derzeit alle freigeschalteten Funktionen.</p>
+            </div>
+            <button
+              onClick={() => setIsCancelModalOpen(true)}
+              className="px-4 py-2 bg-white border border-slate-300 text-slate-700 font-bold rounded-lg hover:bg-slate-50 hover:text-red-600 transition-all shadow-sm cursor-pointer"
+            >
+              Paket kündigen
+            </button>
+          </div>
+        </div>
+      )}
+
+      <CancelModal isOpen={isCancelModalOpen} onClose={() => setIsCancelModalOpen(false)} />
     </div>
   )
 }

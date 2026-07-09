@@ -49,7 +49,7 @@ export default async function UserManagementPage() {
     <div className="max-w-5xl mx-auto py-8">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Userverwaltung</h1>
+          <h1 className="text-3xl font-bold text-slate-900">Team & Paket</h1>
           <p className="text-slate-500 mt-2">Verwalte den Zugriff deines Teams auf diesen Mandanten.</p>
         </div>
       </div>

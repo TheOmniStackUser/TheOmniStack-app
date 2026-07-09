@@ -169,6 +169,20 @@
       "when": 1783262298242,
       "tag": "0023_safe_human_cannonball",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1783275225019,
+      "tag": "0024_odd_multiple_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1783593432308,
+      "tag": "0025_strange_sasquatch",
+      "breakpoints": true
     }
   ]
 }
