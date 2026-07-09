@@ -22,6 +22,8 @@ export default async function AdminMerchantsPage() {
       email: companies.email,
       createdAt: companies.createdAt,
       trialExpiresAt: companies.trialExpiresAt,
+      registeredApp: companies.registeredApp,
+      canceledAt: companies.canceledAt,
     })
     .from(companies)
     .orderBy(companies.createdAt)
@@ -64,6 +66,26 @@ export default async function AdminMerchantsPage() {
     .from(companyMembers)
     .groupBy(companyMembers.companyId)
 
+  // Last login per company
+  const userLogins = await db
+    .select({
+      companyId: companyMembers.companyId,
+      lastLoginAt: users.lastLoginAt,
+      lastLoginApp: users.lastLoginApp
+    })
+    .from(companyMembers)
+    .innerJoin(users, eq(companyMembers.userId, users.id))
+
+  const latestLoginMap = new Map<string, { time: Date, app: string | null }>()
+  for (const row of userLogins) {
+    if (row.lastLoginAt) {
+      const current = latestLoginMap.get(row.companyId)
+      if (!current || row.lastLoginAt > current.time) {
+        latestLoginMap.set(row.companyId, { time: row.lastLoginAt, app: row.lastLoginApp })
+      }
+    }
+  }
+
   const thisMonthMap = new Map(ordersThisMonth.map(r => [r.companyId, Number(r.count)]))
   const lastMonthMap = new Map(ordersLastMonth.map(r => [r.companyId, Number(r.count)]))
   const totalMap = new Map(ordersTotalByCompany.map(r => [r.companyId, Number(r.count)]))
@@ -85,10 +107,13 @@ export default async function AdminMerchantsPage() {
             <thead>
               <tr className="border-b border-white/10">
                 <th className="text-left px-6 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider">Händler</th>
+                <th className="text-left px-6 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider">App</th>
+                <th className="text-left px-6 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider">Letzter Login</th>
                 <th className="text-right px-6 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider">Nutzer</th>
                 <th className="text-right px-6 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider">{lastMonthName}</th>
                 <th className="text-right px-6 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider">{monthName}</th>
                 <th className="text-right px-6 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider">Gesamt</th>
+                <th className="text-center px-6 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider">Status</th>
                 <th className="text-center px-6 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider">Testphase</th>
                 <th className="text-right px-6 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider">Details</th>
               </tr>
@@ -109,6 +134,21 @@ export default async function AdminMerchantsPage() {
                         <p className="text-xs text-white/30 mt-0.5">{company.email || '–'}</p>
                       </div>
                     </td>
+                    <td className="px-6 py-4">
+                      <span className="inline-flex items-center rounded-md bg-white/10 px-2 py-1 text-xs font-medium text-white ring-1 ring-inset ring-white/20">
+                        {company.registeredApp}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      {latestLoginMap.has(company.id) ? (
+                        <div>
+                          <p className="text-sm text-white">{latestLoginMap.get(company.id)?.time.toLocaleDateString('de-DE')}</p>
+                          <p className="text-xs text-white/40">{latestLoginMap.get(company.id)?.app || 'Unbekannt'}</p>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-white/30">–</span>
+                      )}
+                    </td>
                     <td className="px-6 py-4 text-right text-white/60">{userCount}</td>
                     <td className="px-6 py-4 text-right text-white/60">{lastMonth}</td>
                     <td className="px-6 py-4 text-right">
@@ -122,6 +162,17 @@ export default async function AdminMerchantsPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right text-white/40 text-xs">{total}</td>
+                    <td className="px-6 py-4 text-center">
+                      {company.canceledAt ? (
+                        <span className="bg-red-500/10 text-red-400 text-[10px] px-2 py-1 rounded-full font-bold">
+                          Gekündigt
+                        </span>
+                      ) : (
+                        <span className="bg-emerald-500/10 text-emerald-400 text-[10px] px-2 py-1 rounded-full font-bold">
+                          Aktiv
+                        </span>
+                      )}
+                    </td>
                     <td className="px-6 py-4 text-center">
                       {company.trialExpiresAt ? (
                         (() => {

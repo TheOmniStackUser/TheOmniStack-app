@@ -71,8 +71,8 @@ export async function cancelSubscriptionAction(formData: FormData) {
       <h3>Kündigungsgrund:</h3>
       <ul>
         <li><strong>Kategorie:</strong> ${category}</li>
-        ${subReason ? \`<li><strong>Detail:</strong> \${subReason}</li>\` : ''}
-        ${details ? \`<li><strong>Zusatzinfo:</strong> \${details}</li>\` : ''}
+        ${subReason ? `<li><strong>Detail:</strong> ${subReason}</li>` : ''}
+        ${details ? `<li><strong>Zusatzinfo:</strong> ${details}</li>` : ''}
       </ul>
       <p>Eingereicht am: ${now.toLocaleString('de-DE')}</p>
     `

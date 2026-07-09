@@ -5,6 +5,7 @@ import { companies } from '@/db/schema/companies'
 import { users } from '@/db/schema/auth'
 import { companyMembers } from '@/db/schema/companies'
 import { sql, count, gte, and } from 'drizzle-orm'
+import Link from 'next/link'
 
 export default async function AdminDashboardPage() {
   await requireSuperAdmin()
@@ -63,6 +64,7 @@ export default async function AdminDashboardPage() {
         <StatCard
           label="Händler gesamt"
           value={totalCompanies.count.toString()}
+          href="/admin/merchants"
           icon={
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5" />
@@ -191,11 +193,13 @@ function StatCard({
   value,
   icon,
   color,
+  href,
 }: {
   label: string
   value: string
   icon: React.ReactNode
   color: 'violet' | 'blue' | 'emerald' | 'amber'
+  href?: string
 }) {
   const colors = {
     violet: 'from-violet-500/20 to-violet-500/5 border-violet-500/20 text-violet-400',
@@ -203,11 +207,18 @@ function StatCard({
     emerald: 'from-emerald-500/20 to-emerald-500/5 border-emerald-500/20 text-emerald-400',
     amber: 'from-amber-500/20 to-amber-500/5 border-amber-500/20 text-amber-400',
   }
-  return (
-    <div className={`bg-gradient-to-br ${colors[color]} border rounded-2xl p-5`}>
+  
+  const content = (
+    <div className={`bg-gradient-to-br ${colors[color]} border rounded-2xl p-5 h-full ${href ? 'hover:brightness-110 transition-all cursor-pointer' : ''}`}>
       <div className={`mb-3 ${colors[color].split(' ').find(c => c.startsWith('text-'))}`}>{icon}</div>
       <p className="text-3xl font-bold text-white mb-1">{value}</p>
       <p className="text-xs text-white/40">{label}</p>
     </div>
   )
+
+  if (href) {
+    return <Link href={href} className="block h-full">{content}</Link>
+  }
+
+  return content
 }

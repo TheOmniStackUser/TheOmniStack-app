@@ -134,6 +134,15 @@ export async function loginAction(
     redirect('/login/2fa')
   }
 
+  // Update last login
+  await db
+    .update(users)
+    .set({
+      lastLoginAt: new Date(),
+      lastLoginApp: process.env.APP_NAME || 'TheOmniStack'
+    })
+    .where(eq(users.id, user.id))
+
   // Find the user's first company to set as active context
   const [membership] = await db
     .select({ companyId: companyMembers.companyId })
@@ -243,6 +252,15 @@ export async function verifyTwoFactorLoginAction(
 
   // Success - Clear pending state and create session
   await clearTwoFactorPending()
+
+  // Update last login
+  await db
+    .update(users)
+    .set({
+      lastLoginAt: new Date(),
+      lastLoginApp: process.env.APP_NAME || 'TheOmniStack'
+    })
+    .where(eq(users.id, user.id))
 
   const [membership] = await db
     .select({ companyId: companyMembers.companyId })
@@ -466,6 +484,7 @@ export async function completeRegistrationAction(
       .values({ 
         name: companyName, 
         legalName: companyLegalName,
+        registeredApp: process.env.APP_NAME || 'TheOmniStack',
         trialExpiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) // 14 days
       })
       .returning({ id: companies.id })
@@ -679,6 +698,8 @@ export async function acceptInvitationAction(
     .set({
       passwordHash,
       emailVerifiedAt: new Date(),
+      lastLoginAt: new Date(),
+      lastLoginApp: process.env.APP_NAME || 'TheOmniStack'
     })
     .where(eq(users.id, user.id))
 
