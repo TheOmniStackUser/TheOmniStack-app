@@ -455,8 +455,8 @@ export function UserList({
         </>
       )}
 
-      {/* Subscription Management (Owner Only) */}
-      {currentUserRole === 'owner' && (
+      {/* Subscription Management (Owner & Admin Only) */}
+      {(currentUserRole === 'owner' || currentUserRole === 'admin') && (
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 mt-8">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-3 rounded-xl bg-slate-50 text-slate-600">

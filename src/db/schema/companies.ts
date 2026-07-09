@@ -136,6 +136,7 @@ export const companies = pgTable('companies', {
     subReason?: string;
     details?: string;
   }>(),
+  registeredApp: text('registered_app').notNull().default('TheOmniStack'),
 
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

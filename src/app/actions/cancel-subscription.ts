@@ -12,8 +12,8 @@ export async function cancelSubscriptionAction(formData: FormData) {
   try {
     const auth = await requireAuth()
     
-    if (auth.role !== 'owner') {
-      return { error: 'Nur der Besitzer (Owner) kann das Paket kündigen.' }
+    if (auth.role !== 'owner' && auth.role !== 'admin') {
+      return { error: 'Nur der Besitzer oder Administrator kann das Paket kündigen.' }
     }
 
     const category = formData.get('category') as string
