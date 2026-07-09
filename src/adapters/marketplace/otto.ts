@@ -681,6 +681,12 @@ export class OttoAdapter implements MarketplaceAdapter {
       if (!response.ok) {
         const errText = await response.text()
         console.error(`[OttoAdapter] Refund failed: ${response.status} - ${errText}`)
+        
+        if (errText.includes('The return has already been accepted')) {
+          console.log(`[OttoAdapter] Return already accepted by Otto, treating as success.`)
+          return true
+        }
+        
         throw new Error(`Otto API returns error: ${errText}`)
       }
 

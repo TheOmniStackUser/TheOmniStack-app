@@ -206,6 +206,9 @@ export function ReturnsList({
       try {
         const orderDetails = await getOrderDetailsAction(orderId)
         
+        // Cache the order details so the modal can display order notes
+        setOrderDetailsCache(prev => ({ ...prev, [log.id]: orderDetails }))
+        
         // Match order items with returned items
         const inputs = orderDetails.items.map((orderItem: any) => {
           const matchingScannedItem = log.items.find(
