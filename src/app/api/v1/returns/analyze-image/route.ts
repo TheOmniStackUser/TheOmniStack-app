@@ -69,8 +69,8 @@ export async function POST(req: NextRequest) {
 
       1. BESTELLNUMMER (order_number): 
          - Auf dem HERMES Label: Suche nach "ReferenzNr." (z.B. cbn4xbrc7k). Das ist die wichtigste ID!
-         - Auf dem LIEFERSCHEIN: Suche nach der TATSÄCHLICHEN BESTELLNUMMER (z.B. "Bestellnummer", "Bestell-Nr.", "Ihre Bestellung Nr.", "Order-ID").
-         - ACHTUNG: Die "Lieferscheinnummer" / "Lieferschein-Nr." (z.B. 44440) ist *NICHT* die Bestellnummer! Extrahiere NIEMALS die Lieferscheinnummer in das Feld "order_number". Wir benötigen die echte Bestellnummer, um den Beleg mit der Datenbank abzugleichen. Wenn keine echte Bestellnummer auf dem Lieferschein steht, gib null zurück oder verwende die Marktplatz-Referenznummer (z.B. Amazon / Otto Bestell-ID).
+         - Auf dem LIEFERSCHEIN: Suche nach der TATSÄCHLICHEN BESTELLNUMMER / AUFTRAGSNUMMER (z.B. "Bestellnummer", "Auftragsnummer", "Bestell-Nr.", "Ihre Bestellung Nr.", "Order-ID").
+         - ACHTUNG: Die "Lieferscheinnummer" / "Lieferschein-Nr." (z.B. 44440) ist *NICHT* die Bestellnummer/Auftragsnummer! Extrahiere NIEMALS die Lieferscheinnummer in das Feld "order_number". Wir benötigen die echte Bestellnummer, um den Beleg mit der Datenbank abzugleichen. Wenn keine echte Bestellnummer auf dem Lieferschein steht, gib null zurück oder verwende die Marktplatz-Referenznummer (z.B. Amazon / Otto Bestell-ID).
       
       2. KUNDE (customer_name):
          - Der Name unter "Absender" (Label) oder oben links (Lieferschein), z.B. "Carmen Hinkel".

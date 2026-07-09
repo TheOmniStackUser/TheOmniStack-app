@@ -501,7 +501,7 @@ export function ReturnsList({
     if (!editingLog) return
     const cleanedOrderNumber = editOrderNumber.trim()
     if (!cleanedOrderNumber) {
-      showToast('Bestellnummer darf nicht leer sein.', 'error')
+      showToast(process.env.NEXT_PUBLIC_APP_VARIANT === 'craft' ? 'Auftragsnummer darf nicht leer sein.' : 'Bestellnummer darf nicht leer sein.', 'error')
       return
     }
 
@@ -560,7 +560,7 @@ export function ReturnsList({
           <div className="relative flex-1">
             <input
               type="text"
-              placeholder="Bestellnr., Kunde, Notiz suchen..."
+              placeholder={process.env.NEXT_PUBLIC_APP_VARIANT === 'craft' ? "Auftragsnr., Kunde, Notiz suchen..." : "Bestellnr., Kunde, Notiz suchen..."}
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value)
@@ -766,7 +766,7 @@ export function ReturnsList({
                 { label: 'Scan-Zeitpunkt', key: 'scannedAt' },
                 { label: 'Mitarbeiter', key: 'user' },
                 { label: 'Marktplatz', key: 'marketplace' },
-                { label: 'Bestellnummer', key: 'orderNumber' },
+                { label: process.env.NEXT_PUBLIC_APP_VARIANT === 'craft' ? 'Auftragsnummer' : 'Bestellnummer', key: 'orderNumber' },
                 { label: 'Versand', key: 'shippingAddress' }, // Use shippingAddress as placeholder for Versand sorting if needed
                 { label: 'Kunde & Notiz', key: 'customerName' },
               ].map(({ label, key }) => (
@@ -1261,7 +1261,7 @@ export function ReturnsList({
             <div className="p-6 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-bold text-slate-900">Retouren-Daten anpassen</h3>
-                <p className="text-xs text-slate-500 mt-1">Ändere Bestellnummer, Kunde, Lieferadresse und die erfassten Waren.</p>
+                <p className="text-xs text-slate-500 mt-1">Ändere {process.env.NEXT_PUBLIC_APP_VARIANT === 'craft' ? 'Auftragsnummer' : 'Bestellnummer'}, Kunde, Lieferadresse und die erfassten Waren.</p>
               </div>
               <button
                 onClick={() => setEditingLog(null)}
@@ -1278,7 +1278,7 @@ export function ReturnsList({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Order Number */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Bestellnummer</label>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">{process.env.NEXT_PUBLIC_APP_VARIANT === 'craft' ? 'Auftragsnummer' : 'Bestellnummer'}</label>
                   <input
                     type="text"
                     value={editOrderNumber}

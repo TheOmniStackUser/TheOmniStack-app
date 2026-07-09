@@ -763,7 +763,7 @@ export function OrdersTable({
     }
 
     for (const order of orders) {
-      addSuggestion('Bestellnummer', getOrderNumber(order), getOrderBuyerName(order) || formatMarketplaceName(order.marketplace, order.shippingCountry))
+      addSuggestion(process.env.NEXT_PUBLIC_APP_VARIANT === 'craft' ? 'Auftragsnummer' : 'Bestellnummer', getOrderNumber(order), getOrderBuyerName(order) || formatMarketplaceName(order.marketplace, order.shippingCountry))
       addSuggestion('Kunde', getOrderBuyerName(order), getOrderNumber(order))
       addSuggestion('Sendungsnummer', order.trackingNumber || '', getOrderNumber(order))
       if (suggestions.length >= 6) break
@@ -1946,7 +1946,7 @@ export function OrdersTable({
                 }}
                 onFocus={() => setIsSearchFocused(true)}
                 onBlur={() => setIsSearchFocused(false)}
-                placeholder="Nach Bestellnummer, Kunde oder Sendungsnummer suchen..."
+                placeholder={process.env.NEXT_PUBLIC_APP_VARIANT === 'craft' ? "Nach Auftragsnummer, Kunde oder Sendungsnummer suchen..." : "Nach Bestellnummer, Kunde oder Sendungsnummer suchen..."}
                 className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 font-medium placeholder-gray-500 bg-gray-50/30 transition-all"
               />
               {draftSearch && (
@@ -2207,7 +2207,7 @@ export function OrdersTable({
             }}
             className="px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[150px] text-gray-900 font-medium text-sm"
           >
-            <option value="purchase">Bestelldatum</option>
+            <option value="purchase">{process.env.NEXT_PUBLIC_APP_VARIANT === 'craft' ? 'Auftragsdatum' : 'Bestelldatum'}</option>
             <option value="invoice">Rechnungsdatum</option>
             <option value="shipping">Versanddatum</option>
           </select>
@@ -2268,10 +2268,10 @@ export function OrdersTable({
                     onChange={toggleAll}
                   />
                 </th>
-                {renderSortableHeader('Bestelldatum', 'bestelldatum')}
+                {renderSortableHeader(process.env.NEXT_PUBLIC_APP_VARIANT === 'craft' ? 'Auftragsdatum' : 'Bestelldatum', 'bestelldatum')}
                 {renderSortableHeader('Marktplatz', 'marketplace')}
                 {renderSortableHeader('Status', 'status')}
-                {renderSortableHeader('Bestellnummer', 'orderNumber')}
+                {renderSortableHeader(process.env.NEXT_PUBLIC_APP_VARIANT === 'craft' ? 'Auftragsnummer' : 'Bestellnummer', 'orderNumber')}
                 {renderSortableHeader('Kunde', 'kunde')}
                 {renderSortableHeader('Land', 'land')}
                 {renderSortableHeader('Umsatz', 'umsatz', 'right')}
@@ -2622,7 +2622,7 @@ export function OrdersTable({
                                   <span className="font-medium">System Auftrags-ID:</span> <span className="text-gray-500">{order.marketplaceOrderId}</span>
                                 </div>
                                 <div>
-                                  <span className="font-medium">Bestelldatum:</span> <span className="text-gray-500">{formattedBestellDate}</span>
+                                  <span className="font-medium">{process.env.NEXT_PUBLIC_APP_VARIANT === 'craft' ? 'Auftragsdatum' : 'Bestelldatum'}:</span> <span className="text-gray-500">{formattedBestellDate}</span>
                                 </div>
                                 <div>
                                   <span className="font-medium">Versanddatum:</span> <span className="text-gray-500">{formattedVersandDate}</span>

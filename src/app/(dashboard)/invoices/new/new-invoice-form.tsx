@@ -1121,10 +1121,10 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
               </select>
             </div>
             <div><label className="block text-xs font-bold text-slate-600 uppercase mb-2">Steuerland</label><select className="w-full px-4 py-3 border border-slate-300 rounded-xl font-bold text-slate-900 outline-none bg-white" value={settings.taxCountry} onChange={e => setSettings({ ...settings, taxCountry: e.target.value })}>{EU_COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}</select></div>
-            <div><label className="block text-xs font-bold text-slate-600 uppercase mb-2">Bestellnummer</label><input className="w-full px-4 py-3 border border-slate-300 rounded-xl font-bold text-slate-900 outline-none" value={settings.orderNumber} onChange={e => setSettings({ ...settings, orderNumber: e.target.value })} placeholder="P000123" /></div>
+            <div><label className="block text-xs font-bold text-slate-600 uppercase mb-2">{process.env.NEXT_PUBLIC_APP_VARIANT === 'craft' ? 'Auftragsnummer' : 'Bestellnummer'}</label><input className="w-full px-4 py-3 border border-slate-300 rounded-xl font-bold text-slate-900 outline-none" value={settings.orderNumber} onChange={e => setSettings({ ...settings, orderNumber: e.target.value })} placeholder="P000123" /></div>
             <div>
               <label className="block text-xs font-bold text-slate-600 uppercase mb-2">
-                {settings.isCreditNote ? 'Gutschriftsdatum' : 'Bestelldatum'}
+                {settings.isCreditNote ? 'Gutschriftsdatum' : (process.env.NEXT_PUBLIC_APP_VARIANT === 'craft' ? 'Auftragsdatum' : 'Bestelldatum')}
               </label>
               <input 
                 type="date" 

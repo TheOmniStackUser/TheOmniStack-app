@@ -270,7 +270,7 @@ export function ManualImport({
         </button>
       </div>
       <p className="text-xs text-gray-500 mt-3">
-        Tipp: Wird für Mirakl als Versanddatum (start_date) und für Otto als Bestelldatum (fromOrderDate) interpretiert.
+        Tipp: Wird für Mirakl als Versanddatum (start_date) und für Otto als {process.env.NEXT_PUBLIC_APP_VARIANT === 'craft' ? 'Auftragsdatum' : 'Bestelldatum'} (fromOrderDate) interpretiert.
       </p>
 
       {/* Progress UI */}

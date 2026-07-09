@@ -843,7 +843,7 @@ export function InvoiceList({
       addSuggestion('Rechnungsnummer', invoice.invoiceNumber, invoice.recipientName || documentLabel)
       addSuggestion('Kunde', invoice.recipientName, invoice.invoiceNumber || documentLabel)
       addSuggestion('Entwurf', invoice.draftName, invoice.recipientName || documentLabel)
-      addSuggestion('Bestellnummer', invoice.marketplaceOrderId, invoice.invoiceNumber || documentLabel)
+      addSuggestion(process.env.NEXT_PUBLIC_APP_VARIANT === 'craft' ? 'Auftragsnummer' : 'Bestellnummer', invoice.marketplaceOrderId, invoice.invoiceNumber || documentLabel)
       if (suggestions.length >= 6) break
     }
 
@@ -1366,7 +1366,7 @@ export function InvoiceList({
                   <option value="all">Alle Felder</option>
                   <option value="invoice">Belegnummer</option>
                   <option value="customer">Kunde</option>
-                  <option value="order">Bestellnummer</option>
+                  <option value="order">{process.env.NEXT_PUBLIC_APP_VARIANT === 'craft' ? 'Auftragsnummer' : 'Bestellnummer'}</option>
                   <option value="tracking">Tracking / Retoure</option>
                 </select>
                 <div className="relative flex-1">
@@ -1625,7 +1625,7 @@ export function InvoiceList({
               </th>
               {renderSortableHeader('Datum', 'createdAt')}
               {renderSortableHeader('Belegnummer', 'invoiceNumber')}
-              {renderSortableHeader('Bestellnummer', 'marketplaceOrderId')}
+              {renderSortableHeader(process.env.NEXT_PUBLIC_APP_VARIANT === 'craft' ? 'Auftragsnummer' : 'Bestellnummer', 'marketplaceOrderId')}
               {renderSortableHeader('Typ', 'type')}
               {renderSortableHeader('Marktplatz', 'marketplace')}
               {renderSortableHeader('Kunde', 'recipientName')}
@@ -2327,7 +2327,7 @@ export function InvoiceList({
                           const orderNum = isManual 
                             ? (details.linkedOrder.rawPayload as any)?.manualMetadata?.orderNumber 
                             : details.linkedOrder.marketplaceOrderId
-                          return orderNum ? ` • Bestellnr. ${orderNum}` : ''
+                          return orderNum ? ` • ${process.env.NEXT_PUBLIC_APP_VARIANT === 'craft' ? 'Auftragsnr.' : 'Bestellnr.'} ${orderNum}` : ''
                         })()}
                       </p>
 
@@ -2562,7 +2562,7 @@ export function InvoiceList({
                               <>
                                 {(!isManual || orderNum) && (
                                   <div className="grid grid-cols-3 border-b border-slate-100 p-3 bg-white">
-                                    <span className="text-slate-400 font-semibold uppercase tracking-wider">Bestellnr.</span>
+                                    <span className="text-slate-400 font-semibold uppercase tracking-wider">{process.env.NEXT_PUBLIC_APP_VARIANT === 'craft' ? 'Auftragsnr.' : 'Bestellnr.'}</span>
                                     <span className="col-span-2 text-slate-800 font-bold">{orderNum}</span>
                                   </div>
                                 )}

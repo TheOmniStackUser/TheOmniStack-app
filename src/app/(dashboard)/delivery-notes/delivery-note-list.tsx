@@ -1173,7 +1173,7 @@ export function DeliveryNoteList({
                           const orderNum = details.linkedOrder?.marketplace === 'manual'
                             ? (details.linkedOrder.rawPayload as any)?.manualMetadata?.orderNumber 
                             : details.linkedOrder?.marketplaceOrderId
-                          return orderNum ? ` • Bestellnr. ${orderNum}` : ''
+                          return orderNum ? ` • ${process.env.NEXT_PUBLIC_APP_VARIANT === 'craft' ? 'Auftragsnr.' : 'Bestellnr.'} ${orderNum}` : ''
                         })()}
                       </p>
 

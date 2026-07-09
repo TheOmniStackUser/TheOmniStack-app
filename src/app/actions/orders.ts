@@ -626,6 +626,43 @@ export async function refundOrderAction(orderId: string) {
 
     const { returnsLog, returnedItems } = await import('@/db/schema/returns')
 
+    // Find previous returns to calculate already refunded quantities
+    const previousReturns = await db.select().from(returnsLog).where(
+      eq(returnsLog.orderId, order.id)
+    )
+    
+    // We only care about returns that have metadata.refundedItems (from executeRefund)
+    const refundedCounts: Record<string, number> = {}
+    for (const ret of previousReturns) {
+      if (ret.status === 'bearbeitet' && ret.metadata && (ret.metadata as any).refundedItems) {
+        const items = (ret.metadata as any).refundedItems as any[]
+        for (const item of items) {
+          if (!refundedCounts[item.sku]) refundedCounts[item.sku] = 0
+          refundedCounts[item.sku] += Number(item.quantity)
+        }
+      }
+    }
+
+    const itemsToRefund: { sku: string; quantity: number }[] = []
+    
+    for (const item of order.items) {
+      const sku = item.sku || 'UNKNOWN'
+      const orderQty = Number(item.quantity) || 1
+      const returnedQty = refundedCounts[sku] || 0
+      const remainingQty = Math.max(0, orderQty - returnedQty)
+      
+      if (remainingQty > 0) {
+        itemsToRefund.push({
+          sku,
+          quantity: remainingQty
+        })
+      }
+    }
+
+    if (itemsToRefund.length === 0) {
+      return { error: 'Diese Bestellung wurde bereits vollständig erstattet.' }
+    }
+
     // Create a new return log for this manual refund
     const [newReturn] = await db.insert(returnsLog).values({
       companyId: auth.activeCompanyId,
@@ -639,22 +676,18 @@ export async function refundOrderAction(orderId: string) {
       receivedAt: new Date()
     }).returning({ id: returnsLog.id })
 
-    // Insert all items
+    // Insert all items to refund
     await db.insert(returnedItems).values(
-      order.items.map(item => ({
+      itemsToRefund.map(item => ({
         returnLogId: newReturn.id,
-        skuOrProductName: item.sku || 'UNKNOWN',
-        quantity: Number(item.quantity),
+        skuOrProductName: item.sku,
+        quantity: item.quantity,
         condition: 'new',
-        notes: 'Manuelle vollständige Erstattung'
+        notes: 'Manuelle Erstattung'
       }))
     )
 
     const { executeRefund } = await import('@/lib/refund-service')
-    const itemsToRefund = order.items.map(item => ({
-      sku: item.sku || 'UNKNOWN',
-      quantity: Number(item.quantity) || 1
-    }))
 
     const result = await executeRefund({
       companyId: auth.activeCompanyId,

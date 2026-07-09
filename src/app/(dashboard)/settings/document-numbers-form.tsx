@@ -173,8 +173,8 @@ export function DocumentNumbersForm({ company }: { company: Company }) {
     },
     {
       key: 'purchaseOrder' as const,
-      label: 'Bestellung',
-      numberLabel: 'Nächste Bestellnummer',
+      label: process.env.NEXT_PUBLIC_APP_VARIANT === 'craft' ? 'Auftrag' : 'Bestellung',
+      numberLabel: process.env.NEXT_PUBLIC_APP_VARIANT === 'craft' ? 'Nächste Auftragsnummer' : 'Nächste Bestellnummer',
       auto: purchaseOrderAuto,
       setAuto: setPurchaseOrderAuto,
       next: purchaseOrderNext,
