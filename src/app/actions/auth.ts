@@ -15,6 +15,15 @@ import { sendVerificationEmail } from '@/lib/email'
 
 const rateLimitMap = new Map<string, { count: number, resetAt: number }>()
 
+async function getAppName() {
+  const hdrs = await headers()
+  const host = hdrs.get('host') || ''
+  if (host.includes('profifaktura')) {
+    return 'ProfiFaktura'
+  }
+  return process.env.APP_NAME || 'TheOmniStack'
+}
+
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 const LoginSchema = z.object({
   email: z.string().email({ message: 'Bitte gib eine gültige E-Mail ein.' }).trim(),
@@ -28,6 +37,7 @@ const RegisterSchema = z.object({
     .min(8, { message: 'Passwort muss mindestens 8 Zeichen lang sein.' })
     .regex(/[A-Z]/, { message: 'Muss einen Großbuchstaben enthalten.' })
     .regex(/[0-9]/, { message: 'Muss eine Zahl enthalten.' }),
+  terms: z.literal('on', { errorMap: () => ({ message: 'Du musst den Dokumenten zustimmen.' }) }),
 })
 
 const DetailsSchema = z.object({
@@ -139,7 +149,7 @@ export async function loginAction(
     .update(users)
     .set({
       lastLoginAt: new Date(),
-      lastLoginApp: process.env.APP_NAME || 'TheOmniStack'
+      lastLoginApp: await getAppName()
     })
     .where(eq(users.id, user.id))
 
@@ -258,7 +268,7 @@ export async function verifyTwoFactorLoginAction(
     .update(users)
     .set({
       lastLoginAt: new Date(),
-      lastLoginApp: process.env.APP_NAME || 'TheOmniStack'
+      lastLoginApp: await getAppName()
     })
     .where(eq(users.id, user.id))
 
@@ -345,6 +355,7 @@ export async function startRegistrationAction(
   const validated = RegisterSchema.safeParse({
     email: formData.get('email'),
     password: formData.get('password'),
+    terms: formData.get('terms'),
   })
 
   if (!validated.success) {
@@ -484,7 +495,7 @@ export async function completeRegistrationAction(
       .values({ 
         name: companyName, 
         legalName: companyLegalName,
-        registeredApp: process.env.APP_NAME || 'TheOmniStack',
+        registeredApp: await getAppName(),
         trialExpiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) // 14 days
       })
       .returning({ id: companies.id })
@@ -699,7 +710,7 @@ export async function acceptInvitationAction(
       passwordHash,
       emailVerifiedAt: new Date(),
       lastLoginAt: new Date(),
-      lastLoginApp: process.env.APP_NAME || 'TheOmniStack'
+      lastLoginApp: await getAppName()
     })
     .where(eq(users.id, user.id))
 
