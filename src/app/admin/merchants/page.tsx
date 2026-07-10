@@ -6,8 +6,16 @@ import { users } from '@/db/schema/auth'
 import { sql, count, gte, lte, and, eq } from 'drizzle-orm'
 import Link from 'next/link'
 
-export default async function AdminMerchantsPage() {
+export default async function AdminMerchantsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
   await requireSuperAdmin()
+
+  const params = await searchParams
+  const sort = typeof params.sort === 'string' ? params.sort : 'createdAt'
+  const order = typeof params.order === 'string' ? params.order : 'desc'
 
   const now = new Date()
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -26,7 +34,6 @@ export default async function AdminMerchantsPage() {
       canceledAt: companies.canceledAt,
     })
     .from(companies)
-    .orderBy(companies.createdAt)
 
   // Orders this month per company
   const ordersThisMonth = await db
@@ -94,6 +101,103 @@ export default async function AdminMerchantsPage() {
   const monthName = now.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })
   const lastMonthName = new Date(now.getFullYear(), now.getMonth() - 1).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })
 
+  const enrichedCompanies = allCompanies.map(company => {
+    const thisMonth = thisMonthMap.get(company.id) ?? 0
+    const lastMonth = lastMonthMap.get(company.id) ?? 0
+    const total = totalMap.get(company.id) ?? 0
+    const userCount = usersMap.get(company.id) ?? 0
+    const trend = lastMonth === 0 ? null : Math.round(((thisMonth - lastMonth) / lastMonth) * 100)
+    const latestLogin = latestLoginMap.get(company.id)
+
+    return {
+      ...company,
+      thisMonth,
+      lastMonth,
+      total,
+      userCount,
+      trend,
+      latestLogin
+    }
+  })
+
+  enrichedCompanies.sort((a, b) => {
+    let valA: any = a.createdAt?.getTime() ?? 0
+    let valB: any = b.createdAt?.getTime() ?? 0
+
+    switch (sort) {
+      case 'name':
+        valA = a.name.toLowerCase()
+        valB = b.name.toLowerCase()
+        break
+      case 'app':
+        valA = a.registeredApp.toLowerCase()
+        valB = b.registeredApp.toLowerCase()
+        break
+      case 'login':
+        valA = a.latestLogin?.time?.getTime() ?? 0
+        valB = b.latestLogin?.time?.getTime() ?? 0
+        break
+      case 'users':
+        valA = a.userCount
+        valB = b.userCount
+        break
+      case 'lastMonth':
+        valA = a.lastMonth
+        valB = b.lastMonth
+        break
+      case 'thisMonth':
+        valA = a.thisMonth
+        valB = b.thisMonth
+        break
+      case 'total':
+        valA = a.total
+        valB = b.total
+        break
+      case 'status':
+        valA = a.canceledAt ? 1 : 0
+        valB = b.canceledAt ? 1 : 0
+        break
+      case 'trial':
+        valA = a.trialExpiresAt?.getTime() ?? 0
+        valB = b.trialExpiresAt?.getTime() ?? 0
+        break
+    }
+
+    if (valA < valB) return order === 'asc' ? -1 : 1
+    if (valA > valB) return order === 'asc' ? 1 : -1
+    return 0
+  })
+
+  const toggleOrder = (col: string) => {
+    if (sort === col) {
+      return order === 'asc' ? 'desc' : 'asc'
+    }
+    // Standard-Sortierrichtung für neue Spalte
+    if (['users', 'lastMonth', 'thisMonth', 'total', 'login', 'trial'].includes(col)) {
+      return 'desc'
+    }
+    return 'asc'
+  }
+
+  const SortHeader = ({ col, label, align = 'left' }: { col: string, label: string, align?: 'left'|'right'|'center' }) => {
+    const isActive = sort === col
+    const nextOrder = toggleOrder(col)
+    
+    return (
+      <th className={`px-6 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider text-${align}`}>
+        <Link 
+          href={`?sort=${col}&order=${nextOrder}`}
+          className={`group inline-flex items-center gap-1 hover:text-white transition-colors ${align === 'right' ? 'flex-row-reverse' : ''}`}
+        >
+          {label}
+          <span className={`text-[10px] w-2 ${isActive ? 'text-white/60' : 'text-transparent group-hover:text-white/20'}`}>
+            {isActive ? (order === 'asc' ? '↑' : '↓') : '↕'}
+          </span>
+        </Link>
+      </th>
+    )
+  }
+
   return (
     <div className="p-8">
       <div className="mb-8">
@@ -106,26 +210,20 @@ export default async function AdminMerchantsPage() {
           <table className="w-full text-sm min-w-[1000px]">
             <thead>
               <tr className="border-b border-white/10">
-                <th className="text-left px-6 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider">Händler</th>
-                <th className="text-left px-6 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider">App</th>
-                <th className="text-left px-6 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider">Letzter Login</th>
-                <th className="text-right px-6 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider">Nutzer</th>
-                <th className="text-right px-6 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider">{lastMonthName}</th>
-                <th className="text-right px-6 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider">{monthName}</th>
-                <th className="text-right px-6 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider">Gesamt</th>
-                <th className="text-center px-6 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider">Status</th>
-                <th className="text-center px-6 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider">Testphase</th>
+                <SortHeader col="name" label="Händler" />
+                <SortHeader col="app" label="App" />
+                <SortHeader col="login" label="Letzter Login" />
+                <SortHeader col="users" label="Nutzer" align="right" />
+                <SortHeader col="lastMonth" label={lastMonthName} align="right" />
+                <SortHeader col="thisMonth" label={monthName} align="right" />
+                <SortHeader col="total" label="Gesamt" align="right" />
+                <SortHeader col="status" label="Status" align="center" />
+                <SortHeader col="trial" label="Testphase" align="center" />
                 <th className="text-right px-6 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider">Details</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {allCompanies.map(company => {
-                const thisMonth = thisMonthMap.get(company.id) ?? 0
-                const lastMonth = lastMonthMap.get(company.id) ?? 0
-                const total = totalMap.get(company.id) ?? 0
-                const userCount = usersMap.get(company.id) ?? 0
-                const trend = lastMonth === 0 ? null : Math.round(((thisMonth - lastMonth) / lastMonth) * 100)
-
+              {enrichedCompanies.map(company => {
                 return (
                   <tr key={company.id} className="hover:bg-white/5 transition-colors">
                     <td className="px-6 py-4">
@@ -140,28 +238,28 @@ export default async function AdminMerchantsPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      {latestLoginMap.has(company.id) ? (
+                      {company.latestLogin ? (
                         <div>
-                          <p className="text-sm text-white">{latestLoginMap.get(company.id)?.time.toLocaleDateString('de-DE')}</p>
-                          <p className="text-xs text-white/40">{latestLoginMap.get(company.id)?.app || 'Unbekannt'}</p>
+                          <p className="text-sm text-white">{company.latestLogin.time.toLocaleDateString('de-DE')}</p>
+                          <p className="text-xs text-white/40">{company.latestLogin.app || 'Unbekannt'}</p>
                         </div>
                       ) : (
                         <span className="text-xs text-white/30">–</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-right text-white/60">{userCount}</td>
-                    <td className="px-6 py-4 text-right text-white/60">{lastMonth}</td>
+                    <td className="px-6 py-4 text-right text-white/60">{company.userCount}</td>
+                    <td className="px-6 py-4 text-right text-white/60">{company.lastMonth}</td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <span className="font-semibold text-white">{thisMonth}</span>
-                        {trend !== null && (
-                          <span className={`text-xs px-1.5 py-0.5 rounded-md font-medium ${trend >= 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'}`}>
-                            {trend >= 0 ? '+' : ''}{trend}%
+                        <span className="font-semibold text-white">{company.thisMonth}</span>
+                        {company.trend !== null && (
+                          <span className={`text-xs px-1.5 py-0.5 rounded-md font-medium ${company.trend >= 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'}`}>
+                            {company.trend >= 0 ? '+' : ''}{company.trend}%
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-right text-white/40 text-xs">{total}</td>
+                    <td className="px-6 py-4 text-right text-white/40 text-xs">{company.total}</td>
                     <td className="px-6 py-4 text-center">
                       {company.canceledAt ? (
                         <span className="bg-red-500/10 text-red-400 text-[10px] px-2 py-1 rounded-full font-bold">
