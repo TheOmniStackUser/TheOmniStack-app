@@ -233,7 +233,11 @@ export default async function AdminMerchantsPage({
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="inline-flex items-center rounded-md bg-white/10 px-2 py-1 text-xs font-medium text-white ring-1 ring-inset ring-white/20">
+                      <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${
+                        company.registeredApp === 'ProfiFaktura'
+                          ? 'bg-yellow-500/10 text-yellow-500 ring-yellow-500/20'
+                          : 'bg-blue-500/10 text-blue-400 ring-blue-400/20'
+                      }`}>
                         {company.registeredApp}
                       </span>
                     </td>
