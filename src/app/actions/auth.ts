@@ -44,6 +44,7 @@ const DetailsSchema = z.object({
   name: z.string().min(2, { message: 'Name muss mindestens 2 Zeichen lang sein.' }).trim(),
   companyName: z.string().min(2, { message: 'Firmenname ist erforderlich.' }).trim(),
   companyLegalName: z.string().min(2, { message: 'Rechtlicher Name ist erforderlich.' }).trim(),
+  terms: z.literal('on', { error: () => ({ message: 'Du musst den Dokumenten zustimmen.' }) }),
 })
 
 const ForgotPasswordSchema = z.object({
@@ -455,6 +456,7 @@ export async function completeRegistrationAction(
     name: formData.get('name'),
     companyName: formData.get('companyName'),
     companyLegalName: formData.get('companyLegalName'),
+    terms: formData.get('terms'),
   })
 
   if (!validated.success) {

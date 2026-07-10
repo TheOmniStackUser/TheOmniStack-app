@@ -75,6 +75,26 @@ export default function DetailsPage({
             {state?.errors?.companyLegalName && <p className="mt-1 text-sm text-red-600">{state.errors.companyLegalName}</p>}
           </div>
 
+          <div className="flex items-start">
+            <div className="flex items-center h-5">
+              <input
+                id="terms"
+                name="terms"
+                type="checkbox"
+                required
+                defaultChecked={state?.fields?.terms === 'on'}
+                className="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300 rounded cursor-pointer"
+              />
+            </div>
+            <div className="ml-3 text-sm">
+              <label htmlFor="terms" className="font-medium text-gray-700 cursor-pointer">
+                Ich akzeptiere die <a href="/legal/AGB.pdf" target="_blank" className="text-blue-600 hover:underline">AGB</a> und die <a href="/legal/Widerrufsbelehrung.pdf" target="_blank" className="text-blue-600 hover:underline">Widerrufsbelehrung</a>.
+              </label>
+              <p className="text-gray-500">Bitte lies dir die Dokumente durch und stimme ihnen zu.</p>
+            </div>
+          </div>
+          {state?.errors?.terms && <p className="mt-1 text-sm text-red-600">{state.errors.terms}</p>}
+
           <button
             type="submit"
             disabled={pending}
