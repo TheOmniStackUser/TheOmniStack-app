@@ -37,7 +37,7 @@ const RegisterSchema = z.object({
     .min(8, { message: 'Passwort muss mindestens 8 Zeichen lang sein.' })
     .regex(/[A-Z]/, { message: 'Muss einen Großbuchstaben enthalten.' })
     .regex(/[0-9]/, { message: 'Muss eine Zahl enthalten.' }),
-  terms: z.literal('on', { errorMap: () => ({ message: 'Du musst den Dokumenten zustimmen.' }) }),
+  terms: z.literal('on', { error: () => ({ message: 'Du musst den Dokumenten zustimmen.' }) }),
 })
 
 const DetailsSchema = z.object({
