@@ -61,6 +61,7 @@ export default async function AdminMerchantDetailPage({
       email: users.email,
       role: companyMembers.role,
       joinedAt: companyMembers.joinedAt,
+      lastLoginAt: users.lastLoginAt,
     })
     .from(companyMembers)
     .leftJoin(users, eq(companyMembers.userId, users.id))
@@ -141,7 +142,15 @@ export default async function AdminMerchantDetailPage({
             <div key={m.id} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
               <div>
                 <p className="text-sm text-white font-medium">{m.name}</p>
-                <p className="text-xs text-white/30">{m.email}</p>
+                <div className="flex items-center gap-1.5 text-xs text-white/30 mt-0.5">
+                  <span>{m.email}</span>
+                  {m.lastLoginAt && (
+                    <>
+                      <span>&middot;</span>
+                      <span>Login: {m.lastLoginAt.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })} {m.lastLoginAt.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</span>
+                    </>
+                  )}
+                </div>
               </div>
               <div className="text-right">
                 <span className="text-xs px-2 py-0.5 rounded bg-white/10 text-white/60 capitalize">{m.role}</span>
