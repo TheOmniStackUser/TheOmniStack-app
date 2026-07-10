@@ -89,11 +89,9 @@ export function CancelModal({ isOpen, onClose }: { isOpen: boolean, onClose: () 
           <div className="ml-6 mt-2 space-y-2">
             {[
               'Ich benötige die kostenpflichtigen Funktionen nicht',
-              'Ich möchte die kostenlose Version nutzen',
               'Ein Wettbewerber ist günstiger',
               'Die Kosten sind zu hoch',
-              'Die Flex-Option ist mir zu teuer',
-              'Die Archiv-Option ist mir zu teuer'
+              'Die Flex-Option ist mir zu teuer'
             ].map(r => (
               <div key={r} className="space-y-2">
                 <label className="flex items-center gap-2 cursor-pointer">
