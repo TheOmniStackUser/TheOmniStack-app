@@ -800,13 +800,17 @@ export function ReturnsList({
             ) : (
               paginatedLogs.map((log) => (
                 <Fragment key={log.id}>
-                  <tr className="hover:bg-slate-50/30 transition-colors">
+                  <tr 
+                    className="hover:bg-slate-50/30 transition-colors cursor-pointer"
+                    onClick={() => handleToggleExpand(log)}
+                  >
                   {/* Checkbox */}
                   <td className="px-6 py-4 text-center">
                     <input
                       type="checkbox"
                       checked={selectedIds.has(log.id)}
-                      onChange={() => handleSelectOne(log.id)}
+                      onChange={(e) => { e.stopPropagation(); handleSelectOne(log.id) }}
+                      onClick={(e) => e.stopPropagation()}
                       className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4"
                     />
                   </td>
@@ -814,7 +818,7 @@ export function ReturnsList({
                   {/* Status Toggle */}
                   <td className="px-6 py-4">
                     <button
-                      onClick={() => handleStatusToggle(log.id, log.status)}
+                      onClick={(e) => { e.stopPropagation(); handleStatusToggle(log.id, log.status) }}
                       disabled={isPending}
                       className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border transition-all cursor-pointer select-none ${
                         log.status === 'bearbeitet'
@@ -892,7 +896,7 @@ export function ReturnsList({
                     <div className="font-bold text-slate-900">{log.orderNumber}</div>
                     {log.orderId ? (
                       <button
-                        onClick={() => handleToggleExpand(log)}
+                        onClick={(e) => { e.stopPropagation(); handleToggleExpand(log) }}
                         className="inline-flex items-center text-[10px] font-bold text-emerald-600 mt-0.5 hover:text-emerald-700 transition-colors cursor-pointer outline-none"
                         title="Bestelldetails anzeigen"
                       >
@@ -983,7 +987,7 @@ export function ReturnsList({
                       {/* Erstatten Button (Outside Menu) */}
                       {log.orderId && (
                         <button
-                          onClick={() => handleOpenRefund(log)}
+                          onClick={(e) => { e.stopPropagation(); handleOpenRefund(log) }}
                           disabled={isPending || isRefundingPending}
                           className={`p-2 rounded-lg transition-all text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50`}
                           title="Weitere Erstattung veranlassen"
@@ -996,7 +1000,7 @@ export function ReturnsList({
 
                       <div className="relative inline-block text-left action-dropdown-container">
                         <button
-                          onClick={() => setOpenDropdownId(openDropdownId === log.id ? null : log.id)}
+                          onClick={(e) => { e.stopPropagation(); setOpenDropdownId(openDropdownId === log.id ? null : log.id) }}
                           className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-all"
                           title="Aktionen"
                         >
@@ -1009,7 +1013,8 @@ export function ReturnsList({
                         <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-slate-200 z-50 py-1">
                           {log.orderId && (
                             <button
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation()
                                 setOpenDropdownId(null)
                                 handleOpenRefund(log)
                               }}
@@ -1023,7 +1028,8 @@ export function ReturnsList({
                             </button>
                           )}
                           <button
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation()
                               setOpenDropdownId(null)
                               handleOpenEdit(log)
                             }}
@@ -1040,7 +1046,8 @@ export function ReturnsList({
 
                           {log.status !== 'neu' && (
                             <button
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation()
                                 setOpenDropdownId(null)
                                 handleStatusChange(log.id, 'neu')
                               }}
@@ -1055,7 +1062,8 @@ export function ReturnsList({
                           )}
                           {log.status !== 'in_klaerung' && (
                             <button
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation()
                                 setOpenDropdownId(null)
                                 handleStatusChange(log.id, 'in_klaerung')
                               }}
@@ -1070,7 +1078,8 @@ export function ReturnsList({
                           )}
                           {log.status !== 'bearbeitet' && (
                             <button
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation()
                                 setOpenDropdownId(null)
                                 handleStatusChange(log.id, 'bearbeitet')
                               }}
@@ -1087,7 +1096,8 @@ export function ReturnsList({
                           <div className="h-px bg-slate-100 my-1" />
 
                           <button
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation()
                               setOpenDropdownId(null)
                               handleDeleteSingle(log.id)
                             }}
@@ -1121,8 +1131,8 @@ export function ReturnsList({
                         ) : orderDetailsCache[log.id] ? (
                           <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm">
                             <h4 className="text-sm font-bold text-slate-800 mb-3 border-b border-slate-100 pb-2">Bestelldetails ({orderDetailsCache[log.id].marketplaceOrderId})</h4>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
-                              <div>
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 text-sm">
+                              <div className="md:col-span-3">
                                 <div className="font-semibold text-slate-500 text-xs uppercase tracking-wider mb-2">Kunde & Versand</div>
                                 <div className="text-slate-700">
                                   <div className="font-medium">{orderDetailsCache[log.id].shippingName || orderDetailsCache[log.id].buyerName}</div>
@@ -1131,7 +1141,7 @@ export function ReturnsList({
                                   <div>{orderDetailsCache[log.id].shippingCountry}</div>
                                 </div>
                               </div>
-                              <div>
+                              <div className="md:col-span-3">
                                 <div className="font-semibold text-slate-500 text-xs uppercase tracking-wider mb-2">Zahlung</div>
                                 <div className="text-slate-700 space-y-1">
                                   <div className="flex justify-between">
@@ -1148,18 +1158,33 @@ export function ReturnsList({
                                   </div>
                                 </div>
                               </div>
-                              <div>
+                              <div className="md:col-span-6">
                                 <div className="font-semibold text-slate-500 text-xs uppercase tracking-wider mb-2">Artikel in Bestellung</div>
-                                <ul className="space-y-2 max-h-40 overflow-y-auto pr-2">
-                                  {orderDetailsCache[log.id].items?.map((item: any, idx: number) => (
-                                    <li key={idx} className="flex flex-col border-b border-slate-50 pb-2 last:border-0 last:pb-0">
-                                      <div className="font-medium text-slate-800 line-clamp-1" title={item.title}>{item.title}</div>
-                                      <div className="flex justify-between text-xs text-slate-500 mt-0.5">
-                                        <span>SKU: {item.sku || 'N/A'}</span>
-                                        <span>{item.quantity}x á {Number(item.unitPrice || 0).toFixed(2)} {orderDetailsCache[log.id].currency}</span>
-                                      </div>
-                                    </li>
-                                  ))}
+                                <ul className="space-y-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                                  {orderDetailsCache[log.id].items?.map((item: any, idx: number) => {
+                                    const returnedItem = log.items?.find(
+                                      (logItem: any) => logItem.skuOrProductName.toLowerCase() === item.sku?.toLowerCase()
+                                    )
+                                    const isRefunded = !!returnedItem
+                                    const returnedQty = returnedItem?.quantity || 0
+
+                                    return (
+                                      <li key={idx} className={`flex flex-col border-b border-slate-50 pb-2 last:border-0 last:pb-0 ${isRefunded ? 'bg-emerald-50/50 -mx-2 px-2 rounded-md' : ''}`}>
+                                        <div className="flex items-start justify-between gap-2">
+                                          <div className="font-medium text-slate-800 line-clamp-1" title={item.title}>{item.title}</div>
+                                          {isRefunded && (
+                                            <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-100 text-emerald-800">
+                                              {returnedQty > 0 ? `${returnedQty}x Erstattet` : 'Erstattet'}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div className="flex justify-between text-xs text-slate-500 mt-0.5">
+                                          <span>SKU: {item.sku || 'N/A'}</span>
+                                          <span>{item.quantity}x á {Number(item.unitPrice || 0).toFixed(2)} {orderDetailsCache[log.id].currency}</span>
+                                        </div>
+                                      </li>
+                                    )
+                                  })}
                                 </ul>
                               </div>
                             </div>
