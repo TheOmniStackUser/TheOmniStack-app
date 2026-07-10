@@ -95,3 +95,26 @@ export async function cancelSubscriptionAction(formData: FormData) {
     return { error: 'Ein Fehler ist aufgetreten. Bitte versuche es später noch einmal.' }
   }
 }
+
+export async function undoCancelSubscriptionAction() {
+  try {
+    const auth = await requireAuth()
+    
+    if (auth.role !== 'owner' && auth.role !== 'admin') {
+      return { error: 'Nur der Besitzer oder Administrator kann die Kündigung aufheben.' }
+    }
+
+    await db.update(companies)
+      .set({
+        canceledAt: null,
+        cancelEffectiveDate: null,
+        cancelReason: null
+      })
+      .where(eq(companies.id, auth.activeCompanyId))
+
+    return { success: true }
+  } catch (error) {
+    console.error('[Undo Cancel Subscription] Error:', error)
+    return { error: 'Ein Fehler ist aufgetreten. Bitte versuche es später noch einmal.' }
+  }
+}

@@ -5,6 +5,7 @@ import { addUserAction, removeUserAction, getOrCreateInviteLinkAction, updateCur
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
 import { CancelModal } from './cancel-modal'
+import { undoCancelSubscriptionAction } from '@/app/actions/cancel-subscription'
 
 interface Member {
   id: string
@@ -46,6 +47,7 @@ export function UserList({
   const [emailError, setEmailError] = useState<string | null>(null)
   
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
+  const [isUndoingCancel, setIsUndoingCancel] = useState(false)
 
   const currentUser = initialMembers.find((m) => m.id === currentUserId)
   
@@ -144,6 +146,22 @@ export function UserList({
 
   const canManage = currentUserRole === 'owner' || currentUserRole === 'admin' || currentUserRole === 'omnistack_support' || currentUserRole === 'omnistack_beta'
   const isLimitReached = initialMembers.length >= 10
+
+  const handleUndoCancel = async () => {
+    try {
+      setIsUndoingCancel(true)
+      const result = await undoCancelSubscriptionAction()
+      if (result.error) {
+        setError(result.error)
+      } else {
+        window.location.reload()
+      }
+    } catch (e) {
+      setError('Fehler beim Aufheben der Kündigung.')
+    } finally {
+      setIsUndoingCancel(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -521,7 +539,15 @@ export function UserList({
                 </>
               )}
             </div>
-            {!subscriptionDetails?.canceledAt && (
+            {subscriptionDetails?.canceledAt ? (
+              <button
+                onClick={handleUndoCancel}
+                disabled={isUndoingCancel}
+                className="px-4 py-2 bg-blue-600 border border-transparent text-white font-bold rounded-lg hover:bg-blue-700 transition-all shadow-sm cursor-pointer disabled:opacity-50"
+              >
+                {isUndoingCancel ? 'Wird aufgehoben...' : 'Kündigung aufheben'}
+              </button>
+            ) : (
               <button
                 onClick={() => setIsCancelModalOpen(true)}
                 className="px-4 py-2 bg-white border border-slate-300 text-slate-700 font-bold rounded-lg hover:bg-slate-50 hover:text-red-600 transition-all shadow-sm cursor-pointer"
