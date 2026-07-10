@@ -3,7 +3,8 @@ import { VerificationEmail } from '@/emails/VerificationEmail'
 import { InvitationEmail } from '@/emails/InvitationEmail'
 import { CompanyEmailVerificationEmail } from '@/emails/CompanyEmailVerificationEmail'
 import { PasswordResetEmail } from '@/emails/PasswordResetEmail'
-
+import fs from 'fs'
+import path from 'path'
 // Initialize Resend. 
 // If no API key is provided (e.g. in local dev), it won't crash but sending will fail.
 const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder')
@@ -17,11 +18,31 @@ export async function sendVerificationEmail(toEmail: string, token: string) {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
     const verifyLink = `${baseUrl}/register/verify?token=${token}`
 
+    const agbPath = path.join(process.cwd(), 'public', 'legal', 'AGB.pdf')
+    const widerrufPath = path.join(process.cwd(), 'public', 'legal', 'Widerrufsbelehrung.pdf')
+
+    const attachments = []
+    
+    if (fs.existsSync(agbPath)) {
+      attachments.push({
+        filename: 'AGB_TheOmniStack.pdf',
+        content: fs.readFileSync(agbPath)
+      })
+    }
+    
+    if (fs.existsSync(widerrufPath)) {
+      attachments.push({
+        filename: 'Widerrufsbelehrung_TheOmniStack.pdf',
+        content: fs.readFileSync(widerrufPath)
+      })
+    }
+
     const { data, error } = await resend.emails.send({
       from: DEFAULT_SENDER,
       to: [toEmail],
       subject: 'Willkommen bei TheOmniStack – Bitte E-Mail bestätigen',
       react: VerificationEmail({ verifyLink }),
+      attachments: attachments.length > 0 ? attachments : undefined,
     })
 
     if (error) {
