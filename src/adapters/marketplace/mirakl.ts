@@ -1499,12 +1499,21 @@ export class MiraklAdapter implements MarketplaceAdapter {
         console.log(`[MiraklAdapter:${this.marketplace}] Some updates are missing price. Fetching existing offers to fill mandatory price field...`)
         try {
           let offset = 0
+          let retryCount = 0
           while (true) {
             const fetchUrl = url.includes('?') 
               ? `${url}&max=100&offset=${offset}`
               : `${url}?max=100&offset=${offset}`
               
             const res = await fetch(fetchUrl, { headers })
+            
+            if (res.status === 429 && retryCount < 3) {
+              console.warn(`[MiraklAdapter:${this.marketplace}] Rate limited (429) during price fetch. Retrying after 2s...`)
+              await new Promise(r => setTimeout(r, 2000))
+              retryCount++
+              continue
+            }
+            
             if (!res.ok) break
             const data = await res.json()
             if (!data.offers || data.offers.length === 0) break
@@ -1517,6 +1526,10 @@ export class MiraklAdapter implements MarketplaceAdapter {
             
             if (data.offers.length < 100) break
             offset += 100
+            retryCount = 0
+            
+            // Add a small delay between requests to prevent hitting rate limits
+            await new Promise(r => setTimeout(r, 500))
           }
           console.log(`[MiraklAdapter:${this.marketplace}] Fetched ${Object.keys(currentOffersMap).length} existing offers.`)
         } catch (e) {
@@ -1544,16 +1557,43 @@ export class MiraklAdapter implements MarketplaceAdapter {
 
       console.log(`[MiraklAdapter:${this.marketplace}] Updating ${offers.length} offers via POST ${url}...`)
       
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ offers })
-      })
+      const chunkSize = 1000
+      for (let i = 0; i < offers.length; i += chunkSize) {
+        const chunk = offers.slice(i, i + chunkSize)
+        let retryCount = 0
+        let success = false
+        
+        while (!success && retryCount < 3) {
+          const response = await fetch(url, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ offers: chunk })
+          })
 
-      if (!response.ok) {
-        const errText = await response.text()
-        console.error(`[MiraklAdapter:${this.marketplace}] Update offers failed (${response.status}): ${errText}`)
-        throw new Error(`Mirakl API offer update failed: ${errText}`)
+          if (response.status === 429) {
+            console.warn(`[MiraklAdapter:${this.marketplace}] Rate limited (429) during offer update chunk (${i}-${i + chunk.length}). Retrying after 5s...`)
+            await new Promise(r => setTimeout(r, 5000))
+            retryCount++
+            continue
+          }
+
+          if (!response.ok) {
+            const errText = await response.text()
+            console.error(`[MiraklAdapter:${this.marketplace}] Update offers chunk failed (${response.status}): ${errText}`)
+            throw new Error(`Mirakl API offer update failed: ${errText}`)
+          }
+          
+          success = true
+        }
+        
+        if (!success) {
+          throw new Error(`Mirakl API offer update failed after ${retryCount} retries.`)
+        }
+        
+        if (i + chunkSize < offers.length) {
+          // Delay between chunks to prevent rate limiting
+          await new Promise(r => setTimeout(r, 1000))
+        }
       }
 
       console.log(`[MiraklAdapter:${this.marketplace}] Offers successfully updated.`)
