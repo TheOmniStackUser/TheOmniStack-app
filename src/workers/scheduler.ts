@@ -176,3 +176,4 @@ export async function setupDunningSchedule() {
   )
   console.log('   - Scheduled daily dunning check at 08:00 (Europe/Berlin)')
 }
+

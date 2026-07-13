@@ -342,6 +342,7 @@ export class AboutYouAdapter implements MarketplaceAdapter {
 
       const response = await fetch(`${this.baseUrl}/orders/return`, {
         method: 'POST',
+        cache: 'no-store',
         headers: {
           'X-API-Key': this.config.apiKey,
           'Content-Type': 'application/json',

@@ -211,9 +211,14 @@ export function ReturnsList({
         
         // Match order items with returned items
         const inputs = orderDetails.items.map((orderItem: any) => {
-          const matchingScannedItem = log.items.find(
-            item => item.skuOrProductName.toLowerCase() === orderItem.sku?.toLowerCase()
-          )
+          const orderSku = (orderItem.sku || '').toLowerCase()
+          const matchingScannedItem = log.items.find(item => {
+            const scannedSku = (item.skuOrProductName || '').toLowerCase()
+            if (scannedSku === orderSku) return true
+            // Handle common OCR mistakes (l vs 1, O vs 0)
+            const normalize = (s: string) => s.replace(/[l1i]/g, '1').replace(/[o0]/g, '0')
+            return normalize(scannedSku) === normalize(orderSku)
+          })
           const returnedQty = matchingScannedItem ? matchingScannedItem.quantity : 0
           
           return {
@@ -801,9 +806,9 @@ export function ReturnsList({
               paginatedLogs.map((log) => (
                 <Fragment key={log.id}>
                   <tr 
-                    className="hover:bg-slate-50/30 transition-colors cursor-pointer"
-                    onClick={() => handleToggleExpand(log)}
-                  >
+                  className={`hover:bg-slate-50 transition-colors group cursor-pointer ${expandedLogId === log.id ? 'bg-gray-50' : 'bg-white'}`}
+                  onClick={() => handleToggleExpand(log)}
+                >
                   {/* Checkbox */}
                   <td className="px-6 py-4 text-center">
                     <input
@@ -832,6 +837,11 @@ export function ReturnsList({
                       <span className={`w-1.5 h-1.5 rounded-full ${log.status === 'bearbeitet' ? 'bg-emerald-500' : log.status === 'in_klaerung' ? 'bg-amber-500' : 'bg-indigo-500'}`} />
                       {log.status === 'bearbeitet' ? 'Bearbeitet' : log.status === 'in_klaerung' ? 'In Klärung' : 'Neu'}
                     </button>
+                    {log.status === 'bearbeitet' && (log.metadata as any)?.refunded_at && (
+                      <div className="mt-1 text-[10px] text-emerald-600 font-medium" title="Erstattungszeitpunkt">
+                        am {format(new Date((log.metadata as any).refunded_at), 'dd.MM.yy HH:mm', { locale: de })}
+                      </div>
+                    )}
                   </td>
 
                   {/* Eingang (Date only) */}
@@ -1117,9 +1127,9 @@ export function ReturnsList({
                 </tr>
                 
                 {expandedLogId === log.id && (
-                  <tr className="bg-slate-50/50">
-                    <td colSpan={11} className="p-0">
-                      <div className="px-6 py-4 border-t border-slate-100 animate-fade-in">
+                  <tr className="bg-gray-50 border-t border-b border-gray-100">
+                    <td colSpan={11} className="px-6 py-6 animate-fade-in">
+                      <div className="w-full">
                         {isLoadingOrderDetails[log.id] ? (
                           <div className="text-sm text-slate-500 flex items-center justify-center py-4">
                             <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -1129,8 +1139,8 @@ export function ReturnsList({
                             Lade Bestelldetails...
                           </div>
                         ) : orderDetailsCache[log.id] ? (
-                          <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm">
-                            <h4 className="text-sm font-bold text-slate-800 mb-3 border-b border-slate-100 pb-2">Bestelldetails ({orderDetailsCache[log.id].marketplaceOrderId})</h4>
+                          <div>
+                            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Bestelldetails ({orderDetailsCache[log.id].marketplaceOrderId})</h4>
                             <div className="grid grid-cols-1 md:grid-cols-12 gap-6 text-sm">
                               <div className="md:col-span-3">
                                 <div className="font-semibold text-slate-500 text-xs uppercase tracking-wider mb-2">Kunde & Versand</div>
@@ -1169,7 +1179,7 @@ export function ReturnsList({
                                     const returnedQty = returnedItem?.quantity || 0
 
                                     return (
-                                      <li key={idx} className={`flex flex-col border-b border-slate-50 pb-2 last:border-0 last:pb-0 ${isRefunded ? 'bg-emerald-50/50 -mx-2 px-2 rounded-md' : ''}`}>
+                                      <li key={idx} className={`flex flex-col border-b border-slate-200 pb-2 last:border-0 last:pb-0 ${isRefunded ? 'bg-emerald-100/50 -mx-2 px-2 pt-2 rounded-md' : 'pt-2'}`}>
                                         <div className="flex items-start justify-between gap-2">
                                           <div className="font-medium text-slate-800 line-clamp-1" title={item.title}>{item.title}</div>
                                           {isRefunded && (

@@ -134,7 +134,7 @@ export class OttoAdapter implements MarketplaceAdapter {
         },
         body: new URLSearchParams({
           grant_type: 'client_credentials',
-          scope: 'orders products shipments returns receipts availability price-reduction'
+          scope: 'orders products shipments returns availability price-reduction'
         }).toString(),
         signal: AbortSignal.timeout(15000)
       })
@@ -654,6 +654,7 @@ export class OttoAdapter implements MarketplaceAdapter {
       console.log(`[OttoAdapter] Sending return confirmation to Otto:`, requestBody)
       let response = await fetch(`${this.baseUrl}/v3/returns/acceptance`, {
         method: 'POST',
+        cache: 'no-store',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
@@ -668,6 +669,7 @@ export class OttoAdapter implements MarketplaceAdapter {
           console.log(`[OttoAdapter] Retrying with direct array payload...`)
           response = await fetch(`${this.baseUrl}/v3/returns/acceptance`, {
             method: 'POST',
+            cache: 'no-store',
             headers: {
               'Authorization': `Bearer ${accessToken}`,
               'Content-Type': 'application/json',

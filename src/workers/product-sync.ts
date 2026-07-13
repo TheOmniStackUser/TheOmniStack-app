@@ -221,18 +221,40 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
       )
     )
 
+  // Find active integrations first
+  const activeIntegrations = await db
+    .select()
+    .from(marketplaceIntegrations)
+    .where(
+      and(
+        eq(marketplaceIntegrations.companyId, companyId),
+        eq(marketplaceIntegrations.isActive, true)
+      )
+    )
+
+  if (activeIntegrations.length === 0) return { totalUpdatesSent: 0, activeMarketplaces: [], failedMarketplaces: [] }
+
   // Group mappings by integrationId
   const updatesByIntegration: Record<string, { sku: string, marketplaceProductId?: string, stock?: number, price?: number }[]> = {}
 
   for (const mapping of mappings) {
+    const intId = mapping.integrationId
+    if (!intId) continue // skip if mapping has no integrationId
+
+    const integration = activeIntegrations.find(i => i.id === intId)
+    if (!integration) continue
+
+    const productSyncSettings = (integration.metadata as any)?.productSync
+    // Default to true if not set to ensure backward compatibility for basic stock sync,
+    // but price sync defaults to false since it requires explicit opt-in.
+    const isGlobalEnabled = productSyncSettings ? productSyncSettings.enabled : true
+    if (!isGlobalEnabled) continue
+
     const centralProduct = centralProducts.find(p => p.id === mapping.productId)
     if (!centralProduct) continue
 
     const updateDef = updates.find(u => u.sku === centralProduct.sku)
     if (!updateDef) continue
-
-    const intId = mapping.integrationId
-    if (!intId) continue // skip if mapping has no integrationId
 
     if (!updatesByIntegration[intId]) {
       updatesByIntegration[intId] = []
@@ -243,11 +265,14 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
       marketplaceProductId: mapping.marketplaceProductId || undefined
     }
 
-    if (mapping.syncStock && updateDef.stock !== undefined) {
+    const canSyncStock = productSyncSettings ? productSyncSettings.syncStock !== false : true
+    const canSyncPrice = productSyncSettings ? productSyncSettings.syncPrice === true : false
+
+    if (canSyncStock && mapping.syncStock && updateDef.stock !== undefined) {
       mUpdate.stock = updateDef.stock
     }
 
-    if (mapping.syncPrice && updateDef.price !== undefined) {
+    if (canSyncPrice && mapping.syncPrice && updateDef.price !== undefined) {
       let finalPrice = updateDef.price
       // Apply price modifiers
       if (mapping.priceModifierType === 'fixed') {
@@ -263,17 +288,6 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
       updatesByIntegration[intId].push(mUpdate)
     }
   }
-
-  // Find active integrations
-  const activeIntegrations = await db
-    .select()
-    .from(marketplaceIntegrations)
-    .where(
-      and(
-        eq(marketplaceIntegrations.companyId, companyId),
-        eq(marketplaceIntegrations.isActive, true)
-      )
-    )
 
   let totalUpdatesSent = 0
   const activeMarketplaces: string[] = []

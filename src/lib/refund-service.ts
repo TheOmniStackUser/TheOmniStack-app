@@ -153,6 +153,46 @@ export async function executeRefund({
   let newCreditNoteInvoiceId = ''
   let pdfBuffer: Buffer | null = null
 
+  // 7. API Refund Trigger
+  let apiSuccess = false
+  if (integration) {
+    const adapter = getAdapterForIntegration(integration)
+    if (adapter && adapter.refundOrder) {
+      try {
+        let receiveResult: boolean | 'ACCEPTED' = false
+        if (adapter.receiveReturnItems) {
+          console.log(`[RefundService] Attempting to mark return items as received on marketplace...`)
+          receiveResult = await adapter.receiveReturnItems(order.marketplaceOrderId, itemsToRefund, order.rawPayload)
+        }
+
+        if (receiveResult === 'ACCEPTED') {
+          console.log(`[RefundService] Return was received and accepted (refunded) successfully via Returns API. Skipping Order Refund API.`)
+          apiSuccess = true
+        } else {
+          console.log(`[RefundService] Triggering API refund for marketplace ${order.marketplace}...`)
+          apiSuccess = await adapter.refundOrder(
+            order.marketplaceOrderId,
+            itemsToRefund,
+            order.rawPayload
+          )
+        }
+        if (apiSuccess) {
+          console.log(`[RefundService] API refund processed successfully on marketplace.`)
+        } else {
+          console.warn(`[RefundService] API refund call returned false status.`)
+        }
+      } catch (err: any) {
+        console.error(`[RefundService] Failed to trigger API refund on marketplace:`, err)
+        return { 
+          success: false, 
+          error: `Fehler bei der Kommunikation mit ${order.marketplace}: ${err?.message || 'Unbekannter Fehler'}`
+        }
+      }
+    } else {
+      console.log(`[RefundService] Adapter for ${order.marketplace} does not support refundOrder.`)
+    }
+  }
+
   if (autoCreditNote) {
     // 3. Ensure order has a linked invoice; otherwise generate it first
     if (!order.invoiceId) {
@@ -317,46 +357,6 @@ export async function executeRefund({
       }) as any
     )
 
-    // 7. API Refund Trigger
-    let apiSuccess = false
-    if (integration) {
-      const adapter = getAdapterForIntegration(integration)
-      if (adapter && adapter.refundOrder) {
-        try {
-          let receiveResult: boolean | 'ACCEPTED' = false
-          if (adapter.receiveReturnItems) {
-            console.log(`[RefundService] Attempting to mark return items as received on marketplace...`)
-            receiveResult = await adapter.receiveReturnItems(order.marketplaceOrderId, itemsToRefund, order.rawPayload)
-          }
-
-          if (receiveResult === 'ACCEPTED') {
-            console.log(`[RefundService] Return was received and accepted (refunded) successfully via Returns API. Skipping Order Refund API.`)
-            apiSuccess = true
-          } else {
-            console.log(`[RefundService] Triggering API refund for marketplace ${order.marketplace}...`)
-            apiSuccess = await adapter.refundOrder(
-              order.marketplaceOrderId,
-              itemsToRefund,
-              order.rawPayload
-            )
-          }
-          if (apiSuccess) {
-            console.log(`[RefundService] API refund processed successfully on marketplace.`)
-          } else {
-            console.warn(`[RefundService] API refund call returned false status.`)
-          }
-        } catch (err: any) {
-          console.error(`[RefundService] Failed to trigger API refund on marketplace:`, err)
-          return { 
-            success: false, 
-            error: `Fehler bei der Kommunikation mit ${order.marketplace}: ${err?.message || 'Unbekannter Fehler'}`
-          }
-        }
-      } else {
-        console.log(`[RefundService] Adapter for ${order.marketplace} does not support refundOrder.`)
-      }
-    }
-
     const storageKey = buildInvoiceKey(companyId, creditNoteNumber)
     await uploadDocument(storageKey, pdfBuffer)
 
@@ -437,6 +437,7 @@ export async function executeRefund({
           metadata: {
             ...existingMetadata,
             creditNoteId: newCreditNoteInvoice.id,
+            refunded_at: new Date().toISOString(),
             refundedItems: itemsToRefund
           }
         })
@@ -503,6 +504,7 @@ export async function executeRefund({
         notes: `Rückerstattung veranlasst. ${creditNoteNumber}`,
         metadata: {
           ...existingMetadata,
+          refunded_at: new Date().toISOString(),
           refundedItems: itemsToRefund
         }
       })
