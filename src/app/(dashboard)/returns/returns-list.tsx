@@ -343,6 +343,9 @@ export function ReturnsList({
     } else if (sortConfig.key === 'scannedAt' || sortConfig.key === 'receivedAt') {
       aValue = aValue ? new Date(aValue).getTime() : 0;
       bValue = bValue ? new Date(bValue).getTime() : 0;
+    } else if (sortConfig.key === 'refunded_at') {
+      aValue = (a.metadata as any)?.refunded_at ? new Date((a.metadata as any).refunded_at).getTime() : 0;
+      bValue = (b.metadata as any)?.refunded_at ? new Date((b.metadata as any).refunded_at).getTime() : 0;
     } else if (sortConfig.key === 'marketplace') {
       aValue = getMarketplaceDisplayName(aValue);
       bValue = getMarketplaceDisplayName(bValue);
@@ -770,6 +773,7 @@ export function ReturnsList({
               </th>
               {[
                 { label: 'Status', key: 'status' },
+                { label: 'Erstattet am', key: 'refunded_at' },
                 { label: 'Eingang', key: 'receivedAt' },
                 { label: 'Scan-Zeitpunkt', key: 'scannedAt' },
                 { label: 'Mitarbeiter', key: 'user' },
@@ -798,7 +802,7 @@ export function ReturnsList({
           <tbody className="divide-y divide-slate-100">
             {filteredLogs.length === 0 ? (
               <tr>
-                <td colSpan={11} className="px-6 py-12 text-center text-slate-400 italic">
+                <td colSpan={12} className="px-6 py-12 text-center text-slate-400 italic">
                   Keine Retouren gefunden.
                 </td>
               </tr>
@@ -837,10 +841,19 @@ export function ReturnsList({
                       <span className={`w-1.5 h-1.5 rounded-full ${log.status === 'bearbeitet' ? 'bg-emerald-500' : log.status === 'in_klaerung' ? 'bg-amber-500' : 'bg-indigo-500'}`} />
                       {log.status === 'bearbeitet' ? 'Bearbeitet' : log.status === 'in_klaerung' ? 'In Klärung' : 'Neu'}
                     </button>
-                    {log.status === 'bearbeitet' && (log.metadata as any)?.refunded_at && (
-                      <div className="mt-1 text-[10px] text-emerald-600 font-medium" title="Erstattungszeitpunkt">
-                        am {format(new Date((log.metadata as any).refunded_at), 'dd.MM.yy HH:mm', { locale: de })}
+                  </td>
+
+                  {/* Erstattet am */}
+                  <td className="px-6 py-4">
+                    {log.status === 'bearbeitet' && (log.metadata as any)?.refunded_at ? (
+                      <div className="text-xs font-bold text-emerald-700 flex items-center gap-1.5" title="Erstattungszeitpunkt">
+                        <svg className="w-3.5 h-3.5 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>{format(new Date((log.metadata as any).refunded_at), 'dd.MM.yy HH:mm', { locale: de })}</span>
                       </div>
+                    ) : (
+                      <span className="text-xs text-slate-400 italic">-</span>
                     )}
                   </td>
 
