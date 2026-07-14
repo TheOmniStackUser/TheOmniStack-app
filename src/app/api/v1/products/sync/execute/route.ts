@@ -54,7 +54,8 @@ export async function POST(request: Request) {
     }))
 
     if (updates.length > 0) {
-      await adapter.updateListings(companyId, updates)
+      const { pushUpdatesToMarketplaces } = await import('@/workers/product-sync')
+      await pushUpdatesToMarketplaces(companyId, updates, undefined, integrationId)
     }
 
     return NextResponse.json({

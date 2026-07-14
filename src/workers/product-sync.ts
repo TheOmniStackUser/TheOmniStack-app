@@ -208,7 +208,7 @@ export async function syncProductsForCompany(companyId: string, integrationId?: 
 /**
  * Pushes inventory and price updates from OmniStack to the mapped marketplaces.
  */
-export async function pushUpdatesToMarketplaces(companyId: string, updates: { sku: string, stock?: number, price?: number }[], job?: Job<any>) {
+export async function pushUpdatesToMarketplaces(companyId: string, updates: { sku: string, stock?: number, price?: number }[], job?: Job<any>, targetIntegrationId?: string) {
   console.log(`[ProductSync] Pushing updates for ${updates.length} products for company ${companyId}...`)
   
   if (updates.length === 0) return { totalUpdatesSent: 0, activeMarketplaces: [] }
@@ -249,7 +249,8 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
     .where(
       and(
         eq(marketplaceIntegrations.companyId, companyId),
-        eq(marketplaceIntegrations.isActive, true)
+        eq(marketplaceIntegrations.isActive, true),
+        targetIntegrationId ? eq(marketplaceIntegrations.id, targetIntegrationId) : undefined
       )
     )
 
