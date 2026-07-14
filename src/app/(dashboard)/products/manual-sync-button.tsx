@@ -56,7 +56,13 @@ export function ManualSyncButton() {
     if (jobId) {
       interval = setInterval(async () => {
         try {
-          const res = await fetch(`/api/v1/products/sync/status?jobId=${jobId}`)
+          const res = await fetch(`/api/v1/products/sync/status?jobId=${jobId}&_t=${Date.now()}`, { 
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache'
+            }
+          })
           if (!res.ok) return
           const data = await res.json()
           
