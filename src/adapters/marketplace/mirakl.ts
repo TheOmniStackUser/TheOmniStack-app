@@ -430,8 +430,10 @@ export class MiraklAdapter implements MarketplaceAdapter {
       delete downloadHeaders['Accept']
 
       const downloadResponse = await fetch(downloadUrl, {
-        method: 'GET',
-        headers: downloadHeaders
+      method: 'GET',
+        
+      cache: 'no-store',
+      headers: downloadHeaders
       })
 
       if (!downloadResponse.ok) {

@@ -60,8 +60,10 @@ export class WooCommerceAdapter implements MarketplaceAdapter {
       console.log(`[WooCommerceAdapter] Fetching page ${page}/${totalPages}: ${url.toString()}`)
 
       const response = await fetch(url.toString(), {
-        method: 'GET',
-        headers: {
+      method: 'GET',
+        
+      cache: 'no-store',
+      headers: {
           'Authorization': this.authHeader,
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -226,8 +228,10 @@ export class WooCommerceAdapter implements MarketplaceAdapter {
       if (!rawOrder || !rawOrder.line_items) {
         console.log(`[WooCommerceAdapter] Fetching order details from WooCommerce API...`)
         const response = await fetch(`${this.baseUrl}/wp-json/wc/v3/orders/${marketplaceOrderId}`, {
-          method: 'GET',
-          headers: {
+      method: 'GET',
+          
+      cache: 'no-store',
+      headers: {
             'Authorization': this.authHeader,
             'Content-Type': 'application/json',
             'Accept': 'application/json',
@@ -314,8 +318,10 @@ export class WooCommerceAdapter implements MarketplaceAdapter {
         console.log(`[WooCommerceAdapter] Fetching products page ${page}/${totalPages}...`)
 
         const response = await fetch(url.toString(), {
-          method: 'GET',
-          headers: {
+      method: 'GET',
+          
+      cache: 'no-store',
+      headers: {
             'Authorization': this.authHeader,
             'Content-Type': 'application/json',
             'Accept': 'application/json',

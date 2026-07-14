@@ -185,8 +185,10 @@ export class OttoAdapter implements MarketplaceAdapter {
         pagesFetched++
         console.log(`[OttoAdapter] Fetching page ${pagesFetched}: ${nextUrl}`)
         const res: Response = await fetch(nextUrl, {
-          method: 'GET',
-          headers: {
+      method: 'GET',
+          
+      cache: 'no-store',
+      headers: {
             'Authorization': `Bearer ${accessToken}`,
             'Accept': 'application/json'
           },
@@ -438,8 +440,10 @@ export class OttoAdapter implements MarketplaceAdapter {
       
       const listUrl = `${this.baseUrl}/v3/receipts?salesOrderId=${salesOrderId}`
       const response = await fetch(listUrl, {
-        method: 'GET',
-        headers: {
+      method: 'GET',
+        
+      cache: 'no-store',
+      headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Accept': 'application/json'
         }
@@ -467,8 +471,10 @@ export class OttoAdapter implements MarketplaceAdapter {
       
       const downloadUrl = `${this.baseUrl}/v3/receipts/${receiptNumber}.pdf`
       const pdfResponse = await fetch(downloadUrl, {
-        method: 'GET',
-        headers: {
+      method: 'GET',
+        
+      cache: 'no-store',
+      headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Accept': 'application/pdf'
         }
@@ -501,8 +507,10 @@ export class OttoAdapter implements MarketplaceAdapter {
       const accessToken = await this.getAccessToken()
       const downloadUrl = `${this.baseUrl}/v3/receipts/${receiptNumber}.pdf`
       const pdfResponse = await fetch(downloadUrl, {
-        method: 'GET',
-        headers: {
+      method: 'GET',
+        
+      cache: 'no-store',
+      headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Accept': 'application/pdf'
         }
@@ -523,8 +531,10 @@ export class OttoAdapter implements MarketplaceAdapter {
       
       const listUrl = `${this.baseUrl}/v3/receipts?salesOrderId=${marketplaceOrderId}`
       const response = await fetch(listUrl, {
-        method: 'GET',
-        headers: {
+      method: 'GET',
+        
+      cache: 'no-store',
+      headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Accept': 'application/json'
         }
@@ -611,8 +621,10 @@ export class OttoAdapter implements MarketplaceAdapter {
       if (!hasPositionItems) {
         console.log(`[OttoAdapter] Fetching order details from Otto v4 API for ${salesOrderId}...`)
         const response = await fetch(`${this.baseUrl}/v4/orders/${salesOrderId}`, {
-          method: 'GET',
-          headers: {
+      method: 'GET',
+          
+      cache: 'no-store',
+      headers: {
             'Authorization': `Bearer ${accessToken}`,
             'Accept': 'application/json'
           }
@@ -741,8 +753,10 @@ export class OttoAdapter implements MarketplaceAdapter {
         while (fetchRetries > 0) {
           try {
             response = await fetch(nextUrl, {
-              method: 'GET',
-              headers: {
+      method: 'GET',
+              
+      cache: 'no-store',
+      headers: {
                 'Authorization': `Bearer ${accessToken}`,
                 'Accept': 'application/json'
               },
@@ -827,8 +841,10 @@ export class OttoAdapter implements MarketplaceAdapter {
           while (qRetries > 0) {
             try {
               qRes = await fetch(quantitiesUrl, {
-                method: 'GET',
-                headers: {
+      method: 'GET',
+                
+      cache: 'no-store',
+      headers: {
                   'Authorization': `Bearer ${accessToken}`,
                   'Accept': 'application/json'
                 },

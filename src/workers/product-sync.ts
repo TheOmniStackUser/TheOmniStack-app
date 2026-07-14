@@ -59,7 +59,7 @@ export function createProductSyncWorker() {
           price: p.price !== null && p.price !== undefined ? Number(p.price) : undefined
         }))
 
-        await pushUpdatesToMarketplaces(companyId, updates)
+        await pushUpdatesToMarketplaces(companyId, updates, job)
       } else {
         await syncProductsForCompany(companyId, integrationId)
       }
@@ -208,7 +208,7 @@ export async function syncProductsForCompany(companyId: string, integrationId?: 
 /**
  * Pushes inventory and price updates from OmniStack to the mapped marketplaces.
  */
-export async function pushUpdatesToMarketplaces(companyId: string, updates: { sku: string, stock?: number, price?: number }[]) {
+export async function pushUpdatesToMarketplaces(companyId: string, updates: { sku: string, stock?: number, price?: number }[], job?: Job<any>) {
   console.log(`[ProductSync] Pushing updates for ${updates.length} products for company ${companyId}...`)
   
   if (updates.length === 0) return { totalUpdatesSent: 0, activeMarketplaces: [] }
@@ -314,13 +314,22 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
   const activeMarketplaces: string[] = []
   const failedMarketplaces: { name: string, error: string }[] = []
 
-  for (const [integrationId, mpUpdates] of Object.entries(updatesByIntegration)) {
+  const integrationEntries = Object.entries(updatesByIntegration)
+  let currentIndex = 0
+
+  for (const [integrationId, mpUpdates] of integrationEntries) {
     const integration = activeIntegrations.find(i => i.id === integrationId)
-    if (!integration) continue
+    if (!integration) {
+      currentIndex++
+      continue
+    }
 
     const marketplace = integration.type
     const adapter = getAdapterForIntegration(integration)
-    if (!adapter || !adapter.updateListings) continue
+    if (!adapter || !adapter.updateListings) {
+      currentIndex++
+      continue
+    }
 
     const meta = integration.metadata as any
     const fallbackNames: Record<string, string> = {
@@ -333,6 +342,16 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
     }
     const displayName = meta?.customName || fallbackNames[marketplace] || marketplace
 
+    if (job) {
+      await job.updateProgress({
+        step: 'pushing',
+        integrationIndex: currentIndex,
+        totalIntegrations: integrationEntries.length,
+        marketplace: displayName,
+        updatesCount: mpUpdates.length
+      })
+    }
+
     try {
       console.log(`[ProductSync] Pushing ${mpUpdates.length} updates to ${marketplace}...`)
       await adapter.updateListings(companyId, mpUpdates)
@@ -344,6 +363,12 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
       console.error(`[ProductSync] Failed to push updates to ${marketplace}:`, error)
       failedMarketplaces.push({ name: displayName, error: error.message || 'Unbekannter Fehler' })
     }
+    
+    currentIndex++
+  }
+
+  if (job) {
+    await job.updateProgress({ step: 'completed', totalUpdatesSent, activeMarketplaces, failedMarketplaces })
   }
 
   return { totalUpdatesSent, activeMarketplaces, failedMarketplaces }

@@ -36,6 +36,7 @@ export class AboutYouAdapter implements MarketplaceAdapter {
 
       const response = await fetch(url, {
         method: 'GET',
+        cache: 'no-store',
         headers: {
           'X-API-Key': this.config.apiKey,
           'Accept': 'application/json'
@@ -236,6 +237,7 @@ export class AboutYouAdapter implements MarketplaceAdapter {
     
     const response = await fetch(url, {
       method: 'GET',
+      cache: 'no-store',
       headers: {
         'X-API-Key': this.config.apiKey,
         'Accept': 'application/pdf'
@@ -260,6 +262,7 @@ export class AboutYouAdapter implements MarketplaceAdapter {
     
     const response = await fetch(url, {
       method: 'GET',
+      cache: 'no-store',
       headers: {
         'X-API-Key': this.config.apiKey,
         'Accept': 'application/pdf'
@@ -376,7 +379,7 @@ export class AboutYouAdapter implements MarketplaceAdapter {
       const brandMap = new Map<number, string>()
       try {
         const brandsResponse = await fetch(`${this.baseUrl}/brands`, {
-          method: 'GET',
+          cache: 'no-store',
           headers: {
             'X-API-Key': this.config.apiKey,
             'Accept': 'application/json'
@@ -401,7 +404,7 @@ export class AboutYouAdapter implements MarketplaceAdapter {
         pageCount++
         console.log(`[AboutYouAdapter] Fetching products page: ${nextUrl}`)
         const response: Response = await fetch(nextUrl, {
-          method: 'GET',
+          cache: 'no-store',
           headers: {
             'X-API-Key': this.config.apiKey,
             'Accept': 'application/json'

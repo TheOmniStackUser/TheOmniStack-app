@@ -44,6 +44,8 @@ export class ShopifyAdapter implements MarketplaceAdapter {
   private async fetchWithToken(shopUrl: string, token: string, options?: any): Promise<NormalizedOrder[]> {
     const endpoint = `${shopUrl}/admin/api/2024-01/orders.json?status=any&limit=50`
     const res = await fetch(endpoint, {
+      method: 'GET',
+      cache: 'no-store',
       headers: {
         'X-Shopify-Access-Token': token,
         'Content-Type': 'application/json',

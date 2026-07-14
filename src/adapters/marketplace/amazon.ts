@@ -44,7 +44,9 @@ export class AmazonAdapter implements MarketplaceAdapter {
       // Get Unshipped MFN orders
       const ordersUrl = `${this.baseUrl}/orders/v0/orders?MarketplaceIds=${this.marketplaceId}&FulfillmentChannels=MFN&OrderStatuses=Unshipped`
       const ordersResponse = await fetch(ordersUrl, {
-        headers: {
+      method: 'GET',
+      cache: 'no-store',
+      headers: {
           'x-amz-access-token': accessToken,
           'Accept': 'application/json'
         }
@@ -64,7 +66,9 @@ export class AmazonAdapter implements MarketplaceAdapter {
         console.log(`[AmazonAdapter] Fetching items for order ${rawOrder.AmazonOrderId}...`)
         const itemsUrl = `${this.baseUrl}/orders/v0/orders/${rawOrder.AmazonOrderId}/orderItems`
         const itemsResponse = await fetch(itemsUrl, {
-          headers: {
+      method: 'GET',
+      cache: 'no-store',
+      headers: {
             'x-amz-access-token': accessToken,
             'Accept': 'application/json'
           }
@@ -187,7 +191,9 @@ export class AmazonAdapter implements MarketplaceAdapter {
       
       console.log(`[AmazonAdapter] Fetching products via GET ${catalogUrl}...`)
       const response = await fetch(catalogUrl, {
-        headers: {
+      method: 'GET',
+      cache: 'no-store',
+      headers: {
           'x-amz-access-token': accessToken,
           'Accept': 'application/json'
         }
