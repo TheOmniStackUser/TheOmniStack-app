@@ -3,7 +3,7 @@
 import { useState, Fragment, ReactNode, useEffect, useMemo, useTransition } from 'react'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
-import { Package, Truck, CheckCircle2, Store, Clock, XCircle, RefreshCw } from 'lucide-react'
+import { Package, Truck, CheckCircle2, Store, Clock, XCircle, RefreshCw, Copy, Check } from 'lucide-react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { generateHermesLabelsAction, generateDhlLabelsAction } from '@/app/actions/shipping'
 import { archiveOrderAction, archiveOrdersBulkAction, updateOrderStatusAction, updateOrderAddressAction, updateOrderBillingAddressAction, generateOrDownloadInvoicesBulkAction, markOrderAsShippedManuallyAction, getOrderLabelsAction, updateOrderNotesAction, refundOrderAction, refundOrderPartialAction } from '@/app/actions/orders'
@@ -2350,8 +2350,21 @@ export function OrdersTable({
                           {getDisplayStatus(order.status) === 'later_shipment' ? 'Späterer Versand' : getDisplayStatus(order.status)}
                         </span>
                       </td>
-                      <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {orderNumber}
+                      <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 group/order">
+                        <div className="flex items-center gap-2">
+                          <span>{orderNumber}</span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              navigator.clipboard.writeText(orderNumber)
+                              showToast('Bestellnummer kopiert', 'success')
+                            }}
+                            className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 opacity-0 group-hover:opacity-100 transition-all focus:opacity-100"
+                            title="Bestellnummer kopieren"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                       <td className="px-3 py-4 text-sm text-gray-500">
                         <div style={{ whiteSpace: 'pre-line' }}>
@@ -2619,7 +2632,23 @@ export function OrdersTable({
                               <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Bestelldetails</h4>
                               <div className="space-y-4 text-sm text-gray-700">
                                 <div>
-                                  <span className="font-medium">System Auftrags-ID:</span> <span className="text-gray-500">{order.marketplaceOrderId}</span>
+                                  <span className="font-medium">System Auftrags-ID:</span>{' '}
+                                  <div className="inline-flex items-center gap-2 group/copy">
+                                    <span className="text-gray-500">{order.marketplaceOrderId}</span>
+                                    {order.marketplaceOrderId && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          navigator.clipboard.writeText(order.marketplaceOrderId || '')
+                                          showToast('ID kopiert', 'success')
+                                        }}
+                                        className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 opacity-0 group-hover/copy:opacity-100 transition-all focus:opacity-100"
+                                        title="ID kopieren"
+                                      >
+                                        <Copy className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                                 <div>
                                   <span className="font-medium">{process.env.NEXT_PUBLIC_APP_VARIANT === 'craft' ? 'Auftragsdatum' : 'Bestelldatum'}:</span> <span className="text-gray-500">{formattedBestellDate}</span>
