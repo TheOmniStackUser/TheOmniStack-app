@@ -1,12 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { RefreshCw, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
 
 export function ManualSyncButton() {
   const [isSyncing, setIsSyncing] = useState(false)
-  const [jobId, setJobId] = useState<string | null>(null)
-  const [progressData, setProgressData] = useState<any>(null)
+  const [progressData, setProgressData] = useState<{ step: string; current: number; total: number; marketplace: string; updatesCount: number } | null>(null)
   
   const [modalState, setModalState] = useState<{ isOpen: boolean; type: 'success' | 'error' | 'syncing'; message: string }>({
     isOpen: false,
@@ -17,29 +16,72 @@ export function ManualSyncButton() {
   const handleSync = async () => {
     setIsSyncing(true)
     setProgressData(null)
+    setModalState({
+      isOpen: true,
+      type: 'syncing',
+      message: 'Der Sync wird vorbereitet...'
+    })
+
     try {
-      const res = await fetch('/api/v1/products/sync', { method: 'POST' })
-      const result = await res.json()
+      // Step 1: Get plan (active integrations)
+      const planRes = await fetch('/api/v1/products/sync/plan')
+      const plan = await planRes.json()
       
-      if (!res.ok) {
-        throw new Error(result.error || 'Fehler beim Abruf')
-      }
+      if (!planRes.ok) throw new Error(plan.error || 'Fehler beim Abruf des Sync-Plans')
       
-      if (result.jobId) {
-        setJobId(result.jobId)
-        setModalState({
-          isOpen: true,
-          type: 'syncing',
-          message: 'Der Sync wird im Hintergrund ausgeführt. Sie können dieses Fenster schließen.'
-        })
-      } else {
+      const integrations = plan.integrations || []
+      const totalProducts = plan.totalProducts || 0
+
+      if (integrations.length === 0) {
         setModalState({
           isOpen: true,
           type: 'success',
-          message: result.message || 'Sync wurde im Hintergrund gestartet.'
+          message: 'Keine aktiven Marktplätze für den Push-Sync gefunden.'
         })
         setIsSyncing(false)
+        return
       }
+
+      // Step 2: Execute sync sequentially
+      let updatesSent = 0
+      
+      for (let i = 0; i < integrations.length; i++) {
+        const integration = integrations[i]
+        
+        setProgressData({
+          step: 'pushing',
+          current: i,
+          total: integrations.length,
+          marketplace: integration.displayName,
+          updatesCount: totalProducts
+        })
+
+        const execRes = await fetch(`/api/v1/products/sync/execute?integrationId=${integration.id}`, { method: 'POST' })
+        const execData = await execRes.json()
+        
+        if (!execRes.ok) {
+          console.error(`Fehler bei ${integration.displayName}:`, execData.error)
+          // We continue with other integrations even if one fails
+        } else {
+          updatesSent = execData.updatesCount || updatesSent
+        }
+      }
+
+      // Final success
+      setProgressData({
+        step: 'completed',
+        current: integrations.length,
+        total: integrations.length,
+        marketplace: '',
+        updatesCount: updatesSent
+      })
+
+      setModalState({
+        isOpen: true,
+        type: 'success',
+        message: `Sync abgeschlossen. Es wurden ${updatesSent} Produktupdates erfolgreich an die Marktplätze gesendet.`
+      })
+
     } catch (error: any) {
       console.error(error)
       setModalState({
@@ -47,73 +89,14 @@ export function ManualSyncButton() {
         type: 'error',
         message: `Fehler beim Sync: ${error.message || 'Unbekannter Fehler'}`
       })
+    } finally {
       setIsSyncing(false)
     }
   }
 
-  useEffect(() => {
-    let interval: ReturnType<typeof setInterval>
-    if (jobId) {
-      interval = setInterval(async () => {
-        try {
-          const res = await fetch(`/api/v1/products/sync/status?jobId=${jobId}&_t=${Date.now()}`, { 
-            cache: 'no-store',
-            headers: {
-              'Cache-Control': 'no-cache, no-store, must-revalidate',
-              'Pragma': 'no-cache'
-            }
-          })
-          if (res.status === 404) {
-            setJobId(null)
-            setIsSyncing(false)
-            setModalState({
-              isOpen: true,
-              type: 'success',
-              message: 'Sync abgeschlossen.'
-            })
-            return
-          }
-          if (!res.ok) return
-          const data = await res.json()
-          
-          if (data.state === 'completed' || data.state === 'failed') {
-             setJobId(null)
-             setIsSyncing(false)
-             if (data.state === 'completed') {
-               const updatesSent = data.result?.totalUpdatesSent || data.progress?.totalUpdatesSent || 0
-               setModalState(prev => {
-                 // Only update modal if it's currently open or if we want to force open it.
-                 // We will force open it to notify the user.
-                 return {
-                   isOpen: true,
-                   type: 'success',
-                   message: `Sync abgeschlossen. Es wurden ${updatesSent} Produktupdates erfolgreich an die Marktplätze gesendet.`
-                 }
-               })
-             } else {
-               setModalState({
-                 isOpen: true,
-                 type: 'error',
-                 message: 'Der Sync ist fehlgeschlagen.'
-               })
-             }
-          } else {
-             setProgressData(data.progress)
-          }
-        } catch (e) {
-          console.error("Status poll error", e)
-        }
-      }, 1500)
-    }
-    return () => clearInterval(interval)
-  }, [jobId])
-
   const calculateProgressPercent = () => {
-    if (!progressData) return 0
-    if (progressData.step === 'pushing' && progressData.totalIntegrations > 0) {
-      return Math.round((progressData.integrationIndex / progressData.totalIntegrations) * 100)
-    }
-    return 0
+    if (!progressData || progressData.total === 0) return 0
+    return Math.round((progressData.current / progressData.total) * 100)
   }
 
   return (
@@ -147,11 +130,11 @@ export function ManualSyncButton() {
                 {modalState.message}
               </p>
 
-              {modalState.type === 'syncing' && (
+              {modalState.type === 'syncing' && progressData && (
                 <div className="mt-4 text-left">
                   <div className="flex justify-between text-xs text-slate-500 mb-1">
                     <span>
-                      {progressData?.step === 'pushing' ? `Aktualisiere ${progressData.marketplace}...` : 'Bereite vor...'}
+                      {progressData.step === 'pushing' ? `Aktualisiere ${progressData.marketplace}...` : 'Bereite vor...'}
                     </span>
                     <span className="font-medium text-slate-700">{calculateProgressPercent()}%</span>
                   </div>
@@ -167,17 +150,10 @@ export function ManualSyncButton() {
             
             <div className="bg-slate-50 px-6 py-4 flex justify-center">
               <button
-                onClick={() => {
-                  if (modalState.type !== 'syncing') {
-                    setModalState({ ...modalState, isOpen: false })
-                  } else {
-                    // Just hide modal, sync continues in background
-                    setModalState({ ...modalState, isOpen: false })
-                  }
-                }}
+                onClick={() => setModalState({ ...modalState, isOpen: false })}
                 className="w-full inline-flex justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 transition-colors"
               >
-                {modalState.type === 'syncing' ? 'Im Hintergrund ausführen' : 'Verstanden'}
+                Verstanden
               </button>
             </div>
           </div>
