@@ -524,7 +524,7 @@ export class AboutYouAdapter implements MarketplaceAdapter {
         }
       }
 
-      const postChunkSize = 1000 // the endpoints usually support up to 1000 items
+      const postChunkSize = 100 // reduced to prevent whole-batch rejections on About You side
 
       // Update Stocks
       if (stockItems.length > 0) {
@@ -540,6 +540,8 @@ export class AboutYouAdapter implements MarketplaceAdapter {
             },
             body: JSON.stringify({ items: chunk })
           })
+          
+          await new Promise(r => setTimeout(r, 200)) // rate limiting delay
 
           if (!res.ok) {
             const errText = await res.text()
@@ -565,6 +567,8 @@ export class AboutYouAdapter implements MarketplaceAdapter {
             },
             body: JSON.stringify({ items: chunk })
           })
+          
+          await new Promise(r => setTimeout(r, 200)) // rate limiting delay
 
           if (!res.ok) {
             const errText = await res.text()
