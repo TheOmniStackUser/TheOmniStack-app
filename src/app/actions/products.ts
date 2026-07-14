@@ -713,12 +713,20 @@ export async function updateProductStockInline(productId: string, newStock: numb
     .set({ currentStock: safeStock.toString(), updatedAt: new Date() })
     .where(eq(products.id, productId))
 
-  // Trigger sync
+  // Trigger sync in the background so the UI doesn't hang
   const { pushUpdatesToMarketplaces } = await import('@/workers/product-sync')
-  await pushUpdatesToMarketplaces(auth.activeCompanyId, [{
-    sku: product.sku,
-    stock: safeStock
-  }])
+  import('next/server').then(({ after }) => {
+    after(async () => {
+      try {
+        await pushUpdatesToMarketplaces(auth.activeCompanyId, [{
+          sku: product.sku,
+          stock: safeStock
+        }])
+      } catch (error) {
+        console.error('[updateProductStockInline] Background sync failed:', error)
+      }
+    })
+  }).catch(console.error)
 
   return { success: true }
 }
@@ -738,12 +746,20 @@ export async function updateProductPriceInline(productId: string, newPrice: numb
     .set({ price: newPrice.toString(), updatedAt: new Date() })
     .where(eq(products.id, productId))
 
-  // Trigger sync
+  // Trigger sync in the background so the UI doesn't hang
   const { pushUpdatesToMarketplaces } = await import('@/workers/product-sync')
-  await pushUpdatesToMarketplaces(auth.activeCompanyId, [{
-    sku: product.sku,
-    price: newPrice
-  }])
+  import('next/server').then(({ after }) => {
+    after(async () => {
+      try {
+        await pushUpdatesToMarketplaces(auth.activeCompanyId, [{
+          sku: product.sku,
+          price: newPrice
+        }])
+      } catch (error) {
+        console.error('[updateProductPriceInline] Background sync failed:', error)
+      }
+    })
+  }).catch(console.error)
 
   return { success: true }
 }
