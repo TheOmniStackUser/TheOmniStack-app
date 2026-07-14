@@ -7,6 +7,7 @@ import { AddMappingClient } from './add-mapping-client'
 import { DeleteMappingClient } from './delete-mapping-client'
 import { eq, and } from 'drizzle-orm'
 import { ProductFormClient, SubmitButton } from './product-form-client'
+import { InlineCopyButton } from './copy-button'
 import Link from 'next/link'
 import { ArrowLeft, Save, Package, Link as LinkIcon, Settings2, Trash2 } from 'lucide-react'
 import { notFound } from 'next/navigation'
@@ -164,11 +165,17 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                   <input type="text" name="title" defaultValue={product.title} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 placeholder:text-slate-500" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">SKU</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-semibold text-slate-700">SKU</label>
+                    <InlineCopyButton text={product.sku} label="SKU" />
+                  </div>
                   <input type="text" name="sku" defaultValue={product.sku} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 placeholder:text-slate-500" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">EANs / Barcodes (kommagetrennt)</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-semibold text-slate-700">EANs / Barcodes (kommagetrennt)</label>
+                    <InlineCopyButton text={product.ean || ''} label="EANs" />
+                  </div>
                   <textarea name="ean" rows={2} defaultValue={product.ean || ''} placeholder="Z.B. 4251439205740, 4251439205741" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all resize-none text-slate-900 placeholder:text-slate-500" />
                 </div>
                 <div className="space-y-2">
@@ -250,10 +257,14 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                           {getMarketplaceName(mapping)}
                         </span>
                         <div className="mt-1 flex flex-wrap items-center gap-2">
-                          <p className="font-mono text-sm font-bold text-slate-700">{mapping.marketplaceSku}</p>
+                          <p className="font-mono text-sm font-bold text-slate-700 group/msku flex items-center gap-1">
+                            {mapping.marketplaceSku}
+                            <InlineCopyButton text={mapping.marketplaceSku} label="Marktplatz SKU" className="opacity-0 group-hover/msku:opacity-100" />
+                          </p>
                           {(mapping.ean || (product.ean ? product.ean.split(',')[0].trim() : null)) && (
-                            <span className="text-[10px] font-mono font-bold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded uppercase tracking-wide border border-slate-200">
+                            <span className="text-[10px] font-mono font-bold bg-slate-100 text-slate-500 pl-1.5 pr-0.5 py-0.5 rounded uppercase tracking-wide border border-slate-200 group/mean flex items-center gap-1">
                               EAN: {mapping.ean || (product.ean ? product.ean.split(',')[0].trim() : '')}
+                              <InlineCopyButton text={mapping.ean || (product.ean ? product.ean.split(',')[0].trim() : '')} label="EAN" className="opacity-0 group-hover/mean:opacity-100 !p-0.5 hover:bg-slate-300" />
                             </span>
                           )}
                         </div>
