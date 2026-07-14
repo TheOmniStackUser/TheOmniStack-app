@@ -50,7 +50,6 @@ export class ShopifyAdapter implements MarketplaceAdapter {
         'X-Shopify-Access-Token': token,
         'Content-Type': 'application/json',
       },
-      cache: 'no-store'
     })
 
     if (!res.ok) {
