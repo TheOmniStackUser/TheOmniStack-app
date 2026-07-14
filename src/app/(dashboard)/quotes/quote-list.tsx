@@ -7,6 +7,7 @@ import { getInvoiceDownloadUrl, getInvoiceDetailsAction, sendInvoiceEmailAction,
 import { convertQuoteAction, convertQuoteToOrderAction, deleteQuoteAction, saveQuoteEmailTemplateAction } from '@/app/actions/manual-invoice'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { Copy } from 'lucide-react'
 
 interface Quote {
   id: string
@@ -668,10 +669,23 @@ export function QuoteList({
                     onClick={() => handleSelectQuote(quote.id)}
                     className="hover:bg-slate-50/60 transition-colors group cursor-pointer"
                   >
-                    <td className="px-5 py-4">
-                      <span className="font-mono text-xs font-semibold text-slate-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg">
-                        {quote.invoiceNumber}
-                      </span>
+                    <td className="px-5 py-4 group/angebot">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-semibold text-slate-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg">
+                          {quote.invoiceNumber}
+                        </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            navigator.clipboard.writeText(quote.invoiceNumber)
+                            showToast('Angebotnummer kopiert', 'success')
+                          }}
+                          className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 opacity-0 group-hover/angebot:opacity-100 transition-all focus:opacity-100"
+                          title="Angebotnummer kopieren"
+                        >
+                          <Copy className="w-3 h-3" />
+                        </button>
+                      </div>
                     </td>
                     <td className="px-5 py-4">
                       <div className="font-medium text-slate-800" style={{ whiteSpace: 'pre-line' }}>

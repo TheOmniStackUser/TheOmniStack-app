@@ -11,6 +11,7 @@ import {
   refundReturnAction,
   getOrderDetailsAction
 } from '@/app/actions/returns'
+import { Copy } from 'lucide-react'
 
 interface ScannedItem {
   id?: string
@@ -915,8 +916,21 @@ export function ReturnsList({
                   </td>
 
                   {/* Order ID */}
-                  <td className="px-6 py-4">
-                    <div className="font-bold text-slate-900">{log.orderNumber}</div>
+                  <td className="px-6 py-4 group/bestell">
+                    <div className="flex items-center gap-2">
+                      <div className="font-bold text-slate-900">{log.orderNumber}</div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          navigator.clipboard.writeText(log.orderNumber)
+                          showToast('Bestellnummer kopiert', 'success')
+                        }}
+                        className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 opacity-0 group-hover/bestell:opacity-100 transition-all focus:opacity-100"
+                        title="Bestellnummer kopieren"
+                      >
+                        <Copy className="w-3 h-3" />
+                      </button>
+                    </div>
                     {log.orderId ? (
                       <button
                         onClick={(e) => { e.stopPropagation(); handleToggleExpand(log) }}
