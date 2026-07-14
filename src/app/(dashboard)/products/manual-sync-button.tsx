@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { RefreshCw, Loader2, CheckCircle2, AlertCircle, X } from 'lucide-react'
-import { triggerGlobalMarketplaceSync } from '@/app/actions/products'
 
 export function ManualSyncButton() {
   const [isSyncing, setIsSyncing] = useState(false)
@@ -15,7 +14,12 @@ export function ManualSyncButton() {
   const handleSync = async () => {
     setIsSyncing(true)
     try {
-      const result = await triggerGlobalMarketplaceSync()
+      const res = await fetch('/api/v1/products/sync', { method: 'POST' })
+      const result = await res.json()
+      
+      if (!res.ok) {
+        throw new Error(result.error || 'Fehler beim Abruf')
+      }
       
       const count = result?.totalUpdatesSent || 0
       const mkts = result?.activeMarketplaces?.join(', ') || ''
