@@ -63,6 +63,16 @@ export function ManualSyncButton() {
               'Pragma': 'no-cache'
             }
           })
+          if (res.status === 404) {
+            setJobId(null)
+            setIsSyncing(false)
+            setModalState({
+              isOpen: true,
+              type: 'success',
+              message: 'Sync abgeschlossen.'
+            })
+            return
+          }
           if (!res.ok) return
           const data = await res.json()
           

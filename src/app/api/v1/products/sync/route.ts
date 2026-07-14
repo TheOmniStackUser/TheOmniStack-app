@@ -18,7 +18,7 @@ export async function POST() {
         action: 'push_all'
       },
       {
-        removeOnComplete: true,
+        removeOnComplete: { age: 3600, count: 100 },
         removeOnFail: false,
       }
     )
