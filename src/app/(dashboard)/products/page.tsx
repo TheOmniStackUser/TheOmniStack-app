@@ -12,6 +12,9 @@ export const metadata = {
   title: 'Produkte - TheOmniStack',
 }
 
+export const maxDuration = 300
+
+
 export default async function ProductsPage() {
   const auth = await requireAuth()
 

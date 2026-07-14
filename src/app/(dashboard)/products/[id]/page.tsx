@@ -13,8 +13,10 @@ import { notFound } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 
 export const metadata = {
-  title: 'Produktdetails - TheOmniStack',
+  title: 'Produkt bearbeiten - TheOmniStack',
 }
+
+export const maxDuration = 300
 
 export default async function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth()
