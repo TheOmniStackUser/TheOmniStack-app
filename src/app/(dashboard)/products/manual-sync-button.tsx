@@ -153,7 +153,7 @@ export function ManualSyncButton() {
                 onClick={() => setModalState({ ...modalState, isOpen: false })}
                 className="w-full inline-flex justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 transition-colors"
               >
-                Verstanden
+                OK
               </button>
             </div>
           </div>
