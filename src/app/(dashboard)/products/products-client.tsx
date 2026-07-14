@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react'
 import Link from 'next/link'
-import { Package, Search, ChevronUp, ChevronDown, ChevronRight, Scale, MapPin, Tag, FileText, Barcode, ExternalLink, Trash2, Building2, X, Loader2 } from 'lucide-react'
+import { Package, Search, ChevronUp, ChevronDown, ChevronRight, Scale, MapPin, Tag, FileText, Barcode, ExternalLink, Trash2, Building2, X, Loader2, Copy } from 'lucide-react'
 import { DeleteProductButton } from './delete-button'
 import { useRouter } from 'next/navigation'
 
@@ -213,6 +213,14 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set())
   const [isBulkDeleting, setIsBulkDeleting] = useState(false)
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ message, type })
+    setTimeout(() => {
+      setToast(current => current?.message === message ? null : current)
+    }, 3000)
+  }
 
   const toggleSort = (column: string) => {
     if (sortColumn === column) {
@@ -449,14 +457,42 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                       <td className="px-4 py-4 text-slate-400">
                         <ChevronRight className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-90 text-cyan-600' : ''}`} />
                       </td>
-                      <td className="px-6 py-4">
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 text-xs font-mono font-bold">
-                          {product.sku}
-                        </span>
+                      <td className="px-6 py-4 group/sku">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 text-xs font-mono font-bold">
+                            {product.sku}
+                          </span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              navigator.clipboard.writeText(product.sku)
+                              showToast('SKU kopiert', 'success')
+                            }}
+                            className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 opacity-0 group-hover/sku:opacity-100 transition-all focus:opacity-100"
+                            title="SKU kopieren"
+                          >
+                            <Copy className="w-3 h-3" />
+                          </button>
+                        </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="font-semibold text-slate-900 line-clamp-1">{product.title}</div>
-                        {product.ean && <div className="text-xs text-slate-500 mt-0.5">EAN: {product.ean}</div>}
+                        {product.ean && (
+                          <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-2 group/ean w-fit">
+                            <span>EAN: {product.ean}</span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                navigator.clipboard.writeText(product.ean)
+                                showToast('EAN kopiert', 'success')
+                              }}
+                              className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 opacity-0 group-hover/ean:opacity-100 transition-all focus:opacity-100"
+                              title="EAN kopieren"
+                            >
+                              <Copy className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         <StockEditor product={product} />
@@ -581,6 +617,18 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed bottom-4 right-4 px-4 py-3 rounded-lg shadow-lg shadow-slate-200/50 flex items-center gap-3 animate-in slide-in-from-bottom-5 z-50 ${
+          toast.type === 'error' ? 'bg-red-500 text-white' : 
+          toast.type === 'success' ? 'bg-emerald-500 text-white' : 
+          'bg-slate-800 text-white'
+        }`}>
+          <span>{toast.message}</span>
+          <button onClick={() => setToast(null)} className="text-white/70 hover:text-white">✕</button>
         </div>
       )}
     </div>
