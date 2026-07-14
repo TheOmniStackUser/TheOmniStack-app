@@ -1,5 +1,5 @@
 'use server'
-
+export const maxDuration = 300
 import { requireAuth } from '@/lib/session'
 import { db } from '@/db/client'
 import { products, productMappings } from '@/db/schema/products'
