@@ -590,7 +590,11 @@ export async function syncShippedOrdersInvoices(
       console.log(`[Worker Debug] thresholdDate=${thresholdDate.toISOString()}, autoInvoice=${autoInvoice}`)
 
       const candidateOrders = await db
-        .select()
+        .select({
+          id: orders.id,
+          marketplaceOrderId: orders.marketplaceOrderId,
+          companyId: orders.companyId
+        })
         .from(orders)
         .where(
           and(
@@ -604,6 +608,7 @@ export async function syncShippedOrdersInvoices(
             gte(orders.createdAt, thresholdDate)
           )
         )
+        .limit(200)
 
       if (candidateOrders.length === 0) {
         // Log to help debug why there are no candidates

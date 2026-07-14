@@ -34,10 +34,10 @@ export async function setupScheduledReports() {
 }
 
 /**
- * Sets up hourly repeatable invoice sync jobs for all companies where enabled.
+ * Sets up 12-hourly repeatable invoice sync jobs for all companies where enabled.
  */
 export async function setupHourlyInvoiceSyncs() {
-  console.log('⏰ Setting up scheduled hourly invoice syncs...')
+  console.log('⏰ Setting up scheduled 12-hourly invoice syncs...')
 
   // Clean up any existing repeatable hourly invoice sync jobs from the queue
   try {
@@ -58,7 +58,7 @@ export async function setupHourlyInvoiceSyncs() {
     {
       jobId: 'hourly-invoice-sync',
       repeat: {
-        pattern: '0 * * * *', // every hour
+        pattern: '0 */12 * * *', // every 12 hours
         tz: 'Europe/Berlin',
       },
       removeOnComplete: true,
@@ -66,7 +66,7 @@ export async function setupHourlyInvoiceSyncs() {
       backoff: { type: 'exponential', delay: 5000 },
     }
   )
-  console.log(`   - Scheduled hourly invoice sync at minute 0 (Europe/Berlin)`)
+  console.log(`   - Scheduled 12-hourly invoice sync at minute 0 (Europe/Berlin)`)
 }
 
 /**
