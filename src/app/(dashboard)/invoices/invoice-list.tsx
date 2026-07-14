@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { Copy } from 'lucide-react'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
 import { 
@@ -1671,8 +1672,23 @@ export function InvoiceList({
                   </td>
                   {/* Belegnummer */}
                   <td className="px-6 py-4 font-medium text-slate-900">
-                    <div className="flex flex-col">
-                      <span>{invoice.status === 'draft' ? (invoice.draftName || 'Unbenannter Entwurf') : invoice.invoiceNumber}</span>
+                    <div className="flex flex-col group/beleg">
+                      <div className="flex items-center gap-2">
+                        <span>{invoice.status === 'draft' ? (invoice.draftName || 'Unbenannter Entwurf') : invoice.invoiceNumber}</span>
+                        {invoice.status !== 'draft' && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              navigator.clipboard.writeText(invoice.invoiceNumber)
+                              showToast('Belegnummer kopiert', 'success')
+                            }}
+                            className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 opacity-0 group-hover/beleg:opacity-100 transition-all focus:opacity-100"
+                            title="Belegnummer kopieren"
+                          >
+                            <Copy className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
                       {invoice.cancelsInvoiceId && invoice.originalInvoiceNumber && (
                         <span className={`text-[10px] font-bold mt-0.5 ${
                           invoice.invoiceNumber === invoice.originalInvoiceNumber ? 'text-rose-600' : 'text-amber-600'
@@ -1704,8 +1720,23 @@ export function InvoiceList({
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-4 font-mono text-xs text-slate-600">
-                    {invoice.displayOrderNumber || invoice.marketplaceOrderId || '–'}
+                  <td className="px-6 py-4 font-mono text-xs text-slate-600 group/bestell">
+                    <div className="flex items-center gap-2">
+                      <span>{invoice.displayOrderNumber || invoice.marketplaceOrderId || '–'}</span>
+                      {(invoice.displayOrderNumber || invoice.marketplaceOrderId) && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            navigator.clipboard.writeText(invoice.displayOrderNumber || invoice.marketplaceOrderId || '')
+                            showToast('Bestellnummer kopiert', 'success')
+                          }}
+                          className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 opacity-0 group-hover/bestell:opacity-100 transition-all focus:opacity-100"
+                          title="Bestellnummer kopieren"
+                        >
+                          <Copy className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-4">
                     {(() => {

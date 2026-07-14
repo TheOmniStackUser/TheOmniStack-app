@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { Copy } from 'lucide-react'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
 import { 
@@ -819,8 +820,21 @@ export function DeliveryNoteList({
                   <td className="px-6 py-4 text-slate-600">
                     {format(new Date(dn.createdAt), 'dd.MM.yyyy HH:mm', { locale: de })}
                   </td>
-                  <td className="px-6 py-4 font-medium text-slate-900">
-                    {dn.invoiceNumber}
+                  <td className="px-6 py-4 font-medium text-slate-900 group/lieferschein">
+                    <div className="flex items-center gap-2">
+                      <span>{dn.invoiceNumber}</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          navigator.clipboard.writeText(dn.invoiceNumber)
+                          showToast('Lieferscheinnummer kopiert', 'success')
+                        }}
+                        className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 opacity-0 group-hover/lieferschein:opacity-100 transition-all focus:opacity-100"
+                        title="Lieferscheinnummer kopieren"
+                      >
+                        <Copy className="w-3 h-3" />
+                      </button>
+                    </div>
                   </td>
                   <td className="px-6 py-4">
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize" 
