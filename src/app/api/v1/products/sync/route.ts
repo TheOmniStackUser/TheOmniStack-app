@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
-import { verifySession } from '@/lib/session'
+import { getSession } from '@/lib/session'
 import { getProductSyncQueue } from '@/workers/product-sync'
 
 export const maxDuration = 60
 
 export async function POST() {
   try {
-    const session = await verifySession()
+    const session = await getSession()
     if (!session || !session.activeCompanyId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
