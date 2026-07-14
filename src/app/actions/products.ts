@@ -728,6 +728,9 @@ export async function updateProductStockInline(productId: string, newStock: numb
     })
   }).catch(console.error)
 
+  const { revalidatePath } = await import('next/cache')
+  revalidatePath('/products')
+
   return { success: true }
 }
 
@@ -760,6 +763,9 @@ export async function updateProductPriceInline(productId: string, newPrice: numb
       }
     })
   }).catch(console.error)
+
+  const { revalidatePath } = await import('next/cache')
+  revalidatePath('/products')
 
   return { success: true }
 }
