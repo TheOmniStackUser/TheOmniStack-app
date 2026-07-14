@@ -326,7 +326,8 @@ export class OttoAdapter implements MarketplaceAdapter {
       const positionItems: any[] = []
       if (rawOrderPayload?.positionItems) {
         for (const item of rawOrderPayload.positionItems) {
-          if (item.positionItemId) {
+          const isProcessable = !item.fulfillmentStatus || item.fulfillmentStatus === 'PROCESSABLE'
+          if (item.positionItemId && isProcessable) {
             positionItems.push({
               positionItemId: item.positionItemId,
               salesOrderId: rawOrderPayload.salesOrderId || marketplaceOrderId,
@@ -338,7 +339,11 @@ export class OttoAdapter implements MarketplaceAdapter {
       }
 
       if (positionItems.length === 0) {
-        throw new Error(`Keine positionItemIds für Bestellung ${marketplaceOrderId} gefunden.`)
+        const hasItems = rawOrderPayload?.positionItems?.length > 0;
+        if (hasItems) {
+          throw new Error(`Alle Artikel der Bestellung ${marketplaceOrderId} sind bereits versendet oder storniert.`)
+        }
+        throw new Error(`Keine versendbaren Artikel (positionItemIds) für Bestellung ${marketplaceOrderId} gefunden.`)
       }
 
       const shipmentPayload = {
@@ -399,11 +404,20 @@ export class OttoAdapter implements MarketplaceAdapter {
         let message = `HTTP ${response?.status}`
         try {
           const parsed = JSON.parse(errText)
-          message = parsed.message || parsed.errors?.[0]?.message || parsed.detail || errText
+          if (parsed.errors && Array.isArray(parsed.errors)) {
+            const errorTitles = parsed.errors.map((e: any) => e.title || e.message).filter(Boolean).join(', ')
+            message = errorTitles || parsed.message || parsed.detail || errText
+            
+            if (message.includes('POSITION_ITEM_CAN_NOT_BE_SENT')) {
+              message = `Einige Artikel konnten nicht als versendet markiert werden (möglicherweise bereits storniert oder versendet).`
+            }
+          } else {
+            message = parsed.message || parsed.errors?.[0]?.message || parsed.detail || errText
+          }
         } catch {
           message = errText
         }
-        throw new Error(`(Payload: ${requestBody}) Otto API Fehler: ${message}`)
+        throw new Error(`Otto API Fehler: ${message}`)
       }
 
       console.log(`[OttoAdapter] Shipment confirmed successfully for ${marketplaceOrderId}`)
