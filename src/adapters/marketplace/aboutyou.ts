@@ -497,91 +497,83 @@ export class AboutYouAdapter implements MarketplaceAdapter {
     companyId: string, 
     updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number }[]
   ): Promise<void> {
-    console.log(`[AboutYouAdapter] Updating listings for company ${companyId}:`, updates)
+    console.log(`[AboutYouAdapter] Updating listings for company ${companyId}:`, updates.length, 'items')
     try {
-      // About You Seller Center API requires the FULL product payload for an update.
-      // We fetch ALL existing products via fetchProducts to avoid hitting Vercel serverless function timeouts
-      // which would happen if we fetched 200+ products sequentially.
-      const existingProducts = await this.fetchProducts(companyId)
-      const validItems: any[] = []
+      const stockItems: any[] = []
+      const priceItems: any[] = []
 
       for (const u of updates) {
-        const targetSku = u.sku || u.marketplaceProductId
-        const existing = existingProducts.find(p => p.sku === targetSku || p.marketplaceProductId === targetSku)
-        
-        if (!existing || !existing.rawPayload) continue
-        
-        const existingProduct = existing.rawPayload as any
-        
-        // Merge updates
-        if (u.stock !== undefined) {
-          existingProduct.quantity = u.stock
+        const sku = u.marketplaceProductId || u.sku
+        if (!sku) continue
+
+        if (u.stock !== undefined && u.stock !== null) {
+          stockItems.push({
+            sku,
+            quantity: u.stock
+          })
         }
-        if (u.price !== undefined) {
-          // Maintain existing prices array, just update 'DE' or the first one
-          if (existingProduct.prices && existingProduct.prices.length > 0) {
-            const dePrice = existingProduct.prices.find((p: any) => p.country_code === 'DE')
-            if (dePrice) {
-              dePrice.retail_price = u.price
-              delete dePrice.sale_price // Remove sale_price to prevent validation errors if it's >= new retail_price
-            } else {
-              existingProduct.prices[0].retail_price = u.price
-              delete existingProduct.prices[0].sale_price
+
+        if (u.price !== undefined && u.price !== null) {
+          priceItems.push({
+            sku,
+            price: {
+              country_code: 'DE',
+              retail_price: u.price
             }
-          } else {
-            existingProduct.prices = [{ country_code: 'DE', retail_price: u.price }]
-          }
+          })
         }
-        // The About You API strictly limits the number of images to 10 per product update
-        if (existingProduct.images && existingProduct.images.length > 10) {
-          existingProduct.images = existingProduct.images.slice(0, 10)
-        }
-
-        // AboutYou API now strictly requires 'brand' to be an integer (the brand ID). 
-        // When fetching, it might return a full object like { id: 123, name: '...' }
-        if (existingProduct.brand && typeof existingProduct.brand === 'object' && existingProduct.brand.id) {
-          existingProduct.brand = existingProduct.brand.id
-        } else if (existingProduct.brand !== undefined && existingProduct.brand !== null) {
-          const parsedBrand = parseInt(existingProduct.brand, 10)
-          if (!isNaN(parsedBrand)) {
-            existingProduct.brand = parsedBrand
-          }
-        }
-
-        validItems.push(existingProduct)
       }
 
-      if (validItems.length === 0) {
-        console.log(`[AboutYouAdapter] No valid products found on About You to update.`)
-        return
+      const postChunkSize = 1000 // the endpoints usually support up to 1000 items
+
+      // Update Stocks
+      if (stockItems.length > 0) {
+        console.log(`[AboutYouAdapter] Pushing ${stockItems.length} stock updates...`)
+        for (let i = 0; i < stockItems.length; i += postChunkSize) {
+          const chunk = stockItems.slice(i, i + postChunkSize)
+          const res = await fetch(`${this.baseUrl}/products/stocks`, {
+            method: 'PUT',
+            headers: {
+              'X-API-Key': this.config.apiKey,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify({ items: chunk })
+          })
+
+          if (!res.ok) {
+            const errText = await res.text()
+            console.error(`[AboutYouAdapter] Stock update failed: ${res.status} - ${errText}`)
+            throw new Error(`About You API Fehler beim Bestandsabgleich: ${res.status} - ${errText}`)
+          }
+          const result = await res.json()
+          console.log(`[AboutYouAdapter] Stock update successful, batchRequestId:`, result.batchRequestId || result)
+        }
       }
 
-      console.log(`[AboutYouAdapter] Pushing full payload for ${validItems.length} products...`)
+      // Update Prices
+      if (priceItems.length > 0) {
+        console.log(`[AboutYouAdapter] Pushing ${priceItems.length} price updates...`)
+        for (let i = 0; i < priceItems.length; i += postChunkSize) {
+          const chunk = priceItems.slice(i, i + postChunkSize)
+          const res = await fetch(`${this.baseUrl}/products/prices`, {
+            method: 'PUT',
+            headers: {
+              'X-API-Key': this.config.apiKey,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify({ items: chunk })
+          })
 
-      // About You API accepts a maximum of 100 items per batch
-      const postChunkSize = 100
-      for (let i = 0; i < validItems.length; i += postChunkSize) {
-        const postChunk = validItems.slice(i, i + postChunkSize)
-        console.log(`[AboutYouAdapter] Sending batch ${Math.floor(i / postChunkSize) + 1} with ${postChunk.length} items...`)
-
-        const response = await fetch(`${this.baseUrl}/products/`, {
-          method: 'POST',
-          headers: {
-            'X-API-Key': this.config.apiKey,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify({ items: postChunk })
-        })
-
-        if (!response.ok) {
-          const errText = await response.text()
-          console.error(`[AboutYouAdapter] Update failed: ${response.status} - ${errText}`)
-          throw new Error(`About You API Fehler beim Bestandsabgleich: ${response.status} - ${errText}`)
+          if (!res.ok) {
+            const errText = await res.text()
+            console.error(`[AboutYouAdapter] Price update failed: ${res.status} - ${errText}`)
+            throw new Error(`About You API Fehler beim Preisabgleich: ${res.status} - ${errText}`)
+          }
+          const result = await res.json()
+          console.log(`[AboutYouAdapter] Price update successful, batchRequestId:`, result.batchRequestId || result)
         }
-
-        const result = await response.json()
-        console.log(`[AboutYouAdapter] Update successful, batchRequestId:`, result.batchRequestId || result)
       }
 
     } catch (error) {
