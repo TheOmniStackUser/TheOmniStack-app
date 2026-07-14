@@ -21,22 +21,10 @@ export function ManualSyncButton() {
         throw new Error(result.error || 'Fehler beim Abruf')
       }
       
-      const count = result?.totalUpdatesSent || 0
-      const mkts = result?.activeMarketplaces?.join(', ') || ''
-      const fails = result?.failedMarketplaces?.map((f: any) => `${f.name} (${f.error})`).join(', ') || ''
-      
-      let msg = count > 0 
-        ? `Es wurden ${count} Listings erfolgreich an ${result?.activeMarketplaces?.length || 0} Marktplätze (${mkts}) gesendet!`
-        : 'Sync wurde angestoßen, aber es gab keine Bestand/Preis Änderungen.'
-
-      if (fails) {
-        msg += `\nFehler bei: ${fails}`
-      }
-
       setModalState({
         isOpen: true,
         type: 'success',
-        message: msg
+        message: result.message || 'Sync wurde im Hintergrund gestartet.'
       })
     } catch (error: any) {
       console.error(error)

@@ -32,16 +32,37 @@ export function getProductSyncQueue(): Queue {
 
 export type ProductSyncJobData = {
   companyId: string
-  integrationId: string
+  integrationId?: string
+  action?: 'import' | 'push_all'
 }
 
 export function createProductSyncWorker() {
   return new Worker<ProductSyncJobData>(
     QUEUE_PRODUCT_SYNC,
     async (job: Job<ProductSyncJobData>) => {
-      const { companyId, integrationId } = job.data
-      console.log(`[ProductSync Worker] Starting job ${job.id} for company ${companyId}, integration ${integrationId}`)
-      await syncProductsForCompany(companyId, integrationId)
+      const { companyId, integrationId, action } = job.data
+      console.log(`[ProductSync Worker] Starting job ${job.id} for company ${companyId}`)
+      
+      if (action === 'push_all') {
+        const allProducts = await db
+          .select({
+            sku: products.sku,
+            currentStock: products.currentStock,
+            price: products.price
+          })
+          .from(products)
+          .where(eq(products.companyId, companyId))
+
+        const updates = allProducts.map(p => ({
+          sku: p.sku,
+          stock: p.currentStock !== null && p.currentStock !== undefined ? Number(p.currentStock) : undefined,
+          price: p.price !== null && p.price !== undefined ? Number(p.price) : undefined
+        }))
+
+        await pushUpdatesToMarketplaces(companyId, updates)
+      } else {
+        await syncProductsForCompany(companyId, integrationId)
+      }
     },
     {
       connection: getRedisConnection(),
