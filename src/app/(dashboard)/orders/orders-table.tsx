@@ -2394,7 +2394,7 @@ export function OrdersTable({
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-500" suppressHydrationWarning>
                         <div>{formattedVersandDate}</div>
                         {order.trackingNumber && (
-                          <div className="mt-1">
+                          <div className="mt-1 flex items-center gap-1 group/tracking">
                             <a
                               href={getTrackingUrl(order.trackingNumber)}
                               target="_blank"
@@ -2408,6 +2408,17 @@ export function OrdersTable({
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                               </svg>
                             </a>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                navigator.clipboard.writeText(order.trackingNumber || '')
+                                showToast('Sendungsnummer kopiert', 'success')
+                              }}
+                              className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 opacity-0 group-hover/tracking:opacity-100 transition-all focus:opacity-100"
+                              title="Sendungsnummer kopieren"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         )}
                       </td>
@@ -2796,18 +2807,31 @@ export function OrdersTable({
                                 {order.trackingNumber && (
                                   <div>
                                     <span className="font-medium">Sendungsnummer:</span>{' '}
-                                    <a
-                                      href={getTrackingUrl(order.trackingNumber)}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1 font-mono font-medium"
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      {order.trackingNumber}
-                                      <svg className="w-3.5 h-3.5 text-blue-500 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                      </svg>
-                                    </a>
+                                    <div className="inline-flex items-center gap-2 group/copy-tracking">
+                                      <a
+                                        href={getTrackingUrl(order.trackingNumber)}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1 font-mono font-medium"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        {order.trackingNumber}
+                                        <svg className="w-3.5 h-3.5 text-blue-500 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                        </svg>
+                                      </a>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          navigator.clipboard.writeText(order.trackingNumber || '')
+                                          showToast('Sendungsnummer kopiert', 'success')
+                                        }}
+                                        className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 opacity-0 group-hover/copy-tracking:opacity-100 transition-all focus:opacity-100"
+                                        title="Sendungsnummer kopieren"
+                                      >
+                                        <Copy className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
                                   </div>
                                 )}
                                 {order.labelUrl && (
@@ -2834,18 +2858,31 @@ export function OrdersTable({
                                 {order.returnTrackingNumber && (
                                   <div>
                                     <span className="font-medium">Retouren-Nr:</span>{' '}
-                                    <a
-                                      href={getTrackingUrl(order.returnTrackingNumber)}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1 font-mono font-medium"
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      {order.returnTrackingNumber}
-                                      <svg className="w-3.5 h-3.5 text-blue-500 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                      </svg>
-                                    </a>
+                                    <div className="inline-flex items-center gap-2 group/copy-return">
+                                      <a
+                                        href={getTrackingUrl(order.returnTrackingNumber)}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1 font-mono font-medium"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        {order.returnTrackingNumber}
+                                        <svg className="w-3.5 h-3.5 text-blue-500 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                        </svg>
+                                      </a>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          navigator.clipboard.writeText(order.returnTrackingNumber || '')
+                                          showToast('Retouren-Nr kopiert', 'success')
+                                        }}
+                                        className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 opacity-0 group-hover/copy-return:opacity-100 transition-all focus:opacity-100"
+                                        title="Retouren-Nr kopieren"
+                                      >
+                                        <Copy className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
                                   </div>
                                 )}
                                 {order.returnLabelUrl && (
