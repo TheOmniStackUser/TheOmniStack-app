@@ -75,7 +75,11 @@ export function ReturnsList({
     mpMap.set('zalando', { value: 'Zalando', label: 'Zalando' });
     
     activeMarketplaces.forEach(mp => {
-      mpMap.set(mp.id.toLowerCase(), { value: mp.id, label: mp.name });
+      const rawKey = mp.name.toLowerCase();
+      const key = rawKey.replace(/\s+/g, '');
+      if (!mpMap.has(key)) {
+        mpMap.set(key, { value: mp.name, label: mp.name });
+      }
     });
     
     initialLogs.forEach(log => {
