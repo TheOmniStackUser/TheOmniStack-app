@@ -1210,12 +1210,14 @@ export function ReturnsList({
                                     const returnedQty = returnedItem?.quantity || 0
 
                                     return (
-                                      <li key={idx} className={`flex flex-col border-b border-slate-200 pb-2 last:border-0 last:pb-0 ${isRefunded ? 'bg-emerald-100/50 -mx-2 px-2 pt-2 rounded-md' : 'pt-2'}`}>
+                                      <li key={idx} className={`flex flex-col border-b border-slate-200 pb-2 last:border-0 last:pb-0 ${isRefunded ? (log.status === 'bearbeitet' ? 'bg-emerald-100/50' : 'bg-blue-50') + ' -mx-2 px-2 pt-2 rounded-md' : 'pt-2'}`}>
                                         <div className="flex items-start justify-between gap-2">
                                           <div className="font-medium text-slate-800 line-clamp-1" title={item.title}>{item.title}</div>
                                           {isRefunded && (
-                                            <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-100 text-emerald-800">
-                                              {returnedQty > 0 ? `${returnedQty}x Erstattet` : 'Erstattet'}
+                                            <span className={`shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${log.status === 'bearbeitet' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'}`}>
+                                              {returnedQty > 0 
+                                                ? `${returnedQty}x ${log.status === 'bearbeitet' ? 'Erstattet' : 'Retourniert'}` 
+                                                : (log.status === 'bearbeitet' ? 'Erstattet' : 'Retourniert')}
                                             </span>
                                           )}
                                         </div>
