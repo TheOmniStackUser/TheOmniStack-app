@@ -812,7 +812,7 @@ export function ReturnsList({
                 </td>
               </tr>
             ) : (
-              paginatedLogs.map((log) => (
+              paginatedLogs.map((log, index) => (
                 <Fragment key={log.id}>
                   <tr 
                   className={`hover:bg-slate-50 transition-colors group cursor-pointer ${expandedLogId === log.id ? 'bg-gray-50' : 'bg-white'}`}
@@ -1051,7 +1051,7 @@ export function ReturnsList({
                         </button>
                       
                       {openDropdownId === log.id && (
-                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-slate-200 z-50 py-1">
+                        <div className={`absolute right-0 w-48 bg-white rounded-md shadow-lg border border-slate-200 z-50 py-1 ${paginatedLogs.length > 3 && index >= paginatedLogs.length - 2 ? 'bottom-full mb-2' : 'mt-2'}`}>
                           {log.orderId && (
                             <button
                               onClick={(e) => {
