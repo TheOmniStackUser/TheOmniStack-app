@@ -453,7 +453,7 @@ export function InvoiceList({
     const resolved = resolveDunningText(invoice, 'reminder', hasFee, fee)
     setDunningSubject(resolved.subject)
     setDunningBody(resolved.body)
-    setDunningRecipient((invoice as any).recipientEmail || '')
+    setDunningRecipient((invoice as any).recipientEmail || (invoice as any).buyerEmail || '')
     setDunningSender(
       company?.smtpSettings?.enabled && company.smtpSettings.fromEmail
         ? company.smtpSettings.fromEmail
