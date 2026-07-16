@@ -180,6 +180,10 @@ export async function executeRefund({
           console.log(`[RefundService] API refund processed successfully on marketplace.`)
         } else {
           console.warn(`[RefundService] API refund call returned false status.`)
+          return { 
+            success: false, 
+            error: `API-Rückerstattung bei ${order.marketplace} fehlgeschlagen. Bitte überprüfen Sie die Marktplatz-Verbindung.`
+          }
         }
       } catch (err: any) {
         console.error(`[RefundService] Failed to trigger API refund on marketplace:`, err)

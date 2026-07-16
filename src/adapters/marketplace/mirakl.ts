@@ -1133,11 +1133,13 @@ export class MiraklAdapter implements MarketplaceAdapter {
           // Get the base unit price
           const priceUnit = line.price_unit || (line.price / line.quantity) || 0
 
+          const isLimango = this.marketplace.toLowerCase().includes('limango') || this.config.baseUrl.includes('limango')
+          const defaultReason = isLimango ? '17' : '14'
           const refundPayload: any = {
             order_line_id: lineId,
             amount: parseFloat((priceUnit * qtyToRefund).toFixed(2)),
             quantity: qtyToRefund,
-            reason_code: '14', // '14' = Customer return, '15' = Out of stock
+            reason_code: defaultReason, // '14' = Customer return, '15' = Out of stock, '17' = Retoure Limango
             shipping_amount: 0,
             currency_iso_code: miraklOrder.currency_iso_code || 'EUR'
           }
@@ -1215,7 +1217,7 @@ export class MiraklAdapter implements MarketplaceAdapter {
       })
 
       if (!refundResponse.ok) {
-        const errText = await refundResponse.text()
+        const errText = await refundResponse.clone().text()
         console.warn(`[MiraklAdapter:${this.marketplace}] Refund failed with default reason: ${refundResponse.status} - ${errText}. Attempting to fetch valid reason codes...`)
         
         try {
@@ -1240,6 +1242,16 @@ export class MiraklAdapter implements MarketplaceAdapter {
           } else {
              const rErr = await reasonRes.text()
              console.warn(`[MiraklAdapter:${this.marketplace}] Failed to fetch reason codes: ${reasonRes.status} - ${rErr}`)
+             
+             if (this.marketplace.toLowerCase().includes('limango') || baseUrl.includes('limango')) {
+                console.log(`[MiraklAdapter:${this.marketplace}] Using hardcoded reason code 17 for Limango fallback...`)
+                refunds.forEach(r => r.reason_code = '17')
+                refundResponse = await fetch(refundUrl, {
+                  method: 'PUT',
+                  headers,
+                  body: JSON.stringify({ refunds })
+                })
+             }
           }
         } catch(e) {
           console.error(`[MiraklAdapter:${this.marketplace}] Exception fetching reason codes for fallback:`, e)
