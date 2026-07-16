@@ -642,6 +642,8 @@ export async function generateDhlLabelsAction(
                 .replace(/consignee\.postalCode/g, 'Postleitzahl (PLZ) der Lieferadresse')
                 .replace(/consignee\.city/g, 'Ort/Stadt der Lieferadresse')
                 .replace(/consignee\.name1/g, 'Name der Lieferadresse')
+                .replace(/delivery\.destinationAddress\.postcode/g, 'Postleitzahl (PLZ)')
+                .replace(/delivery\.destinationAddress\.city/g, 'Ort/Stadt')
             }
             apiMsg = rawMsg
           } catch {/* not JSON */}
