@@ -1731,7 +1731,6 @@ const filteredOrders = orders;
                 onChange={(e) => {
                   const val = e.target.value
                   setDraftSearch(val)
-                  setActiveFilters(prev => ({ ...prev, search: val }))
                   pushParams({ page: '1' })
                 }}
                 onFocus={() => setIsSearchFocused(true)}
@@ -1794,7 +1793,6 @@ const filteredOrders = orders;
             onChange={(e) => {
               const val = e.target.value
               setDraftMarketplace(val)
-              setActiveFilters(prev => ({ ...prev, marketplace: val }))
               pushParams({ page: '1' })
             }}
             className="px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[150px] text-gray-900 font-medium text-sm"
@@ -1844,7 +1842,6 @@ const filteredOrders = orders;
             onChange={(e) => {
               const val = e.target.value
               setDraftStatus(val)
-              setActiveFilters(prev => ({ ...prev, status: val }))
               pushParams({ page: '1' })
             }}
             className="px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[150px] text-gray-900 font-medium text-sm"
@@ -1905,7 +1902,6 @@ const filteredOrders = orders;
                           onClick={() => {
                             const next = { ...draftProgress, [item.id]: 'all' as const }
                             setDraftProgress(next)
-                            setActiveFilters(prev => ({ ...prev, progress: next }))
                             pushParams({ page: '1' })
                           }}
                           className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
@@ -1921,7 +1917,6 @@ const filteredOrders = orders;
                           onClick={() => {
                             const next = { ...draftProgress, [item.id]: 'yes' as const }
                             setDraftProgress(next)
-                            setActiveFilters(prev => ({ ...prev, progress: next }))
                             pushParams({ page: '1' })
                           }}
                           className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
@@ -1937,7 +1932,6 @@ const filteredOrders = orders;
                           onClick={() => {
                             const next = { ...draftProgress, [item.id]: 'no' as const }
                             setDraftProgress(next)
-                            setActiveFilters(prev => ({ ...prev, progress: next }))
                             pushParams({ page: '1' })
                           }}
                           className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
@@ -1961,7 +1955,6 @@ const filteredOrders = orders;
             onChange={(e) => {
               const val = e.target.value
               setDraftCountry(val)
-              setActiveFilters(prev => ({ ...prev, country: val }))
               pushParams({ page: '1' })
             }}
             className="px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[120px] text-gray-900 font-medium text-sm"
@@ -1977,7 +1970,6 @@ const filteredOrders = orders;
             onChange={(e) => {
               const val = e.target.value
               setDraftInvoiceFilter(val)
-              setActiveFilters(prev => ({ ...prev, invoiceFilter: val }))
               pushParams({ page: '1' })
             }}
             className="px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[150px] text-gray-900 font-medium text-sm"
@@ -1992,7 +1984,6 @@ const filteredOrders = orders;
             onChange={(e) => {
               const val = e.target.value
               setDraftDateType(val)
-              setActiveFilters(prev => ({ ...prev, dateType: val }))
               pushParams({ page: '1' })
             }}
             className="px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[150px] text-gray-900 font-medium text-sm"
@@ -2009,7 +2000,6 @@ const filteredOrders = orders;
               onChange={(e) => {
                 const val = e.target.value
                 setDraftFromDate(val)
-                setActiveFilters(prev => ({ ...prev, fromDate: val }))
                 pushParams({ page: '1' })
               }}
               className="px-2 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm text-gray-900 font-medium"
@@ -2022,7 +2012,6 @@ const filteredOrders = orders;
               onChange={(e) => {
                 const val = e.target.value
                 setDraftToDate(val)
-                setActiveFilters(prev => ({ ...prev, toDate: val }))
                 pushParams({ page: '1' })
               }}
               className="px-2 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm text-gray-900 font-medium"
