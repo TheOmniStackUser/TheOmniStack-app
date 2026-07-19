@@ -359,6 +359,10 @@ const renderOrderProgress = (order: OrderWithItems, customMiraklIntegrations: an
 
 export function OrdersTable({ 
   orders, 
+  totalOrdersCount = 0,
+  currentPage = 1,
+  pageSize = 25,
+  urlParams = {} as any,
   hermesDefaultParcelClass = 'XS',
   customMiraklIntegrations = [],
   dhlConfig = null,
@@ -371,6 +375,10 @@ export function OrdersTable({
   hasShopifyIntegration = false,
 }: { 
   orders: OrderWithItems[]
+  totalOrdersCount?: number
+  currentPage?: number
+  pageSize?: number
+  urlParams?: any
   hermesDefaultParcelClass?: string
   customMiraklIntegrations?: any[]
   dhlConfig?: DhlConfig | null
@@ -707,7 +715,7 @@ export function OrdersTable({
   }
   
   // Applied Filters (The actual state used for filtering)
-  const [activeFilters, setActiveFilters] = useState({
+  /*
     search: '',
     marketplace: 'all',
     status: 'all',
@@ -724,24 +732,35 @@ export function OrdersTable({
       label: 'all'
     } as Record<string, 'all' | 'yes' | 'no'>,
     shippingStatus: 'all',
-  })
+  }) */
 
+  const setActiveFilters = (val: any | ((prev: any) => any)) => {}
+  const setCurrentPage = (val: number | ((prev: number) => number)) => {
+    const next = typeof val === "function" ? val(currentPage) : val;
+    pushParams({ page: String(next) });
+  }
+  const setPageSize = (val: number) => {
+    pushParams({ pageSize: String(val), page: "1" });
+  }
+
+  const router = useRouter()
+  const pathname = usePathname()
   // Draft Filters (The state while typing/selecting)
-  const [draftSearch, setDraftSearch] = useState('')
-  const [draftMarketplace, setDraftMarketplace] = useState('all')
-  const [draftStatus, setDraftStatus] = useState('all')
-  const [draftShippingStatus, setDraftShippingStatus] = useState('all')
-  const [draftCountry, setDraftCountry] = useState('all')
-  const [draftFromDate, setDraftFromDate] = useState('')
-  const [draftToDate, setDraftToDate] = useState('')
-  const [draftInvoiceFilter, setDraftInvoiceFilter] = useState('all')
-  const [draftDateType, setDraftDateType] = useState('purchase')
+  const [draftSearch, setDraftSearch] = useState(urlParams.search || '')
+  const [draftMarketplace, setDraftMarketplace] = useState(urlParams.marketplace || 'all')
+  const [draftStatus, setDraftStatus] = useState(urlParams.status || 'all')
+  const [draftShippingStatus, setDraftShippingStatus] = useState(urlParams.shippingStatus || 'all')
+  const [draftCountry, setDraftCountry] = useState(urlParams.country || 'all')
+  const [draftFromDate, setDraftFromDate] = useState(urlParams.fromDate || '')
+  const [draftToDate, setDraftToDate] = useState(urlParams.toDate || '')
+  const [draftInvoiceFilter, setDraftInvoiceFilter] = useState(urlParams.invoiceFilter || 'all')
+  const [draftDateType, setDraftDateType] = useState(urlParams.dateType || 'purchase')
   const [draftProgress, setDraftProgress] = useState<Record<string, 'all' | 'yes' | 'no'>>({
-    ordered: 'all',
-    paid: 'all',
-    shipped: 'all',
-    invoice: 'all',
-    label: 'all'
+    ordered: urlParams.ordered || 'all',
+    paid: urlParams.paid || 'all',
+    shipped: urlParams.shipped || 'all',
+    invoice: urlParams.invoice || 'all',
+    label: urlParams.label || 'all'
   })
   const [isProgressDropdownOpen, setIsProgressDropdownOpen] = useState(false)
   const [isSearchFocused, setIsSearchFocused] = useState(false)
@@ -773,41 +792,57 @@ export function OrdersTable({
   }, [draftSearch, orders])
 
   // Pagination
-  const [pageSize, setPageSize] = useState(25)
-  const [currentPage, setCurrentPage] = useState(1)
+  
+  
 
   // Sorting
-  const [sortField, setSortField] = useState<string | null>(null)
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | null>(null)
+  const sortField = urlParams.sortField || null
+  const sortDirection = urlParams.sortDirection || null
 
   const handleSort = (field: string) => {
     if (sortField === field) {
       if (sortDirection === 'asc') {
-        setSortDirection('desc')
+        pushParams({ sortDirection: 'desc' })
       } else if (sortDirection === 'desc') {
-        setSortField(null)
-        setSortDirection(null)
+        pushParams({ sortField: undefined, sortDirection: undefined })
       }
     } else {
-      setSortField(field)
-      setSortDirection('asc')
+      pushParams({ sortField: field, sortDirection: 'asc' })
     }
   }
 
-  const handleApplyFilters = () => {
-    setActiveFilters({
-      search: draftSearch,
-      marketplace: draftMarketplace,
-      status: draftStatus,
-      country: draftCountry,
-      fromDate: draftFromDate,
-      toDate: draftToDate,
-      invoiceFilter: draftInvoiceFilter,
-      dateType: draftDateType,
-      progress: draftProgress,
-      shippingStatus: draftShippingStatus,
+  const pushParams = (updates: Record<string, string|undefined>) => {
+    const params = new URLSearchParams()
+    if (draftSearch) params.set('search', draftSearch)
+    if (draftMarketplace !== 'all') params.set('marketplace', draftMarketplace)
+    if (draftStatus !== 'all') params.set('status', draftStatus)
+    if (draftShippingStatus !== 'all') params.set('shippingStatus', draftShippingStatus)
+    if (draftCountry !== 'all') params.set('country', draftCountry)
+    if (draftFromDate) params.set('fromDate', draftFromDate)
+    if (draftToDate) params.set('toDate', draftToDate)
+    if (draftDateType !== 'purchase') params.set('dateType', draftDateType)
+    if (draftInvoiceFilter !== 'all') params.set('invoiceFilter', draftInvoiceFilter)
+    
+    if (draftProgress.ordered !== 'all') params.set('ordered', draftProgress.ordered)
+    if (draftProgress.paid !== 'all') params.set('paid', draftProgress.paid)
+    if (draftProgress.shipped !== 'all') params.set('shipped', draftProgress.shipped)
+    if (draftProgress.invoice !== 'all') params.set('invoice', draftProgress.invoice)
+    if (draftProgress.label !== 'all') params.set('label', draftProgress.label)
+
+    if (sortField) params.set('sortField', sortField)
+    if (sortDirection) params.set('sortDirection', sortDirection)
+    if (pageSize !== 25) params.set('pageSize', String(pageSize))
+
+    Object.entries(updates).forEach(([k, v]) => {
+      if (v === undefined || v === null) params.delete(k)
+      else params.set(k, v)
     })
-    setCurrentPage(1)
+    
+    router.push(`${pathname}?${params.toString()}`)
+  }
+
+  const handleApplyFilters = () => {
+    pushParams({ page: '1' })
   }
 
   const handleResetFilters = () => {
@@ -827,47 +862,19 @@ export function OrdersTable({
       invoice: 'all',
       label: 'all'
     })
-    setActiveFilters({
-      search: '',
-      marketplace: 'all',
-      status: 'all',
-      country: 'all',
-      fromDate: '',
-      toDate: '',
-      invoiceFilter: 'all',
-      dateType: 'purchase',
-      progress: {
-        ordered: 'all',
-        paid: 'all',
-        shipped: 'all',
-        invoice: 'all',
-        label: 'all'
-      },
-      shippingStatus: 'all',
-    })
-    setSortField(null)
-    setSortDirection(null)
-    setCurrentPage(1)
+    router.push(pathname)
   }
 
   const handleClearSearch = () => {
     setDraftSearch('')
-    setActiveFilters(prev => ({
-      ...prev,
-      search: ''
-    }))
-    setCurrentPage(1)
+    pushParams({ search: undefined, page: '1' })
   }
 
   const handleSelectSearchSuggestion = (value: string) => {
     setDraftSearch(value)
-    setActiveFilters(prev => ({
-      ...prev,
-      search: value
-    }))
-    setCurrentPage(1)
     setIsSearchFocused(false)
     document.getElementById('search')?.blur()
+    pushParams({ search: value, page: '1' })
   }
 
   const handleStatusUpdate = async (orderId: string, newStatus: string) => {
@@ -971,222 +978,8 @@ export function OrdersTable({
     }
   }
 
-  const filteredOrders = orders.filter(order => {
-    // Filter by Marketplace
-    if (activeFilters.marketplace !== 'all') {
-      const orderMp = (order.marketplace || 'manual').toLowerCase()
-      const targetMp = activeFilters.marketplace.toLowerCase()
-      const formattedOrderMp = formatMarketplaceName(order.marketplace, order.shippingCountry).toLowerCase()
-      
-      if (targetMp === 'manual') {
-        if (orderMp !== 'manual' && orderMp !== '') {
-          return false
-        }
-      } else if (targetMp === 'group_direct') {
-        const isDirect = ['otto', 'aboutyou', 'shopify', 'kaufland', 'ebay', 'amazon'].includes(orderMp)
-        if (!isDirect) {
-          return false
-        }
-      } else if (targetMp === 'group_decathlon') {
-        const isDecathlon = formattedOrderMp.startsWith('decathlon') || orderMp === 'mirakl_decathlon_eu' || orderMp === 'mirakl_custom' || orderMp === 'mirakl_decathlon'
-        if (!isDecathlon) {
-          return false
-        }
-      } else if (targetMp === 'group_secret_sales') {
-        const isSecretSales = orderMp.startsWith('secret sales') || formattedOrderMp.startsWith('secret sales')
-        if (!isSecretSales) {
-          return false
-        }
-      } else if (targetMp === 'group_other') {
-        const isDecathlon = formattedOrderMp.startsWith('decathlon') || orderMp === 'mirakl_decathlon_eu' || orderMp === 'mirakl_custom' || orderMp === 'mirakl_decathlon'
-        const isSecretSales = orderMp.startsWith('secret sales') || formattedOrderMp.startsWith('secret sales')
-        const isDirect = ['otto', 'aboutyou', 'shopify', 'kaufland', 'ebay', 'amazon'].includes(orderMp)
-        if (orderMp === 'manual' || orderMp === '' || isDecathlon || isSecretSales || isDirect) {
-          return false
-        }
-      } else if (targetMp.startsWith('display_')) {
-        const displayTarget = targetMp.replace('display_', '')
-        if (formattedOrderMp !== displayTarget) {
-          return false
-        }
-      } else if (orderMp !== targetMp) {
-        return false
-      }
-    }
-    // Filter by Status
-    if (activeFilters.status !== 'all' && order.status !== activeFilters.status) {
-      return false
-    }
-    // Filter by Shipping Status
-    if (activeFilters.shippingStatus !== 'all') {
-      const orderShippingStatus = (order as any).shippingStatus || 'in_preparation'
-      if (orderShippingStatus !== activeFilters.shippingStatus) {
-        return false
-      }
-    }
-    // Filter by Progress Status
-    if (activeFilters.progress) {
-      const states = getOrderProgressStates(order, customMiraklIntegrations)
-      for (const [key, value] of Object.entries(activeFilters.progress)) {
-        const orderHasState = states[key as keyof typeof states]
-        if (value === 'yes' && !orderHasState) return false
-        if (value === 'no' && orderHasState) return false
-      }
-    }
-    // Filter by Invoice Status
-    if (activeFilters.invoiceFilter !== 'all') {
-      if (activeFilters.invoiceFilter === 'with_invoice' && !order.invoiceId) {
-        return false
-      }
-      if (activeFilters.invoiceFilter === 'without_invoice' && order.invoiceId) {
-        return false
-      }
-    }
-    // Filter by Date Range
-    if (activeFilters.fromDate || activeFilters.toDate) {
-      let targetDate: Date | null = null
-      if (activeFilters.dateType === 'invoice') {
-        const rawDate = order.invoice?.issuedAt || order.invoice?.createdAt
-        targetDate = rawDate ? new Date(rawDate) : null
-      } else if (activeFilters.dateType === 'shipping') {
-        const rawDate = order.status === 'shipped' ? order.updatedAt : null
-        targetDate = rawDate ? new Date(rawDate) : null
-      } else {
-        const rawDate = order.marketplacePurchaseDate || order.createdAt
-        targetDate = rawDate ? new Date(rawDate) : null
-      }
-
-      if (!targetDate) return false
-      
-      if (activeFilters.fromDate) {
-        const start = new Date(activeFilters.fromDate)
-        start.setHours(0, 0, 0, 0)
-        if (targetDate < start) return false
-      }
-      if (activeFilters.toDate) {
-        const end = new Date(activeFilters.toDate)
-        end.setHours(23, 59, 59, 999)
-        if (targetDate > end) return false
-      }
-    }
-    // Filter by Country
-    if (activeFilters.country !== 'all') {
-      const raw = (order.shippingCountry || '').toUpperCase()
-      const iso3to2: Record<string, string> = {
-        DEU: 'DE', AUT: 'AT', CHE: 'CH', FRA: 'FR', NLD: 'NL',
-        BEL: 'BE', POL: 'PL', CZE: 'CZ', SVK: 'SK', LUX: 'LU',
-        ITA: 'IT', ESP: 'ES', GBR: 'GB', USA: 'US', CHN: 'CN',
-      }
-      const code = raw.length === 3 ? (iso3to2[raw] ?? raw.slice(0, 2)) : raw
-      if (code !== activeFilters.country) {
-        return false
-      }
-    }
-
-    // Filter by Search (Order ID, Customer Name)
-    if (activeFilters.search.trim() !== '') {
-      const q = activeFilters.search.trim().toLowerCase()
-      const orderNumber = getOrderNumber(order).toLowerCase()
-      const buyerName = getOrderBuyerName(order).toLowerCase()
-      const trackingNumber = (order.trackingNumber || '').toLowerCase()
-      if (!orderNumber.includes(q) && !buyerName.includes(q) && !trackingNumber.includes(q)) {
-        return false
-      }
-    }
-    return true
-  })
-
-  // Sort orders if sorting is active
-  const sortedOrders = [...filteredOrders].sort((a, b) => {
-    if (!sortField || !sortDirection) return 0
-
-    let valA: any = null
-    let valB: any = null
-
-    switch (sortField) {
-      case 'bestelldatum': {
-        const dateA = a.marketplacePurchaseDate ? new Date(a.marketplacePurchaseDate).getTime() : new Date(a.createdAt).getTime()
-        const dateB = b.marketplacePurchaseDate ? new Date(b.marketplacePurchaseDate).getTime() : new Date(b.createdAt).getTime()
-        valA = dateA
-        valB = dateB
-        break
-      }
-      case 'marketplace':
-        valA = formatMarketplaceName(a.marketplace, a.shippingCountry).toLowerCase()
-        valB = formatMarketplaceName(b.marketplace, b.shippingCountry).toLowerCase()
-        break
-      case 'status':
-        valA = (a.status === 'later_shipment' ? 'Späterer Versand' : (a.status || '')).toLowerCase()
-        valB = (b.status === 'later_shipment' ? 'Späterer Versand' : (b.status || '')).toLowerCase()
-        break
-      case 'orderNumber': {
-        const numA = getOrderNumber(a as any)
-        const numB = getOrderNumber(b as any)
-        valA = numA
-        valB = numB
-        break
-      }
-      case 'kunde': {
-        // @ts-ignore
-        valA = String(a.buyerName || a.buyer?.name || '').toLowerCase()
-        // @ts-ignore
-        valB = String(b.buyerName || b.buyer?.name || '').toLowerCase()
-        break
-      }
-      case 'land': {
-        const getCountryCode = (raw?: string | null) => {
-          if (!raw) return ''
-          const clean = raw.toUpperCase()
-          const iso3to2: Record<string, string> = {
-            DEU: 'DE', AUT: 'AT', CHE: 'CH', FRA: 'FR', NLD: 'NL',
-            BEL: 'BE', POL: 'PL', CZE: 'CZ', SVK: 'SK', LUX: 'LU',
-            ITA: 'IT', ESP: 'ES', GBR: 'GB', USA: 'US', CHN: 'CN',
-          }
-          return clean.length === 3 ? (iso3to2[clean] ?? clean.slice(0, 2)) : clean
-        }
-        valA = getCountryCode(a.shippingCountry)
-        valB = getCountryCode(b.shippingCountry)
-        break
-      }
-      case 'versanddatum': {
-        const dateA = a.status === 'shipped' ? new Date(a.updatedAt).getTime() : null
-        const dateB = b.status === 'shipped' ? new Date(b.updatedAt).getTime() : null
-        valA = dateA
-        valB = dateB
-        break
-      }
-      case 'rechnungsdatum': {
-        const dateA = a.invoice ? new Date(a.invoice.issuedAt || a.invoice.createdAt).getTime() : null
-        const dateB = b.invoice ? new Date(b.invoice.issuedAt || b.invoice.createdAt).getTime() : null
-        valA = dateA
-        valB = dateB
-        break
-      }
-      case 'umsatz':
-        valA = Number(a.totalAmount) || 0
-        valB = Number(b.totalAmount) || 0
-        break
-      default:
-        return 0
-    }
-
-    const isEmpty = (val: any) => val === null || val === undefined || val === ''
-    const isEmptyA = isEmpty(valA)
-    const isEmptyB = isEmpty(valB)
-
-    if (isEmptyA && isEmptyB) return 0
-    if (isEmptyA) return 1
-    if (isEmptyB) return -1
-
-    if (typeof valA === 'number' && typeof valB === 'number') {
-      return sortDirection === 'asc' ? valA - valB : valB - valA
-    }
-
-    return sortDirection === 'asc'
-      ? String(valA).localeCompare(String(valB), 'de', { numeric: true, sensitivity: 'base' })
-      : String(valB).localeCompare(String(valA), 'de', { numeric: true, sensitivity: 'base' })
-  })
-
+  const sortedOrders = orders;
+const filteredOrders = orders;
   // Get unique countries for filter
   const uniqueCountries = Array.from(new Set(orders.map(o => {
     const raw = (o.shippingCountry || '').toUpperCase()
@@ -1199,16 +992,13 @@ export function OrdersTable({
   }))).filter(Boolean).sort()
 
   // Pagination Logic
-  const totalPages = Math.ceil(sortedOrders.length / pageSize)
-  const paginatedOrders = sortedOrders.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  )
+  const totalPages = Math.max(1, Math.ceil(totalOrdersCount / pageSize))
+  const paginatedOrders = sortedOrders
 
   // Reset to page 1 when filters change
   const handleFilterChange = (setter: (val: any) => void, value: any) => {
     setter(value)
-    setCurrentPage(1)
+    pushParams({ page: '1' })
   }
 
   const toggleAll = () => {
@@ -1792,7 +1582,7 @@ export function OrdersTable({
       <div className="mb-4 flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
         <div className="flex items-center gap-4">
           <p className="text-sm text-gray-500">
-            {selectedIds.size} von {filteredOrders.length} Bestellungen ausgewählt
+            {selectedIds.size} von {totalOrdersCount} Bestellungen ausgewählt
           </p>
           <button
             onClick={toggleExpandAll}
@@ -1942,7 +1732,7 @@ export function OrdersTable({
                   const val = e.target.value
                   setDraftSearch(val)
                   setActiveFilters(prev => ({ ...prev, search: val }))
-                  setCurrentPage(1)
+                  pushParams({ page: '1' })
                 }}
                 onFocus={() => setIsSearchFocused(true)}
                 onBlur={() => setIsSearchFocused(false)}
@@ -1993,7 +1783,7 @@ export function OrdersTable({
           </div>
           
           <div className="flex items-center gap-2 px-3 text-sm text-gray-500">
-            {filteredOrders.length} {filteredOrders.length === 1 ? 'Bestellung' : 'Bestellungen'}
+            {totalOrdersCount} {totalOrdersCount === 1 ? 'Bestellung' : 'Bestellungen'}
           </div>
         </div>
 
@@ -2005,7 +1795,7 @@ export function OrdersTable({
               const val = e.target.value
               setDraftMarketplace(val)
               setActiveFilters(prev => ({ ...prev, marketplace: val }))
-              setCurrentPage(1)
+              pushParams({ page: '1' })
             }}
             className="px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[150px] text-gray-900 font-medium text-sm"
           >
@@ -2055,7 +1845,7 @@ export function OrdersTable({
               const val = e.target.value
               setDraftStatus(val)
               setActiveFilters(prev => ({ ...prev, status: val }))
-              setCurrentPage(1)
+              pushParams({ page: '1' })
             }}
             className="px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[150px] text-gray-900 font-medium text-sm"
           >
@@ -2116,7 +1906,7 @@ export function OrdersTable({
                             const next = { ...draftProgress, [item.id]: 'all' as const }
                             setDraftProgress(next)
                             setActiveFilters(prev => ({ ...prev, progress: next }))
-                            setCurrentPage(1)
+                            pushParams({ page: '1' })
                           }}
                           className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
                             currentValue === 'all'
@@ -2132,7 +1922,7 @@ export function OrdersTable({
                             const next = { ...draftProgress, [item.id]: 'yes' as const }
                             setDraftProgress(next)
                             setActiveFilters(prev => ({ ...prev, progress: next }))
-                            setCurrentPage(1)
+                            pushParams({ page: '1' })
                           }}
                           className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
                             currentValue === 'yes'
@@ -2148,7 +1938,7 @@ export function OrdersTable({
                             const next = { ...draftProgress, [item.id]: 'no' as const }
                             setDraftProgress(next)
                             setActiveFilters(prev => ({ ...prev, progress: next }))
-                            setCurrentPage(1)
+                            pushParams({ page: '1' })
                           }}
                           className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
                             currentValue === 'no'
@@ -2172,7 +1962,7 @@ export function OrdersTable({
               const val = e.target.value
               setDraftCountry(val)
               setActiveFilters(prev => ({ ...prev, country: val }))
-              setCurrentPage(1)
+              pushParams({ page: '1' })
             }}
             className="px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[120px] text-gray-900 font-medium text-sm"
           >
@@ -2188,7 +1978,7 @@ export function OrdersTable({
               const val = e.target.value
               setDraftInvoiceFilter(val)
               setActiveFilters(prev => ({ ...prev, invoiceFilter: val }))
-              setCurrentPage(1)
+              pushParams({ page: '1' })
             }}
             className="px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[150px] text-gray-900 font-medium text-sm"
           >
@@ -2203,7 +1993,7 @@ export function OrdersTable({
               const val = e.target.value
               setDraftDateType(val)
               setActiveFilters(prev => ({ ...prev, dateType: val }))
-              setCurrentPage(1)
+              pushParams({ page: '1' })
             }}
             className="px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[150px] text-gray-900 font-medium text-sm"
           >
@@ -2220,7 +2010,7 @@ export function OrdersTable({
                 const val = e.target.value
                 setDraftFromDate(val)
                 setActiveFilters(prev => ({ ...prev, fromDate: val }))
-                setCurrentPage(1)
+                pushParams({ page: '1' })
               }}
               className="px-2 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm text-gray-900 font-medium"
               title="Von Datum"
@@ -2233,7 +2023,7 @@ export function OrdersTable({
                 const val = e.target.value
                 setDraftToDate(val)
                 setActiveFilters(prev => ({ ...prev, toDate: val }))
-                setCurrentPage(1)
+                pushParams({ page: '1' })
               }}
               className="px-2 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm text-gray-900 font-medium"
               title="Bis Datum"
@@ -2252,7 +2042,7 @@ export function OrdersTable({
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
-        {filteredOrders.length === 0 ? (
+        {totalOrdersCount === 0 ? (
           <div className="p-8 text-center text-gray-500">
             {orders.length === 0 ? 'Noch keine Bestellungen importiert.' : 'Keine Bestellungen entsprechen den Filtern.'}
           </div>
@@ -3299,10 +3089,10 @@ export function OrdersTable({
       </div>
 
       {/* Pagination Controls */}
-      {filteredOrders.length > 0 && (
+      {totalOrdersCount > 0 && (
         <div className="mt-6 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="text-sm text-gray-500">
-            Zeige <span className="font-medium">{(currentPage - 1) * pageSize + 1}</span> bis <span className="font-medium">{Math.min(currentPage * pageSize, filteredOrders.length)}</span> von <span className="font-medium">{filteredOrders.length}</span> Ergebnissen
+            Zeige <span className="font-medium">{(currentPage - 1) * pageSize + 1}</span> bis <span className="font-medium">{Math.min(currentPage * pageSize, totalOrdersCount)}</span> von <span className="font-medium">{totalOrdersCount}</span> Ergebnissen
           </div>
           
           <div className="flex flex-wrap items-center gap-4">
@@ -3314,7 +3104,7 @@ export function OrdersTable({
                 value={pageSize}
                 onChange={(e) => {
                   setPageSize(Number(e.target.value))
-                  setCurrentPage(1)
+                  pushParams({ page: '1' })
                 }}
                 className="bg-transparent focus:outline-none text-sm text-gray-700 font-bold cursor-pointer"
               >
