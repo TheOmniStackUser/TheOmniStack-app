@@ -24,6 +24,8 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   const country = (params.country as string) || 'all'
   const sortField = (params.sortField as string) || null
   const sortDirection = (params.sortDirection as string) || null
+  const fromDateParam = (params.fromDate as string) || null
+  const toDateParam = (params.toDate as string) || null
 
   // Base where clause
   const whereConditions = [
@@ -31,6 +33,20 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     eq(orders.isArchived, false),
     ne(orders.status, 'draft')
   ]
+
+  if (!search && !fromDateParam) {
+    const threeDaysAgo = new Date()
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3)
+    whereConditions.push(sql`${orders.marketplacePurchaseDate} >= ${threeDaysAgo.toISOString()}`)
+  } else if (fromDateParam) {
+    whereConditions.push(sql`${orders.marketplacePurchaseDate} >= ${new Date(fromDateParam).toISOString()}`)
+  }
+
+  if (toDateParam) {
+    const end = new Date(toDateParam)
+    end.setHours(23, 59, 59, 999)
+    whereConditions.push(sql`${orders.marketplacePurchaseDate} <= ${end.toISOString()}`)
+  }
 
   if (search) {
     whereConditions.push(

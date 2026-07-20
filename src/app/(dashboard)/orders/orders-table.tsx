@@ -747,6 +747,16 @@ export function OrdersTable({
   const pathname = usePathname()
   // Draft Filters (The state while typing/selecting)
   const [draftSearch, setDraftSearch] = useState(urlParams.search || '')
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (draftSearch !== (urlParams.search || '')) {
+        pushParams({ search: draftSearch, page: "1" })
+      }
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [draftSearch, urlParams.search])
+
   const [draftMarketplace, setDraftMarketplace] = useState(urlParams.marketplace || 'all')
   const [draftStatus, setDraftStatus] = useState(urlParams.status || 'all')
   const [draftShippingStatus, setDraftShippingStatus] = useState(urlParams.shippingStatus || 'all')
@@ -1729,9 +1739,7 @@ const filteredOrders = orders;
                 id="search"
                 value={draftSearch}
                 onChange={(e) => {
-                  const val = e.target.value
-                  setDraftSearch(val)
-                  pushParams({ page: '1' })
+                  setDraftSearch(e.target.value)
                 }}
                 onFocus={() => setIsSearchFocused(true)}
                 onBlur={() => setIsSearchFocused(false)}
@@ -3093,7 +3101,6 @@ const filteredOrders = orders;
                 value={pageSize}
                 onChange={(e) => {
                   setPageSize(Number(e.target.value))
-                  pushParams({ page: '1' })
                 }}
                 className="bg-transparent focus:outline-none text-sm text-gray-700 font-bold cursor-pointer"
               >
