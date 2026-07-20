@@ -34,11 +34,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     ne(orders.status, 'draft')
   ]
 
-  if (!search && !fromDateParam) {
-    const threeDaysAgo = new Date()
-    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3)
-    whereConditions.push(sql`${orders.marketplacePurchaseDate} >= ${threeDaysAgo.toISOString()}`)
-  } else if (fromDateParam) {
+  if (fromDateParam) {
     whereConditions.push(sql`${orders.marketplacePurchaseDate} >= ${new Date(fromDateParam).toISOString()}`)
   }
 
