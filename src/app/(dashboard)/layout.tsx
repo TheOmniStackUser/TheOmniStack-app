@@ -124,7 +124,7 @@ export default async function DashboardLayout({
               
               <Link href="/status" title="System Status" className="flex items-center px-3 py-2 text-sm font-medium rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all group-[.collapsed]/sidebar:justify-center group-[.collapsed]/sidebar:px-0">
                 <div className="w-[18px] h-[18px] flex items-center justify-center mr-3 group-[.collapsed]/sidebar:mr-0">
-                  <div className="w-3 h-3 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)] animate-pulse" />
+                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
                 </div>
                 <span className="group-[.collapsed]/sidebar:hidden">System Status</span>
               </Link>
