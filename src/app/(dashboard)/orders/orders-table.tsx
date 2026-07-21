@@ -2160,8 +2160,8 @@ const filteredOrders = orders;
                           </button>
                         </div>
                       </td>
-                      <td className="px-3 py-4 text-sm text-gray-500">
-                        <div style={{ whiteSpace: 'pre-line' }}>
+                      <td className="px-3 py-4">
+                        <div className="font-semibold text-slate-900 text-sm" style={{ whiteSpace: 'pre-line' }}>
                           {/* @ts-ignore */}
                           {formatCustomerName(order.buyerName || order.buyer?.name || 'Unbekannt')}
                         </div>

@@ -1777,8 +1777,8 @@ export function InvoiceList({
                       {formatMarketplaceName(invoice.marketplace, invoice.recipientCountry)}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-slate-600">
-                    <div style={{ whiteSpace: 'pre-line' }}>
+                  <td className="px-6 py-4">
+                    <div className="font-semibold text-slate-900 text-sm" style={{ whiteSpace: 'pre-line' }}>
                       {formatCustomerName(invoice.recipientName || '–')}
                     </div>
                   </td>

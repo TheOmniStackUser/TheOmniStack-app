@@ -842,8 +842,8 @@ export function DeliveryNoteList({
                       {formatMarketplaceName(dn.marketplace, dn.recipientCountry)}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-slate-600">
-                    <div style={{ whiteSpace: 'pre-line' }}>
+                  <td className="px-6 py-4">
+                    <div className="font-semibold text-slate-900 text-sm" style={{ whiteSpace: 'pre-line' }}>
                       {formatCustomerName(dn.recipientName || '–')}
                     </div>
                   </td>

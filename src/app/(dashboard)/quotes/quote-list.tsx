@@ -694,7 +694,7 @@ export function QuoteList({
                       </div>
                     </td>
                     <td className="px-5 py-4">
-                      <div className="font-medium text-slate-800" style={{ whiteSpace: 'pre-line' }}>
+                      <div className="font-semibold text-slate-900 text-sm" style={{ whiteSpace: 'pre-line' }}>
                         {formatCustomerName(quote.recipientName || '–')}
                       </div>
                       {quote.draftName && (

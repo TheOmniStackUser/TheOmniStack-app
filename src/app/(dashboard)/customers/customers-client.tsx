@@ -111,7 +111,7 @@ export function CustomersClient({ initialCustomers }: { initialCustomers: any[] 
                   </td>
                   <td className="px-6 py-4">
                     {c.companyName && <div className="font-bold text-slate-900">{c.companyName}</div>}
-                    <div className={c.companyName ? "text-slate-600 font-medium mt-1" : "font-bold text-slate-900"}>{c.name}</div>
+                    <div className="font-semibold text-slate-900 text-sm mt-1">{c.name}</div>
                     {c.vatId && <div className="text-[10px] text-slate-500 font-medium uppercase mt-1">USt-Id: {c.vatId}</div>}
                   </td>
                   <td className="px-6 py-4">
