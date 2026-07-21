@@ -1,27 +1,31 @@
 import React from 'react'
-import { getAdminIncidents, createIncident, resolveIncident } from './actions'
+import { getAdminIncidents, createIncident, resolveIncident, getOverrideStatuses } from './actions'
 import { AlertCircle, Plus, CheckCircle2 } from 'lucide-react'
 import { systemServicesEnum, incidentStatusEnum } from '@/db/schema/system-status'
 
 import { CreateIncidentForm } from './create-incident-form'
+import { LiveStatusOverride } from './live-status-override'
 
 export default async function AdminSystemStatusPage() {
   const incidents = await getAdminIncidents()
+  const overrides = await getOverrideStatuses()
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
       <div>
-        <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
+        <h1 className="text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
           <AlertCircle className="w-8 h-8 text-indigo-500" />
           System Status & Incidents
         </h1>
-        <p className="text-slate-500 mt-2 text-sm">
+        <p className="text-white/60 mt-2 text-sm">
           Manage system incidents and maintenance windows. These will be visible to merchants who use the affected integration.
         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-1 space-y-8">
+          <LiveStatusOverride overrides={overrides} />
+          
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6 sticky top-8">
             <h2 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
               <Plus className="w-4 h-4 text-indigo-500" /> Neues Ereignis melden
@@ -31,7 +35,7 @@ export default async function AdminSystemStatusPage() {
         </div>
 
         <div className="lg:col-span-2 space-y-4">
-          <h2 className="font-semibold text-slate-800 text-lg">Vorfälle & Wartungen</h2>
+          <h2 className="font-semibold text-white text-lg">Vorfälle & Wartungen</h2>
           {incidents.length === 0 ? (
             <div className="text-center py-12 bg-white rounded-2xl border border-slate-200/60 border-dashed">
               <p className="text-slate-500 text-sm">Keine Vorfälle protokolliert.</p>

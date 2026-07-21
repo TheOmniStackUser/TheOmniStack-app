@@ -50,3 +50,16 @@ export const systemStatusDaily = pgTable('system_status_daily', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
+
+export const overrideStatusEnum = pgEnum('override_status', [
+  'auto',
+  'online',
+  'offline'
+])
+
+// Manually override the live status of a service
+export const systemStatusOverride = pgTable('system_status_override', {
+  service: systemServicesEnum('service').primaryKey().notNull(),
+  status: overrideStatusEnum('status').notNull().default('auto'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})

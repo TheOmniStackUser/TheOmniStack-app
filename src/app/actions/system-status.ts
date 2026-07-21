@@ -122,9 +122,19 @@ export async function getSystemStatusData() {
     }
   }
 
+  // Fetch overrides
+  const overridesRows = await db.query.systemStatusOverride.findMany()
+  const overrides: Record<string, string> = {}
+  for (const o of overridesRows) {
+    if (usedServices.has(o.service)) {
+      overrides[o.service] = o.status
+    }
+  }
+
   return {
     usedServices: Array.from(usedServices),
     incidents: relevantIncidents,
     uptimeData: serviceUptimeMap,
+    overrides
   }
 }

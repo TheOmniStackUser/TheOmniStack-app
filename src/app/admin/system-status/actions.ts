@@ -62,3 +62,39 @@ export async function resolveIncident(id: string) {
   revalidatePath('/status')
   revalidatePath('/admin/system-status')
 }
+
+export async function getOverrideStatuses() {
+  const auth = await requireAuth()
+  if (auth.role !== 'owner' && auth.role !== 'admin' && auth.role !== 'omnistack_support') {
+    throw new Error('Unauthorized')
+  }
+
+  const overrides = await db.query.systemStatusOverride.findMany()
+  const map: Record<string, string> = {}
+  for (const o of overrides) {
+    map[o.service] = o.status
+  }
+  return map
+}
+
+export async function setOverrideStatus(
+  service: typeof systemServicesEnum.enumValues[number], 
+  status: 'auto' | 'online' | 'offline'
+) {
+  const auth = await requireAuth()
+  if (auth.role !== 'owner' && auth.role !== 'admin' && auth.role !== 'omnistack_support') {
+    throw new Error('Unauthorized')
+  }
+
+  const { systemStatusOverride } = await import('@/db/schema/system-status')
+  await db.insert(systemStatusOverride).values({
+    service,
+    status
+  }).onConflictDoUpdate({
+    target: systemStatusOverride.service,
+    set: { status, updatedAt: new Date() }
+  })
+
+  revalidatePath('/status')
+  revalidatePath('/admin/system-status')
+}

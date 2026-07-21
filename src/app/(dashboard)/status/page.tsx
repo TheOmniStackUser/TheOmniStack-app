@@ -22,7 +22,7 @@ const serviceNames: Record<string, string> = {
 }
 
 export default async function SystemStatusPage() {
-  const { incidents, uptimeData, usedServices } = await getSystemStatusData()
+  const { incidents, uptimeData, usedServices, overrides } = await getSystemStatusData()
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -96,7 +96,10 @@ export default async function SystemStatusPage() {
               ? ((upDays.length / validDays.length) * 100).toFixed(2)
               : '100.00' // fallback if no data
               
-            const isOperational = data[data.length - 1] !== 0 // current status
+            const override = overrides[service]
+            const isOperational = override === 'online' ? true 
+                               : override === 'offline' ? false 
+                               : data[data.length - 1] !== 0 // fallback to auto
 
             return (
               <div key={service} className="p-6 transition-colors hover:bg-slate-50/50">

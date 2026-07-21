@@ -4,7 +4,7 @@ import fs from 'fs';
 
 async function run() {
   try {
-    const migrationSql = fs.readFileSync('./src/db/migrations/0021_mature_shape.sql', 'utf8');
+    const migrationSql = fs.readFileSync('./src/db/migrations/0028_magical_micromax.sql', 'utf8');
     const statements = migrationSql.split('--> statement-breakpoint').map(s => s.trim()).filter(s => s);
     
     for (const statement of statements) {
