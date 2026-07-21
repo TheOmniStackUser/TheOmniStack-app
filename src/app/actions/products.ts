@@ -939,3 +939,30 @@ export async function undoUnmappedAction(payload: {
   revalidatePath('/products')
   return { success: true }
 }
+
+export async function toggleProductSync(productId: string, field: 'stock' | 'price', value: boolean) {
+  const auth = await requireAuth()
+
+  if (field === 'stock') {
+    await db.update(productMappings)
+      .set({ syncStock: value })
+      .where(
+        and(
+          eq(productMappings.productId, productId),
+          eq(productMappings.companyId, auth.activeCompanyId)
+        )
+      )
+  } else {
+    await db.update(productMappings)
+      .set({ syncPrice: value })
+      .where(
+        and(
+          eq(productMappings.productId, productId),
+          eq(productMappings.companyId, auth.activeCompanyId)
+        )
+      )
+  }
+
+  revalidatePath('/products')
+  return { success: true }
+}

@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react'
 import Link from 'next/link'
-import { Package, Search, ChevronUp, ChevronDown, ChevronRight, Scale, MapPin, Tag, FileText, Barcode, ExternalLink, Trash2, Building2, X, Loader2, Copy } from 'lucide-react'
+import { Package, Search, ChevronUp, ChevronDown, ChevronRight, Scale, MapPin, Tag, FileText, Barcode, ExternalLink, Trash2, Building2, X, Loader2, Copy, MoreHorizontal } from 'lucide-react'
 import { DeleteProductButton } from './delete-button'
 import { useRouter } from 'next/navigation'
 
@@ -214,6 +214,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set())
   const [isBulkDeleting, setIsBulkDeleting] = useState(false)
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -221,6 +222,19 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
     setTimeout(() => {
       setToast(current => current?.message === message ? null : current)
     }, 3000)
+  }
+
+  const handleToggleSync = async (productId: string, field: 'stock' | 'price', value: boolean) => {
+    try {
+      const { toggleProductSync } = await import('@/app/actions/products')
+      await toggleProductSync(productId, field, value)
+      showToast(`${field === 'stock' ? 'Bestand' : 'Preis'}-Sync aktualisiert`, 'success')
+      setOpenMenuId(null)
+      router.refresh()
+    } catch (e) {
+      console.error(e)
+      showToast('Fehler beim Aktualisieren', 'error')
+    }
   }
 
   const toggleSort = (column: string) => {
@@ -526,7 +540,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                         {new Date(product.updatedAt).toLocaleDateString('de-DE')}
                       </td>
                       <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center justify-end gap-3 opacity-100 transition-opacity">
                           <Link 
                             href={`/products/${product.id}`}
                             className="text-sm font-semibold text-cyan-600 hover:text-cyan-700 transition-colors"
@@ -534,6 +548,38 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                             Bearbeiten
                           </Link>
                           <DeleteProductButton productId={product.id} productTitle={product.title} />
+                          
+                          <div className="relative">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setOpenMenuId(openMenuId === product.id ? null : product.id)
+                              }}
+                              className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                            >
+                              <MoreHorizontal className="w-5 h-5" />
+                            </button>
+                            
+                            {openMenuId === product.id && (
+                              <>
+                                <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); }} />
+                                <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-xl shadow-lg border border-slate-200 py-1.5 z-50 text-left overflow-hidden">
+                                  <button 
+                                    onClick={(e) => { e.stopPropagation(); handleToggleSync(product.id, 'stock', !!product.hasSyncStockOff); }}
+                                    className="w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 transition-colors text-slate-700 font-medium"
+                                  >
+                                    {product.hasSyncStockOff ? 'Bestand-Sync aktivieren' : 'Bestand-Sync deaktivieren'}
+                                  </button>
+                                  <button 
+                                    onClick={(e) => { e.stopPropagation(); handleToggleSync(product.id, 'price', !!product.hasSyncPriceOff); }}
+                                    className="w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 transition-colors text-slate-700 font-medium"
+                                  >
+                                    {product.hasSyncPriceOff ? 'Preis-Sync aktivieren' : 'Preis-Sync deaktivieren'}
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </td>
                     </tr>
