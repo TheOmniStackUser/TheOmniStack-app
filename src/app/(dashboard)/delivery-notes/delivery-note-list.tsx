@@ -638,11 +638,10 @@ export function DeliveryNoteList({
         </div>
       )}
 
-      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-5">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
         {/* Row 1: Search */}
-        <div className="flex flex-col sm:flex-row gap-4 items-center">
-          <div className="flex-1 w-full flex gap-2">
-            <div className="relative flex-1">
+        <div className="flex flex-col sm:flex-row gap-4 items-center w-full lg:max-w-2xl">
+          <div className="relative flex-1 w-full">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -651,7 +650,7 @@ export function DeliveryNoteList({
               <input
                 type="text"
                 placeholder="Lieferscheinnummer oder Kunde suchen..."
-                className="block w-full pl-10 pr-10 py-2.5 border border-slate-200 rounded-lg leading-5 bg-slate-50/30 text-slate-900 font-medium placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-all"
+                className="block w-full pl-10 pr-10 py-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm text-slate-900 font-medium placeholder:text-slate-500 transition-all"
                 value={draftSearch}
                 onChange={(e) => {
                   const val = e.target.value
@@ -676,18 +675,18 @@ export function DeliveryNoteList({
             <button
               type="button"
               onClick={handleApplyFilters}
-              className="px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm whitespace-nowrap"
+              className="px-5 py-2 w-full sm:w-auto bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm whitespace-nowrap"
             >
               Suchen
             </button>
           </div>
-          <div className="text-sm text-slate-500 font-medium px-2 bg-slate-50 py-2 rounded-lg border border-slate-100 min-w-[120px] text-center">
+          <div className="hidden lg:flex items-center gap-2 px-3 text-sm text-slate-500 font-medium">
             {filteredDeliveryNotes.length} {filteredDeliveryNotes.length === 1 ? 'Lieferschein' : 'Lieferscheine'}
           </div>
         </div>
 
         {/* Row 2: Filters & Actions */}
-        <div className="flex flex-wrap items-center gap-4 pt-4 border-t border-slate-100">
+        <div className="flex flex-wrap items-center gap-4 mt-4">
           <select
             value={draftCountry}
             onChange={(e) => {
@@ -696,7 +695,7 @@ export function DeliveryNoteList({
               setActiveFilters(prev => ({ ...prev, country: val }))
               setCurrentPage(1)
             }}
-            className="px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[140px] text-sm text-slate-900 font-medium"
+            className="px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 min-w-[140px] text-sm text-slate-900 font-medium"
           >
             <option value="all">Alle Länder</option>
             {uniqueCountries.map(c => (

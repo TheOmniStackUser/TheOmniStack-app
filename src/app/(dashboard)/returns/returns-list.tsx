@@ -571,7 +571,7 @@ export function ReturnsList({
   return (
     <div className="space-y-6">
       {/* Search and Filters */}
-      <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-slate-50 p-4 rounded-xl border border-slate-200">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
         <div className="flex-1 w-full md:max-w-md flex gap-2">
           <div className="relative flex-1">
             <input
@@ -582,7 +582,7 @@ export function ReturnsList({
                 setSearchTerm(e.target.value)
                 setCurrentPage(1)
               }}
-              className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm bg-white text-slate-900 placeholder-slate-400 font-medium"
+              className="w-full pl-10 pr-10 py-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm text-slate-900 font-medium placeholder:text-slate-500 transition-all"
             />
             <svg className="w-5 h-5 text-slate-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -590,7 +590,7 @@ export function ReturnsList({
           </div>
           <button
             type="button"
-            className="px-5 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors shadow-sm whitespace-nowrap"
+            className="px-5 py-2 w-full sm:w-auto bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm whitespace-nowrap"
           >
             Suchen
           </button>
@@ -604,7 +604,7 @@ export function ReturnsList({
               setMarketplaceFilter(e.target.value)
               setCurrentPage(1)
             }}
-            className="px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm bg-white text-slate-600 font-medium"
+            className="px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm text-slate-900 font-medium"
           >
             <option value="all">Alle Kanäle</option>
             <option value="direct">Direkt / Kein Marktplatz</option>

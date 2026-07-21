@@ -371,7 +371,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
           <select
             value={searchField}
             onChange={(e) => setSearchField(e.target.value as any)}
-            className="w-36 py-2 pl-3 pr-8 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all text-slate-900"
+            className="w-48 px-3 py-2 pr-8 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all text-slate-900 font-medium"
           >
             <option value="all">Alle Felder</option>
             <option value="sku">SKU</option>
@@ -381,7 +381,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
           <select
             value={syncFilter}
             onChange={(e) => setSyncFilter(e.target.value as any)}
-            className="w-48 py-2 pl-3 pr-8 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all text-slate-900"
+            className="w-48 px-3 py-2 pr-8 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all text-slate-900 font-medium"
           >
             <option value="all">Alle Sync-Stati</option>
             <option value="stock_on">Bestand Sync: AN</option>
@@ -397,7 +397,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                 placeholder={searchField === 'all' ? "SKU, Titel oder EAN suchen..." : `${searchField.toUpperCase()} suchen...`} 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all text-slate-900 placeholder:text-slate-500"
+                className="w-full pl-10 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all text-slate-900 placeholder:text-slate-500 font-medium"
               />
               {searchQuery && (
                 <button

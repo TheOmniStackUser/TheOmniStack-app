@@ -69,22 +69,22 @@ export function CustomersClient({ initialCustomers }: { initialCustomers: any[] 
         </div>
       )}
 
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-        <div className="relative w-full md:w-96">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <div className="relative w-full lg:max-w-md">
           <input 
-            className="w-full pl-12 pr-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-cyan-500 outline-none font-bold text-slate-900 placeholder:text-slate-500 transition-all"
+            className="w-full pl-10 pr-10 py-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm text-slate-900 font-medium placeholder:text-slate-500 transition-all"
             placeholder="Suchen nach Name, E-Mail..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
           />
-          <svg className="w-5 h-5 absolute left-4 top-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+          <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
           {isSearching && (
-            <div className="absolute right-4 top-3.5 animate-spin h-5 w-5 border-2 border-cyan-500 border-t-transparent rounded-full" />
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full" />
           )}
         </div>
         <button 
           onClick={handleOpenCreate}
-          className="px-6 py-3 bg-cyan-500 text-white font-bold rounded-xl hover:bg-cyan-600 transition-all shadow-lg shadow-cyan-200 flex items-center gap-2 whitespace-nowrap"
+          className="px-5 py-2 w-full lg:w-auto bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm flex items-center justify-center gap-2 whitespace-nowrap"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
           Neuen Kunden anlegen

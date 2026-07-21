@@ -1342,27 +1342,15 @@ export function InvoiceList({
 
       <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-5">
           {/* Row 1: Search */}
-          <div className="flex flex-col sm:flex-row gap-4 items-center">
+          <div className="flex flex-col lg:max-w-2xl sm:flex-row gap-4 items-center">
             <div className="flex-1 w-full flex gap-2">
-              <div className="relative flex-1 flex shadow-sm">
                 <select
                   value={draftSearchScope}
                   onChange={(e) => {
                     const val = e.target.value
                     setDraftSearchScope(val)
-                    setActiveFilters(prev => ({ ...prev, searchScope: val }))
-                    setCurrentPage(1)
                   }}
-                  className="px-3 py-2.5 border border-slate-200 border-r-0 rounded-l-lg bg-slate-50/80 text-slate-700 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:z-10 transition-all cursor-pointer"
-                  style={{ 
-                    minWidth: '130px', 
-                    paddingRight: '2.25rem', 
-                    appearance: 'none',
-                    backgroundImage: 'url("data:image/svg+xml,%3csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3e%3cpath stroke=\'%236b7280\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M6 8l4 4 4-4\'/%3e%3c/svg%3e")', 
-                    backgroundPosition: 'right 0.5rem center', 
-                    backgroundRepeat: 'no-repeat', 
-                    backgroundSize: '1.5em 1.5em' 
-                  }}
+                  className="px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm text-slate-900 font-medium"
                 >
                   <option value="all">Alle Felder</option>
                   <option value="invoice">Belegnummer</option>
@@ -1380,12 +1368,11 @@ export function InvoiceList({
                     type="text"
                     id="search"
                     placeholder="Suchbegriff eingeben..."
-                    className="block w-full pl-10 pr-10 py-2.5 border border-slate-200 rounded-r-lg leading-5 bg-white text-slate-900 font-medium placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-all focus:z-10 relative"
+                    className="block w-full pl-10 pr-10 py-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm text-slate-900 font-medium placeholder:text-slate-500 transition-all"
                     value={draftSearch}
                   onChange={(e) => {
                     const val = e.target.value
                     setDraftSearch(val)
-                    setActiveFilters(prev => ({ ...prev, search: val }))
                     setCurrentPage(1)
                   }}
                   onFocus={() => setIsSearchFocused(true)}
@@ -1425,11 +1412,13 @@ export function InvoiceList({
                   </div>
                 )}
               </div>
-              </div>
               <button
                 type="button"
-                onClick={handleApplyFilters}
-                className="px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm whitespace-nowrap"
+                onClick={() => {
+                  setActiveFilters(prev => ({ ...prev, search: draftSearch, searchScope: draftSearchScope }))
+                  setCurrentPage(1)
+                }}
+                className="px-5 py-2 w-full sm:w-auto bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm whitespace-nowrap"
               >
                 Suchen
               </button>

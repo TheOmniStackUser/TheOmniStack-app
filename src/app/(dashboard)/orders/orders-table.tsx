@@ -1724,78 +1724,77 @@ const filteredOrders = orders;
       </div>
 
       {/* Filters Bar */}
-      <div className="mb-6 bg-white p-5 rounded-xl shadow-sm border border-gray-200 flex flex-col gap-5">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
         {/* Row 1: Search */}
-        <div className="flex flex-col sm:flex-row gap-4 items-center">
-          <div className="flex-1 w-full flex gap-2">
-            <div className="relative flex-1">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
-              <input
-                type="text"
-                id="search"
-                value={draftSearch}
-                onChange={(e) => {
-                  setDraftSearch(e.target.value)
-                }}
-                onFocus={() => setIsSearchFocused(true)}
-                onBlur={() => setIsSearchFocused(false)}
-                placeholder={process.env.NEXT_PUBLIC_APP_VARIANT === 'craft' ? "Nach Auftragsnummer, Kunde oder Sendungsnummer suchen..." : "Nach Bestellnummer, Kunde oder Sendungsnummer suchen..."}
-                className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 font-medium placeholder-gray-500 bg-gray-50/30 transition-all"
-              />
-              {draftSearch && (
-                <button
-                  type="button"
-                  onClick={handleClearSearch}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
-                  title="Suche leeren"
-                >
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              )}
-              {isSearchFocused && searchSuggestions.length > 0 && (
-                <div className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
-                  {searchSuggestions.map((suggestion) => (
-                    <button
-                      key={`${suggestion.label}-${suggestion.value}`}
-                      type="button"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => handleSelectSearchSuggestion(suggestion.value)}
-                      className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-sm hover:bg-blue-50 transition-colors"
-                    >
-                      <span className="min-w-0">
-                        <span className="block truncate font-bold text-gray-900">{suggestion.value}</span>
-                        <span className="block truncate text-xs text-gray-500">{suggestion.detail}</span>
-                      </span>
-                      <span className="shrink-0 rounded-md bg-gray-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-gray-500">
-                        {suggestion.label}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
+        <div className="flex flex-col sm:flex-row gap-4 items-center w-full lg:max-w-2xl">
+          <div className="relative flex-1 w-full">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
             </div>
-            <button
-              type="button"
-              onClick={handleApplyFilters}
-              className="px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm whitespace-nowrap"
-            >
-              Suchen
-            </button>
+            <input
+              type="text"
+              id="search"
+              value={draftSearch}
+              onChange={(e) => {
+                setDraftSearch(e.target.value)
+              }}
+              onFocus={() => setIsSearchFocused(true)}
+              onBlur={() => setIsSearchFocused(false)}
+              placeholder={process.env.NEXT_PUBLIC_APP_VARIANT === 'craft' ? "Nach Auftragsnummer, Kunde oder Sendungsnummer suchen..." : "Nach Bestellnummer, Kunde oder Sendungsnummer suchen..."}
+              className="w-full pl-10 pr-10 py-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm text-slate-900 font-medium placeholder:text-slate-500 transition-all"
+            />
+            {draftSearch && (
+              <button
+                type="button"
+                onClick={handleClearSearch}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+                title="Suche leeren"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+            {isSearchFocused && searchSuggestions.length > 0 && (
+              <div className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+                {searchSuggestions.map((suggestion) => (
+                  <button
+                    key={`${suggestion.label}-${suggestion.value}`}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => handleSelectSearchSuggestion(suggestion.value)}
+                    className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-sm hover:bg-blue-50 transition-colors"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate font-bold text-gray-900">{suggestion.value}</span>
+                      <span className="block truncate text-xs text-gray-500">{suggestion.detail}</span>
+                    </span>
+                    <span className="shrink-0 rounded-md bg-gray-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-gray-500">
+                      {suggestion.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-          
-          <div className="flex items-center gap-2 px-3 text-sm text-gray-500">
-            {totalOrdersCount} {totalOrdersCount === 1 ? 'Bestellung' : 'Bestellungen'}
-          </div>
+          <button
+            type="button"
+            onClick={handleApplyFilters}
+            className="px-5 py-2 w-full sm:w-auto bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm whitespace-nowrap"
+          >
+            Suchen
+          </button>
         </div>
+          
+        <div className="hidden lg:flex items-center gap-2 px-3 text-sm text-gray-500 font-medium">
+          {totalOrdersCount} {totalOrdersCount === 1 ? 'Bestellung' : 'Bestellungen'}
+        </div>
+      </div>
 
-        {/* Row 2: Selects & Dates & Apply */}
-        <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-gray-100">
+      {/* Row 2: Selects & Dates & Apply */}
+      <div className="flex flex-wrap items-center gap-3 mt-4">
           <select
             value={draftMarketplace}
             onChange={(e) => {
@@ -1994,7 +1993,7 @@ const filteredOrders = orders;
               setDraftDateType(val)
               pushParams({ page: '1' })
             }}
-            className="px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[150px] text-gray-900 font-medium text-sm"
+            className="px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 min-w-[150px] text-slate-900 font-medium text-sm"
           >
             <option value="purchase">{process.env.NEXT_PUBLIC_APP_VARIANT === 'craft' ? 'Auftragsdatum' : 'Bestelldatum'}</option>
             <option value="invoice">Rechnungsdatum</option>
@@ -2010,7 +2009,7 @@ const filteredOrders = orders;
                 setDraftFromDate(val)
                 pushParams({ page: '1' })
               }}
-              className="px-2 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm text-gray-900 font-medium"
+              className="px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm text-slate-900 font-medium"
               title="Von Datum"
             />
             <span className="text-gray-400 font-bold">-</span>

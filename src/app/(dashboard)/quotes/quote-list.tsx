@@ -518,16 +518,21 @@ export function QuoteList({
       )}
 
       {/* Search & Filters */}
-      <div className="mb-6 space-y-4">
-        <div className="flex flex-col sm:flex-row gap-4 items-center">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <div className="flex flex-col sm:flex-row gap-4 items-center w-full lg:max-w-2xl">
           <div className="flex-1 w-full flex gap-2">
-            <div className="relative flex-1 max-w-xs">
+            <div className="relative flex-1 w-full">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
               <input
                 type="text"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Angebot suchen…"
-                className="w-full pr-10 pl-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 bg-white text-slate-800 placeholder-slate-400 font-medium"
+                className="w-full pl-10 pr-10 py-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm text-slate-900 font-medium placeholder:text-slate-500 transition-all"
               />
               {search && (
                 <button
@@ -561,13 +566,14 @@ export function QuoteList({
         </div>
 
         {/* Permanent Filters Row */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 p-4 bg-slate-50 border border-slate-100 rounded-xl">
+        {/* Permanent Filters Row */}
+        <div className="flex flex-wrap items-center gap-3 mt-4">
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Status</label>
             <select
               value={filterStatus}
               onChange={e => setFilterStatus(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 bg-white text-slate-800"
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm text-slate-900 font-medium"
             >
               <option value="all">Alle</option>
               <option value="draft">Entwurf</option>
@@ -583,7 +589,7 @@ export function QuoteList({
             <select
               value={filterCountry}
               onChange={e => setFilterCountry(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 bg-white text-slate-800"
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm text-slate-900 font-medium"
             >
               <option value="all">Alle</option>
               {uniqueCountries.map(country => (
@@ -599,7 +605,7 @@ export function QuoteList({
                 placeholder="0.00"
                 value={filterMinAmount}
                 onChange={e => setFilterMinAmount(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 bg-white text-slate-900 placeholder:text-slate-400"
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm text-slate-900 font-medium placeholder:text-slate-500"
               />
             </div>
             <div className="flex-1">
@@ -609,7 +615,7 @@ export function QuoteList({
                 placeholder="0.00"
                 value={filterMaxAmount}
                 onChange={e => setFilterMaxAmount(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 bg-white text-slate-900 placeholder:text-slate-400"
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm text-slate-900 font-medium placeholder:text-slate-500"
               />
             </div>
           </div>
@@ -620,7 +626,7 @@ export function QuoteList({
                 type="date"
                 value={filterDateFrom}
                 onChange={e => setFilterDateFrom(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 bg-white text-slate-800"
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm text-slate-900 font-medium"
               />
             </div>
             <div className="flex-1">
@@ -629,7 +635,7 @@ export function QuoteList({
                 type="date"
                 value={filterDateTo}
                 onChange={e => setFilterDateTo(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 bg-white text-slate-800"
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm text-slate-900 font-medium"
               />
             </div>
           </div>
