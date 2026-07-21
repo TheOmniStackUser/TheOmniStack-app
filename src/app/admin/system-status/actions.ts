@@ -69,12 +69,41 @@ export async function getOverrideStatuses() {
     throw new Error('Unauthorized')
   }
 
-  const overrides = await db.query.systemStatusOverride.findMany()
-  const map: Record<string, string> = {}
-  for (const o of overrides) {
-    map[o.service] = o.status
+  const overridesRows = await db.query.systemStatusOverride.findMany()
+  const overrides: Record<string, string> = {}
+  for (const o of overridesRows) {
+    overrides[o.service] = o.status
   }
-  return map
+
+  // Get current automatic status for all services for today
+  const { systemStatusDaily, systemServicesEnum } = await import('@/db/schema/system-status')
+  const { gte } = await import('drizzle-orm')
+  
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  
+  const uptimeRows = await db.query.systemStatusDaily.findMany({
+    where: gte(systemStatusDaily.date, today)
+  })
+
+  const autoStatus: Record<string, boolean> = {}
+  
+  // Default to true (online) if no data
+  for (const s of systemServicesEnum.enumValues) {
+    autoStatus[s] = true
+  }
+
+  for (const row of uptimeRows) {
+    const dataArray = row.uptimeData as (1 | 0 | null)[]
+    if (dataArray && dataArray.length > 0) {
+      const hasDowntime = dataArray.some(status => status === 0)
+      if (hasDowntime) {
+        autoStatus[row.service] = false
+      }
+    }
+  }
+
+  return { overrides, autoStatus }
 }
 
 export async function setOverrideStatus(

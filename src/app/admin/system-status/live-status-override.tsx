@@ -4,7 +4,13 @@ import React from 'react'
 import { setOverrideStatus } from './actions'
 import { systemServicesEnum } from '@/db/schema/system-status'
 
-export function LiveStatusOverride({ overrides }: { overrides: Record<string, string> }) {
+export function LiveStatusOverride({ 
+  overrides, 
+  autoStatus 
+}: { 
+  overrides: Record<string, string>,
+  autoStatus: Record<string, boolean>
+}) {
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6">
       <h2 className="font-semibold text-slate-800 mb-4">Live Status Override</h2>
@@ -15,10 +21,16 @@ export function LiveStatusOverride({ overrides }: { overrides: Record<string, st
       <div className="space-y-3">
         {systemServicesEnum.enumValues.map(service => {
           const currentStatus = overrides[service] || 'auto'
+          const isOnline = currentStatus === 'online' ? true 
+                         : currentStatus === 'offline' ? false 
+                         : autoStatus[service]
           
           return (
             <div key={service} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
-              <span className="text-sm font-medium text-slate-700">{service}</span>
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'}`} />
+                <span className="text-sm font-medium text-slate-700">{service}</span>
+              </div>
               <select 
                 value={currentStatus}
                 onChange={async (e) => {

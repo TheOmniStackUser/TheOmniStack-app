@@ -8,7 +8,7 @@ import { LiveStatusOverride } from './live-status-override'
 
 export default async function AdminSystemStatusPage() {
   const incidents = await getAdminIncidents()
-  const overrides = await getOverrideStatuses()
+  const { overrides, autoStatus } = await getOverrideStatuses()
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
@@ -24,14 +24,14 @@ export default async function AdminSystemStatusPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-1 space-y-8">
-          <LiveStatusOverride overrides={overrides} />
-          
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6 sticky top-8">
             <h2 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
               <Plus className="w-4 h-4 text-indigo-500" /> Neues Ereignis melden
             </h2>
             <CreateIncidentForm />
           </div>
+          
+          <LiveStatusOverride overrides={overrides} autoStatus={autoStatus} />
         </div>
 
         <div className="lg:col-span-2 space-y-4">
