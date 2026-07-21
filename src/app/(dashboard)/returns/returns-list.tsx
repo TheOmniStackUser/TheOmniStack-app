@@ -766,7 +766,7 @@ export function ReturnsList({
       )}
 
       {/* Main Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-x-auto shadow-sm">
+      <div className="bg-white rounded-2xl border border-slate-200 overflow-x-auto shadow-sm min-h-[350px]">
         <table className="min-w-[1400px] w-full text-left border-collapse">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
@@ -1051,7 +1051,7 @@ export function ReturnsList({
                         </button>
                       
                       {openDropdownId === log.id && (
-                        <div className={`absolute right-0 w-48 bg-white rounded-md shadow-lg border border-slate-200 z-50 py-1 ${paginatedLogs.length > 3 && index >= paginatedLogs.length - 2 ? 'bottom-full mb-2' : 'mt-2'}`}>
+                        <div className={`absolute right-0 w-48 bg-white rounded-md shadow-lg border border-slate-200 z-50 py-1 ${paginatedLogs.length > 5 && index >= paginatedLogs.length - 2 ? 'bottom-full mb-2' : 'mt-2'}`}>
                           {log.orderId && (
                             <button
                               onClick={(e) => {
