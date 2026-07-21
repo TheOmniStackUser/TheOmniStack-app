@@ -822,7 +822,7 @@ export function DeliveryNoteList({
                   </td>
                   <td className="px-6 py-4 font-medium text-slate-900 group/lieferschein">
                     <div className="flex items-center gap-2">
-                      <span>{dn.invoiceNumber}</span>
+                      <span className="font-mono text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-md">{dn.invoiceNumber}</span>
                       <button
                         onClick={(e) => {
                           e.stopPropagation()

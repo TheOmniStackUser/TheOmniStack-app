@@ -924,7 +924,7 @@ export function ReturnsList({
                   {/* Order ID */}
                   <td className="px-6 py-4 group/bestell">
                     <div className="flex items-center gap-2">
-                      <div className="font-bold text-slate-900">{log.orderNumber}</div>
+                      <span className="font-mono text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-md">{log.orderNumber}</span>
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
@@ -1675,6 +1675,18 @@ export function ReturnsList({
                         </div>
                         <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate" title={item.sku}>
                           {item.sku}
+                        </div>
+                        <div className="mt-2 flex items-center">
+                          <input
+                            type="checkbox"
+                            id={`restock-return-${idx}`}
+                            checked={item.restock}
+                            onChange={(e) => handleRestockToggle(idx, e.target.checked)}
+                            className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
+                          />
+                          <label htmlFor={`restock-return-${idx}`} className="ml-1.5 text-[10px] text-slate-600 font-medium cursor-pointer">
+                            Wieder einlagern (+1)
+                          </label>
                         </div>
                       </div>
 

@@ -677,7 +677,7 @@ export function QuoteList({
                   >
                     <td className="px-5 py-4 group/angebot">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-semibold text-slate-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg">
+                        <span className="font-mono text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-md">
                           {quote.invoiceNumber}
                         </span>
                         <button

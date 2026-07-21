@@ -2146,7 +2146,7 @@ const filteredOrders = orders;
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 group/order">
                         <div className="flex items-center gap-2">
-                          <span>{orderNumber}</span>
+                          <span className="font-mono text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-md">{orderNumber}</span>
                           <button
                             onClick={(e) => {
                               e.stopPropagation()

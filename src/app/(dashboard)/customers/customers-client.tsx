@@ -107,7 +107,7 @@ export function CustomersClient({ initialCustomers }: { initialCustomers: any[] 
               {customers.map((c) => (
                 <tr key={c.id} className="hover:bg-slate-50 transition-colors group">
                   <td className="px-6 py-4">
-                    <span className="font-black text-cyan-600 bg-cyan-50 px-2 py-1 rounded-md text-[10px] uppercase">{c.customerNumber || '---'}</span>
+                    <span className="font-mono text-xs font-semibold text-cyan-700 bg-cyan-50 border border-cyan-200 px-2.5 py-1 rounded-md uppercase">{c.customerNumber || '---'}</span>
                   </td>
                   <td className="px-6 py-4">
                     {c.companyName && <div className="font-bold text-slate-900">{c.companyName}</div>}

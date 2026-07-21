@@ -1663,7 +1663,7 @@ export function InvoiceList({
                   <td className="px-6 py-4 font-medium text-slate-900">
                     <div className="flex flex-col group/beleg">
                       <div className="flex items-center gap-2">
-                        <span>{invoice.status === 'draft' ? (invoice.draftName || 'Unbenannter Entwurf') : invoice.invoiceNumber}</span>
+                        <span className={invoice.status === 'draft' ? "font-mono text-xs font-semibold text-slate-700 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-md" : "font-mono text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-md"}>{invoice.status === 'draft' ? (invoice.draftName || 'Unbenannter Entwurf') : invoice.invoiceNumber}</span>
                         {invoice.status !== 'draft' && (
                           <button
                             onClick={(e) => {
