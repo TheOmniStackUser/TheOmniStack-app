@@ -432,6 +432,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
             </button>
           </div>
         )}
+        </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -717,7 +718,6 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
           <span>{toast.message}</span>
           <button onClick={() => setToast(null)} className="text-white/70 hover:text-white">✕</button>
         </div>
-      )}
       )}
     </div>
   )
