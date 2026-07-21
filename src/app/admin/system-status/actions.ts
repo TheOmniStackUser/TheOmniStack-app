@@ -24,6 +24,8 @@ export async function createIncident(data: {
   title: string
   description?: string
   status: typeof incidentStatusEnum.enumValues[number]
+  startTime?: Date
+  endTime?: Date
 }) {
   const auth = await requireAuth()
   if (auth.role !== 'owner' && auth.role !== 'admin' && auth.role !== 'omnistack_support') {
@@ -35,6 +37,8 @@ export async function createIncident(data: {
     title: data.title,
     description: data.description || null,
     status: data.status,
+    startTime: data.startTime || new Date(),
+    endTime: data.endTime || null,
   })
 
   revalidatePath('/status')
