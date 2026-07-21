@@ -1134,13 +1134,12 @@ export class MiraklAdapter implements MarketplaceAdapter {
           const priceUnit = line.price_unit || (line.price / line.quantity) || 0
 
           const isLimango = this.marketplace.toLowerCase().includes('limango') || this.config.baseUrl.includes('limango')
-          const isDecathlon = this.marketplace.toLowerCase().includes('decathlon') || this.config.baseUrl.includes('decathlon')
-          const defaultReason = isLimango ? '17' : (isDecathlon ? '111' : '14')
+          const defaultReason = isLimango ? '17' : '14'
           const refundPayload: any = {
             order_line_id: lineId,
             amount: parseFloat((priceUnit * qtyToRefund).toFixed(2)),
             quantity: qtyToRefund,
-            reason_code: defaultReason, // '14' = Customer return, '111' = Decathlon Return, '17' = Retoure Limango
+            reason_code: defaultReason, // '14' = Customer return, will fallback to '17' or '111' if rejected
             currency_iso_code: miraklOrder.currency_iso_code || 'EUR'
           }
 
@@ -1155,17 +1154,25 @@ export class MiraklAdapter implements MarketplaceAdapter {
           }
 
           if (shippingAmountToRefund > 0) {
-            refundPayload.shipping_amount = parseFloat(shippingAmountToRefund.toFixed(2))
-            
-            const shippingTaxes = line.shipping_taxes || miraklOrder.shipping_taxes || []
-            if (shippingTaxes.length > 0) {
-              refundPayload.shipping_taxes = shippingTaxes.map((st: any) => ({
-                amount: parseFloat(Number(st.amount).toFixed(2)),
-                code: st.code || 'VAT'
-              }))
+            let lineShippingRefund = shippingAmountToRefund
+            if (line.shipping_price !== undefined && line.shipping_price !== null) {
+              lineShippingRefund = Math.min(Number(line.shipping_price), shippingAmountToRefund)
             }
-            
-            shippingAmountToRefund = 0 // Only attach to the first line
+
+            if (lineShippingRefund > 0) {
+              refundPayload.shipping_amount = parseFloat(lineShippingRefund.toFixed(2))
+              
+              const shippingTaxes = line.shipping_taxes || miraklOrder.shipping_taxes || []
+              if (shippingTaxes.length > 0) {
+                const totalShippingPrice = miraklOrder.shipping_price || 1
+                refundPayload.shipping_taxes = shippingTaxes.map((st: any) => ({
+                  amount: parseFloat((Number(st.amount) * (lineShippingRefund / totalShippingPrice)).toFixed(2)),
+                  code: st.code || 'VAT'
+                }))
+              }
+              
+              shippingAmountToRefund -= lineShippingRefund
+            }
           }
 
           refunds.push(refundPayload)
