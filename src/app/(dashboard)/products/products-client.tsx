@@ -555,7 +555,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                                 e.stopPropagation()
                                 setOpenMenuId(openMenuId === product.id ? null : product.id)
                               }}
-                              className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                              className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors outline-none focus:outline-none border-none"
                             >
                               <MoreHorizontal className="w-5 h-5" />
                             </button>
