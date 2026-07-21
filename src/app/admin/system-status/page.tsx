@@ -50,6 +50,7 @@ export default async function AdminSystemStatusPage() {
                   <option value="investigating">Untersuchung läuft</option>
                   <option value="identified">Problem identifiziert</option>
                   <option value="monitoring">Beobachtung (Monitoring)</option>
+                  <option value="resolved">Problem gelöst</option>
                   <option value="maintenance">Geplante Wartung</option>
                 </select>
               </div>

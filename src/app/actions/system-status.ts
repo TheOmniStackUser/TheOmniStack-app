@@ -43,14 +43,30 @@ export async function getSystemStatusData() {
     }
   }
 
-  // Fetch active incidents (where end_time is null or in the future)
-  const now = new Date()
-  const allIncidents = await db.query.systemIncidents.findMany({
-    where: or(
-      eq(systemIncidents.endTime, null as any),
-      gte(systemIncidents.endTime, now)
-    ),
+  // Fetch incidents from the last 30 days
+  const thirtyDaysAgo = new Date()
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+  
+  const rawIncidents = await db.query.systemIncidents.findMany({
+    where: gte(systemIncidents.createdAt, thirtyDaysAgo),
     orderBy: [desc(systemIncidents.createdAt)]
+  })
+
+  // Filter based on rules:
+  // - Incidents within last 30 days (already filtered by SQL query)
+  // - Maintenance only visible up to 1 day after it ended (or was planned if no end time)
+  const oneDayAgo = new Date()
+  oneDayAgo.setDate(oneDayAgo.getDate() - 1)
+
+  const allIncidents = rawIncidents.filter(incident => {
+    if (incident.status === 'maintenance') {
+      if (incident.endTime) {
+        return incident.endTime >= oneDayAgo
+      } else {
+        return incident.createdAt >= oneDayAgo
+      }
+    }
+    return true
   })
 
   // Filter incidents for used services
