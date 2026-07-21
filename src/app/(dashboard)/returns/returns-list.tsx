@@ -11,7 +11,7 @@ import {
   refundReturnAction,
   getOrderDetailsAction
 } from '@/app/actions/returns'
-import { Copy } from 'lucide-react'
+import { Copy, MoreHorizontal } from 'lucide-react'
 
 interface ScannedItem {
   id?: string
@@ -1042,12 +1042,10 @@ export function ReturnsList({
                       <div className="relative inline-block text-left action-dropdown-container">
                         <button
                           onClick={(e) => { e.stopPropagation(); setOpenDropdownId(openDropdownId === log.id ? null : log.id) }}
-                          className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-all"
+                          className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-all outline-none focus:outline-none border-none"
                           title="Aktionen"
                         >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                          </svg>
+                          <MoreHorizontal className="w-5 h-5" />
                         </button>
                       
                       {openDropdownId === log.id && (
