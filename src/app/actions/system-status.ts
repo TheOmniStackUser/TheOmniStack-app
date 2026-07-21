@@ -1,0 +1,114 @@
+'use server'
+
+import { db } from '@/db/client'
+import { systemIncidents, systemStatusDaily, systemServicesEnum } from '@/db/schema/system-status'
+import { marketplaceIntegrations } from '@/db/schema/integrations'
+import { eq, and, or, gte, desc } from 'drizzle-orm'
+import { requireAuth } from '@/lib/session'
+
+// We map marketplace integration types to system services where applicable
+const integrationTypeToServiceMap: Record<string, string> = {
+  'amazon': 'amazon',
+  'otto': 'otto',
+  'mirakl_decathlon': 'decathlon',
+  'mirakl_decathlon_eu': 'decathlon',
+  'mirakl_mediamarkt': 'mediamarkt',
+  'shopify': 'shopify',
+  'aboutyou': 'aboutyou',
+  'dhl': 'dhl',
+  'hermes': 'hermes',
+  'limango': 'limango',
+  'kaufland': 'kaufland',
+  'ebay': 'ebay',
+  'woocommerce': 'woocommerce',
+  'shopware': 'shopware',
+}
+
+export async function getSystemStatusData() {
+  const auth = await requireAuth()
+
+  // Find out which integrations this company uses
+  const activeIntegrations = await db.query.marketplaceIntegrations.findMany({
+    where: eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
+    columns: {
+      type: true,
+      isActive: true,
+    }
+  })
+
+  const usedServices = new Set<string>(['core_api']) // Core API is always used
+  for (const integration of activeIntegrations) {
+    if (integration.isActive && integrationTypeToServiceMap[integration.type]) {
+      usedServices.add(integrationTypeToServiceMap[integration.type])
+    }
+  }
+
+  // Fetch active incidents (where end_time is null or in the future)
+  const now = new Date()
+  const allIncidents = await db.query.systemIncidents.findMany({
+    where: or(
+      eq(systemIncidents.endTime, null as any),
+      gte(systemIncidents.endTime, now)
+    ),
+    orderBy: [desc(systemIncidents.createdAt)]
+  })
+
+  // Filter incidents for used services
+  const relevantIncidents = allIncidents.filter(incident => usedServices.has(incident.service))
+
+  // Fetch 90 days of uptime data for the used services
+  // To keep data transfer minimal, we just pull the last 90 rows per service and combine them.
+  // Actually, we can just return a mocked 90 day array for all used services initially since we just created the table and it has no data.
+  // As days go by, the table will fill up. 
+  // Let's implement real fetching.
+  const ninetyDaysAgo = new Date()
+  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
+
+  const uptimeRows = await db.query.systemStatusDaily.findMany({
+    where: gte(systemStatusDaily.date, ninetyDaysAgo)
+  })
+
+  const serviceUptimeMap: Record<string, (1 | 0 | null)[]> = {}
+  
+  // Initialize with nulls
+  for (const service of usedServices) {
+    serviceUptimeMap[service] = Array(90).fill(null)
+  }
+
+  // Populate actual data
+  // We align it by taking the difference in days from today
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  
+  for (const row of uptimeRows) {
+    if (usedServices.has(row.service)) {
+      const rowDate = new Date(row.date)
+      rowDate.setHours(0, 0, 0, 0)
+      const diffTime = Math.abs(today.getTime() - rowDate.getTime())
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+      const index = 89 - diffDays
+      
+      if (index >= 0 && index < 90) {
+        // Summarize the day's uptime array. If any hour was 0, mark the day as 0, else 1
+        // Assuming uptimeData is an array of 1s and 0s
+        const dataArray = row.uptimeData as (1 | 0 | null)[]
+        if (!dataArray || dataArray.length === 0) continue
+
+        const hasDowntime = dataArray.some(status => status === 0)
+        const hasUptime = dataArray.some(status => status === 1)
+        
+        if (hasDowntime) {
+          serviceUptimeMap[row.service][index] = 0
+        } else if (hasUptime) {
+          serviceUptimeMap[row.service][index] = 1
+        }
+      }
+    }
+  }
+
+  return {
+    usedServices: Array.from(usedServices),
+    incidents: relevantIncidents,
+    uptimeData: serviceUptimeMap,
+  }
+}
