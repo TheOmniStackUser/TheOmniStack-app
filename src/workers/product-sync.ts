@@ -227,7 +227,12 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
       )
     )
 
-  if (centralProducts.length === 0) return { totalUpdatesSent: 0, activeMarketplaces: [] }
+  if (centralProducts.length === 0) {
+    console.log("[Debug] No central products found for SKUs:", skus, "Company:", companyId)
+    return { totalUpdatesSent: 0, activeMarketplaces: [] }
+  }
+  
+  console.log("[Debug] Found central products:", centralProducts.map(p => p.sku))
 
   const productIds = centralProducts.map(p => p.id)
   
@@ -254,17 +259,26 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
       )
     )
 
-  if (activeIntegrations.length === 0) return { totalUpdatesSent: 0, activeMarketplaces: [], failedMarketplaces: [] }
+  if (activeIntegrations.length === 0) {
+    console.log("[Debug] No active integrations found")
+    return { totalUpdatesSent: 0, activeMarketplaces: [], failedMarketplaces: [] }
+  }
+
+  console.log("[Debug] Found active integrations:", activeIntegrations.map(i => i.id))
 
   // Group mappings by integrationId
   const updatesByIntegration: Record<string, { sku: string, marketplaceProductId?: string, stock?: number, price?: number }[]> = {}
 
   for (const mapping of mappings) {
+    console.log("[Debug] Checking mapping:", mapping.id, mapping.integrationId, mapping.marketplaceSku)
     const intId = mapping.integrationId
     if (!intId) continue // skip if mapping has no integrationId
 
     const integration = activeIntegrations.find(i => i.id === intId)
-    if (!integration) continue
+    if (!integration) {
+      console.log("[Debug] Integration not found in active list:", intId)
+      continue
+    }
 
     const productSyncSettings = (integration.metadata as any)?.productSync
     // Default to true if not set to ensure backward compatibility for basic stock sync,

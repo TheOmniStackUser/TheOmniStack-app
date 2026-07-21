@@ -565,16 +565,32 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                                 <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); }} />
                                 <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-xl shadow-lg border border-slate-200 py-1.5 z-50 text-left overflow-hidden">
                                   <button 
-                                    onClick={(e) => { e.stopPropagation(); handleToggleSync(product.id, 'stock', !!product.hasSyncStockOff); }}
-                                    className="w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 transition-colors text-slate-700 font-medium"
+                                    onClick={(e) => { e.stopPropagation(); if (product.hasSyncStockOff) handleToggleSync(product.id, 'stock', true); }}
+                                    disabled={!product.hasSyncStockOff}
+                                    className={`w-full text-left px-4 py-2.5 text-sm transition-colors font-medium ${!product.hasSyncStockOff ? 'text-slate-300 cursor-not-allowed' : 'text-slate-700 hover:bg-slate-50'}`}
                                   >
-                                    {product.hasSyncStockOff ? 'Bestand-Sync aktivieren' : 'Bestand-Sync deaktivieren'}
+                                    Bestand-Sync aktivieren
                                   </button>
                                   <button 
-                                    onClick={(e) => { e.stopPropagation(); handleToggleSync(product.id, 'price', !!product.hasSyncPriceOff); }}
-                                    className="w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 transition-colors text-slate-700 font-medium"
+                                    onClick={(e) => { e.stopPropagation(); if (product.hasSyncStockOn) handleToggleSync(product.id, 'stock', false); }}
+                                    disabled={!product.hasSyncStockOn}
+                                    className={`w-full text-left px-4 py-2.5 text-sm transition-colors font-medium border-b border-slate-100 ${!product.hasSyncStockOn ? 'text-slate-300 cursor-not-allowed' : 'text-slate-700 hover:bg-slate-50'}`}
                                   >
-                                    {product.hasSyncPriceOff ? 'Preis-Sync aktivieren' : 'Preis-Sync deaktivieren'}
+                                    Bestand-Sync deaktivieren
+                                  </button>
+                                  <button 
+                                    onClick={(e) => { e.stopPropagation(); if (product.hasSyncPriceOff) handleToggleSync(product.id, 'price', true); }}
+                                    disabled={!product.hasSyncPriceOff}
+                                    className={`w-full text-left px-4 py-2.5 text-sm transition-colors font-medium ${!product.hasSyncPriceOff ? 'text-slate-300 cursor-not-allowed' : 'text-slate-700 hover:bg-slate-50'}`}
+                                  >
+                                    Preis-Sync aktivieren
+                                  </button>
+                                  <button 
+                                    onClick={(e) => { e.stopPropagation(); if (product.hasSyncPriceOn) handleToggleSync(product.id, 'price', false); }}
+                                    disabled={!product.hasSyncPriceOn}
+                                    className={`w-full text-left px-4 py-2.5 text-sm transition-colors font-medium ${!product.hasSyncPriceOn ? 'text-slate-300 cursor-not-allowed' : 'text-slate-700 hover:bg-slate-50'}`}
+                                  >
+                                    Preis-Sync deaktivieren
                                   </button>
                                 </div>
                               </>

@@ -135,6 +135,26 @@ async function processDunningForCompany(
 
   console.log(`[Dunning] ${company.name}: ${overdueInvoices.length} overdue invoices found.`)
 
+  // 4a. Setup email transporter once per company
+  let transporter: any = null
+  let useResend = true
+  if (company.smtpSettings?.enabled && company.smtpSettings.host && company.smtpSettings.fromEmail) {
+    useResend = false
+    const nodemailer = await import('nodemailer')
+    const secure = company.smtpSettings.encryption === 'ssl' || company.smtpSettings.port === 465
+    transporter = nodemailer.createTransport({
+      host: company.smtpSettings.host,
+      port: company.smtpSettings.port || 587,
+      secure,
+      auth: company.smtpSettings.username && company.smtpSettings.password
+        ? { user: company.smtpSettings.username, pass: company.smtpSettings.password }
+        : undefined,
+      tls: { rejectUnauthorized: false },
+      pool: true, // Use connection pooling to avoid rate limits / timeouts
+      maxConnections: 1, // Only one connection at a time to be safe with rate limits
+    })
+  }
+
   for (const invoice of overdueInvoices) {
     stats.processed++
 
@@ -277,27 +297,13 @@ async function processDunningForCompany(
       let emailSent = false
       let emailError: string | undefined
 
-      if (company.smtpSettings?.enabled && company.smtpSettings.host && company.smtpSettings.fromEmail) {
-        // Use custom SMTP
-        const nodemailer = await import('nodemailer')
-        const secure = company.smtpSettings.encryption === 'ssl' || company.smtpSettings.port === 465
-
-        const transporter = nodemailer.createTransport({
-          host: company.smtpSettings.host,
-          port: company.smtpSettings.port || 587,
-          secure,
-          auth: company.smtpSettings.username && company.smtpSettings.password
-            ? { user: company.smtpSettings.username, pass: company.smtpSettings.password }
-            : undefined,
-          tls: { rejectUnauthorized: false },
-        })
-
+      if (!useResend && transporter) {
         const fromAddr = ruleToApply.senderEmail && ruleToApply.senderEmail.includes('@')
           ? ruleToApply.senderEmail.trim()
-          : company.smtpSettings.fromEmail
+          : company.smtpSettings!.fromEmail
 
-        const from = company.smtpSettings.fromName
-          ? `"${company.smtpSettings.fromName}" <${fromAddr}>`
+        const from = company.smtpSettings!.fromName
+          ? `"${company.smtpSettings!.fromName}" <${fromAddr}>`
           : fromAddr
 
         try {
@@ -383,6 +389,10 @@ async function processDunningForCompany(
       stats.failed++
       console.error(`[Dunning] ❌ Error processing invoice ${invoice.invoiceNumber}:`, err)
     }
+  }
+
+  if (transporter) {
+    transporter.close()
   }
 
   return stats
