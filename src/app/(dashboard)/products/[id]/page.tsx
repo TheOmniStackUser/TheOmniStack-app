@@ -12,6 +12,7 @@ import Link from 'next/link'
 import { ArrowLeft, Save, Package, Link as LinkIcon, Settings2, Trash2 } from 'lucide-react'
 import { notFound } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
+import { after } from 'next/server'
 
 export const metadata = {
   title: 'Produkt bearbeiten - TheOmniStack',
@@ -116,13 +117,15 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       )
     }
     
-    const { pushUpdatesToMarketplaces } = await import('@/workers/product-sync')
-    await pushUpdatesToMarketplaces(auth.activeCompanyId, [{
-      sku: formData.get('sku') as string,
-      stock: Math.max(0, parseInt((formData.get('currentStock') as string) || '0', 10)),
-      price: parseFloat((formData.get('price') as string) || '0')
-    }]).catch(e => {
-      console.error('Failed to sync product updates:', e)
+    after(async () => {
+      const { pushUpdatesToMarketplaces } = await import('@/workers/product-sync')
+      await pushUpdatesToMarketplaces(auth.activeCompanyId, [{
+        sku: formData.get('sku') as string,
+        stock: Math.max(0, parseInt((formData.get('currentStock') as string) || '0', 10)),
+        price: parseFloat((formData.get('price') as string) || '0')
+      }]).catch(e => {
+        console.error('Failed to sync product updates:', e)
+      })
     })
     
     revalidatePath(`/products/${product.id}`)
