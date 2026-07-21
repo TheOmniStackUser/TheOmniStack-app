@@ -1724,11 +1724,12 @@ const filteredOrders = orders;
       </div>
 
       {/* Filters Bar */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+      <div className="flex flex-col gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
         {/* Row 1: Search */}
-        <div className="flex flex-col sm:flex-row gap-4 items-center w-full lg:max-w-2xl">
-          <div className="relative flex-1 w-full">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 w-full">
+          <div className="flex flex-col sm:flex-row gap-4 items-center w-full lg:max-w-2xl">
+            <div className="relative flex-1 w-full">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
@@ -1794,7 +1795,7 @@ const filteredOrders = orders;
       </div>
 
       {/* Row 2: Selects & Dates & Apply */}
-      <div className="flex flex-wrap items-center gap-3 mt-4">
+      <div className="flex flex-wrap items-center gap-3">
           <select
             value={draftMarketplace}
             onChange={(e) => {
