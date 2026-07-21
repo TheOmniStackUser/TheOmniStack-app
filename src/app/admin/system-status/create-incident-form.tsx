@@ -14,11 +14,13 @@ export function CreateIncidentForm() {
       const description = formData.get('description') as string
       const statusValue = formData.get('status') as typeof incidentStatusEnum.enumValues[number]
       
+      const startDateStr = formData.get('startDate') as string
       const startTimeStr = formData.get('startTime') as string
+      const endDateStr = formData.get('endDate') as string
       const endTimeStr = formData.get('endTime') as string
       
-      const startTime = startTimeStr ? new Date(startTimeStr) : undefined
-      const endTime = endTimeStr ? new Date(endTimeStr) : undefined
+      const startTime = (startDateStr && startTimeStr) ? new Date(`${startDateStr}T${startTimeStr}`) : undefined
+      const endTime = (endDateStr && endTimeStr) ? new Date(`${endDateStr}T${endTimeStr}`) : undefined
       
       if (service && title && statusValue) {
         await createIncident({ service, title, description, status: statusValue, startTime, endTime })
@@ -52,14 +54,26 @@ export function CreateIncidentForm() {
       </div>
 
       {status === 'maintenance' && (
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">Startzeitpunkt</label>
-            <input type="datetime-local" name="startTime" required className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900" />
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">Start Datum</label>
+              <input type="date" name="startDate" required className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">Start Uhrzeit</label>
+              <input type="time" name="startTime" required className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900" />
+            </div>
           </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">Endzeitpunkt</label>
-            <input type="datetime-local" name="endTime" required className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900" />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">End Datum</label>
+              <input type="date" name="endDate" required className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">End Uhrzeit</label>
+              <input type="time" name="endTime" required className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900" />
+            </div>
           </div>
         </div>
       )}
