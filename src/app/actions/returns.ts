@@ -175,7 +175,7 @@ export async function updateReturnAction(
 
 export async function refundReturnAction(
   returnLogId: string,
-  itemsToRefund: { sku: string; quantity: number }[]
+  itemsToRefund: { sku: string; quantity: number; restock?: boolean }[]
 ) {
   const session = await checkAuth()
   try {

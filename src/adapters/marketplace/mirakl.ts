@@ -1073,15 +1073,15 @@ export class MiraklAdapter implements MarketplaceAdapter {
         let orderUrl = ''
         if (baseUrl.includes('miraklconnect.com')) {
           if (baseUrl.endsWith('/v1')) {
-            orderUrl = `${baseUrl}/orders/${marketplaceOrderId}`
+            orderUrl = `${baseUrl}/orders?order_ids=${marketplaceOrderId}`
           } else {
-            orderUrl = `${baseUrl}/api/v1/orders/${marketplaceOrderId}`
+            orderUrl = `${baseUrl}/api/v1/orders?order_ids=${marketplaceOrderId}`
           }
         } else {
           if (baseUrl.endsWith('/api')) {
-            orderUrl = `${baseUrl}/orders/${marketplaceOrderId}`
+            orderUrl = `${baseUrl}/orders?order_ids=${marketplaceOrderId}`
           } else {
-            orderUrl = `${baseUrl}/api/orders/${marketplaceOrderId}`
+            orderUrl = `${baseUrl}/api/orders?order_ids=${marketplaceOrderId}`
           }
         }
 
@@ -1134,19 +1134,19 @@ export class MiraklAdapter implements MarketplaceAdapter {
           const priceUnit = line.price_unit || (line.price / line.quantity) || 0
 
           const isLimango = this.marketplace.toLowerCase().includes('limango') || this.config.baseUrl.includes('limango')
-          const defaultReason = isLimango ? '17' : '14'
+          const isDecathlon = this.marketplace.toLowerCase().includes('decathlon') || this.config.baseUrl.includes('decathlon')
+          const defaultReason = isLimango ? '17' : (isDecathlon ? '111' : '14')
           const refundPayload: any = {
             order_line_id: lineId,
             amount: parseFloat((priceUnit * qtyToRefund).toFixed(2)),
             quantity: qtyToRefund,
-            reason_code: defaultReason, // '14' = Customer return, '15' = Out of stock, '17' = Retoure Limango
-            shipping_amount: 0,
+            reason_code: defaultReason, // '14' = Customer return, '111' = Decathlon Return, '17' = Retoure Limango
             currency_iso_code: miraklOrder.currency_iso_code || 'EUR'
           }
 
           if (line.taxes && line.taxes.length > 0) {
             refundPayload.taxes = line.taxes.map((t: any) => {
-              const taxAmount = t.amount !== undefined ? t.amount : (t.rate ? (priceUnit - (priceUnit / (1 + (t.rate / 100)))) * line.quantity : 0)
+              const taxAmount = t.amount !== undefined ? Number(t.amount) : (t.rate ? (priceUnit - (priceUnit / (1 + (t.rate / 100)))) * line.quantity : 0)
               return {
                 amount: parseFloat(((taxAmount / line.quantity) * qtyToRefund).toFixed(2)),
                 code: t.code || 'VAT'
@@ -1160,7 +1160,7 @@ export class MiraklAdapter implements MarketplaceAdapter {
             const shippingTaxes = line.shipping_taxes || miraklOrder.shipping_taxes || []
             if (shippingTaxes.length > 0) {
               refundPayload.shipping_taxes = shippingTaxes.map((st: any) => ({
-                amount: parseFloat(st.amount.toFixed(2)),
+                amount: parseFloat(Number(st.amount).toFixed(2)),
                 code: st.code || 'VAT'
               }))
             }

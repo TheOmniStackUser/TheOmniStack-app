@@ -14,6 +14,7 @@ import { after } from 'next/server'
 export type RefundItemInput = {
   sku: string
   quantity: number
+  restock?: boolean
 }
 
 export async function executeRefund({
@@ -527,7 +528,10 @@ export async function executeRefund({
       if (refundItem.quantity <= 0) continue
       
       const condition = resolvedConditions[refundItem.sku.toLowerCase()] || 'new'
-      if (condition.toLowerCase() === 'new' || condition.toLowerCase() === 'neu') {
+      const isNew = condition.toLowerCase() === 'new' || condition.toLowerCase() === 'neu'
+      const shouldRestock = refundItem.restock !== undefined ? refundItem.restock : isNew
+
+      if (shouldRestock) {
         const [product] = await db.select().from(products)
           .where(and(eq(products.sku, refundItem.sku), eq(products.companyId, companyId)))
           .limit(1)

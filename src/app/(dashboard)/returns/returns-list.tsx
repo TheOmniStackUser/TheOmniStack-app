@@ -173,7 +173,7 @@ export function ReturnsList({
 
   // Refund Modal State
   const [refundingLog, setRefundingLog] = useState<ReturnLog | null>(null)
-  const [refundItemsInput, setRefundItemsInput] = useState<{ sku: string; title: string; orderQty: number; returnedQty: number; refundQty: number }[]>([])
+  const [refundItemsInput, setRefundItemsInput] = useState<{ sku: string; title: string; orderQty: number; returnedQty: number; refundQty: number; restock: boolean }[]>([])
   const [isRefundingPending, startRefundTransition] = useTransition()
 
   // Expandable Order Details State
@@ -225,13 +225,16 @@ export function ReturnsList({
             return normalize(scannedSku) === normalize(orderSku)
           })
           const returnedQty = matchingScannedItem ? matchingScannedItem.quantity : 0
+          const condition = matchingScannedItem?.condition || 'new'
+          const isNew = condition.toLowerCase() === 'new' || condition.toLowerCase() === 'neu'
           
           return {
             sku: orderItem.sku || 'N/A',
             title: orderItem.title,
             orderQty: parseInt(orderItem.quantity) || 1,
             returnedQty,
-            refundQty: returnedQty // default to the returned quantity
+            refundQty: returnedQty, // default to the returned quantity
+            restock: isNew
           }
         })
         
@@ -249,6 +252,12 @@ export function ReturnsList({
     setRefundItemsInput(next)
   }
 
+  const handleRestockToggle = (index: number, val: boolean) => {
+    const next = [...refundItemsInput]
+    next[index].restock = val
+    setRefundItemsInput(next)
+  }
+
   const handleRefundAllToggle = (refundAll: boolean) => {
     const next = refundItemsInput.map(item => ({
       ...item,
@@ -259,14 +268,7 @@ export function ReturnsList({
 
   const handleExecuteRefund = async () => {
     if (!refundingLog) return
-    
-    const payload = refundItemsInput
-      .filter(item => item.refundQty > 0)
-      .map(item => ({
-        sku: item.sku,
-        quantity: item.refundQty
-      }))
-
+    const payload = refundItemsInput.filter(item => item.refundQty > 0).map(item => ({ sku: item.sku, quantity: item.refundQty, restock: item.restock }))
     if (payload.length === 0) {
       showToast('Bitte wähle mindestens einen Artikel mit einer Menge größer als 0 aus.', 'error')
       return

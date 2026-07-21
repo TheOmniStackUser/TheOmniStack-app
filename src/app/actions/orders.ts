@@ -713,7 +713,7 @@ export async function refundOrderAction(orderId: string) {
   }
 }
 
-export async function refundOrderPartialAction(orderId: string, itemsToRefund: { sku: string; quantity: number }[]) {
+export async function refundOrderPartialAction(orderId: string, itemsToRefund: { sku: string; quantity: number; restock?: boolean }[]) {
   try {
     const auth = await requireAuth()
 
@@ -754,7 +754,7 @@ export async function refundOrderPartialAction(orderId: string, itemsToRefund: {
         returnLogId: newReturn.id,
         skuOrProductName: item.sku || 'UNKNOWN',
         quantity: Number(item.quantity),
-        condition: 'new',
+        condition: item.restock === false ? 'defective' : 'new',
         notes: 'Erstattung aus dem Dashboard'
       }))
     )
