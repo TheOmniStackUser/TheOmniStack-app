@@ -343,7 +343,7 @@ export async function bulkCreateProductsFromUnmapped(unmappedProductIds: string[
             integrationId: unmapped.integrationId,
             marketplaceSku: unmapped.marketplaceSku,
             marketplaceProductId: unmapped.marketplaceProductId,
-            syncStock: unmapped.stock !== null && unmapped.stock !== undefined,
+            syncStock: true,
             syncPrice: false,
             ean: skuToEan.get(unmapped.marketplaceSku) || null,
           })
@@ -589,7 +589,7 @@ export async function mapUnmappedProductToExisting(unmappedProductId: string, pr
     integrationId: unmapped.integrationId,
     marketplaceSku: unmapped.marketplaceSku,
     marketplaceProductId: unmapped.marketplaceProductId,
-    syncStock: unmapped.stock !== null && unmapped.stock !== undefined,
+    syncStock: true,
     syncPrice: false,
     ean: unmappedEan || null,
   }).onConflictDoNothing().returning({ id: productMappings.id })

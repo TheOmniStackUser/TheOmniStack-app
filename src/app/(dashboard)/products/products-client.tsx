@@ -207,6 +207,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
   const [searchField, setSearchField] = useState<'all' | 'sku' | 'title' | 'ean'>('all')
+  const [syncFilter, setSyncFilter] = useState<'all' | 'stock_on' | 'stock_off' | 'price_on' | 'price_off'>('all')
   const [sortColumn, setSortColumn] = useState<string>('createdAt')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
@@ -277,6 +278,16 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
   const filteredAndSortedProducts = useMemo(() => {
     let result = [...initialProducts]
 
+    if (syncFilter !== 'all') {
+      result = result.filter(p => {
+        if (syncFilter === 'stock_on') return p.hasSyncStockOn
+        if (syncFilter === 'stock_off') return p.hasSyncStockOff
+        if (syncFilter === 'price_on') return p.hasSyncPriceOn
+        if (syncFilter === 'price_off') return p.hasSyncPriceOff
+        return true
+      })
+    }
+
     if (searchQuery.trim()) {
       const terms = searchQuery.toLowerCase().trim().split(/\s+/).filter(Boolean)
       result = result.filter(p => {
@@ -320,7 +331,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
     })
 
     return result
-  }, [initialProducts, searchQuery, sortColumn, sortDirection, searchField])
+  }, [initialProducts, searchQuery, sortColumn, sortDirection, searchField, syncFilter])
 
   const SortIcon = ({ column }: { column: string }) => {
     if (sortColumn !== column) return <ChevronUp className="w-3 h-3 opacity-20" />
@@ -352,6 +363,17 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
             <option value="sku">SKU</option>
             <option value="title">Titel</option>
             <option value="ean">EAN</option>
+          </select>
+          <select
+            value={syncFilter}
+            onChange={(e) => setSyncFilter(e.target.value as any)}
+            className="w-48 py-2 pl-3 pr-8 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all text-slate-900"
+          >
+            <option value="all">Alle Sync-Stati</option>
+            <option value="stock_on">Bestand Sync: AN</option>
+            <option value="stock_off">Bestand Sync: AUS</option>
+            <option value="price_on">Preis Sync: AN</option>
+            <option value="price_off">Preis Sync: AUS</option>
           </select>
           <div className="relative flex-1 flex gap-2">
             <div className="relative flex-1">

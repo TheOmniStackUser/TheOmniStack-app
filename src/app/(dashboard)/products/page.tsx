@@ -35,6 +35,8 @@ export default async function ProductsPage() {
       productId: productMappings.productId,
       marketplaceSku: productMappings.marketplaceSku,
       ean: productMappings.ean,
+      syncStock: productMappings.syncStock,
+      syncPrice: productMappings.syncPrice,
     })
     .from(productMappings)
     .where(eq(productMappings.companyId, auth.activeCompanyId))
@@ -45,6 +47,10 @@ export default async function ProductsPage() {
       ...p,
       mappingSkus: pMappings.map(m => m.marketplaceSku).join(' '),
       mappingEans: pMappings.map(m => m.ean).filter(Boolean).join(' '),
+      hasSyncStockOn: pMappings.some(m => m.syncStock),
+      hasSyncStockOff: pMappings.some(m => !m.syncStock),
+      hasSyncPriceOn: pMappings.some(m => m.syncPrice),
+      hasSyncPriceOff: pMappings.some(m => !m.syncPrice),
     }
   })
 
