@@ -1153,26 +1153,26 @@ export class MiraklAdapter implements MarketplaceAdapter {
             })
           }
 
+          let lineShippingRefund = 0
           if (shippingAmountToRefund > 0) {
-            let lineShippingRefund = shippingAmountToRefund
+            lineShippingRefund = shippingAmountToRefund
             if (line.shipping_price !== undefined && line.shipping_price !== null) {
               lineShippingRefund = Math.min(Number(line.shipping_price), shippingAmountToRefund)
             }
+          }
 
-            if (lineShippingRefund > 0) {
-              refundPayload.shipping_amount = parseFloat(lineShippingRefund.toFixed(2))
-              
-              const shippingTaxes = line.shipping_taxes || miraklOrder.shipping_taxes || []
-              if (shippingTaxes.length > 0) {
-                const totalShippingPrice = miraklOrder.shipping_price || 1
-                refundPayload.shipping_taxes = shippingTaxes.map((st: any) => ({
-                  amount: parseFloat((Number(st.amount) * (lineShippingRefund / totalShippingPrice)).toFixed(2)),
-                  code: st.code || 'VAT'
-                }))
-              }
-              
-              shippingAmountToRefund -= lineShippingRefund
+          refundPayload.shipping_amount = parseFloat(lineShippingRefund.toFixed(2))
+          
+          if (lineShippingRefund > 0) {
+            const shippingTaxes = line.shipping_taxes || miraklOrder.shipping_taxes || []
+            if (shippingTaxes.length > 0) {
+              const totalShippingPrice = miraklOrder.shipping_price || 1
+              refundPayload.shipping_taxes = shippingTaxes.map((st: any) => ({
+                amount: parseFloat((Number(st.amount) * (lineShippingRefund / totalShippingPrice)).toFixed(2)),
+                code: st.code || 'VAT'
+              }))
             }
+            shippingAmountToRefund -= lineShippingRefund
           }
 
           refunds.push(refundPayload)
