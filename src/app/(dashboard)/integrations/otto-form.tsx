@@ -6,19 +6,14 @@ import { HelpCircle, ExternalLink } from 'lucide-react'
 
 export function OttoIntegrationForm({ 
   companyId,
-  initialClientId, 
   initialEnvironment = 'production',
-  initialReturnAddressCarrierId = '',
-  initialConnectionType = 'service_partner'
+  initialReturnAddressCarrierId = ''
 }: { 
   companyId: string,
-  initialClientId: string, 
   initialEnvironment?: string,
-  initialReturnAddressCarrierId?: string,
-  initialConnectionType?: string
+  initialReturnAddressCarrierId?: string
 }) {
   const [state, action, pending] = useActionState(saveOttoIntegrationAction, undefined)
-  const [connectionType, setConnectionType] = useState(initialConnectionType)
   const [environment, setEnvironment] = useState(initialEnvironment)
   const [inviteLink, setInviteLink] = useState('')
 
@@ -46,74 +41,10 @@ export function OttoIntegrationForm({
         </div>
       )}
 
-      {/* VERBINDUNGSTYP */}
-      <div>
-        <label className="block text-sm font-semibold text-gray-700 mb-2">Verbindungstyp</label>
-        <input type="hidden" name="connectionType" value={connectionType} />
-        <div className="flex bg-slate-100 p-1 rounded-xl">
-          <button
-            type="button"
-            onClick={() => setConnectionType('service_partner')}
-            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${
-              connectionType === 'service_partner' 
-                ? 'bg-white shadow-sm text-blue-600 border border-slate-200' 
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Service Partner App (OAuth)
-          </button>
-          <button
-            type="button"
-            onClick={() => setConnectionType('private')}
-            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${
-              connectionType === 'private' 
-                ? 'bg-white shadow-sm text-blue-600 border border-slate-200' 
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Private App (API-Benutzer)
-          </button>
-        </div>
-      </div>
+      <input type="hidden" name="connectionType" value="service_partner" />
 
-      {/* PRIVATE APP */}
-      {connectionType === 'private' ? (
-        <>
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <label htmlFor="clientId" className="block text-sm font-semibold text-gray-700">Client ID (API User)</label>
-              <div className="group relative">
-                <HelpCircle className="w-4 h-4 text-slate-400 cursor-help hover:text-slate-600 transition-colors" />
-                <div className="absolute left-6 top-0 w-64 p-3 bg-slate-900 text-white text-xs rounded-xl shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 transform -translate-y-1/4">
-                  <p className="font-bold mb-1">Wo finde ich das?</p>
-                  <p className="leading-relaxed text-slate-300">Erstelle in Otto Partner Connect unter Konfiguration &gt; API-Zugriff einen neuen &quot;API-Benutzer&quot;.</p>
-                  <div className="absolute left-0 top-3 -translate-x-full border-8 border-transparent border-r-slate-900"></div>
-                </div>
-              </div>
-            </div>
-            <input
-              type="text"
-              id="clientId"
-              name="clientId"
-              defaultValue={initialClientId}
-              className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm text-slate-900 placeholder:text-slate-500"
-              placeholder="e.g. 8f72..."
-            />
-          </div>
-          <div className="space-y-1">
-            <label htmlFor="clientSecret" className="block text-sm font-semibold text-gray-700">Client Secret (Passwort)</label>
-            <input
-              type="password"
-              id="clientSecret"
-              name="clientSecret"
-              className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm text-slate-900 placeholder:text-slate-500"
-              placeholder="••••••••••••••••"
-            />
-          </div>
-        </>
-      ) : (
-        /* SERVICE PARTNER: Invitation link → sets cookie first */
-        <div className="p-5 bg-blue-50 border border-blue-200 rounded-xl space-y-4">
+      {/* SERVICE PARTNER: Invitation link → sets cookie first */}
+      <div className="p-5 bg-blue-50 border border-blue-200 rounded-xl space-y-4">
           <div>
             <p className="font-semibold text-blue-900 mb-1">Verbindung via TheOmniStack App</p>
             <p className="text-sm text-blue-800 leading-relaxed">
@@ -158,7 +89,6 @@ export function OttoIntegrationForm({
             </a>
           </div>
         </div>
-      )}
 
       {/* RETURN ADDRESS */}
       <div>
