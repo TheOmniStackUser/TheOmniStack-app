@@ -37,6 +37,14 @@ export async function getSystemStatusData() {
   })
 
   const usedServices = new Set<string>(['core_api']) // Core API is always used
+  
+  // Add the correct frontend app based on environment
+  if (process.env.NEXT_PUBLIC_APP_VARIANT === 'craft') {
+    usedServices.add('profifaktura_app')
+  } else {
+    usedServices.add('theomnistack_app')
+  }
+
   for (const integration of activeIntegrations) {
     if (integration.isActive && integrationTypeToServiceMap[integration.type]) {
       usedServices.add(integrationTypeToServiceMap[integration.type])

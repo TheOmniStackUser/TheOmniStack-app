@@ -10,6 +10,8 @@ export const incidentStatusEnum = pgEnum('incident_status', [
 
 export const systemServicesEnum = pgEnum('system_service', [
   'core_api',
+  'theomnistack_app',
+  'profifaktura_app',
   'amazon',
   'otto',
   'shopify',
@@ -26,6 +28,27 @@ export const systemServicesEnum = pgEnum('system_service', [
   'woocommerce',
   'shopware',
 ])
+
+export const serviceNamesMap: Record<string, string> = {
+  'core_api': 'TheOmniStack API (Kernsystem)',
+  'theomnistack_app': 'TheOmniStack App',
+  'profifaktura_app': 'ProfiFaktura App',
+  'amazon': 'Amazon Marketplace',
+  'otto': 'Otto Market',
+  'shopify': 'Shopify',
+  'aboutyou': 'About You',
+  'dhl': 'DHL Geschäftskunden',
+  'hermes': 'Hermes',
+  'limango': 'Limango',
+  'mirakl_decathlon': 'Decathlon (Mirakl)',
+  'mirakl_decathlon_eu': 'Decathlon EU (Mirakl)',
+  'mirakl_mediamarkt': 'MediaMarkt (Mirakl)',
+  'mirakl_custom': 'Mirakl (Custom)',
+  'kaufland': 'Kaufland',
+  'ebay': 'eBay',
+  'woocommerce': 'WooCommerce',
+  'shopware': 'Shopware',
+}
 
 export const systemIncidents = pgTable('system_incidents', {
   id: uuid('id').primaryKey().defaultRandom(),

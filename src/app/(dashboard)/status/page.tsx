@@ -2,24 +2,7 @@ import React from 'react'
 import { getSystemStatusData } from '@/app/actions/system-status'
 import { StatusBar } from '@/components/status-bar'
 import { AlertTriangle, CheckCircle2, Info, Activity } from 'lucide-react'
-
-// Map service keys to readable names
-const serviceNames: Record<string, string> = {
-  'core_api': 'TheOmniStack API (Kernsystem)',
-  'amazon': 'Amazon Marketplace',
-  'otto': 'Otto Market',
-  'shopify': 'Shopify',
-  'aboutyou': 'About You',
-  'dhl': 'DHL Geschäftskunden',
-  'hermes': 'Hermes',
-  'limango': 'Limango',
-  'decathlon': 'Decathlon (Mirakl)',
-  'mediamarkt': 'MediaMarkt (Mirakl)',
-  'kaufland': 'Kaufland',
-  'ebay': 'eBay',
-  'woocommerce': 'WooCommerce',
-  'shopware': 'Shopware',
-}
+import { serviceNamesMap } from '@/db/schema/system-status'
 
 export default async function SystemStatusPage() {
   const { incidents, uptimeData, usedServices, overrides } = await getSystemStatusData()
@@ -60,7 +43,7 @@ export default async function SystemStatusPage() {
                   <Info className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
                   <div>
                     <div className="flex items-center gap-2">
-                      <p className="font-bold text-sm">{serviceNames[incident.service] || incident.service}</p>
+                      <p className="font-bold text-sm">{serviceNamesMap[incident.service] || incident.service}</p>
                       <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-200/50 text-amber-700">
                         {incident.status}
                       </span>
@@ -105,7 +88,7 @@ export default async function SystemStatusPage() {
               <div key={service} className="p-6 transition-colors hover:bg-slate-50/50">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-slate-800 text-sm">{serviceNames[service] || service}</h3>
+                    <h3 className="font-semibold text-slate-800 text-sm">{serviceNamesMap[service] || service}</h3>
                   </div>
                   <div className="flex items-center gap-4">
                     <span className="text-xs font-medium text-slate-500">

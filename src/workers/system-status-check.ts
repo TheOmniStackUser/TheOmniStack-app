@@ -1,11 +1,15 @@
 import { Queue, Worker } from 'bullmq'
-import { redisClient } from '@/lib/redis'
+import IORedis from 'ioredis'
 import { db } from '@/db/client'
 import { systemStatusDaily, systemServicesEnum, systemIncidents } from '@/db/schema/system-status'
 import { eq, isNull, and, or, lte, gte } from 'drizzle-orm'
 
+const connection = new IORedis(process.env.REDIS_URL as string, {
+  maxRetriesPerRequest: null,
+})
+
 export const systemStatusQueue = new Queue('system-status-check', {
-  connection: redisClient,
+  connection,
 })
 
 // Worker that runs every 15 minutes to check system status
@@ -70,7 +74,7 @@ export const systemStatusWorker = new Worker(
     
     console.log(`[SystemStatus] Check complete. Logged status for ${systemServicesEnum.enumValues.length} services.`)
   },
-  { connection: redisClient }
+  { connection }
 )
 
 systemStatusWorker.on('failed', (job, err) => {

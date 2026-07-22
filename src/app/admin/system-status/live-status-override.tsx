@@ -2,7 +2,7 @@
 
 import React from 'react'
 import { setOverrideStatus } from './actions'
-import { systemServicesEnum } from '@/db/schema/system-status'
+import { systemServicesEnum, serviceNamesMap } from '@/db/schema/system-status'
 
 export function LiveStatusOverride({ 
   overrides, 
@@ -29,7 +29,7 @@ export function LiveStatusOverride({
             <div key={service} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
               <div className="flex items-center gap-2">
                 <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'}`} />
-                <span className="text-sm font-medium text-slate-700">{service}</span>
+                <span className="text-sm font-medium text-slate-700">{serviceNamesMap[service] || service}</span>
               </div>
               <select 
                 value={currentStatus}
