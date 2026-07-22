@@ -177,3 +177,36 @@ export async function setupDunningSchedule() {
   console.log('   - Scheduled daily dunning check at 08:00 (Europe/Berlin)')
 }
 
+/**
+ * Sets up a 15-minute periodic check for the system status.
+ */
+export async function setupSystemStatusCheck() {
+  console.log('⏰ Setting up system status check (every 15 minutes)...')
+  
+  const { systemStatusQueue } = await import('./system-status-check')
+  
+  try {
+    const repeatableJobs = await systemStatusQueue.getRepeatableJobs()
+    for (const job of repeatableJobs) {
+      if (job.key?.includes('system-status-periodic')) {
+        await systemStatusQueue.removeRepeatableByKey(job.key)
+      }
+    }
+  } catch (err) {
+    console.error('[Scheduler] Failed to clear old system status jobs:', err)
+  }
+
+  await systemStatusQueue.add(
+    'system-status-periodic',
+    {},
+    {
+      jobId: 'system-status-periodic',
+      repeat: {
+        pattern: '*/15 * * * *', // every 15 minutes
+      },
+      removeOnComplete: true,
+    }
+  )
+  console.log('   - Scheduled system status check (every 15 minutes)')
+}
+
