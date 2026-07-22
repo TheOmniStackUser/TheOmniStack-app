@@ -69,7 +69,7 @@ export class OttoAdapter implements MarketplaceAdapter {
 
     const basicAuth = Buffer.from(`${tokenClientId}:${tokenClientSecret}`).toString('base64')
     
-    let scope = isPrivate ? 'orders products shipments returns receipts availability' : 'developer'
+    let scope = isPrivate ? 'orders products shipments returns receipts availability price-reduction' : 'developer'
 
     const doFetch = async (currentScope: string) => fetch(this.tokenUrl, {
       method: 'POST',
@@ -92,7 +92,7 @@ export class OttoAdapter implements MarketplaceAdapter {
       // If the user misconfigured private vs service_partner, try fallback
       if (response.status === 400 && errText.includes('invalid_scope')) {
          console.warn(`[OttoAdapter] Invalid scope '${scope}', attempting fallback...`)
-         const fallbackScope = isPrivate ? 'developer' : 'orders products shipments returns receipts availability'
+         const fallbackScope = isPrivate ? 'developer' : 'orders products shipments returns receipts availability price-reduction'
          response = await doFetch(fallbackScope)
          if (!response.ok) {
              const fallbackErr = await response.text()
@@ -134,7 +134,7 @@ export class OttoAdapter implements MarketplaceAdapter {
         },
         body: new URLSearchParams({
           grant_type: 'client_credentials',
-          scope: 'orders products shipments returns availability price-reduction'
+          scope: 'orders products shipments returns receipts availability price-reduction'
         }).toString(),
         signal: AbortSignal.timeout(15000)
       })
