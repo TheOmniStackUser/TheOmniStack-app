@@ -1676,18 +1676,20 @@ export function ReturnsList({
                         <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate" title={item.sku}>
                           {item.sku}
                         </div>
-                        <div className="mt-2 flex items-center">
-                          <input
-                            type="checkbox"
-                            id={`restock-return-${idx}`}
-                            checked={item.restock}
-                            onChange={(e) => handleRestockToggle(idx, e.target.checked)}
-                            className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
-                          />
-                          <label htmlFor={`restock-return-${idx}`} className="ml-1.5 text-[10px] text-slate-600 font-medium cursor-pointer">
-                            Wieder einlagern (+1)
-                          </label>
-                        </div>
+                        {item.returnedQty > 0 && (
+                          <div className="mt-2 flex items-center">
+                            <input
+                              type="checkbox"
+                              id={`restock-return-${idx}`}
+                              checked={item.restock}
+                              onChange={(e) => handleRestockToggle(idx, e.target.checked)}
+                              className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
+                            />
+                            <label htmlFor={`restock-return-${idx}`} className="ml-1.5 text-[10px] text-slate-600 font-medium cursor-pointer">
+                              Wieder einlagern (+1)
+                            </label>
+                          </div>
+                        )}
                       </div>
 
                       <div className="col-span-2 text-center text-slate-600 font-bold">
