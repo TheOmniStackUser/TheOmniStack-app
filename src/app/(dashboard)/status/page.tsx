@@ -1,7 +1,7 @@
 import React from 'react'
 import { getSystemStatusData } from '@/app/actions/system-status'
 import { StatusBar } from '@/components/status-bar'
-import { AlertTriangle, CheckCircle2, Info, Activity } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Info, Activity, Wrench } from 'lucide-react'
 import { serviceNamesMap } from '@/db/schema/system-status'
 
 export default async function SystemStatusPage() {
@@ -38,26 +38,49 @@ export default async function SystemStatusPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              {incidents.map(incident => (
-                <div key={incident.id} className="flex items-start gap-3 text-slate-800 bg-amber-50 rounded-xl p-4 border border-amber-100">
-                  <Info className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="font-bold text-sm">{serviceNamesMap[incident.service] || incident.service}</p>
-                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-200/50 text-amber-700">
-                        {incident.status}
-                      </span>
+              {incidents.map(incident => {
+                const isMaintenance = incident.status === 'maintenance'
+                
+                const containerClass = isMaintenance 
+                  ? "flex items-start gap-3 text-slate-800 bg-blue-50/80 rounded-xl p-4 border border-blue-100"
+                  : "flex items-start gap-3 text-slate-800 bg-amber-50 rounded-xl p-4 border border-amber-100"
+                  
+                const Icon = isMaintenance ? Wrench : Info
+                const iconColor = isMaintenance ? "text-blue-500" : "text-amber-500"
+                const badgeClass = isMaintenance
+                  ? "bg-blue-200/50 text-blue-700"
+                  : "bg-amber-200/50 text-amber-700"
+
+                return (
+                  <div key={incident.id} className={containerClass}>
+                    <Icon className={`w-5 h-5 shrink-0 mt-0.5 ${iconColor}`} />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-bold text-sm">{serviceNamesMap[incident.service] || incident.service}</p>
+                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${badgeClass}`}>
+                          {incident.status}
+                        </span>
+                      </div>
+                      <p className="font-medium text-sm mt-1">{incident.title}</p>
+                      {incident.description && (
+                        <p className="text-sm mt-1 text-slate-600">{incident.description}</p>
+                      )}
+                      
+                      {isMaintenance && incident.startTime && (
+                        <div className="mt-3 bg-white/50 rounded-lg p-2 text-xs text-slate-600 border border-blue-100/50">
+                          <p className="font-semibold mb-0.5 text-blue-800">Geplanter Zeitraum:</p>
+                          <p>Start: {new Date(incident.startTime).toLocaleString('de-DE')}</p>
+                          <p>Ende: {incident.endTime ? new Date(incident.endTime).toLocaleString('de-DE') : 'Unbekannt'}</p>
+                        </div>
+                      )}
+                      
+                      <p className="text-xs text-slate-400 mt-2">
+                        Gemeldet am: {new Date(incident.createdAt).toLocaleString('de-DE')}
+                      </p>
                     </div>
-                    <p className="font-medium text-sm mt-1">{incident.title}</p>
-                    {incident.description && (
-                      <p className="text-sm mt-1 text-slate-600">{incident.description}</p>
-                    )}
-                    <p className="text-xs text-slate-400 mt-2">
-                      Gemeldet am: {new Date(incident.createdAt).toLocaleString('de-DE')}
-                    </p>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>

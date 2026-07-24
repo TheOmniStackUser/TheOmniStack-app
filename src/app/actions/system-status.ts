@@ -36,19 +36,15 @@ export async function getSystemStatusData() {
     }
   })
 
-  const usedServices = new Set<string>(['core_api']) // Core API is always used
+  const usedServices = new Set<string>()
   
-  // Add the correct frontend app based on environment
-  if (process.env.NEXT_PUBLIC_APP_VARIANT === 'craft') {
-    usedServices.add('profifaktura_app')
-  } else {
-    usedServices.add('theomnistack_app')
-  }
-
-  for (const integration of activeIntegrations) {
-    if (integration.isActive && integrationTypeToServiceMap[integration.type]) {
-      usedServices.add(integrationTypeToServiceMap[integration.type])
-    }
+  // Add all services from the enum
+  for (const service of systemServicesEnum.enumValues) {
+    // Exclude the other app variant
+    if (process.env.NEXT_PUBLIC_APP_VARIANT === 'craft' && service === 'theomnistack_app') continue
+    if (process.env.NEXT_PUBLIC_APP_VARIANT !== 'craft' && service === 'profifaktura_app') continue
+    
+    usedServices.add(service)
   }
 
   // Fetch incidents from the last 30 days
