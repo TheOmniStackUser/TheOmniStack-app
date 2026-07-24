@@ -452,7 +452,8 @@ export class OttoAdapter implements MarketplaceAdapter {
       if (!response.ok) {
         const errText = await response.text()
         console.warn(`[OttoAdapter] Failed to fetch receipts list for ${marketplaceOrderId}: ${response.status} - ${errText}`)
-        if (response.status === 429) {
+        // Dragonfish WAF returns 403 when rate limiting/blocking IPs
+        if (response.status === 429 || response.status === 403) {
           throw new Error('RATE_LIMIT')
         }
         return null
