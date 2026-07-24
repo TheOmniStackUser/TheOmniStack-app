@@ -605,7 +605,7 @@ export async function syncShippedOrdersInvoices(
             eq(orders.status, 'shipped'),
             isNull(orders.invoiceId),
             eq(orders.isArchived, false),
-            gte(orders.createdAt, thresholdDate)
+            gte(orders.createdAt, new Date(Math.max(thresholdDate.getTime(), Date.now() - 14 * 24 * 60 * 60 * 1000)))
           )
         )
         .limit(200)
