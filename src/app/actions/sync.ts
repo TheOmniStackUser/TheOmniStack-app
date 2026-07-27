@@ -4,7 +4,7 @@ import { requireAuth } from '@/lib/session'
 import { marketplaceSyncQueue } from '@/workers/marketplace-sync'
 import { db } from '@/db/client'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
-import { eq, and, sql } from 'drizzle-orm'
+import { eq, and, sql, notInArray } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { OttoAdapter } from '@/adapters/marketplace/otto'
 import { MiraklAdapter } from '@/adapters/marketplace/mirakl'
@@ -23,7 +23,7 @@ export async function getActiveIntegrationsList() {
       and(
         eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
         eq(marketplaceIntegrations.isActive, true),
-        sql`${marketplaceIntegrations.type} NOT IN ('dhl', 'hermes')`
+        notInArray(marketplaceIntegrations.type, ['dhl', 'hermes'])
       )
     )
 
@@ -65,7 +65,7 @@ export async function triggerSyncAction() {
       and(
         eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
         eq(marketplaceIntegrations.isActive, true),
-        sql`${marketplaceIntegrations.type} NOT IN ('dhl', 'hermes')`
+        notInArray(marketplaceIntegrations.type, ['dhl', 'hermes'])
       )
     )
 

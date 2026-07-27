@@ -75,7 +75,8 @@ export function SyncButton() {
         router.refresh()
       }
     } catch (e) {
-      showNotification('Ein unerwarteter Fehler ist beim Import aufgetreten.', 'error')
+      console.error("Sync error:", e);
+      showNotification(`Ein unerwarteter Fehler ist beim Import aufgetreten: ${e instanceof Error ? e.message : String(e)}`, 'error')
     } finally {
       setIsPending(false)
       setTimeout(() => setSyncProgress(null), 3000)
