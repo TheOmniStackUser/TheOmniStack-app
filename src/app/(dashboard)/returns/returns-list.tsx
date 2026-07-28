@@ -1326,7 +1326,7 @@ export function ReturnsList({
 
       {/* Edit Modal Dialog */}
       {editingLog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 animate-fade-in">
           <div className="bg-white w-full max-w-2xl rounded-2xl border border-slate-200 shadow-2xl overflow-hidden animate-scale-in">
             {/* Header */}
             <div className="p-6 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between">
@@ -1601,7 +1601,7 @@ export function ReturnsList({
 
       {/* Refund Modal Dialog */}
       {refundingLog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 animate-fade-in">
           <div className="bg-white w-full max-w-3xl rounded-2xl border border-slate-200 shadow-2xl overflow-hidden animate-scale-in">
             {/* Header */}
             <div className="p-6 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between">
