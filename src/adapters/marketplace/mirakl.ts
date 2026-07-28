@@ -1227,6 +1227,11 @@ export class MiraklAdapter implements MarketplaceAdapter {
         const errText = await refundResponse.clone().text()
         console.warn(`[MiraklAdapter:${this.marketplace}] Refund failed with default reason: ${refundResponse.status} - ${errText}. Attempting to fetch valid reason codes...`)
         
+        if (refundResponse.status === 400 && errText.includes('REFUNDED')) {
+          console.log(`[MiraklAdapter:${this.marketplace}] Order lines are already REFUNDED. Treating as success.`)
+          return true
+        }
+        
         try {
           console.log(`[MiraklAdapter:${this.marketplace}] Fetching valid reason codes via GET ${reasonUrl}...`)
           const reasonRes = await fetch(reasonUrl, { method: 'GET', headers })
@@ -1267,6 +1272,12 @@ export class MiraklAdapter implements MarketplaceAdapter {
         if (!refundResponse.ok) {
           const errTextFinal = await refundResponse.text()
           console.error(`[MiraklAdapter:${this.marketplace}] Refund failed after retry: ${refundResponse.status} - ${errTextFinal}`)
+          
+          if (refundResponse.status === 400 && errTextFinal.includes('REFUNDED')) {
+            console.log(`[MiraklAdapter:${this.marketplace}] Order lines are already REFUNDED. Treating as success.`)
+            return true
+          }
+          
           throw new Error(`Mirakl Refund API Error: ${errTextFinal || errText}`)
         }
       }
