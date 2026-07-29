@@ -126,7 +126,7 @@ export async function syncProductsForCompany(companyId: string, integrationId?: 
 
       // Bulk Load existing data
       const existingMappings = await db.select().from(productMappings).where(and(eq(productMappings.companyId, companyId), eq(productMappings.integrationId, integration.id)))
-      const existingProducts = await db.select().from(products).where(eq(products.companyId, companyId))
+      const existingProducts = await db.select({ id: products.id, sku: products.sku }).from(products).where(eq(products.companyId, companyId))
 
       const mappedSkus = new Set(existingMappings.map(m => m.marketplaceSku))
       const centralProductMap = new Map(existingProducts.map(p => [p.sku, p]))
@@ -217,35 +217,45 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
 
   // Find all mappings for these SKUs
   // First find central products
-  const centralProducts = await db
-    .select({ id: products.id, sku: products.sku })
-    .from(products)
-    .where(
-      and(
-        eq(products.companyId, companyId),
-        inArray(products.sku, skus)
+  const centralProducts: { id: string, sku: string }[] = []
+  for (let i = 0; i < skus.length; i += 1000) {
+    const chunkSkus = skus.slice(i, i + 1000)
+    const chunkProducts = await db
+      .select({ id: products.id, sku: products.sku })
+      .from(products)
+      .where(
+        and(
+          eq(products.companyId, companyId),
+          inArray(products.sku, chunkSkus)
+        )
       )
-    )
+    centralProducts.push(...chunkProducts)
+  }
 
   if (centralProducts.length === 0) {
-    console.log("[Debug] No central products found for SKUs:", skus, "Company:", companyId)
+    console.log("[Debug] No central products found for SKUs:", skus.length, "Company:", companyId)
     return { totalUpdatesSent: 0, activeMarketplaces: [] }
   }
   
-  console.log("[Debug] Found central products:", centralProducts.map(p => p.sku))
+  console.log(`[Debug] Found ${centralProducts.length} central products.`)
 
   const productIds = centralProducts.map(p => p.id)
   
   // Find mappings
-  const mappings = await db
-    .select()
-    .from(productMappings)
-    .where(
-      and(
-        eq(productMappings.companyId, companyId),
-        inArray(productMappings.productId, productIds)
+  const mappings: typeof productMappings.$inferSelect[] = []
+  for (let i = 0; i < productIds.length; i += 1000) {
+    const chunkIds = productIds.slice(i, i + 1000)
+    const chunkMappings = await db
+      .select()
+      .from(productMappings)
+      .where(
+        and(
+          eq(productMappings.companyId, companyId),
+          inArray(productMappings.productId, chunkIds)
+        )
       )
-    )
+    mappings.push(...chunkMappings)
+  }
 
   // Find active integrations first
   const activeIntegrations = await db
