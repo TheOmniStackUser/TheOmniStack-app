@@ -55,7 +55,14 @@ export async function POST(request: Request) {
 
     if (updates.length > 0) {
       const { pushUpdatesToMarketplaces } = await import('@/workers/product-sync')
-      await pushUpdatesToMarketplaces(companyId, updates, undefined, integrationId)
+      const { after } = await import('next/server')
+      after(async () => {
+        try {
+          await pushUpdatesToMarketplaces(companyId, updates, undefined, integrationId)
+        } catch (e) {
+          console.error(`[SyncExecute] Background sync failed for ${integrationId}:`, e)
+        }
+      })
     }
 
     return NextResponse.json({
