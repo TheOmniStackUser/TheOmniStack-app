@@ -308,16 +308,22 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
       mUpdate.stock = updateDef.stock
     }
 
-    if (canSyncPrice && mapping.syncPrice && updateDef.price !== undefined) {
-      let finalPrice = updateDef.price
-      // Apply price modifiers
+    let modifiedPrice = updateDef.price
+    if (modifiedPrice !== undefined) {
       if (mapping.priceModifierType === 'fixed') {
-        finalPrice += parseFloat(mapping.priceModifierValue?.toString() || '0')
+        modifiedPrice += parseFloat(mapping.priceModifierValue?.toString() || '0')
       } else if (mapping.priceModifierType === 'percentage') {
         const percent = parseFloat(mapping.priceModifierValue?.toString() || '0')
-        finalPrice = finalPrice * (1 + (percent / 100))
+        modifiedPrice = modifiedPrice * (1 + (percent / 100))
       }
-      mUpdate.price = finalPrice
+    }
+
+    if (canSyncPrice && mapping.syncPrice && updateDef.price !== undefined) {
+      mUpdate.price = modifiedPrice
+    }
+
+    if (modifiedPrice !== undefined) {
+      (mUpdate as any).fallbackPrice = modifiedPrice
     }
 
     if (mUpdate.stock !== undefined || mUpdate.price !== undefined) {

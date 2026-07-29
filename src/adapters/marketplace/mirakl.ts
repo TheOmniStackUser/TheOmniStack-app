@@ -1493,7 +1493,7 @@ export class MiraklAdapter implements MarketplaceAdapter {
    */
   async updateListings(
     companyId: string, 
-    updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number }[]
+    updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number; fallbackPrice?: number }[]
   ): Promise<void> {
     if (!updates || updates.length === 0) return
 
@@ -1524,11 +1524,12 @@ export class MiraklAdapter implements MarketplaceAdapter {
       }
 
       // Check if any updates are missing the price field (Mirakl OF01 requires price)
-      const needsPriceFetch = updates.some(u => u.price === undefined)
+      // If we have a fallbackPrice we don't necessarily need to fetch
+      const needsPriceFetch = updates.some(u => u.price === undefined && u.fallbackPrice === undefined)
       const currentOffersMap: Record<string, number> = {}
 
       if (needsPriceFetch) {
-        console.log(`[MiraklAdapter:${this.marketplace}] Some updates are missing price. Fetching existing offers to fill mandatory price field...`)
+        console.log(`[MiraklAdapter:${this.marketplace}] Some updates are missing price and fallbackPrice. Fetching existing offers to fill mandatory price field...`)
         try {
           let offset = 0
           let retryCount = 0
@@ -1551,7 +1552,7 @@ export class MiraklAdapter implements MarketplaceAdapter {
             if (!data.offers || data.offers.length === 0) break
             
             for (const offer of data.offers) {
-              if (offer.shop_sku && offer.price !== undefined) {
+              if (offer.shop_sku && offer.price !== undefined && offer.price !== null) {
                 currentOffersMap[offer.shop_sku] = offer.price
               }
             }
@@ -1578,10 +1579,14 @@ export class MiraklAdapter implements MarketplaceAdapter {
         if (update.stock !== undefined) offer.quantity = update.stock
         
         // Price is mandatory in Mirakl OF01
-        if (update.price !== undefined) {
+        if (update.price !== undefined && update.price !== null) {
           offer.price = update.price
-        } else if (currentOffersMap[update.sku] !== undefined) {
+        } else if (currentOffersMap[update.sku] !== undefined && currentOffersMap[update.sku] !== null) {
           offer.price = currentOffersMap[update.sku]
+        } else if (update.fallbackPrice !== undefined && update.fallbackPrice !== null) {
+          offer.price = update.fallbackPrice
+        } else {
+          console.warn(`[MiraklAdapter:${this.marketplace}] Warning: SKU ${update.sku} has no price available, import might fail.`)
         }
         
         return offer

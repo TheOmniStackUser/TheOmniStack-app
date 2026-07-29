@@ -124,7 +124,7 @@ export interface MarketplaceAdapter {
    */
   updateListings?(
     companyId: string, 
-    updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number }[]
+    updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number; fallbackPrice?: number }[]
   ): Promise<void>
 
   /**
