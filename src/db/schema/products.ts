@@ -131,6 +131,42 @@ export const unmappedMarketplaceProducts = pgTable('unmapped_marketplace_product
   companyUnmappedIdx: index('unmapped_company_idx').on(t.companyId),
 }))
 
+export const syncLogStatusEnum = pgEnum('sync_log_status', [
+  'success',
+  'error',
+  'partial'
+])
+
+// ─── Product Sync Logs ────────────────────────────────────────────────────────
+export const productSyncLogs = pgTable('product_sync_logs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  companyId: uuid('company_id')
+    .notNull()
+    .references(() => companies.id, { onDelete: 'cascade' }),
+  integrationId: uuid('integration_id')
+    .notNull()
+    .references(() => marketplaceIntegrations.id, { onDelete: 'cascade' }),
+  
+  marketplace: text('marketplace').notNull(),
+  status: syncLogStatusEnum('status').notNull(),
+  
+  totalUpdates: numeric('total_updates').notNull(),
+  syncedSkus: jsonb('synced_skus').notNull(), // Array of { sku, stock, price, status, error }
+  errorMessage: text('error_message'),
+  
+  startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+}, (t) => ({
+  companyLogsIdx: index('product_sync_logs_company_idx').on(t.companyId),
+  integrationLogsIdx: index('product_sync_logs_integration_idx').on(t.integrationId),
+  createdAtLogsIdx: index('product_sync_logs_created_at_idx').on(t.startedAt),
+}))
+
+export const productSyncLogsRelations = relations(productSyncLogs, ({ one }) => ({
+  company: one(companies, { fields: [productSyncLogs.companyId], references: [companies.id] }),
+  integration: one(marketplaceIntegrations, { fields: [productSyncLogs.integrationId], references: [marketplaceIntegrations.id] }),
+}))
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type Product = typeof products.$inferSelect
 export type NewProduct = typeof products.$inferInsert
@@ -138,3 +174,5 @@ export type ProductMapping = typeof productMappings.$inferSelect
 export type NewProductMapping = typeof productMappings.$inferInsert
 export type UnmappedMarketplaceProduct = typeof unmappedMarketplaceProducts.$inferSelect
 export type NewUnmappedMarketplaceProduct = typeof unmappedMarketplaceProducts.$inferInsert
+export type ProductSyncLog = typeof productSyncLogs.$inferSelect
+export type NewProductSyncLog = typeof productSyncLogs.$inferInsert

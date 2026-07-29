@@ -1,8 +1,8 @@
 import { db } from '@/db/client'
 import { companies } from '@/db/schema/companies'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
-import { products, productMappings, unmappedMarketplaceProducts } from '@/db/schema/products'
-import { eq, and, inArray, sql } from 'drizzle-orm'
+import { products, productMappings, unmappedMarketplaceProducts, productSyncLogs } from '@/db/schema/products'
+import { eq, and, inArray, sql, lte } from 'drizzle-orm'
 import { Worker, Queue, type Job } from 'bullmq'
 import IORedis from 'ioredis'
 import { getAdapterForIntegration } from '@/workers/marketplace-sync'
@@ -345,6 +345,14 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
   const activeMarketplaces: string[] = []
   const failedMarketplaces: { name: string, error: string }[] = []
 
+  // 1. Delete logs older than 30 days
+  try {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    await db.delete(productSyncLogs).where(lte(productSyncLogs.startedAt, thirtyDaysAgo))
+  } catch (e) {
+    console.error('[ProductSync] Failed to cleanup old sync logs:', e)
+  }
+
   const integrationEntries = Object.entries(updatesByIntegration)
   let currentIndex = 0
 
@@ -383,6 +391,29 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
       })
     }
 
+    // Prepare log data payload (exclude fallbackPrice to avoid confusion, only show what user actually synced)
+    const logPayload = mpUpdates.map((u: any) => ({
+      sku: u.sku,
+      ...(u.stock !== undefined ? { stock: u.stock } : {}),
+      ...(u.price !== undefined ? { price: u.price } : {})
+    }))
+
+    // Create sync log
+    let logId: string | undefined
+    try {
+      const inserted = await db.insert(productSyncLogs).values({
+        companyId,
+        integrationId,
+        marketplace: displayName,
+        status: 'partial', // temporary status while running
+        totalUpdates: mpUpdates.length.toString(),
+        syncedSkus: logPayload
+      }).returning({ id: productSyncLogs.id })
+      logId = inserted[0]?.id
+    } catch (e) {
+      console.error(`[ProductSync] Failed to create sync log for ${marketplace}:`, e)
+    }
+
     try {
       console.log(`[ProductSync] Pushing ${mpUpdates.length} updates to ${marketplace}...`)
       await adapter.updateListings(companyId, mpUpdates)
@@ -390,15 +421,35 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
       if (!activeMarketplaces.includes(displayName)) {
         activeMarketplaces.push(displayName)
       }
+      
       // Save success status
       const updatedMeta = { ...meta, lastPushSync: { timestamp: Date.now(), status: 'success', updatesCount: mpUpdates.length } }
       await db.update(marketplaceIntegrations).set({ metadata: updatedMeta }).where(eq(marketplaceIntegrations.id, integrationId))
+
+      // Update log to success
+      if (logId) {
+        await db.update(productSyncLogs).set({
+          status: 'success',
+          completedAt: new Date()
+        }).where(eq(productSyncLogs.id, logId))
+      }
+
     } catch (error: any) {
       console.error(`[ProductSync] Failed to push updates to ${marketplace}:`, error)
       failedMarketplaces.push({ name: displayName, error: error.message || 'Unbekannter Fehler' })
+      
       // Save error status
       const updatedMeta = { ...meta, lastPushSync: { timestamp: Date.now(), status: 'error', error: error.message || 'Unbekannter Fehler' } }
       await db.update(marketplaceIntegrations).set({ metadata: updatedMeta }).where(eq(marketplaceIntegrations.id, integrationId))
+
+      // Update log to error
+      if (logId) {
+        await db.update(productSyncLogs).set({
+          status: 'error',
+          errorMessage: error.message || 'Unbekannter Fehler',
+          completedAt: new Date()
+        }).where(eq(productSyncLogs.id, logId))
+      }
     }
     
     currentIndex++
