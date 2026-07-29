@@ -374,9 +374,15 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
       if (!activeMarketplaces.includes(displayName)) {
         activeMarketplaces.push(displayName)
       }
+      // Save success status
+      const updatedMeta = { ...meta, lastPushSync: { timestamp: Date.now(), status: 'success', updatesCount: mpUpdates.length } }
+      await db.update(marketplaceIntegrations).set({ metadata: updatedMeta }).where(eq(marketplaceIntegrations.id, integrationId))
     } catch (error: any) {
       console.error(`[ProductSync] Failed to push updates to ${marketplace}:`, error)
       failedMarketplaces.push({ name: displayName, error: error.message || 'Unbekannter Fehler' })
+      // Save error status
+      const updatedMeta = { ...meta, lastPushSync: { timestamp: Date.now(), status: 'error', error: error.message || 'Unbekannter Fehler' } }
+      await db.update(marketplaceIntegrations).set({ metadata: updatedMeta }).where(eq(marketplaceIntegrations.id, integrationId))
     }
     
     currentIndex++

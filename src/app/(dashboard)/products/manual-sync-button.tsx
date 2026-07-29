@@ -153,9 +153,26 @@ export function ManualSyncButton() {
                           checked={selectedIds.includes(integration.id)}
                           onChange={() => toggleSelect(integration.id)}
                           onClick={(e) => e.stopPropagation()}
-                          className="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 cursor-pointer"
+                          className="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 cursor-pointer self-start mt-0.5"
                         />
-                        <span className="text-slate-700">{integration.displayName}</span>
+                        <div className="flex flex-col overflow-hidden">
+                          <span className="text-slate-900 font-medium">{integration.displayName}</span>
+                          {integration.lastPushSync ? (
+                            <span className="text-xs text-slate-500 flex items-center gap-1 mt-1">
+                              {integration.lastPushSync.status === 'success' ? (
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                              ) : (
+                                <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                              )}
+                              <span className="truncate">
+                                Letzter Sync: {new Date(integration.lastPushSync.timestamp).toLocaleString('de-DE')}
+                                {integration.lastPushSync.status === 'error' && integration.lastPushSync.error && ` - ${integration.lastPushSync.error}`}
+                              </span>
+                            </span>
+                          ) : (
+                            <span className="text-xs text-slate-400 mt-1">Noch kein Sync durchgeführt</span>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>

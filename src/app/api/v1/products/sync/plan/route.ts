@@ -39,7 +39,8 @@ export async function GET(request: Request) {
       return {
         id: i.id,
         marketplace: i.type,
-        displayName: meta?.customName || fallbackNames[i.type] || i.type
+        displayName: meta?.customName || fallbackNames[i.type] || i.type,
+        lastPushSync: meta?.lastPushSync
       }
     })
 
