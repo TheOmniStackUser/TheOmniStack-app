@@ -3,7 +3,7 @@ import { db } from '@/db/client'
 import { products, productMappings } from '@/db/schema/products'
 import { eq, isNull } from 'drizzle-orm'
 import Link from 'next/link'
-import { Plus, Package, Settings, ServerCrash, AlertTriangle, Info } from 'lucide-react'
+import { Plus, Package, Settings, ServerCrash, AlertTriangle, Info, History } from 'lucide-react'
 import { CsvActions } from './csv-actions'
 import { ProductsClient } from './products-client'
 import { ManualSyncButton } from './manual-sync-button'
@@ -87,6 +87,13 @@ export default async function ProductsPage() {
         </div>
 
         <div className="flex flex-wrap gap-3">
+          <Link
+            href="/products/logs"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-50 text-slate-700 font-semibold hover:bg-slate-100 transition-colors border border-slate-200 shadow-sm"
+          >
+            <History className="w-4 h-4" />
+            Logs
+          </Link>
           <Link
             href="/products/settings"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-50 text-slate-700 font-semibold hover:bg-slate-100 transition-colors border border-slate-200 shadow-sm"
