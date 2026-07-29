@@ -549,7 +549,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
     setIsSubmitting(true)
     setAutoMapProgress({ current: 0, total: filteredAutoMapMatches.length })
     try {
-      const BATCH_SIZE = 25;
+      const BATCH_SIZE = 100;
       const allDeletedUnmapped: any[] = []
       const allCreatedMappingIds: string[] = []
       for (let i = 0; i < filteredAutoMapMatches.length; i += BATCH_SIZE) {

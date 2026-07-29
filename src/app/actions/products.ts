@@ -882,18 +882,130 @@ export async function getAutoMappableProducts() {
 export async function bulkAutoMapProducts(mappings: { unmappedId: string, matchedProductId: string }[]) {
   const auth = await requireAuth()
 
+  if (!mappings || mappings.length === 0) return { success: true, deletedUnmapped: [], createdMappingIds: [] }
+
+  const unmappedIds = mappings.map(m => m.unmappedId)
+  const centralProductIds = [...new Set(mappings.map(m => m.matchedProductId))]
+
+  // Fetch unmapped products
+  const unmappedProducts = await db
+    .select()
+    .from(unmappedMarketplaceProducts)
+    .where(
+      and(
+        eq(unmappedMarketplaceProducts.companyId, auth.activeCompanyId),
+        inArray(unmappedMarketplaceProducts.id, unmappedIds)
+      )
+    )
+
+  if (unmappedProducts.length === 0) return { success: true, deletedUnmapped: [], createdMappingIds: [] }
+
+  // Fetch central products
+  const centralProducts = await db
+    .select()
+    .from(products)
+    .where(
+      and(
+        eq(products.companyId, auth.activeCompanyId),
+        inArray(products.id, centralProductIds)
+      )
+    )
+    
+  const centralProductsMap = new Map(centralProducts.map(p => [p.id, p]))
+  const unmappedProductsMap = new Map(unmappedProducts.map(u => [u.id, u]))
+
+  const mappingsToInsert = []
+  const stockUpdates: {sku: string, stock: number}[] = []
+  
+  // We need to keep track of EAN updates for central products
+  // productId -> Set of new EANs
+  const productEanUpdates = new Map<string, Set<string>>()
+  
   const allDeletedUnmapped: any[] = []
-  const allCreatedMappingIds: string[] = []
 
   for (const mapping of mappings) {
-     try {
-       const res = await mapUnmappedProductToExisting(mapping.unmappedId, mapping.matchedProductId)
-       if (res.deletedUnmapped) allDeletedUnmapped.push(...res.deletedUnmapped)
-       if (res.createdMappingIds) allCreatedMappingIds.push(...res.createdMappingIds)
-     } catch (err) {
-       console.error('Failed to auto-map:', err)
-     }
+    const unmapped = unmappedProductsMap.get(mapping.unmappedId)
+    const central = centralProductsMap.get(mapping.matchedProductId)
+    
+    if (unmapped && central) {
+      const unmappedEan = getEanFromPayload(unmapped.rawPayload);
+      
+      mappingsToInsert.push({
+        companyId: auth.activeCompanyId,
+        productId: central.id,
+        marketplace: unmapped.marketplace,
+        integrationId: unmapped.integrationId,
+        marketplaceSku: unmapped.marketplaceSku,
+        marketplaceProductId: unmapped.marketplaceProductId,
+        syncStock: true,
+        syncPrice: false,
+        ean: unmappedEan || null,
+      })
+      
+      if (unmappedEan) {
+        const existingEans = central.ean ? central.ean.split(',').map((s: string) => s.trim()) : [];
+        if (!existingEans.includes(unmappedEan)) {
+          if (!productEanUpdates.has(central.id)) {
+            productEanUpdates.set(central.id, new Set(existingEans))
+          }
+          productEanUpdates.get(central.id)!.add(unmappedEan)
+        }
+      }
+      
+      if (central.currentStock !== null) {
+        stockUpdates.push({
+          sku: central.sku,
+          stock: parseInt(central.currentStock?.toString() || '0', 10)
+        })
+      }
+      
+      allDeletedUnmapped.push(unmapped)
+    }
   }
+
+  const allCreatedMappingIds: string[] = []
+  
+  if (mappingsToInsert.length > 0) {
+    const insertedMappings = await db.insert(productMappings).values(mappingsToInsert).onConflictDoNothing().returning({ id: productMappings.id })
+    allCreatedMappingIds.push(...insertedMappings.map(m => m.id))
+  }
+  
+  // Update EANs
+  for (const [productId, eanSet] of productEanUpdates.entries()) {
+    await db.update(products).set({
+      ean: Array.from(eanSet).join(', '),
+      updatedAt: new Date()
+    }).where(eq(products.id, productId))
+  }
+  
+  // Delete unmapped
+  const idsToDelete = allDeletedUnmapped.map(u => u.id)
+  if (idsToDelete.length > 0) {
+    await db.delete(unmappedMarketplaceProducts).where(
+      and(
+        eq(unmappedMarketplaceProducts.companyId, auth.activeCompanyId),
+        inArray(unmappedMarketplaceProducts.id, idsToDelete)
+      )
+    )
+  }
+
+  // Trigger sync
+  if (stockUpdates.length > 0) {
+    const { pushUpdatesToMarketplaces } = await import('@/workers/product-sync')
+    import('next/server').then(({ after }) => {
+      after(async () => {
+        try {
+          await pushUpdatesToMarketplaces(auth.activeCompanyId, stockUpdates)
+        } catch (e) {
+          console.error('[bulkAutoMapProducts] Failed to push stock updates', e)
+        }
+      })
+    }).catch(console.error)
+  }
+  
+  revalidatePath('/products')
+  revalidatePath('/products/import')
+
   return { success: true, deletedUnmapped: allDeletedUnmapped, createdMappingIds: allCreatedMappingIds }
 }
 
