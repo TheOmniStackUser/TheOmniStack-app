@@ -114,17 +114,17 @@ export function ManualSyncButton() {
 
       {modalState.isOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col animate-in zoom-in-95 duration-200 relative overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col animate-in zoom-in-95 duration-200 relative overflow-hidden max-h-[90vh]">
             
             {modalState.type === 'select' && plan ? (
               <>
-                <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
                   <h3 className="font-bold text-slate-900 text-lg">Marktplätze für Sync auswählen</h3>
                   <button onClick={() => setModalState({ ...modalState, isOpen: false })} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
                     <X className="w-5 h-5" />
                   </button>
                 </div>
-                <div className="p-6">
+                <div className="p-6 overflow-y-auto custom-scrollbar shrink">
                   <p className="text-sm text-slate-500 mb-4">Bitte wähle die Marktplätze aus, an die du Bestand und Preise (falls konfiguriert) live senden möchtest.</p>
                   
                   <div className="space-y-2">
@@ -160,7 +160,7 @@ export function ManualSyncButton() {
                     ))}
                   </div>
                 </div>
-                <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3 shrink-0">
                   <button
                     onClick={() => setModalState({ ...modalState, isOpen: false })}
                     className="px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200 bg-slate-100 rounded-xl transition-colors"
