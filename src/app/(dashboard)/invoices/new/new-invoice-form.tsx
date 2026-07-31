@@ -1215,7 +1215,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   onChange={e => updateItem(index, 'quantity', parseFloat(e.target.value))} 
                 />
               </div>
-              <div className="w-32">
+              <div className="w-28">
                 <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Einzelpreis (Netto)</label>
                 <input 
                   type="number" 
@@ -1225,9 +1225,24 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   value={item.unitPrice} 
                   onChange={e => updateItem(index, 'unitPrice', parseFloat(e.target.value))} 
                 />
-                <div className="mt-1 text-[10px] text-slate-400 font-bold">
-                  Brutto: {(item.unitPrice * (1 + (item.taxRate / 100))).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
-                </div>
+              </div>
+              <div className="w-28">
+                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Einzelpreis (Brutto)</label>
+                <input 
+                  type="number" 
+                  step="0.01" 
+                  required 
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 font-bold text-slate-900 text-sm" 
+                  value={item.unitPrice ? parseFloat((item.unitPrice * (1 + (item.taxRate / 100))).toFixed(4)) : ''} 
+                  onChange={e => {
+                    const val = parseFloat(e.target.value);
+                    if (!isNaN(val)) {
+                      updateItem(index, 'unitPrice', parseFloat((val / (1 + (item.taxRate / 100))).toFixed(4)));
+                    } else {
+                      updateItem(index, 'unitPrice', 0);
+                    }
+                  }} 
+                />
               </div>
               <div className="w-24">
                 <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">MwSt %</label>
