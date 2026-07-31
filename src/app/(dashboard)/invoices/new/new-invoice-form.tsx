@@ -1222,8 +1222,8 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   step="0.01" 
                   required 
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-900 text-sm" 
-                  value={item.unitPrice} 
-                  onChange={e => updateItem(index, 'unitPrice', parseFloat(e.target.value))} 
+                  value={item.unitPrice === 0 ? '' : Number(item.unitPrice.toFixed(2))} 
+                  onChange={e => updateItem(index, 'unitPrice', e.target.value === '' ? 0 : parseFloat(e.target.value))} 
                 />
               </div>
               <div className="w-28">
@@ -1233,11 +1233,12 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   step="0.01" 
                   required 
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 font-bold text-slate-900 text-sm" 
-                  value={item.unitPrice ? parseFloat((item.unitPrice * (1 + (item.taxRate / 100))).toFixed(2)) : ''} 
+                  value={item.unitPrice === 0 ? '' : Number((item.unitPrice * (1 + (item.taxRate / 100))).toFixed(2))} 
                   onChange={e => {
                     const val = parseFloat(e.target.value);
                     if (!isNaN(val)) {
-                      updateItem(index, 'unitPrice', parseFloat((val / (1 + (item.taxRate / 100))).toFixed(2)));
+                      // Keine interne Rundung hier, damit der Bruttowert exakt erhalten bleibt!
+                      updateItem(index, 'unitPrice', val / (1 + (item.taxRate / 100)));
                     } else {
                       updateItem(index, 'unitPrice', 0);
                     }
