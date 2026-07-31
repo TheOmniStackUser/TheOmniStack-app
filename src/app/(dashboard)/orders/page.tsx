@@ -118,8 +118,8 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     }
   }
 
-  // Fetch paginated base orders and integrations in parallel
-  const [baseOrders, hermesIntegration, integrations] = await Promise.all([
+  // Fetch paginated base orders, integrations, and unique countries in parallel
+  const [baseOrders, hermesIntegration, integrations, uniqueCountriesRows] = await Promise.all([
     db.select().from(orders).where(
       and(...whereConditions)
     )
@@ -137,8 +137,22 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
         eq(marketplaceIntegrations.isActive, true)
       )
-    })
+    }),
+    db.select({ country: orders.shippingCountry })
+      .from(orders)
+      .where(eq(orders.companyId, auth.activeCompanyId))
+      .groupBy(orders.shippingCountry)
   ])
+
+  const allUniqueCountries = Array.from(new Set(uniqueCountriesRows.map(r => {
+    const raw = (r.country || '').toUpperCase()
+    const iso3to2: Record<string, string> = {
+      DEU: 'DE', AUT: 'AT', CHE: 'CH', FRA: 'FR', NLD: 'NL',
+      BEL: 'BE', POL: 'PL', CZE: 'CZ', SVK: 'SK', LUX: 'LU',
+      ITA: 'IT', ESP: 'ES', GBR: 'GB', USA: 'US', CHN: 'CN',
+    }
+    return raw.length === 3 ? (iso3to2[raw] ?? raw.slice(0, 2)) : raw
+  }))).filter(Boolean).sort()
 
   // Extract IDs for fetching relations ONLY FOR VISIBLE ORDERS
   const orderIds = baseOrders.map(o => o.id)
@@ -288,6 +302,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         hasDecathlonIntegration={hasDecathlonIntegration}
         hasAmazonIntegration={hasAmazonIntegration}
         hasShopifyIntegration={hasShopifyIntegration}
+        allUniqueCountries={allUniqueCountries}
       />
     </div>
   )

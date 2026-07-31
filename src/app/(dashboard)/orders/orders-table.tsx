@@ -400,6 +400,7 @@ export function OrdersTable({
   hasDecathlonIntegration = false,
   hasAmazonIntegration = false,
   hasShopifyIntegration = false,
+  allUniqueCountries = [],
 }: { 
   orders: OrderWithItems[]
   totalOrdersCount?: number
@@ -416,6 +417,7 @@ export function OrdersTable({
   hasDecathlonIntegration?: boolean
   hasAmazonIntegration?: boolean
   hasShopifyIntegration?: boolean
+  allUniqueCountries?: string[]
 }) {
   const configuredDhlProducts = useMemo(() => {
     if (!dhlConfig?.zones || dhlConfig.zones.length === 0) {
@@ -1038,8 +1040,8 @@ export function OrdersTable({
 
   const sortedOrders = orders;
 const filteredOrders = orders;
-  // Get unique countries for filter
-  const uniqueCountries = Array.from(new Set(orders.map(o => {
+  // Get unique countries for filter, prefer passed allUniqueCountries or fallback to dynamically computed ones
+  const uniqueCountries = allUniqueCountries.length > 0 ? allUniqueCountries : Array.from(new Set(orders.map(o => {
     const raw = (o.shippingCountry || '').toUpperCase()
     const iso3to2: Record<string, string> = {
       DEU: 'DE', AUT: 'AT', CHE: 'CH', FRA: 'FR', NLD: 'NL',
