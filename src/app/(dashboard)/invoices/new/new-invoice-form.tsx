@@ -1233,11 +1233,11 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   step="0.01" 
                   required 
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 font-bold text-slate-900 text-sm" 
-                  value={item.unitPrice ? parseFloat((item.unitPrice * (1 + (item.taxRate / 100))).toFixed(4)) : ''} 
+                  value={item.unitPrice ? parseFloat((item.unitPrice * (1 + (item.taxRate / 100))).toFixed(2)) : ''} 
                   onChange={e => {
                     const val = parseFloat(e.target.value);
                     if (!isNaN(val)) {
-                      updateItem(index, 'unitPrice', parseFloat((val / (1 + (item.taxRate / 100))).toFixed(4)));
+                      updateItem(index, 'unitPrice', parseFloat((val / (1 + (item.taxRate / 100))).toFixed(2)));
                     } else {
                       updateItem(index, 'unitPrice', 0);
                     }
