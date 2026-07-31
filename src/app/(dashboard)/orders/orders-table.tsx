@@ -57,18 +57,32 @@ const formatCountry = (code?: string | null) => {
 }
 
 const getDefaultDhlProductCode = (country: string | null | undefined, config: DhlConfig | null | undefined): string => {
-  if (!country) return 'V01PAK'
-  const c = country.toUpperCase()
-  const isDomestic = ['DE', 'DEU'].includes(c)
-  if (isDomestic) return 'V01PAK'
-
-  const connectCountries = ['BE', 'BEL', 'LU', 'LUX', 'NL', 'NLD', 'AT', 'AUT', 'PL', 'POL', 'SK', 'SVK', 'CZ', 'CZE']
-  const isConnect = connectCountries.includes(c)
-
-  // Check which zones actually have billing numbers configured
   const hasZone = (prodCode: string) => {
     return !!config?.zones?.find(z => z.productCode === prodCode && z.billingNumber?.trim())
   }
+
+  const getFirstConfigured = () => {
+    if (!config?.zones) return 'V01PAK'
+    const first = config.zones.find(z => z.billingNumber?.trim())
+    return first ? first.productCode : 'V01PAK'
+  }
+
+  if (!country) {
+    if (hasZone('V01PAK')) return 'V01PAK'
+    return getFirstConfigured()
+  }
+
+  const c = country.toUpperCase()
+  const isDomestic = ['DE', 'DEU'].includes(c)
+  if (isDomestic) {
+    if (hasZone('V01PAK')) return 'V01PAK'
+    if (hasZone('V62WP')) return 'V62WP'
+    if (hasZone('V86PARCEL')) return 'V86PARCEL'
+    return getFirstConfigured()
+  }
+
+  const connectCountries = ['BE', 'BEL', 'LU', 'LUX', 'NL', 'NLD', 'AT', 'AUT', 'PL', 'POL', 'SK', 'SVK', 'CZ', 'CZE']
+  const isConnect = connectCountries.includes(c)
 
   if (isConnect) {
     if (hasZone('V55PAK')) return 'V55PAK' // DHL Paket Connect
@@ -91,9 +105,22 @@ const getDefaultDhlProductCode = (country: string | null | undefined, config: Dh
   if (hasZone('V06PAK')) return 'V06PAK'
   if (hasZone('V53WPAK')) return 'V53WPAK'
   if (hasZone('V55PAK')) return 'V55PAK'
+  if (hasZone('V66WPI')) return 'V66WPI'
+  if (hasZone('V87PARCEL')) return 'V87PARCEL'
   
-  return 'V06PAK' // Default international if nothing is configured
+  return getFirstConfigured()
 }
+
+const ALL_DHL_PRODUCTS = [
+  { value: 'V01PAK', label: 'DHL Paket' },
+  { value: 'V62WP', label: 'Warenpost' },
+  { value: 'V66WPI', label: 'Warenpost International' },
+  { value: 'V86PARCEL', label: 'DHL Kleinpaket' },
+  { value: 'V87PARCEL', label: 'DHL Kleinpaket International' },
+  { value: 'V06PAK', label: 'DHL Paket International' },
+  { value: 'V53WPAK', label: 'DHL Europaket' },
+  { value: 'V55PAK', label: 'DHL Paket Connect' },
+]
 
 const formatMarketplaceName = (mp: string | null, shippingCountry?: string | null) => {
   if (!mp || mp.toLowerCase() === 'manual') return 'Manuell'
@@ -390,6 +417,20 @@ export function OrdersTable({
   hasAmazonIntegration?: boolean
   hasShopifyIntegration?: boolean
 }) {
+  const configuredDhlProducts = useMemo(() => {
+    if (!dhlConfig?.zones || dhlConfig.zones.length === 0) {
+      return ALL_DHL_PRODUCTS
+    }
+    // Set ensures we don't have duplicates if multiple zones map to the same product code
+    const activeCodes = new Set(
+      dhlConfig.zones
+        .filter(z => z.billingNumber?.trim())
+        .map(z => z.productCode)
+    )
+    const configured = ALL_DHL_PRODUCTS.filter(p => activeCodes.has(p.value))
+    return configured.length > 0 ? configured : ALL_DHL_PRODUCTS
+  }, [dhlConfig])
+
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [isGenerating, setIsGenerating] = useState(false)
@@ -3559,14 +3600,9 @@ const filteredOrders = orders;
                           onChange={(e) => handleDhlProductChange(order.id, e.target.value)}
                           className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent bg-white text-slate-800 font-bold"
                         >
-                          <option value="V01PAK">DHL Paket</option>
-                          <option value="V62WP">Warenpost</option>
-                          <option value="V66WPI">Warenpost International</option>
-                          <option value="V86PARCEL">DHL Kleinpaket</option>
-                          <option value="V87PARCEL">DHL Kleinpaket International</option>
-                          <option value="V06PAK">DHL Paket International</option>
-                          <option value="V53WPAK">DHL Europaket</option>
-                          <option value="V55PAK">DHL Paket Connect</option>
+                          {configuredDhlProducts.map(p => (
+                            <option key={p.value} value={p.value}>{p.label}</option>
+                          ))}
                         </select>
                       </div>
                       
