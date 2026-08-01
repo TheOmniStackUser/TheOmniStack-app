@@ -1526,7 +1526,7 @@ export class MiraklAdapter implements MarketplaceAdapter {
       // Check if any updates are missing the price field (Mirakl OF01 requires price)
       // We must fetch existing offers to preserve their price if price sync is disabled.
       const needsPriceFetch = updates.some(u => u.price === undefined)
-      const currentOffersMap: Record<string, number> = {}
+      const currentOffersMap: Record<string, any> = {}
 
       if (needsPriceFetch) {
         console.log(`[MiraklAdapter:${this.marketplace}] Some updates are missing price. Fetching existing offers to preserve marketplace prices...`)
@@ -1553,7 +1553,10 @@ export class MiraklAdapter implements MarketplaceAdapter {
             
             for (const offer of data.offers) {
               if (offer.shop_sku && offer.price !== undefined && offer.price !== null) {
-                currentOffersMap[offer.shop_sku] = offer.price
+                currentOffersMap[offer.shop_sku] = {
+                  price: offer.price,
+                  discount: offer.discount
+                }
               }
             }
             
@@ -1581,8 +1584,11 @@ export class MiraklAdapter implements MarketplaceAdapter {
         // Price is mandatory in Mirakl OF01
         if (update.price !== undefined && update.price !== null) {
           offer.price = update.price
-        } else if (currentOffersMap[update.sku] !== undefined && currentOffersMap[update.sku] !== null) {
-          offer.price = currentOffersMap[update.sku]
+        } else if (currentOffersMap[update.sku] !== undefined) {
+          offer.price = currentOffersMap[update.sku].price
+          if (currentOffersMap[update.sku].discount) {
+            offer.discount = currentOffersMap[update.sku].discount
+          }
         } else if (update.fallbackPrice !== undefined && update.fallbackPrice !== null) {
           offer.price = update.fallbackPrice
         } else {
