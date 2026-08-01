@@ -1524,12 +1524,12 @@ export class MiraklAdapter implements MarketplaceAdapter {
       }
 
       // Check if any updates are missing the price field (Mirakl OF01 requires price)
-      // If we have a fallbackPrice we don't necessarily need to fetch
-      const needsPriceFetch = updates.some(u => u.price === undefined && u.fallbackPrice === undefined)
+      // We must fetch existing offers to preserve their price if price sync is disabled.
+      const needsPriceFetch = updates.some(u => u.price === undefined)
       const currentOffersMap: Record<string, number> = {}
 
       if (needsPriceFetch) {
-        console.log(`[MiraklAdapter:${this.marketplace}] Some updates are missing price and fallbackPrice. Fetching existing offers to fill mandatory price field...`)
+        console.log(`[MiraklAdapter:${this.marketplace}] Some updates are missing price. Fetching existing offers to preserve marketplace prices...`)
         try {
           let offset = 0
           let retryCount = 0
