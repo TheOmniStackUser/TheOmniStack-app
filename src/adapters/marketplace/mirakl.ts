@@ -1600,7 +1600,9 @@ export class MiraklAdapter implements MarketplaceAdapter {
           const rawDisc = currentOffersMap[update.sku].discount;
           offer.discount = {};
           if (rawDisc.discount_price !== undefined) {
-            offer.discount.discount_price = rawDisc.discount_price;
+            offer.discount.price = rawDisc.discount_price;
+          } else if (rawDisc.price !== undefined) {
+            offer.discount.price = rawDisc.price;
           }
           if (rawDisc.start_date) {
             offer.discount.start_date = rawDisc.start_date;
