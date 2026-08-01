@@ -1550,8 +1550,15 @@ export class MiraklAdapter implements MarketplaceAdapter {
           
           for (const offer of data.offers) {
             if (offer.shop_sku && offer.price !== undefined && offer.price !== null) {
+              // In Mirakl, if a discount is active, 'offer.price' often reflects the discounted price.
+              // The true normal price is stored in 'offer.discount.origin_price'.
+              let normalPrice = offer.price;
+              if (offer.discount && offer.discount.origin_price !== undefined) {
+                normalPrice = offer.discount.origin_price;
+              }
+
               currentOffersMap[offer.shop_sku] = {
-                price: offer.price,
+                price: normalPrice,
                 discount: offer.discount
               }
             }
@@ -1590,7 +1597,9 @@ export class MiraklAdapter implements MarketplaceAdapter {
 
         // Always preserve discount if it exists
         if (currentOffersMap[update.sku] && currentOffersMap[update.sku].discount) {
-          offer.discount = currentOffersMap[update.sku].discount
+          offer.discount = { ...currentOffersMap[update.sku].discount }
+          // Ensure the origin_price in the discount block aligns with the offer price we are sending
+          offer.discount.origin_price = offer.price
         }
         
         return offer
