@@ -1597,9 +1597,16 @@ export class MiraklAdapter implements MarketplaceAdapter {
 
         // Always preserve discount if it exists
         if (currentOffersMap[update.sku] && currentOffersMap[update.sku].discount) {
-          offer.discount = { ...currentOffersMap[update.sku].discount }
-          // Ensure the origin_price in the discount block aligns with the offer price we are sending
-          offer.discount.origin_price = offer.price
+          const disc = currentOffersMap[update.sku].discount;
+          if (disc.discount_price !== undefined) {
+            offer.discount_price = disc.discount_price;
+          }
+          if (disc.start_date) {
+            offer.discount_start_date = disc.start_date;
+          }
+          if (disc.end_date) {
+            offer.discount_end_date = disc.end_date;
+          }
         }
         
         return offer
