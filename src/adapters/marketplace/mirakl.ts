@@ -1523,54 +1523,50 @@ export class MiraklAdapter implements MarketplaceAdapter {
         url += `?shop_id=${this.config.shopId}`
       }
 
-      // Check if any updates are missing the price field (Mirakl OF01 requires price)
-      // We must fetch existing offers to preserve their price if price sync is disabled.
-      const needsPriceFetch = updates.some(u => u.price === undefined)
+      // We must fetch existing offers to preserve their discount (if active) and price (if not provided).
       const currentOffersMap: Record<string, any> = {}
 
-      if (needsPriceFetch) {
-        console.log(`[MiraklAdapter:${this.marketplace}] Some updates are missing price. Fetching existing offers to preserve marketplace prices...`)
-        try {
-          let offset = 0
-          let retryCount = 0
-          while (true) {
-            const fetchUrl = url.includes('?') 
-              ? `${url}&max=100&offset=${offset}`
-              : `${url}?max=100&offset=${offset}`
-              
-            const res = await fetch(fetchUrl, { headers })
+      console.log(`[MiraklAdapter:${this.marketplace}] Fetching existing offers to preserve marketplace prices and discounts...`)
+      try {
+        let offset = 0
+        let retryCount = 0
+        while (true) {
+          const fetchUrl = url.includes('?') 
+            ? `${url}&max=100&offset=${offset}`
+            : `${url}?max=100&offset=${offset}`
             
-            if (res.status === 429 && retryCount < 3) {
-              console.warn(`[MiraklAdapter:${this.marketplace}] Rate limited (429) during price fetch. Retrying after 2s...`)
-              await new Promise(r => setTimeout(r, 2000))
-              retryCount++
-              continue
-            }
-            
-            if (!res.ok) break
-            const data = await res.json()
-            if (!data.offers || data.offers.length === 0) break
-            
-            for (const offer of data.offers) {
-              if (offer.shop_sku && offer.price !== undefined && offer.price !== null) {
-                currentOffersMap[offer.shop_sku] = {
-                  price: offer.price,
-                  discount: offer.discount
-                }
+          const res = await fetch(fetchUrl, { headers })
+          
+          if (res.status === 429 && retryCount < 3) {
+            console.warn(`[MiraklAdapter:${this.marketplace}] Rate limited (429) during price fetch. Retrying after 2s...`)
+            await new Promise(r => setTimeout(r, 2000))
+            retryCount++
+            continue
+          }
+          
+          if (!res.ok) break
+          const data = await res.json()
+          if (!data.offers || data.offers.length === 0) break
+          
+          for (const offer of data.offers) {
+            if (offer.shop_sku && offer.price !== undefined && offer.price !== null) {
+              currentOffersMap[offer.shop_sku] = {
+                price: offer.price,
+                discount: offer.discount
               }
             }
-            
-            if (data.offers.length < 100) break
-            offset += 100
-            retryCount = 0
-            
-            // Add a small delay between requests to prevent hitting rate limits
-            await new Promise(r => setTimeout(r, 500))
           }
-          console.log(`[MiraklAdapter:${this.marketplace}] Fetched ${Object.keys(currentOffersMap).length} existing offers.`)
-        } catch (e) {
-          console.warn(`[MiraklAdapter:${this.marketplace}] Failed to fetch existing offers for price fallback:`, e)
+          
+          if (data.offers.length < 100) break
+          offset += 100
+          retryCount = 0
+          
+          // Add a small delay between requests to prevent hitting rate limits
+          await new Promise(r => setTimeout(r, 500))
         }
+        console.log(`[MiraklAdapter:${this.marketplace}] Fetched ${Object.keys(currentOffersMap).length} existing offers.`)
+      } catch (e) {
+        console.warn(`[MiraklAdapter:${this.marketplace}] Failed to fetch existing offers for price fallback:`, e)
       }
 
       // Format payload for Mirakl OF01
@@ -1586,13 +1582,15 @@ export class MiraklAdapter implements MarketplaceAdapter {
           offer.price = update.price
         } else if (currentOffersMap[update.sku] !== undefined) {
           offer.price = currentOffersMap[update.sku].price
-          if (currentOffersMap[update.sku].discount) {
-            offer.discount = currentOffersMap[update.sku].discount
-          }
         } else if (update.fallbackPrice !== undefined && update.fallbackPrice !== null) {
           offer.price = update.fallbackPrice
         } else {
           console.warn(`[MiraklAdapter:${this.marketplace}] Warning: SKU ${update.sku} has no price available, import might fail.`)
+        }
+
+        // Always preserve discount if it exists
+        if (currentOffersMap[update.sku] && currentOffersMap[update.sku].discount) {
+          offer.discount = currentOffersMap[update.sku].discount
         }
         
         return offer
