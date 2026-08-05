@@ -112,6 +112,17 @@ export interface MarketplaceAdapter {
   ): Promise<boolean>
 
   /**
+   * Applies a pure price reduction (Teilerstattung) without physical return.
+   */
+  applyPriceReduction?(
+    marketplaceOrderId: string,
+    positionItemId: string,
+    amount: number,
+    reason: string
+  ): Promise<void>
+
+
+  /**
    * Fetch products from the marketplace for inventory mapping.
    */
   fetchProducts?(

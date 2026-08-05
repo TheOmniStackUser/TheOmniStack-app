@@ -1291,6 +1291,144 @@ export class MiraklAdapter implements MarketplaceAdapter {
   }
 
   /**
+   * Applies a pure price reduction (Teilerstattung) without physical return.
+   */
+  async applyPriceReduction(
+    marketplaceOrderId: string,
+    positionItemId: string,
+    amount: number,
+    reason: string
+  ): Promise<void> {
+    console.log(`[MiraklAdapter:${this.marketplace}] Applying price reduction of ${amount} EUR to order line ${positionItemId} on order ${marketplaceOrderId}...`)
+    try {
+      const token = await this.getAccessToken()
+      const headers: Record<string, string> = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      } else {
+        const apiKey = this.config.clientSecret === '' || !this.config.clientSecret 
+          ? this.config.clientId 
+          : this.config.apiKey
+        
+        if (apiKey) {
+          headers['Authorization'] = apiKey
+          headers['X-Mirakl-Api-Key'] = apiKey
+        }
+      }
+
+      const refunds = [{
+        amount: parseFloat(amount.toFixed(2)),
+        order_line_id: positionItemId,
+        quantity: 1, // Quantity 1 is typically used for price reductions on a line
+        reason_code: reason,
+        currency_iso_code: 'EUR'
+      }]
+
+      // Put Refund
+      const baseUrl = this.config.baseUrl.replace(/\/$/, '')
+      let refundUrl = ''
+      let reasonUrl = ''
+      if (baseUrl.includes('miraklconnect.com')) {
+        if (baseUrl.endsWith('/v1')) {
+          refundUrl = `${baseUrl}/orders/refund`
+          reasonUrl = `${baseUrl}/reasons/REFUND`
+        } else {
+          refundUrl = `${baseUrl}/api/v1/orders/refund`
+          reasonUrl = `${baseUrl}/api/v1/reasons/REFUND`
+        }
+      } else {
+        if (baseUrl.endsWith('/api')) {
+          refundUrl = `${baseUrl}/orders/refund`
+          reasonUrl = `${baseUrl}/reasons/REFUND`
+        } else {
+          refundUrl = `${baseUrl}/api/orders/refund`
+          reasonUrl = `${baseUrl}/api/reasons/REFUND`
+        }
+      }
+      
+      if (this.config.shopId) {
+        refundUrl += `?shop_id=${this.config.shopId}`
+        reasonUrl += `?shop_id=${this.config.shopId}`
+      }
+
+      console.log(`[MiraklAdapter:${this.marketplace}] Sending price reduction refund to Mirakl via PUT ${refundUrl}...`)
+      let refundResponse = await fetch(refundUrl, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ refunds })
+      })
+
+      if (!refundResponse.ok) {
+        const errText = await refundResponse.clone().text()
+        console.warn(`[MiraklAdapter:${this.marketplace}] Price reduction failed with default reason: ${refundResponse.status} - ${errText}. Attempting to fetch valid reason codes...`)
+        
+        if (refundResponse.status === 400 && errText.includes('REFUNDED')) {
+          console.log(`[MiraklAdapter:${this.marketplace}] Order lines are already REFUNDED. Treating as success.`)
+          return
+        }
+        
+        try {
+          console.log(`[MiraklAdapter:${this.marketplace}] Fetching valid reason codes via GET ${reasonUrl}...`)
+          const reasonRes = await fetch(reasonUrl, { method: 'GET', headers })
+          if (reasonRes.ok) {
+            const reasonData = await reasonRes.json()
+            if (reasonData.reasons && reasonData.reasons.length > 0) {
+              const validReason = reasonData.reasons.find((r: any) => r.code === '111' || r.code === '14' || r.label?.toLowerCase().includes('return')) || reasonData.reasons[0]
+              console.log(`[MiraklAdapter:${this.marketplace}] Found valid reason code: ${validReason.code} (${validReason.label}). Retrying price reduction...`)
+              
+              refunds[0].reason_code = validReason.code
+              
+              refundResponse = await fetch(refundUrl, {
+                method: 'PUT',
+                headers,
+                body: JSON.stringify({ refunds })
+              })
+            } else {
+              console.warn(`[MiraklAdapter:${this.marketplace}] API returned no valid reason codes.`)
+            }
+          } else {
+             const rErr = await reasonRes.text()
+             console.warn(`[MiraklAdapter:${this.marketplace}] Failed to fetch reason codes: ${reasonRes.status} - ${rErr}`)
+             
+             if (this.marketplace.toLowerCase().includes('limango') || baseUrl.includes('limango')) {
+                console.log(`[MiraklAdapter:${this.marketplace}] Using hardcoded reason code 17 for Limango fallback...`)
+                refunds[0].reason_code = '17'
+                refundResponse = await fetch(refundUrl, {
+                  method: 'PUT',
+                  headers,
+                  body: JSON.stringify({ refunds })
+                })
+             }
+          }
+        } catch(e) {
+          console.error(`[MiraklAdapter:${this.marketplace}] Exception fetching reason codes for fallback:`, e)
+        }
+
+        if (!refundResponse.ok) {
+          const errTextFinal = await refundResponse.text()
+          console.error(`[MiraklAdapter:${this.marketplace}] Price reduction failed after retry: ${refundResponse.status} - ${errTextFinal}`)
+          
+          if (refundResponse.status === 400 && errTextFinal.includes('REFUNDED')) {
+            console.log(`[MiraklAdapter:${this.marketplace}] Order lines are already REFUNDED. Treating as success.`)
+            return
+          }
+          
+          throw new Error(`Mirakl Refund API Error: ${errTextFinal || errText}`)
+        }
+      }
+
+      console.log(`[MiraklAdapter:${this.marketplace}] Price reduction processed successfully for order ${marketplaceOrderId}`)
+    } catch (error: any) {
+      console.error(`[MiraklAdapter:${this.marketplace}] Error applying price reduction:`, error)
+      throw new Error(error.message || 'Error applying price reduction')
+    }
+  }
+
+  /**
    * Marks a return as received on the marketplace if applicable.
    * Finds the latest open return matching the order ID and calls the RT25 receive endpoint.
    */
