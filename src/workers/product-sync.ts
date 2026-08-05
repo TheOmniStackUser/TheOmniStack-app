@@ -312,7 +312,7 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
     }
 
     const canSyncStock = productSyncSettings ? productSyncSettings.syncStock !== false : true
-    const canSyncPrice = productSyncSettings ? productSyncSettings.syncPrice === true : false
+    const canSyncPrice = productSyncSettings ? productSyncSettings.syncPrice !== false : true
 
     if (canSyncStock && mapping.syncStock && updateDef.stock !== undefined) {
       mUpdate.stock = updateDef.stock
