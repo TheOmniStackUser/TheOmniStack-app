@@ -91,7 +91,13 @@ export class KauflandAdapter implements MarketplaceAdapter {
 
     if (options?.fromDate) {
       queryParams['ts_created_from_iso'] = `${options.fromDate}T00:00:00Z`
+    } else {
+      // Default to 30 days ago to prevent fetching a huge backlog of ancient orders
+      const date = new Date()
+      date.setDate(date.getDate() - 30)
+      queryParams['ts_created_from_iso'] = date.toISOString().split('T')[0] + 'T00:00:00Z'
     }
+
     if (options?.toDate) {
       queryParams['ts_created_until_iso'] = `${options.toDate}T23:59:59Z`
     }
