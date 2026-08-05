@@ -48,6 +48,7 @@ export function SyncButton() {
       setSyncProgress({ current: 0, total: integrations.length, label: integrations[0].label, simulatedProgress: 0 })
 
       let totalAffected = 0
+      let totalChecked = 0
       let hasError = false
 
       for (let i = 0; i < integrations.length; i++) {
@@ -65,18 +66,29 @@ export function SyncButton() {
         if (result?.affected !== undefined) {
           totalAffected += result.affected
         }
+        if (result?.checked !== undefined) {
+          totalChecked += result.checked
+        }
       }
 
       if (!hasError) {
         setSyncProgress({ current: integrations.length, total: integrations.length, label: 'Abgeschlossen', simulatedProgress: 100 })
-        showNotification(totalAffected > 0 
-          ? `Import erfolgreich! ${totalAffected} neue Bestellung(en) wurden hinzugefügt.` 
-          : 'Import abgeschlossen! Es wurden keine neuen Bestellungen gefunden.', 'success')
+        let message = 'Import abgeschlossen! Es wurden keine neuen Bestellungen gefunden.'
+        if (totalAffected > 0) {
+          message = `Import erfolgreich! ${totalAffected} neue Bestellung(en) wurden hinzugefügt.`
+        } else if (totalChecked > 0) {
+          message = `Import abgeschlossen. Es wurden ${totalChecked} Bestellungen geprüft, aber alle waren bereits vorhanden (z.B. durch den automatischen Webhook-Import).`
+        }
+        showNotification(message, 'success')
         router.refresh()
       }
     } catch (e) {
       console.error("Sync error:", e);
-      showNotification(`Ein unerwarteter Fehler ist beim Import aufgetreten: ${e instanceof Error ? e.message : String(e)}`, 'error')
+      let errorMessage = e instanceof Error ? e.message : String(e);
+      if (errorMessage.includes("An unexpected response was received from the server") || errorMessage.includes("fetch failed")) {
+        errorMessage = "Zeitüberschreitung (Timeout) beim Verbindungsaufbau zum Marktplatz. Bitte versuchen Sie es in ein paar Minuten erneut.";
+      }
+      showNotification(`Ein unerwarteter Fehler ist beim Import aufgetreten: ${errorMessage}`, 'error')
     } finally {
       setIsPending(false)
       setTimeout(() => setSyncProgress(null), 3000)

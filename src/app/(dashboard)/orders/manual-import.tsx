@@ -126,6 +126,7 @@ export function ManualImport({
     setSyncProgress({ current: 0, total: selectedToSync.length, label: selectedToSync[0].label, simulatedProgress: 0 })
 
     let totalAffected = 0
+    let totalChecked = 0
     let hasError = false
 
     try {
@@ -148,14 +149,21 @@ export function ManualImport({
         if (result.affected !== undefined) {
           totalAffected += result.affected
         }
+        if (result.checked !== undefined) {
+          totalChecked += result.checked
+        }
       }
 
       if (!hasError) {
         setSyncProgress({ current: selectedToSync.length, total: selectedToSync.length, label: 'Abgeschlossen', simulatedProgress: 100 })
+        let message = 'Import abgeschlossen! Es wurden keine neuen Bestellungen gefunden.'
+        if (totalAffected > 0) {
+          message = `Import erfolgreich! ${totalAffected} neue Bestellung(en) wurden hinzugefügt.`
+        } else if (totalChecked > 0) {
+          message = `Import abgeschlossen. Es wurden ${totalChecked} Bestellungen geprüft, aber alle waren bereits vorhanden (z.B. durch den automatischen Webhook-Import).`
+        }
         setNotification({ 
-          message: totalAffected > 0 
-            ? `Import erfolgreich! ${totalAffected} neue Bestellung(en) wurden hinzugefügt.` 
-            : 'Import abgeschlossen! Es wurden keine neuen Bestellungen gefunden.', 
+          message, 
           type: 'success' 
         })
         setTimeout(() => setNotification(null), 10000)

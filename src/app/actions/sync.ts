@@ -1,5 +1,7 @@
 'use server'
 
+export const maxDuration = 300; // Set max duration to 5 minutes to prevent Vercel timeouts during manual sync
+
 import { requireAuth } from '@/lib/session'
 import { marketplaceSyncQueue } from '@/workers/marketplace-sync'
 import { db } from '@/db/client'
@@ -257,8 +259,8 @@ export async function triggerManualSyncAction(data: { marketplace: string, fromD
   revalidatePath('/orders')
   
   if (totalAffected === 0) {
-    return { success: true, message: `Import abgeschlossen! Es wurden keine neuen Bestellungen gefunden.`, affected: 0 }
+    return { success: true, message: `Import abgeschlossen! Es wurden keine neuen Bestellungen gefunden.`, affected: 0, checked: totalChecked }
   }
 
-  return { success: true, message: `Import erfolgreich! ${totalAffected} neue Bestellung(en) wurden hinzugefügt.`, affected: totalAffected }
+  return { success: true, message: `Import erfolgreich! ${totalAffected} neue Bestellung(en) wurden hinzugefügt.`, affected: totalAffected, checked: totalChecked }
 }
