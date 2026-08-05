@@ -1,7 +1,5 @@
 'use server'
 
-export const maxDuration = 300; // Set max duration to 5 minutes to prevent Vercel timeouts during manual sync
-
 import { requireAuth } from '@/lib/session'
 import { marketplaceSyncQueue } from '@/workers/marketplace-sync'
 import { db } from '@/db/client'
