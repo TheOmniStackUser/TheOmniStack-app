@@ -1185,8 +1185,8 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
         <div className="space-y-4">
           {items.map((item, index) => (
             <div key={index} className="flex flex-wrap md:flex-nowrap gap-4 items-start bg-slate-50/50 p-4 rounded-xl border border-slate-200">
-              <div className="w-40 shrink-0">
-                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Art.-Nr.</label>
+              <div className="w-32 shrink-0">
+                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 whitespace-nowrap">Art.-Nr.</label>
                 <input 
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-900 text-sm" 
                   value={item.sku || ''} 
@@ -1195,7 +1195,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                 />
               </div>
               <div className="flex-1 min-w-[200px]">
-                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Bezeichnung</label>
+                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 whitespace-nowrap">Bezeichnung</label>
                 <input 
                   required 
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-900 text-sm" 
@@ -1205,7 +1205,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                 />
               </div>
               <div className="w-20">
-                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Menge</label>
+                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 whitespace-nowrap">Menge</label>
                 <input 
                   type="number" 
                   required 
@@ -1215,8 +1215,8 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   onChange={e => updateItem(index, 'quantity', parseFloat(e.target.value))} 
                 />
               </div>
-              <div className="w-28">
-                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Einzelpreis (Netto)</label>
+              <div className="w-32">
+                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 whitespace-nowrap">Einzelpreis (Netto)</label>
                 <input 
                   type="number" 
                   step="0.01" 
@@ -1226,8 +1226,8 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   onChange={e => updateItem(index, 'unitPrice', e.target.value === '' ? 0 : parseFloat(e.target.value))} 
                 />
               </div>
-              <div className="w-28">
-                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Einzelpreis (Brutto)</label>
+              <div className="w-32">
+                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 whitespace-nowrap">Einzelpreis (Brutto)</label>
                 <input 
                   type="number" 
                   step="0.01" 
@@ -1246,13 +1246,13 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                 />
               </div>
               <div className="w-24">
-                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">MwSt %</label>
+                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 whitespace-nowrap">MwSt %</label>
                 <select className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-900 text-sm" value={item.taxRate} onChange={e => updateItem(index, 'taxRate', parseFloat(e.target.value))}>
                   {availableVatRates.map(rate => <option key={rate} value={rate}>{rate}%</option>)}
                 </select>
               </div>
               <div className="w-32 text-right">
-                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Gesamt (Brutto)</label>
+                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 whitespace-nowrap">Gesamt (Brutto)</label>
                 <div className="px-3 py-2 bg-slate-100 rounded-lg font-bold text-slate-900 text-sm border border-slate-200">
                   {(item.quantity * item.unitPrice * (1 + (item.taxRate / 100))).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
                 </div>
@@ -1260,7 +1260,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   Netto: {(item.quantity * item.unitPrice).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
                 </div>
               </div>
-              <div className="flex-shrink-0 mb-1"><button type="button" onClick={() => removeItem(index)} disabled={items.length === 1} className="p-2 text-slate-300 hover:text-red-500 transition-colors disabled:opacity-0"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button></div>
+              <div className="flex-shrink-0 mb-1 mt-6"><button type="button" onClick={() => removeItem(index)} disabled={items.length === 1} className="p-2 text-slate-300 hover:text-red-500 transition-colors disabled:opacity-0"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button></div>
             </div>
           ))}
         </div>

@@ -589,26 +589,25 @@ export async function syncShippedOrdersInvoices(
       console.log(`[Worker Debug] Querying candidateOrders for company=${companyId}, marketplace=${integration.type}`)
       console.log(`[Worker Debug] thresholdDate=${thresholdDate.toISOString()}, autoInvoice=${autoInvoice}`)
 
-      const candidateOrders = await db
-        .select({
-          id: orders.id,
-          marketplaceOrderId: orders.marketplaceOrderId,
-          companyId: orders.companyId
-        })
-        .from(orders)
-        .where(
-          and(
-            eq(orders.companyId, companyId),
-            integration.type === 'mirakl_custom'
-              ? eq(orders.marketplace, ((integration.metadata as any)?.customName || 'mirakl_custom').toLowerCase())
-              : eq(orders.marketplace, integration.type),
-            eq(orders.status, 'shipped'),
-            isNull(orders.invoiceId),
-            eq(orders.isArchived, false),
-            gte(orders.createdAt, new Date(Math.max(thresholdDate.getTime(), Date.now() - 14 * 24 * 60 * 60 * 1000)))
-          )
-        )
-        .limit(200)
+      const candidateOrders = await db.query.orders.findMany({
+        where: and(
+          eq(orders.companyId, companyId),
+          integration.type === 'mirakl_custom'
+            ? eq(orders.marketplace, ((integration.metadata as any)?.customName || 'mirakl_custom').toLowerCase())
+            : eq(orders.marketplace, integration.type),
+          eq(orders.status, 'shipped'),
+          isNull(orders.invoiceId),
+          eq(orders.isArchived, false),
+          gte(orders.createdAt, new Date(Math.max(thresholdDate.getTime(), Date.now() - 14 * 24 * 60 * 60 * 1000)))
+        ),
+        with: {
+          items: true
+        },
+        columns: {
+          rawPayload: false
+        },
+        limit: 200
+      })
 
       if (candidateOrders.length === 0) {
         // Log to help debug why there are no candidates
@@ -638,7 +637,7 @@ export async function syncShippedOrdersInvoices(
         try {
           if (downloadInvoice) {
             if (adapter) {
-              const success = await downloadAndSaveMarketplaceInvoice(order.id, companyId, adapter)
+              const success = await downloadAndSaveMarketplaceInvoice(order, companyId, adapter)
               // Delay a bit to prevent rate limit
               await new Promise(resolve => setTimeout(resolve, 500))
               if (success === 'RATE_LIMIT') {
@@ -752,28 +751,38 @@ export async function generateOrDownloadDeliveryNote(
 }
 
 export async function downloadAndSaveMarketplaceInvoice(
-  orderId: string,
+  orderOrId: string | any,
   companyId: string,
   adapter?: MarketplaceAdapter | null
 ): Promise<boolean | 'RATE_LIMIT'> {
-  if (!adapter || !adapter.getInvoice) {
-    console.log(`[Worker] Adapter does not support getInvoice for order ${orderId}`)
+  let order = typeof orderOrId === 'string' ? null : orderOrId;
+
+  if (typeof orderOrId === 'string') {
+    // Load order and items if just ID is passed
+    order = await db.query.orders.findFirst({
+      where: and(eq(orders.id, orderOrId), eq(orders.companyId, companyId)),
+      with: { items: true }
+    })
+  } else if (!order.items) {
+    // If order object is passed but missing items, reload it
+    order = await db.query.orders.findFirst({
+      where: and(eq(orders.id, order.id), eq(orders.companyId, companyId)),
+      with: { items: true }
+    })
+  }
+
+  if (!order) {
+    console.error(`[Worker] Order ${typeof orderOrId === 'string' ? orderOrId : orderOrId?.id} not found when downloading invoice.`)
     return false
   }
 
-  // Load order and items
-  const order = await db.query.orders.findFirst({
-    where: and(eq(orders.id, orderId), eq(orders.companyId, companyId)),
-    with: { items: true }
-  })
-
-  if (!order) {
-    console.error(`[Worker] Order ${orderId} not found when downloading invoice.`)
+  if (!adapter || !adapter.getInvoice) {
+    console.log(`[Worker] Adapter does not support getInvoice for order ${order.id}`)
     return false
   }
 
   if (order.invoiceId) {
-    console.log(`[Worker] Order ${orderId} already has an invoice ${order.invoiceId}, skipping.`)
+    console.log(`[Worker] Order ${order.id} already has an invoice ${order.invoiceId}, skipping.`)
     return true
   }
 
@@ -846,7 +855,7 @@ export async function downloadAndSaveMarketplaceInvoice(
     await db.transaction(async (tx) => {
       // Re-verify inside transaction to avoid race conditions
       const currentOrder = await tx.query.orders.findFirst({
-        where: and(eq(orders.id, orderId), eq(orders.companyId, companyId)),
+        where: and(eq(orders.id, order.id), eq(orders.companyId, companyId)),
         columns: { invoiceId: true }
       })
       if (currentOrder?.invoiceId) return
@@ -940,7 +949,7 @@ export async function downloadAndSaveMarketplaceInvoice(
           invoiceId: newInvoice.id,
           status: newStatus
         })
-        .where(eq(orders.id, orderId))
+        .where(eq(orders.id, order.id))
     })
 
     console.log(`[Worker] Saved downloaded invoice ${invoiceNumber} for order ${order.marketplaceOrderId}`)
