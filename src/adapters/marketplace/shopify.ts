@@ -388,6 +388,11 @@ export class ShopifyAdapter implements MarketplaceAdapter {
 
       const results: import('./base').MarketplaceProduct[] = []
       for (const product of allProducts) {
+        // Skip Gift Cards as they don't have physical inventory
+        if (product.product_type === 'Gift Card' || product.template_suffix === 'gift_card') {
+          continue
+        }
+
         for (const variant of product.variants || []) {
           results.push({
             marketplaceProductId: variant.id.toString(), // Shopify Variant ID
@@ -475,16 +480,43 @@ export class ShopifyAdapter implements MarketplaceAdapter {
             }
 
             if (inventoryItemId) {
-              const invPayload = {
-                location_id: locationId,
-                inventory_item_id: inventoryItemId,
-                available: update.stock
+              const levelsRes = await fetch(`${shopUrl}/admin/api/2024-01/inventory_levels.json?inventory_item_ids=${inventoryItemId}`, { headers })
+              
+              if (levelsRes.ok) {
+                const levelsData = await levelsRes.json()
+                const levels = levelsData.inventory_levels || []
+                
+                if (levels.length > 0) {
+                  // Set the target stock on the first location, and 0 on all others to ensure total sum is exact
+                  for (let i = 0; i < levels.length; i++) {
+                    const level = levels[i]
+                    const stockToSet = i === 0 ? update.stock : 0
+                    
+                    const invPayload = {
+                      location_id: level.location_id,
+                      inventory_item_id: inventoryItemId,
+                      available: stockToSet
+                    }
+                    await fetch(`${shopUrl}/admin/api/2024-01/inventory_levels/set.json`, {
+                      method: 'POST',
+                      headers,
+                      body: JSON.stringify(invPayload)
+                    })
+                  }
+                } else if (locationId) {
+                  // Fallback if no inventory levels exist yet but we have a default location
+                  const invPayload = {
+                    location_id: locationId,
+                    inventory_item_id: inventoryItemId,
+                    available: update.stock
+                  }
+                  await fetch(`${shopUrl}/admin/api/2024-01/inventory_levels/set.json`, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify(invPayload)
+                  })
+                }
               }
-              await fetch(`${shopUrl}/admin/api/2024-01/inventory_levels/set.json`, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify(invPayload)
-              })
             }
           }
         }
