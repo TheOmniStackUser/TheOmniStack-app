@@ -3,10 +3,11 @@ import { getCustomerByIdAction, getCustomerDocumentsAction, getCustomerStatsActi
 import { CustomerDetailClient } from './customer-detail-client'
 import { redirect } from 'next/navigation'
 
-export default async function CustomerDetailPage({ params }: { params: { id: string } }) {
+export default async function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   await requireAuth()
 
-  const customerId = params.id
+  const { id: customerId } = await params
+
 
   const customer = await getCustomerByIdAction(customerId)
   if (!customer) {
