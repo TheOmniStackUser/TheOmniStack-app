@@ -137,7 +137,8 @@ export async function executeRefund({
        const resolvedSku = matchedOrderItem.sku || refundItem.sku
        resolvedItemsToRefund.push({
          sku: resolvedSku,
-         quantity: refundItem.quantity
+         quantity: refundItem.quantity,
+         restock: refundItem.restock
        })
        resolvedConditions[resolvedSku.toLowerCase()] = originalCondition
     } else {

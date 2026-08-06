@@ -966,7 +966,7 @@ export function OrdersTable({
         orderQty,
         returnedQty: refundedCount,
         refundQty: Math.max(0, orderQty - refundedCount),
-        restock: false
+        restock: true
       }
     })
     
@@ -3479,20 +3479,18 @@ const filteredOrders = orders;
                       <div className="col-span-5">
                         <div className="font-bold text-slate-900 truncate" title={item.title}>{item.title}</div>
                         <div className="text-xs text-slate-500 mt-0.5 font-mono">{item.sku}</div>
-                        {item.returnedQty > 0 && (
-                          <div className="mt-2 flex items-center">
-                            <input
-                              type="checkbox"
-                              id={`restock-${idx}`}
-                              checked={item.restock}
-                              onChange={(e) => handleRestockToggle(idx, e.target.checked)}
-                              className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
-                            />
-                            <label htmlFor={`restock-${idx}`} className="ml-1.5 text-xs text-slate-600 font-medium cursor-pointer">
-                              Wieder einlagern (+1)
-                            </label>
-                          </div>
-                        )}
+                        <div className="mt-2 flex items-center">
+                          <input
+                            type="checkbox"
+                            id={`restock-${idx}`}
+                            checked={item.restock}
+                            onChange={(e) => handleRestockToggle(idx, e.target.checked)}
+                            className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
+                          />
+                          <label htmlFor={`restock-${idx}`} className="ml-1.5 text-xs text-slate-600 font-medium cursor-pointer">
+                            Wieder einlagern
+                          </label>
+                        </div>
                       </div>
                       
                       <div className="col-span-2 text-center">
