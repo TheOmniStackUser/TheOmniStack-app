@@ -1188,8 +1188,8 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
         <div className="flex justify-between items-center border-b border-slate-100 pb-4"><h2 className="text-xl font-bold text-slate-900">Positionen</h2><button type="button" onClick={addItem} className="text-sm font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1">+ Zeile hinzufügen</button></div>
         <div className="space-y-4">
           {items.map((item, index) => (
-            <div key={index} className="flex flex-wrap md:flex-nowrap gap-4 items-start bg-slate-50/50 p-4 rounded-xl border border-slate-200">
-              <div className="w-32 shrink-0">
+            <div key={index} className="grid grid-cols-1 md:grid-cols-[minmax(80px,8rem)_1fr_6rem_minmax(100px,8rem)_minmax(100px,8rem)_5rem_minmax(100px,8rem)_auto] gap-4 items-start bg-slate-50/50 p-4 rounded-xl border border-slate-200">
+              <div className="w-full">
                 <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 whitespace-nowrap">Art.-Nr.</label>
                 <input 
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-900 text-sm" 
@@ -1198,7 +1198,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   placeholder="z.B. Art-100" 
                 />
               </div>
-              <div className="flex-1 min-w-[120px]">
+              <div className="w-full">
                 <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 whitespace-nowrap">Bezeichnung</label>
                 <input 
                   required 
@@ -1208,7 +1208,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   placeholder="Produktbezeichnung..." 
                 />
               </div>
-              <div className="w-24">
+              <div className="w-full">
                 <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 whitespace-nowrap">Menge</label>
                 <input 
                   type="number" 
@@ -1220,7 +1220,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   onChange={e => updateItem(index, 'quantity', e.target.value)} 
                 />
               </div>
-              <div className="w-32">
+              <div className="w-full">
                 <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 whitespace-nowrap">Einzelpreis (Netto)</label>
                 <input 
                   type="number" 
@@ -1231,7 +1231,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   onChange={e => updateItem(index, 'unitPrice', e.target.value)} 
                 />
               </div>
-              <div className="w-32">
+              <div className="w-full">
                 <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 whitespace-nowrap">Einzelpreis (Brutto)</label>
                 <input 
                   type="number" 
@@ -1254,13 +1254,13 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   }} 
                 />
               </div>
-              <div className="w-24">
+              <div className="w-full">
                 <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 whitespace-nowrap">MwSt %</label>
                 <select className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-900 text-sm" value={item.taxRate} onChange={e => updateItem(index, 'taxRate', parseFloat(e.target.value))}>
                   {availableVatRates.map(rate => <option key={rate} value={rate}>{rate}%</option>)}
                 </select>
               </div>
-              <div className="w-32 text-right">
+              <div className="w-full text-right">
                 <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 whitespace-nowrap">Gesamt (Brutto)</label>
                 <div className="px-3 py-2 bg-slate-100 rounded-lg font-bold text-slate-900 text-sm border border-slate-200">
                   {(Number(item.quantity || 0) * Number(item.unitPrice || 0) * (1 + (item.taxRate / 100))).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
