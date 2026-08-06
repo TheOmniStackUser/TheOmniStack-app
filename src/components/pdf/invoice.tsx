@@ -420,6 +420,12 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
               : (isCreditNote ? t.creditNoteTitle : (documentType === 'quote' ? t.quoteTitle : t.invoiceTitle)) + ' ' + invoiceNumber
             }
           </Text>
+
+          {(serviceDate || showServiceDateNote) && (
+            <Text style={{ fontSize: 10, marginTop: -3, marginBottom: 8 }}>
+              {serviceDate ? `Leistungsdatum: ${format(new Date(serviceDate), 'dd.MM.yyyy')}` : t.taxNote}
+            </Text>
+          )}
           
           {cancelsInvoiceNumber && invoiceNumber !== cancelsInvoiceNumber && (
             <Text style={{ fontSize: 10, fontStyle: 'italic', marginTop: 5 }}>
@@ -442,11 +448,6 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
           {taxReason && (
             <View style={styles.taxReasonSection}>
               <Text>{taxReason}</Text>
-            </View>
-          )}
-          {(serviceDate || showServiceDateNote) && (
-            <View style={{ ...styles.taxReasonSection, marginTop: taxReason ? 5 : 10 }}>
-              <Text>{serviceDate ? `Leistungsdatum: ${format(new Date(serviceDate), 'dd.MM.yyyy')}` : t.taxNote}</Text>
             </View>
           )}
         </View>
