@@ -1786,6 +1786,11 @@ export function InvoiceList({
                     <div className="font-semibold text-slate-900 text-sm" style={{ whiteSpace: 'pre-line' }}>
                       {formatCustomerName(invoice.recipientName || '–')}
                     </div>
+                    {invoice.recipientCompany && (
+                      <div className="text-xs text-slate-500 mt-0.5">
+                        {invoice.recipientCompany}
+                      </div>
+                    )}
                   </td>
                 <td className="px-6 py-4">
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200 tracking-wide font-mono">
