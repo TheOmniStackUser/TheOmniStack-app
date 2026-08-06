@@ -2388,7 +2388,7 @@ const filteredOrders = orders;
                                   Otto Teilerstattung
                                 </button>
                               )}
-                              {order.marketplace === 'Decathlon DE' && (
+                              {formatMarketplaceName(order.marketplace, order.shippingCountry).toLowerCase().includes('decathlon') && (
                                 <button
                                   type="button"
                                   onClick={() => setShowDecathlonRefundModal(order)}
@@ -2625,7 +2625,7 @@ const filteredOrders = orders;
                                         OTTO Teilerstattung
                                       </button>
                                     )}
-                                    {order.marketplace === 'Decathlon DE' && (
+                                    {formatMarketplaceName(order.marketplace, order.shippingCountry).toLowerCase().includes('decathlon') && (
                                       <button 
                                         onClick={(e) => {
                                           e.stopPropagation()
