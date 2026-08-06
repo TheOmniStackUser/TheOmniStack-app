@@ -1208,7 +1208,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   placeholder="Produktbezeichnung..." 
                 />
               </div>
-              <div className="w-28 shrink-0">
+              <div className="w-24 shrink-0">
                 <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 whitespace-nowrap">Menge</label>
                 <input 
                   type="number" 
@@ -1220,7 +1220,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   onChange={e => updateItem(index, 'quantity', e.target.value)} 
                 />
               </div>
-              <div className="w-32">
+              <div className="w-32 shrink-0">
                 <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 whitespace-nowrap">Einzelpreis (Netto)</label>
                 <input 
                   type="number" 
@@ -1231,7 +1231,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   onChange={e => updateItem(index, 'unitPrice', e.target.value)} 
                 />
               </div>
-              <div className="w-32">
+              <div className="w-32 shrink-0">
                 <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 whitespace-nowrap">Einzelpreis (Brutto)</label>
                 <input 
                   type="number" 
@@ -1254,13 +1254,13 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   }} 
                 />
               </div>
-              <div className="w-24">
+              <div className="w-24 shrink-0">
                 <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 whitespace-nowrap">MwSt %</label>
                 <select className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-900 text-sm" value={item.taxRate} onChange={e => updateItem(index, 'taxRate', parseFloat(e.target.value))}>
                   {availableVatRates.map(rate => <option key={rate} value={rate}>{rate}%</option>)}
                 </select>
               </div>
-              <div className="w-32 text-right">
+              <div className="w-32 shrink-0 text-right">
                 <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 whitespace-nowrap">Gesamt (Brutto)</label>
                 <div className="px-3 py-2 bg-slate-100 rounded-lg font-bold text-slate-900 text-sm border border-slate-200">
                   {(Number(item.quantity || 0) * Number(item.unitPrice || 0) * (1 + (item.taxRate / 100))).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
