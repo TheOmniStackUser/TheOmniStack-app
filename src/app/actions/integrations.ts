@@ -946,17 +946,28 @@ export async function saveSyncSettingsAction(
   return { success: true, message: 'Automatisierungseinstellungen wurden erfolgreich gespeichert!' }
 }
 
-export async function disconnectShopifyAction() {
+export async function disconnectIntegrationAction(type: string, id?: string) {
   const { activeCompanyId } = await requireAuth()
 
-  await db
-    .delete(marketplaceIntegrations)
-    .where(
-      and(
-        eq(marketplaceIntegrations.companyId, activeCompanyId),
-        eq(marketplaceIntegrations.type, 'shopify')
+  if (id) {
+    await db
+      .delete(marketplaceIntegrations)
+      .where(
+        and(
+          eq(marketplaceIntegrations.companyId, activeCompanyId),
+          eq(marketplaceIntegrations.id, id)
+        )
       )
-    )
+  } else {
+    await db
+      .delete(marketplaceIntegrations)
+      .where(
+        and(
+          eq(marketplaceIntegrations.companyId, activeCompanyId),
+          eq(marketplaceIntegrations.type, type as any)
+        )
+      )
+  }
 
   revalidatePath('/integrations')
   return { success: true }

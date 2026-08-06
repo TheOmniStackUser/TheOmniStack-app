@@ -3,15 +3,18 @@
 import { useActionState, useState } from 'react'
 import { saveOttoIntegrationAction } from '@/app/actions/integrations'
 import { HelpCircle, ExternalLink } from 'lucide-react'
+import { DisconnectButton } from './disconnect-button'
 
 export function OttoIntegrationForm({ 
   companyId,
   initialEnvironment = 'production',
-  initialReturnAddressCarrierId = ''
+  initialReturnAddressCarrierId = '',
+  isConnected = false
 }: { 
   companyId: string,
   initialEnvironment?: string,
-  initialReturnAddressCarrierId?: string
+  initialReturnAddressCarrierId?: string,
+  isConnected?: boolean
 }) {
   const [state, action, pending] = useActionState(saveOttoIntegrationAction, undefined)
   const [environment, setEnvironment] = useState(initialEnvironment)
@@ -121,7 +124,7 @@ export function OttoIntegrationForm({
         </select>
       </div>
 
-      <div className="pt-2">
+      <div className="pt-2 flex flex-col sm:flex-row gap-3">
         <button
           type="submit"
           disabled={pending}
@@ -129,6 +132,7 @@ export function OttoIntegrationForm({
         >
           {pending ? 'Wird gespeichert...' : 'Zugangsdaten speichern'}
         </button>
+      {isConnected && <DisconnectButton type="otto" />}
       </div>
     </form>
   )

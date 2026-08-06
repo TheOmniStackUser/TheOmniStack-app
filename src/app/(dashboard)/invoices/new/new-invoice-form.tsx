@@ -96,7 +96,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
   ])
   const standardRate = availableVatRates[0] || 19
 
-  const [items, setItems] = useState([{ sku: '', title: '', quantity: 1, unitPrice: 0, taxRate: standardRate }])
+  const [items, setItems] = useState([{ sku: '', title: '', quantity: 1, unitPrice: 0 as number | string, taxRate: standardRate }])
 
   const [formats, setFormats] = useState({
     standardPdf: true,
@@ -446,7 +446,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
     }
   }
 
-  const addItem = () => setItems([...items, { sku: '', title: '', quantity: 1, unitPrice: 0, taxRate: standardRate }])
+  const addItem = () => setItems([...items, { sku: '', title: '', quantity: 1, unitPrice: 0 as number | string, taxRate: standardRate }])
   const removeItem = (index: number) => setItems(items.filter((_, i) => i !== index))
 
   const updateItem = (index: number, field: string, value: any) => {
@@ -473,7 +473,10 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
       return
     }
 
-    const validItems = items.filter(item => item.title.trim() !== '')
+    const validItems = items.filter(item => item.title.trim() !== '').map(item => ({
+      ...item,
+      unitPrice: Number(item.unitPrice || 0)
+    }))
     if (validItems.length === 0) {
       setNotification({ message: 'Bitte mindestens eine Position mit Titel eingeben.', type: 'error' })
       if (status === 'issued') setIsSubmitting(false)
@@ -596,7 +599,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
     try {
       const result = await previewInvoiceAction({
         customer,
-        items,
+        items: items.map(item => ({ ...item, unitPrice: Number(item.unitPrice || 0) })),
         currency: settings.currency,
         isCreditNote: settings.isCreditNote,
         customText,
@@ -654,10 +657,10 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
     })
   }, [availableVatRates, settings.taxOption])
 
-  const subtotal = items.reduce((sum, i) => sum + (i.quantity * i.unitPrice), 0)
+  const subtotal = items.reduce((sum, i) => sum + (i.quantity * Number(i.unitPrice || 0)), 0)
   const discountAmount = subtotal * (settings.discount / 100)
   const netAfterDiscount = subtotal - discountAmount
-  const totalTax = items.reduce((sum, i) => sum + (i.quantity * i.unitPrice * (1 - settings.discount / 100) * (i.taxRate / 100)), 0)
+  const totalTax = items.reduce((sum, i) => sum + (i.quantity * Number(i.unitPrice || 0) * (1 - settings.discount / 100) * (i.taxRate / 100)), 0)
   const total = netAfterDiscount + totalTax
 
   return (
@@ -1222,8 +1225,8 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   step="0.01" 
                   required 
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-900 text-sm" 
-                  value={item.unitPrice === 0 ? '' : Number(item.unitPrice.toFixed(2))} 
-                  onChange={e => updateItem(index, 'unitPrice', e.target.value === '' ? 0 : parseFloat(e.target.value))} 
+                  value={item.unitPrice === 0 ? '' : item.unitPrice} 
+                  onChange={e => updateItem(index, 'unitPrice', e.target.value)} 
                 />
               </div>
               <div className="w-32">
@@ -1233,8 +1236,12 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   step="0.01" 
                   required 
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 font-bold text-slate-900 text-sm" 
-                  value={item.unitPrice === 0 ? '' : Number((item.unitPrice * (1 + (item.taxRate / 100))).toFixed(2))} 
+                  value={item.unitPrice === 0 || item.unitPrice === '' ? '' : Number((Number(item.unitPrice) * (1 + (item.taxRate / 100))).toFixed(2))} 
                   onChange={e => {
+                    if (e.target.value === '') {
+                      updateItem(index, 'unitPrice', '');
+                      return;
+                    }
                     const val = parseFloat(e.target.value);
                     if (!isNaN(val)) {
                       // Keine interne Rundung hier, damit der Bruttowert exakt erhalten bleibt!
@@ -1254,10 +1261,10 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
               <div className="w-32 text-right">
                 <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 whitespace-nowrap">Gesamt (Brutto)</label>
                 <div className="px-3 py-2 bg-slate-100 rounded-lg font-bold text-slate-900 text-sm border border-slate-200">
-                  {(item.quantity * item.unitPrice * (1 + (item.taxRate / 100))).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+                  {(item.quantity * Number(item.unitPrice || 0) * (1 + (item.taxRate / 100))).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
                 </div>
                 <div className="mt-1 text-[10px] text-slate-400 font-bold">
-                  Netto: {(item.quantity * item.unitPrice).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+                  Netto: {(item.quantity * Number(item.unitPrice || 0)).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
                 </div>
               </div>
               <div className="flex-shrink-0 mb-1 mt-6"><button type="button" onClick={() => removeItem(index)} disabled={items.length === 1} className="p-2 text-slate-300 hover:text-red-500 transition-colors disabled:opacity-0"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button></div>

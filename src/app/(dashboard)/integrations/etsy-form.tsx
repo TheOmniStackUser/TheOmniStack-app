@@ -3,6 +3,7 @@
 import { useActionState } from 'react'
 import { saveEtsyIntegrationAction } from '@/app/actions/integrations'
 import { ExternalLink } from 'lucide-react'
+import { DisconnectButton } from './disconnect-button'
 
 export function EtsyIntegrationForm({
   companyId,
@@ -68,6 +69,7 @@ export function EtsyIntegrationForm({
         >
           {pending ? 'Wird gespeichert...' : 'Zugangsdaten speichern'}
         </button>
+        {isConnected && <DisconnectButton type="etsy" />}
       </div>
 
       {initialClientId && (

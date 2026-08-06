@@ -3,6 +3,7 @@
 import { useActionState } from 'react'
 import { saveShopwareIntegrationAction, type IntegrationFormState } from '@/app/actions/integrations'
 import { HelpCircle } from 'lucide-react'
+import { DisconnectButton } from './disconnect-button'
 
 interface ShopwareIntegrationFormProps {
   initialEnvironment?: string
@@ -137,28 +138,31 @@ export function ShopwareIntegrationForm({
       </div>
 
       {/* Submit Button */}
-      <button
-        type="submit"
-        disabled={isPending}
-        className="w-full flex justify-center items-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-[#189EFF] hover:bg-[#0d8ce8] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#189EFF] disabled:opacity-50 transition-colors"
-      >
-        {isPending ? (
-          <span className="flex items-center gap-2">
-            <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            Verbinde mit Shopware...
-          </span>
-        ) : (
-          <span className="flex items-center gap-2">
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
-            </svg>
-            Speichern & Testen
-          </span>
-        )}
-      </button>
+      <div className="flex flex-col sm:flex-row gap-3">
+        <button
+          type="submit"
+          disabled={isPending}
+          className="w-full flex justify-center items-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-[#189EFF] hover:bg-[#0d8ce8] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#189EFF] disabled:opacity-50 transition-colors"
+        >
+          {isPending ? (
+            <span className="flex items-center gap-2">
+              <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Verbinde mit Shopware...
+            </span>
+          ) : (
+            <span className="flex items-center gap-2">
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
+              </svg>
+              Speichern & Testen
+            </span>
+          )}
+        </button>
+        {initialClientId && <DisconnectButton type="shopware" />}
+      </div>
     </form>
   )
 }

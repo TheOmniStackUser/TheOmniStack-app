@@ -3,6 +3,7 @@
 import { useActionState } from 'react'
 import { saveKauflandIntegrationAction } from '@/app/actions/integrations'
 import { HelpCircle } from 'lucide-react'
+import { DisconnectButton } from './disconnect-button'
 
 export function KauflandIntegrationForm({ 
   initialClientId, 
@@ -80,7 +81,7 @@ export function KauflandIntegrationForm({
         </select>
       </div>
 
-      <div className="pt-2">
+      <div className="pt-2 flex flex-col sm:flex-row gap-3">
         <button
           type="submit"
           disabled={pending}
@@ -88,6 +89,7 @@ export function KauflandIntegrationForm({
         >
           {pending ? 'Wird gespeichert...' : 'Zugangsdaten speichern'}
         </button>
+      {initialClientId && <DisconnectButton type="kaufland" />}
       </div>
     </form>
   )

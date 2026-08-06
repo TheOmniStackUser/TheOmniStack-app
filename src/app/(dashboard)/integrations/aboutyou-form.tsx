@@ -2,6 +2,7 @@
 
 import { useActionState } from 'react'
 import { saveAboutYouIntegrationAction } from '@/app/actions/integrations'
+import { DisconnectButton } from './disconnect-button'
 
 import { HelpCircle } from 'lucide-react'
 
@@ -68,7 +69,7 @@ export function AboutYouIntegrationForm({
         </select>
       </div>
 
-      <div className="pt-2">
+      <div className="pt-2 flex flex-col sm:flex-row gap-3">
         <button
           type="submit"
           disabled={pending}
@@ -76,6 +77,7 @@ export function AboutYouIntegrationForm({
         >
           {pending ? 'Wird gespeichert...' : 'Zugangsdaten speichern'}
         </button>
+      {initialApiKey && <DisconnectButton type="aboutyou" />}
       </div>
     </form>
   )

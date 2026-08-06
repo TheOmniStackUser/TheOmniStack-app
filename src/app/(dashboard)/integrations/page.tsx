@@ -221,6 +221,7 @@ export default async function IntegrationsPage(props: {
                   companyId={auth.activeCompanyId}
                   initialEnvironment={ottoIntegration?.environment || 'production'}
                   initialReturnAddressCarrierId={(ottoIntegration?.metadata as any)?.returnAddressCarrierId || ''}
+                  isConnected={!!ottoIntegration?.clientId}
                 />
               </div>
             </CollapsibleSection>
