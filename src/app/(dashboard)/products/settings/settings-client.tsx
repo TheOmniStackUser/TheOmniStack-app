@@ -162,7 +162,9 @@ export function SyncSettingsClient({ integrations }: { integrations: any[] }) {
 
   const showNotification = (message: string, description?: string, type: 'success' | 'error' | 'info' = 'info') => {
     setNotification({ message, description, type })
-    setTimeout(() => setNotification(null), 8000)
+    if (type !== 'error') {
+      setTimeout(() => setNotification(null), 8000)
+    }
   }
 
   if (integrations.length === 0) {

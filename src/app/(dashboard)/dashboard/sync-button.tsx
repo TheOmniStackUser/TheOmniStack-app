@@ -14,7 +14,9 @@ export function SyncButton() {
   const showNotification = (message: string, type: 'success' | 'error') => {
     setNotification({ message, type })
     // Keep success messages longer so they can be read
-    setTimeout(() => setNotification(null), 8000)
+    if (type !== 'error') {
+      setTimeout(() => setNotification(null), 8000)
+    }
   }
 
   // Simulate progress

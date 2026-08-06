@@ -55,7 +55,6 @@ export function CustomersClient({ initialCustomers }: { initialCustomers: any[] 
     } catch (error) {
       console.error('Failed to save customer', error)
       setNotification({ message: 'Fehler beim Speichern des Kunden', type: 'error' })
-      setTimeout(() => setNotification(null), 3000)
     } finally {
       setIsSaving(false)
     }
