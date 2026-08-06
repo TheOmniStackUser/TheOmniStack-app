@@ -5,16 +5,19 @@ export type KauflandAdapterConfig = {
   clientId: string
   clientSecret: string
   environment?: 'sandbox' | 'production'
+  storefront?: string
 }
 
 export class KauflandAdapter implements MarketplaceAdapter {
   readonly marketplace = 'kaufland' as const
   private readonly baseUrl: string
+  private readonly storefront: string
 
   constructor(private readonly config: KauflandAdapterConfig) {
     this.baseUrl = config.environment === 'sandbox'
       ? 'https://sellerapi-playground.kaufland.com/v2'
       : 'https://sellerapi.kaufland.com/v2'
+    this.storefront = config.storefront || 'de'
   }
 
   /**
@@ -28,6 +31,10 @@ export class KauflandAdapter implements MarketplaceAdapter {
     queryParams: Record<string, string> = {}
   ): Promise<any> {
     const timestamp = Math.floor(Date.now() / 1000)
+
+    if (!queryParams['storefront']) {
+      queryParams['storefront'] = this.storefront
+    }
 
     // Build URL with query params
     const urlObj = new URL(`${this.baseUrl}${path}`)
