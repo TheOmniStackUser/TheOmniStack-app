@@ -1189,8 +1189,8 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
         <div className="space-y-4">
           {items.map((item, index) => (
             <div key={index} className="grid grid-cols-1 md:grid-cols-[90px_1fr_70px_90px_90px_70px_90px_auto] gap-4 bg-slate-50/50 p-4 rounded-xl border border-slate-200">
-              <div className="w-full min-w-0 flex flex-col justify-end h-full">
-                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 ">Art.-Nr.</label>
+              <div className="w-full min-w-0">
+                <label className="flex items-end text-[10px] font-bold text-slate-600 uppercase mb-1 h-8">Art.-Nr.</label>
                 <input 
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-900 text-sm" 
                   value={item.sku || ''} 
@@ -1198,8 +1198,8 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   placeholder="z.B. Art-100" 
                 />
               </div>
-              <div className="w-full min-w-0 flex flex-col justify-end h-full">
-                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 ">Bezeichnung</label>
+              <div className="w-full min-w-0">
+                <label className="flex items-end text-[10px] font-bold text-slate-600 uppercase mb-1 h-8">Bezeichnung</label>
                 <input 
                   required 
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-900 text-sm" 
@@ -1208,8 +1208,8 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   placeholder="Produktbezeichnung..." 
                 />
               </div>
-              <div className="w-full min-w-0 flex flex-col justify-end h-full">
-                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 ">Menge</label>
+              <div className="w-full min-w-0">
+                <label className="flex items-end text-[10px] font-bold text-slate-600 uppercase mb-1 h-8">Menge</label>
                 <input 
                   type="number" 
                   step="any"
@@ -1220,8 +1220,8 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   onChange={e => updateItem(index, 'quantity', e.target.value)} 
                 />
               </div>
-              <div className="w-full min-w-0 flex flex-col justify-end h-full">
-                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 ">Einzelpreis (Netto)</label>
+              <div className="w-full min-w-0">
+                <label className="flex items-end text-[10px] font-bold text-slate-600 uppercase mb-1 h-8">Einzelpreis (Netto)</label>
                 <input 
                   type="number" 
                   step="0.01" 
@@ -1231,8 +1231,8 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   onChange={e => updateItem(index, 'unitPrice', e.target.value)} 
                 />
               </div>
-              <div className="w-full min-w-0 flex flex-col justify-end h-full">
-                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 ">Einzelpreis (Brutto)</label>
+              <div className="w-full min-w-0">
+                <label className="flex items-end text-[10px] font-bold text-slate-600 uppercase mb-1 h-8">Einzelpreis (Brutto)</label>
                 <input 
                   type="number" 
                   step="0.01" 
@@ -1254,14 +1254,14 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   }} 
                 />
               </div>
-              <div className="w-full min-w-0 flex flex-col justify-end h-full">
-                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 ">MwSt %</label>
+              <div className="w-full min-w-0">
+                <label className="flex items-end text-[10px] font-bold text-slate-600 uppercase mb-1 h-8">MwSt %</label>
                 <select className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-900 text-sm" value={item.taxRate} onChange={e => updateItem(index, 'taxRate', parseFloat(e.target.value))}>
                   {availableVatRates.map(rate => <option key={rate} value={rate}>{rate}%</option>)}
                 </select>
               </div>
-              <div className="w-full min-w-0 flex flex-col justify-end h-full text-right">
-                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 ">Gesamt (Brutto)</label>
+              <div className="w-full min-w-0 text-right">
+                <label className="flex items-end justify-end text-[10px] font-bold text-slate-600 uppercase mb-1 h-8">Gesamt (Brutto)</label>
                 <div className="px-3 py-2 bg-slate-100 rounded-lg font-bold text-slate-900 text-sm border border-slate-200">
                   {(Number(item.quantity || 0) * Number(item.unitPrice || 0) * (1 + (item.taxRate / 100))).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
                 </div>
@@ -1269,7 +1269,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   Netto: {(Number(item.quantity || 0) * Number(item.unitPrice || 0)).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
                 </div>
               </div>
-              <div className="flex-shrink-0 flex flex-col gap-0.5 self-end pb-[2px]">
+              <div className="flex-shrink-0 flex flex-col gap-0.5 mt-9">
                 <button type="button" onClick={() => duplicateItem(index)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Position duplizieren">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" /></svg>
                 </button>
