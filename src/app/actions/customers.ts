@@ -380,6 +380,7 @@ export async function getCustomerDocumentsAction(customerId: string) {
       invoiceNumber: invoices.invoiceNumber,
       documentType: invoices.documentType,
       isCreditNote: invoices.isCreditNote,
+      recipientCompany: invoices.recipientCompany,
       recipientName: invoices.recipientName,
       recipientEmail: invoices.recipientEmail,
       recipientStreet: invoices.recipientStreet,

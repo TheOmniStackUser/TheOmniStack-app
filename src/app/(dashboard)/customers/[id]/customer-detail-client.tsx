@@ -185,7 +185,8 @@ export function CustomerDetailClient({
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-white rounded-xl border border-slate-100 shadow-sm animate-in fade-in slide-in-from-top-2">
                             <div>
                               <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Rechnungsadresse</div>
-                              <div className="text-sm font-semibold text-slate-900">{doc.recipientName || '---'}</div>
+                              {doc.recipientCompany && <div className="text-sm font-semibold text-slate-900">{doc.recipientCompany}</div>}
+                              <div className={`text-sm ${doc.recipientCompany ? 'text-slate-600' : 'font-semibold text-slate-900'}`}>{doc.recipientName || '---'}</div>
                               <div className="text-sm text-slate-600">{doc.recipientStreet || '---'}</div>
                               <div className="text-sm text-slate-600">{(doc.recipientZip || '') + ' ' + (doc.recipientCity || '')}</div>
                               <div className="text-sm text-slate-600">{doc.recipientCountry || '---'}</div>
