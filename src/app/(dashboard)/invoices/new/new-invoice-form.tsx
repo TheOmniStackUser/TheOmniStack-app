@@ -247,7 +247,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
       setSettings({
         isCreditNote: invoice.isCreditNote || false,
         currency: invoice.currency || 'EUR',
-        dueDateDays: (invoice as any).dueDateDays || 14,
+        dueDateDays: (invoice as any).dueDateDays ?? 14,
         discount: (invoice as any).discountRate || 0,
         skontoPercent: (invoice as any).skontoRate || 0,
         skontoDays: (invoice as any).skontoDays || 7,
@@ -305,7 +305,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
       setSettings({
         isCreditNote: isCreditNoteParam === 'true',
         currency: invoice.currency || 'EUR',
-        dueDateDays: invoice.dueDateDays || 14,
+        dueDateDays: invoice.dueDateDays ?? 14,
         discount: invoice.discountRate || 0,
         skontoPercent: invoice.skontoRate || 0,
         skontoDays: invoice.skontoDays || 7,
