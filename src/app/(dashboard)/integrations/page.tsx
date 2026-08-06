@@ -22,7 +22,8 @@ export default async function IntegrationsPage(props: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }> 
 }) {
   const searchParams = await props.searchParams
-  const status = searchParams?.status
+  const rawStatus = searchParams?.status
+  const status = typeof rawStatus === 'string' ? rawStatus : Array.isArray(rawStatus) ? rawStatus[0] : undefined
   const auth = await requireAuth()
 
   const [
