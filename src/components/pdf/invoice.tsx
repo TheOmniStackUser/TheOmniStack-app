@@ -470,7 +470,7 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
                 )}
                 <Text>{item.title}</Text>
               </View>
-              <Text style={styles.colMenge}>{item.quantity}</Text>
+              <Text style={styles.colMenge}>{String(item.quantity).replace('.', ',')}</Text>
               <Text style={styles.colTax}>{Number((item.taxRate * 100).toFixed(2))}%</Text>
               <Text style={styles.colPrice}>{formatPrice(item.unitPrice * factor)}</Text>
               <Text style={styles.colTotal}>{formatPrice(item.unitPrice * item.quantity * factor)}</Text>

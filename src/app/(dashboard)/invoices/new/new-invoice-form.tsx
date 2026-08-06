@@ -669,10 +669,10 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
     })
   }, [availableVatRates, settings.taxOption])
 
-  const subtotal = items.reduce((sum, i) => sum + (i.quantity * Number(i.unitPrice || 0)), 0)
+  const subtotal = items.reduce((sum, i) => sum + (Number(i.quantity || 0) * Number(i.unitPrice || 0)), 0)
   const discountAmount = subtotal * (settings.discount / 100)
   const netAfterDiscount = subtotal - discountAmount
-  const totalTax = items.reduce((sum, i) => sum + (i.quantity * Number(i.unitPrice || 0) * (1 - settings.discount / 100) * (i.taxRate / 100)), 0)
+  const totalTax = items.reduce((sum, i) => sum + (Number(i.quantity || 0) * Number(i.unitPrice || 0) * (1 - settings.discount / 100) * (i.taxRate / 100)), 0)
   const total = netAfterDiscount + totalTax
 
   return (
@@ -1208,15 +1208,16 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   placeholder="Produktbezeichnung..." 
                 />
               </div>
-              <div className="w-20">
+              <div className="w-28 shrink-0">
                 <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 whitespace-nowrap">Menge</label>
                 <input 
                   type="number" 
+                  step="any"
                   required 
-                  min="1" 
+                  min="0.01" 
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-900 text-sm" 
-                  value={item.quantity} 
-                  onChange={e => updateItem(index, 'quantity', parseFloat(e.target.value))} 
+                  value={item.quantity === 0 ? '' : item.quantity} 
+                  onChange={e => updateItem(index, 'quantity', e.target.value)} 
                 />
               </div>
               <div className="w-32">
@@ -1262,10 +1263,10 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
               <div className="w-32 text-right">
                 <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 whitespace-nowrap">Gesamt (Brutto)</label>
                 <div className="px-3 py-2 bg-slate-100 rounded-lg font-bold text-slate-900 text-sm border border-slate-200">
-                  {(item.quantity * Number(item.unitPrice || 0) * (1 + (item.taxRate / 100))).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+                  {(Number(item.quantity || 0) * Number(item.unitPrice || 0) * (1 + (item.taxRate / 100))).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
                 </div>
                 <div className="mt-1 text-[10px] text-slate-400 font-bold">
-                  Netto: {(item.quantity * Number(item.unitPrice || 0)).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+                  Netto: {(Number(item.quantity || 0) * Number(item.unitPrice || 0)).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
                 </div>
               </div>
               <div className="flex-shrink-0 mb-1 mt-6 flex gap-1">

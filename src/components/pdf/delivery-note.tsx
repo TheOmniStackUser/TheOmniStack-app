@@ -341,7 +341,7 @@ function DeliveryNotePage({ order, company }: DeliveryNoteProps) {
         </View>
         {items.map((item: any, idx: number) => (
           <View key={idx} style={styles.tableRow}>
-            <Text style={styles.colMenge}>{item.quantity}</Text>
+            <Text style={styles.colMenge}>{String(item.quantity).replace('.', ',')}</Text>
             <Text style={styles.colArtNr}>{item.sku}</Text>
             <Text style={styles.colBez}>{item.title}</Text>
             <Text style={styles.colPos}>{idx + 1}</Text>
