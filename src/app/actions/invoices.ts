@@ -632,6 +632,7 @@ export async function getInvoiceDetailsForCloneAction(invoiceId: string) {
       invoiceNumber: invoice.invoiceNumber,
       createdAt: invoice.createdAt,
       recipientName: invoice.recipientName,
+      recipientCompany: invoice.recipientCompany || null,
       recipientStreet: invoice.recipientStreet || '',
       recipientZip: invoice.recipientZip || '',
       recipientCity: invoice.recipientCity || '',

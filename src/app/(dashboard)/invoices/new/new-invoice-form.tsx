@@ -451,6 +451,12 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
 
   const addItem = () => setItems([...items, { sku: '', title: '', quantity: 1, unitPrice: 0 as number | string, taxRate: standardRate }])
   const removeItem = (index: number) => setItems(items.filter((_, i) => i !== index))
+  const duplicateItem = (index: number) => {
+    const itemToDuplicate = items[index]
+    const newItems = [...items]
+    newItems.splice(index + 1, 0, { ...itemToDuplicate })
+    setItems(newItems)
+  }
 
   const updateItem = (index: number, field: string, value: any) => {
     const newItems = [...items]
@@ -1262,7 +1268,14 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   Netto: {(item.quantity * Number(item.unitPrice || 0)).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
                 </div>
               </div>
-              <div className="flex-shrink-0 mb-1 mt-6"><button type="button" onClick={() => removeItem(index)} disabled={items.length === 1} className="p-2 text-slate-300 hover:text-red-500 transition-colors disabled:opacity-0"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button></div>
+              <div className="flex-shrink-0 mb-1 mt-6 flex gap-1">
+                <button type="button" onClick={() => duplicateItem(index)} className="p-2 text-slate-300 hover:text-blue-500 transition-colors" title="Position duplizieren">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" /></svg>
+                </button>
+                <button type="button" onClick={() => removeItem(index)} disabled={items.length === 1} className="p-2 text-slate-300 hover:text-red-500 transition-colors disabled:opacity-0" title="Position löschen">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                </button>
+              </div>
             </div>
           ))}
         </div>

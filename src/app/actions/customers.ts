@@ -4,7 +4,8 @@ import { db } from '@/db/client'
 import { customers } from '@/db/schema/customers'
 import { orders } from '@/db/schema/orders'
 import { requireAuth } from '@/lib/session'
-import { eq, ilike, or, and, desc, isNotNull, ne } from 'drizzle-orm'
+import { eq, ilike, or, and, desc, isNotNull, ne, inArray, sql } from 'drizzle-orm'
+import { invoices } from '@/db/schema/invoices'
 
 export async function searchCustomersAction(query: string) {
   const auth = await requireAuth()
@@ -336,4 +337,102 @@ export async function getCustomerByIdAction(customerId: string) {
     .limit(1)
 
   return customer || null
+}
+
+export async function getCustomerDocumentsAction(customerId: string) {
+  const auth = await requireAuth()
+  const companyId = auth.activeCompanyId
+
+  const customer = await getCustomerByIdAction(customerId)
+  if (!customer) return []
+
+  // Get orders to find associated invoices
+  let invoiceIds: string[] = []
+  
+  if (customer.customerNumber) {
+    const customerOrders = await db.select({ invoiceId: orders.invoiceId })
+      .from(orders)
+      .where(
+        and(
+          eq(orders.companyId, companyId),
+          eq(orders.customerNumber, customer.customerNumber),
+          isNotNull(orders.invoiceId)
+        )
+      )
+    invoiceIds = customerOrders.map(o => o.invoiceId as string)
+  }
+
+  // Fetch invoices by ID (from orders) OR matching recipient email if no order exists
+  let queryConditions = []
+  if (invoiceIds.length > 0) {
+    queryConditions.push(inArray(invoices.id, invoiceIds))
+  }
+  if (customer.email) {
+    queryConditions.push(eq(invoices.recipientEmail, customer.email))
+  }
+
+  // If no conditions are met, there are no invoices to fetch
+  if (queryConditions.length === 0) return []
+
+  const docs = await db
+    .select({
+      id: invoices.id,
+      invoiceNumber: invoices.invoiceNumber,
+      documentType: invoices.documentType,
+      isCreditNote: invoices.isCreditNote,
+      recipientName: invoices.recipientName,
+      totalAmount: invoices.totalAmount,
+      currency: invoices.currency,
+      createdAt: invoices.createdAt,
+      status: invoices.status,
+      paidAt: invoices.paidAt,
+      pdfStorageKey: invoices.pdfStorageKey,
+      draftName: invoices.draftName
+    })
+    .from(invoices)
+    .where(
+      and(
+        eq(invoices.companyId, companyId),
+        or(...queryConditions)
+      )
+    )
+    .orderBy(desc(invoices.createdAt))
+
+  // Deduplicate by ID just in case an invoice matches both conditions
+  const uniqueDocsMap = new Map()
+  docs.forEach(doc => {
+    if (!uniqueDocsMap.has(doc.id)) {
+      uniqueDocsMap.set(doc.id, doc)
+    }
+  })
+  
+  return Array.from(uniqueDocsMap.values())
+}
+
+export async function getCustomerStatsAction(customerId: string) {
+  const docs = await getCustomerDocumentsAction(customerId)
+  
+  let totalRevenue = 0
+  let outstandingBalance = 0
+  
+  docs.forEach(doc => {
+    if (doc.status !== 'cancelled' && doc.documentType === 'invoice') {
+      const amount = parseFloat(doc.totalAmount || '0')
+      if (doc.isCreditNote) {
+        totalRevenue -= amount
+        // If a credit note is unpaid? Usually they offset balance. We assume credit notes are paid/offset immediately for now, or just subtract from total revenue.
+      } else {
+        totalRevenue += amount
+        if (!doc.paidAt && doc.status !== 'draft') {
+          outstandingBalance += amount
+        }
+      }
+    }
+  })
+  
+  return {
+    totalRevenue,
+    outstandingBalance,
+    totalDocuments: docs.length
+  }
 }

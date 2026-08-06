@@ -29,6 +29,7 @@ interface Invoice {
   invoiceNumber: string
   status: string
   recipientName: string | null
+  recipientCompany: string | null
   recipientCountry: string | null
   totalAmount: string
   currency: string
@@ -843,6 +844,7 @@ export function InvoiceList({
             : 'Rechnung'
       addSuggestion('Rechnungsnummer', invoice.invoiceNumber, invoice.recipientName || documentLabel)
       addSuggestion('Kunde', invoice.recipientName, invoice.invoiceNumber || documentLabel)
+      addSuggestion('Firma', invoice.recipientCompany, invoice.invoiceNumber || documentLabel)
       addSuggestion('Entwurf', invoice.draftName, invoice.recipientName || documentLabel)
       addSuggestion(process.env.NEXT_PUBLIC_APP_VARIANT === 'craft' ? 'Auftragsnummer' : 'Bestellnummer', invoice.marketplaceOrderId, invoice.invoiceNumber || documentLabel)
       if (suggestions.length >= 6) break
@@ -1181,15 +1183,17 @@ export function InvoiceList({
 
     const matchInvoice = (invoice.invoiceNumber || '').toLowerCase().includes(q) || (invoice.draftName || '').toLowerCase().includes(q)
     const matchCustomer = (invoice.recipientName || '').toLowerCase().includes(q)
+    const matchCompany = (invoice.recipientCompany || '').toLowerCase().includes(q)
     const matchOrder = (invoice.marketplaceOrderId || '').toLowerCase().includes(q) || (invoice.displayOrderNumber || '').toLowerCase().includes(q)
     const matchTracking = (invoice.trackingNumber || '').toLowerCase().includes(q) || (invoice.returnTrackingNumber || '').toLowerCase().includes(q)
 
     if (scope === 'invoice') return matchInvoice
     if (scope === 'customer') return matchCustomer
+    if (scope === 'company') return matchCompany
     if (scope === 'order') return matchOrder
     if (scope === 'tracking') return matchTracking
 
-    return matchInvoice || matchCustomer || matchOrder || matchTracking
+    return matchInvoice || matchCustomer || matchCompany || matchOrder || matchTracking
   })
 
   // Apply tab status filter on top of search/filter
@@ -1355,6 +1359,7 @@ export function InvoiceList({
                   <option value="all">Alle Felder</option>
                   <option value="invoice">Belegnummer</option>
                   <option value="customer">Kunde</option>
+                  <option value="company">Firmenname</option>
                   <option value="order">{process.env.NEXT_PUBLIC_APP_VARIANT === 'craft' ? 'Auftragsnummer' : 'Bestellnummer'}</option>
                   <option value="tracking">Tracking / Retoure</option>
                 </select>

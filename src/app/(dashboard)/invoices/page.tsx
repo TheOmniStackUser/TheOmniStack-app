@@ -38,6 +38,7 @@ export default async function InvoicesPage({
         invoiceNumber: invoices.invoiceNumber,
         status: invoices.status,
         recipientName: invoices.recipientName,
+        recipientCompany: invoices.recipientCompany,
         recipientCountry: invoices.recipientCountry,
         recipientEmail: invoices.recipientEmail,
         totalAmount: invoices.totalAmount,

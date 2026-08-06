@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { searchCustomersAction, saveCustomerAction } from '@/app/actions/customers'
 import { WORLD_COUNTRIES } from '@/lib/countries'
 
 export function CustomersClient({ initialCustomers }: { initialCustomers: any[] }) {
+  const router = useRouter()
   const [customers, setCustomers] = useState(initialCustomers)
   const [searchQuery, setSearchQuery] = useState('')
   const [isSearching, setIsSearching] = useState(false)
@@ -104,7 +106,7 @@ export function CustomersClient({ initialCustomers }: { initialCustomers: any[] 
             </thead>
             <tbody className="divide-y divide-slate-100">
               {customers.map((c) => (
-                <tr key={c.id} className="hover:bg-slate-50 transition-colors group">
+                <tr key={c.id} onClick={() => router.push(`/customers/${c.id}`)} className="hover:bg-slate-50 transition-colors group cursor-pointer">
                   <td className="px-6 py-4">
                     <span className="font-mono text-xs font-semibold text-cyan-700 bg-cyan-50 border border-cyan-200 px-2.5 py-1 rounded-md uppercase">{c.customerNumber || '---'}</span>
                   </td>
@@ -123,6 +125,7 @@ export function CustomersClient({ initialCustomers }: { initialCustomers: any[] 
                   <td className="px-6 py-4 text-right flex items-center justify-end gap-2">
                     <Link 
                       href={`/quotes/new?customerId=${c.id}`}
+                      onClick={(e) => e.stopPropagation()}
                       className="px-3 py-2 text-xs font-bold text-amber-600 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors inline-flex items-center gap-1.5"
                       title="Angebot erstellen"
                     >
@@ -131,6 +134,7 @@ export function CustomersClient({ initialCustomers }: { initialCustomers: any[] 
                     </Link>
                     <Link 
                       href={`/invoices/new?customerId=${c.id}`}
+                      onClick={(e) => e.stopPropagation()}
                       className="px-3 py-2 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors inline-flex items-center gap-1.5"
                       title="Rechnung erstellen"
                     >
@@ -138,7 +142,7 @@ export function CustomersClient({ initialCustomers }: { initialCustomers: any[] 
                       Rechnung
                     </Link>
                     <button 
-                      onClick={() => handleOpenEdit(c)}
+                      onClick={(e) => { e.stopPropagation(); handleOpenEdit(c); }}
                       className="px-3 py-2 text-xs font-bold text-slate-500 hover:text-cyan-600 hover:bg-cyan-50 rounded-lg transition-colors border border-transparent hover:border-cyan-100 inline-flex items-center gap-1.5"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
