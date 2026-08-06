@@ -273,6 +273,25 @@ export class MiraklAdapter implements MarketplaceAdapter {
       })
     }
 
+    let finalStreet = (shipping.street_1 || '').trim()
+    let finalAddition = (shipping.additional_info || shipping.street_2 || '').trim()
+
+    if (finalStreet && finalAddition) {
+      const isStreet1Number = /^[\d\-\/]+\s*[a-zA-Z]*$/.test(finalStreet)
+      const isAdditionNumber = /^[\d\-\/]+\s*[a-zA-Z]*$/.test(finalAddition)
+
+      if (isStreet1Number && !isAdditionNumber) {
+        finalStreet = `${finalAddition} ${finalStreet}`
+        finalAddition = ''
+      } else if (!isStreet1Number && isAdditionNumber) {
+        const hasNumberAtEnd = /\d+\s*[a-zA-Z]*$/.test(finalStreet)
+        if (!hasNumberAtEnd) {
+          finalStreet = `${finalStreet} ${finalAddition}`
+          finalAddition = ''
+        }
+      }
+    }
+
     return {
       marketplace: this.marketplace,
       marketplaceOrderId: raw.order_id,
@@ -285,9 +304,9 @@ export class MiraklAdapter implements MarketplaceAdapter {
       shippingAddress: {
         name: `${shipping.firstname || ''} ${shipping.lastname || ''}`.trim(),
         company: shipping.company || shipping.company_2 || undefined,
-        addressAddition: shipping.additional_info || shipping.street_2 || undefined,
+        addressAddition: finalAddition || undefined,
         phone: shipping.phone || shipping.phone_secondary || undefined,
-        street: shipping.street_1 || '',
+        street: finalStreet,
         city: shipping.city || '',
         zip: shipping.zip_code || '',
         country: shipping.country_iso_code || 'DE',

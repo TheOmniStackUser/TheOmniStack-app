@@ -170,6 +170,20 @@ export class HermesAdapter {
     }
     const parcelVolume = volumeMap[parcelClass] || 50
     const recipientAddr = this.splitStreet(order.shippingStreet)
+
+    // Auto-fix for legacy orders where house number was saved in addressAddition (e.g. Limango/Mirakl)
+    if (recipientAddr.houseNo === '.' && order.shippingAddressAddition) {
+      if (/^[\d\-\/]+\s*[a-zA-Z]*$/.test(order.shippingAddressAddition.trim())) {
+        recipientAddr.houseNo = order.shippingAddressAddition.trim()
+      }
+    }
+    if (/^[\d\-\/]+\s*[a-zA-Z]*$/.test(order.shippingStreet?.trim() || '')) {
+      if (order.shippingAddressAddition && !/^[\d\-\/]+\s*[a-zA-Z]*$/.test(order.shippingAddressAddition.trim())) {
+        recipientAddr.houseNo = order.shippingStreet.trim()
+        recipientAddr.street = order.shippingAddressAddition.trim()
+      }
+    }
+
     const shipperAddr = this.splitStreet(company.warehouseStreet || company.street)
 
     // Try to find a human-readable order number (especially for Otto where marketplaceOrderId might be a UUID)
