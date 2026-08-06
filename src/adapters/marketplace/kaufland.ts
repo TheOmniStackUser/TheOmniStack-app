@@ -32,7 +32,7 @@ export class KauflandAdapter implements MarketplaceAdapter {
   ): Promise<any> {
     const timestamp = Math.floor(Date.now() / 1000)
 
-    if (!queryParams['storefront']) {
+    if (method.toUpperCase() === 'GET' && !queryParams['storefront']) {
       queryParams['storefront'] = this.storefront
     }
 
