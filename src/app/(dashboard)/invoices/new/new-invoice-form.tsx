@@ -1188,9 +1188,9 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
         <div className="flex justify-between items-center border-b border-slate-100 pb-4"><h2 className="text-xl font-bold text-slate-900">Positionen</h2><button type="button" onClick={addItem} className="text-sm font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1">+ Zeile hinzufügen</button></div>
         <div className="space-y-4">
           {items.map((item, index) => (
-            <div key={index} className="grid grid-cols-1 md:grid-cols-[128px_1fr_80px_120px_120px_70px_120px_auto] gap-4 items-start bg-slate-50/50 p-4 rounded-xl border border-slate-200">
-              <div className="w-full">
-                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 whitespace-nowrap">Art.-Nr.</label>
+            <div key={index} className="grid grid-cols-1 md:grid-cols-[90px_1fr_70px_90px_90px_70px_90px_auto] gap-4 items-start bg-slate-50/50 p-4 rounded-xl border border-slate-200">
+              <div className="w-full min-w-0">
+                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 ">Art.-Nr.</label>
                 <input 
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-900 text-sm" 
                   value={item.sku || ''} 
@@ -1198,8 +1198,8 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   placeholder="z.B. Art-100" 
                 />
               </div>
-              <div className="w-full">
-                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 whitespace-nowrap">Bezeichnung</label>
+              <div className="w-full min-w-0">
+                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 ">Bezeichnung</label>
                 <input 
                   required 
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-900 text-sm" 
@@ -1208,8 +1208,8 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   placeholder="Produktbezeichnung..." 
                 />
               </div>
-              <div className="w-full">
-                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 whitespace-nowrap">Menge</label>
+              <div className="w-full min-w-0">
+                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 ">Menge</label>
                 <input 
                   type="number" 
                   step="any"
@@ -1220,8 +1220,8 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   onChange={e => updateItem(index, 'quantity', e.target.value)} 
                 />
               </div>
-              <div className="w-full">
-                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 whitespace-nowrap">Einzelpreis (Netto)</label>
+              <div className="w-full min-w-0">
+                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 ">Einzelpreis (Netto)</label>
                 <input 
                   type="number" 
                   step="0.01" 
@@ -1231,8 +1231,8 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   onChange={e => updateItem(index, 'unitPrice', e.target.value)} 
                 />
               </div>
-              <div className="w-full">
-                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 whitespace-nowrap">Einzelpreis (Brutto)</label>
+              <div className="w-full min-w-0">
+                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 ">Einzelpreis (Brutto)</label>
                 <input 
                   type="number" 
                   step="0.01" 
@@ -1254,14 +1254,14 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   }} 
                 />
               </div>
-              <div className="w-full">
-                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 whitespace-nowrap">MwSt %</label>
+              <div className="w-full min-w-0">
+                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 ">MwSt %</label>
                 <select className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-900 text-sm" value={item.taxRate} onChange={e => updateItem(index, 'taxRate', parseFloat(e.target.value))}>
                   {availableVatRates.map(rate => <option key={rate} value={rate}>{rate}%</option>)}
                 </select>
               </div>
-              <div className="w-full text-right">
-                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 whitespace-nowrap">Gesamt (Brutto)</label>
+              <div className="w-full min-w-0 text-right">
+                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 ">Gesamt (Brutto)</label>
                 <div className="px-3 py-2 bg-slate-100 rounded-lg font-bold text-slate-900 text-sm border border-slate-200">
                   {(Number(item.quantity || 0) * Number(item.unitPrice || 0) * (1 + (item.taxRate / 100))).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
                 </div>
