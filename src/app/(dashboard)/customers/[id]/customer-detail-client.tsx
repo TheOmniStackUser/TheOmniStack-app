@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import Link from 'next/link'
 
 export function CustomerDetailClient({ 
@@ -13,6 +13,7 @@ export function CustomerDetailClient({
   stats: any 
 }) {
   const [activeTab, setActiveTab] = useState<'all' | 'quote' | 'invoice' | 'delivery_note'>('all')
+  const [expandedRowId, setExpandedRowId] = useState<string | null>(null)
 
   const filteredDocs = documents.filter(doc => {
     if (activeTab === 'all') return true
@@ -134,45 +135,86 @@ export function CustomerDetailClient({
                 else linkPath = `/invoices/new?edit=${doc.id}`
                 
                 return (
-                  <tr key={doc.id} className="hover:bg-slate-50 transition-colors group">
-                    <td className="px-6 py-4">
-                      <div className="text-slate-900 font-medium">{new Date(doc.createdAt).toLocaleDateString('de-DE')}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-lg ${isQuote ? 'bg-amber-100 text-amber-700' : isDelivery ? 'bg-purple-100 text-purple-700' : isCreditNote ? 'bg-rose-100 text-rose-700' : 'bg-blue-100 text-blue-700'}`}>
-                          {isQuote && <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>}
-                          {isDelivery && <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>}
-                          {isCreditNote && <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-                          {isInvoice && <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>}
+                  <React.Fragment key={doc.id}>
+                    <tr 
+                      onClick={() => setExpandedRowId(expandedRowId === doc.id ? null : doc.id)}
+                      className={`hover:bg-slate-50 transition-colors group cursor-pointer ${expandedRowId === doc.id ? 'bg-slate-50' : ''}`}
+                    >
+                      <td className="px-6 py-4">
+                        <div className="text-slate-900 font-medium">{new Date(doc.createdAt).toLocaleDateString('de-DE')}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 rounded-lg ${isQuote ? 'bg-amber-100 text-amber-700' : isDelivery ? 'bg-purple-100 text-purple-700' : isCreditNote ? 'bg-rose-100 text-rose-700' : 'bg-blue-100 text-blue-700'}`}>
+                            {isQuote && <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>}
+                            {isDelivery && <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>}
+                            {isCreditNote && <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+                            {isInvoice && <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>}
+                          </div>
+                          <div>
+                            <div className="font-bold text-slate-900">{doc.invoiceNumber || doc.draftName || 'Unbenannt'}</div>
+                            <div className="text-xs text-slate-500 font-medium">{isQuote ? 'Angebot' : isDelivery ? 'Lieferschein' : isCreditNote ? 'Gutschrift' : 'Rechnung'}</div>
+                          </div>
                         </div>
-                        <div>
-                          <div className="font-bold text-slate-900">{doc.invoiceNumber || doc.draftName || 'Unbenannt'}</div>
-                          <div className="text-xs text-slate-500 font-medium">{isQuote ? 'Angebot' : isDelivery ? 'Lieferschein' : isCreditNote ? 'Gutschrift' : 'Rechnung'}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        {doc.status === 'draft' && <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-bold bg-slate-100 text-slate-600">Entwurf</span>}
+                        {doc.status === 'issued' && doc.paidAt && <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">Bezahlt</span>}
+                        {doc.status === 'issued' && !doc.paidAt && <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-bold bg-amber-50 text-amber-600 border border-amber-200">Offen</span>}
+                        {doc.status === 'cancelled' && <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-bold bg-rose-50 text-rose-600 border border-rose-200">Storniert</span>}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className={`font-bold ${isCreditNote ? 'text-rose-600' : 'text-slate-900'}`}>
+                          {isCreditNote ? '-' : ''}{parseFloat(doc.totalAmount || '0').toLocaleString('de-DE', { style: 'currency', currency: doc.currency || 'EUR' })}
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      {doc.status === 'draft' && <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-bold bg-slate-100 text-slate-600">Entwurf</span>}
-                      {doc.status === 'issued' && doc.paidAt && <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">Bezahlt</span>}
-                      {doc.status === 'issued' && !doc.paidAt && <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-bold bg-amber-50 text-amber-600 border border-amber-200">Offen</span>}
-                      {doc.status === 'cancelled' && <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-bold bg-rose-50 text-rose-600 border border-rose-200">Storniert</span>}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className={`font-bold ${isCreditNote ? 'text-rose-600' : 'text-slate-900'}`}>
-                        {isCreditNote ? '-' : ''}{parseFloat(doc.totalAmount || '0').toLocaleString('de-DE', { style: 'currency', currency: doc.currency || 'EUR' })}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <Link 
-                        href={linkPath}
-                        className="px-3 py-2 text-xs font-bold text-slate-500 hover:text-cyan-600 hover:bg-cyan-50 rounded-lg transition-colors border border-transparent hover:border-cyan-100 inline-flex items-center gap-1.5"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                        Öffnen
-                      </Link>
-                    </td>
-                  </tr>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <Link 
+                          href={linkPath}
+                          onClick={(e) => e.stopPropagation()}
+                          className="px-3 py-2 text-xs font-bold text-slate-500 hover:text-cyan-600 hover:bg-cyan-50 rounded-lg transition-colors border border-transparent hover:border-cyan-100 inline-flex items-center gap-1.5"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                          Öffnen
+                        </Link>
+                      </td>
+                    </tr>
+                    {expandedRowId === doc.id && (
+                      <tr className="bg-slate-50/50 border-b border-slate-100">
+                        <td colSpan={5} className="px-6 py-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-white rounded-xl border border-slate-100 shadow-sm animate-in fade-in slide-in-from-top-2">
+                            <div>
+                              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Rechnungsadresse</div>
+                              <div className="text-sm font-semibold text-slate-900">{doc.recipientName || '---'}</div>
+                              <div className="text-sm text-slate-600">{doc.recipientStreet || '---'}</div>
+                              <div className="text-sm text-slate-600">{(doc.recipientZip || '') + ' ' + (doc.recipientCity || '')}</div>
+                              <div className="text-sm text-slate-600">{doc.recipientCountry || '---'}</div>
+                              <div className="text-sm text-slate-500 mt-1">{doc.recipientEmail || '---'}</div>
+                            </div>
+                            <div>
+                              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Dokumenten-Infos</div>
+                              <div className="flex justify-between items-center py-1 border-b border-slate-50">
+                                <span className="text-xs text-slate-500">Erstellt am</span>
+                                <span className="text-xs font-medium text-slate-900">{new Date(doc.createdAt).toLocaleDateString('de-DE')}</span>
+                              </div>
+                              <div className="flex justify-between items-center py-1 border-b border-slate-50">
+                                <span className="text-xs text-slate-500">Status</span>
+                                <span className="text-xs font-medium text-slate-900">{doc.status === 'draft' ? 'Entwurf' : doc.status === 'issued' ? 'Ausgestellt' : 'Storniert'}</span>
+                              </div>
+                              <div className="flex justify-between items-center py-1 border-b border-slate-50">
+                                <span className="text-xs text-slate-500">Bezahlt am</span>
+                                <span className="text-xs font-medium text-slate-900">{doc.paidAt ? new Date(doc.paidAt).toLocaleDateString('de-DE') : '---'}</span>
+                              </div>
+                              <div className="flex justify-between items-center py-1">
+                                <span className="text-xs text-slate-500">Dokument-Typ</span>
+                                <span className="text-xs font-medium text-slate-900">{isQuote ? 'Angebot' : isDelivery ? 'Lieferschein' : isCreditNote ? 'Gutschrift' : 'Rechnung'}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 )
               })}
               {filteredDocs.length === 0 && (
