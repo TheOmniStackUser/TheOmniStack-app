@@ -5,6 +5,7 @@ import { companies } from './companies'
 export const integrationTypeEnum = pgEnum('integration_type', [
   'amazon',
   'otto',
+  'etsy',
   'mirakl_decathlon',
   'mirakl_decathlon_eu',
   'mirakl_mediamarkt',

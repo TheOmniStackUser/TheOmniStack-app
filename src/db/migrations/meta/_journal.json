@@ -218,6 +218,13 @@
       "when": 1785320638585,
       "tag": "0030_hard_lionheart",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1786002229723,
+      "tag": "0031_absent_lester",
+      "breakpoints": true
     }
   ]
 }

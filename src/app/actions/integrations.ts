@@ -627,6 +627,61 @@ export async function saveEbayIntegrationAction(
   return { success: true, message: 'eBay Zugangsdaten wurden erfolgreich gespeichert!' }
 }
 
+// ─── Etsy ───────────────────────────────────────────────────────────────
+const EtsyIntegrationSchema = z.object({
+  clientId: z.string().min(1, { message: 'Keystring (Client ID) ist erforderlich.' }).trim(),
+  clientSecret: z.string().min(1, { message: 'Shared Secret (Client Secret) ist erforderlich.' }).trim(),
+})
+
+export async function saveEtsyIntegrationAction(
+  _state: IntegrationFormState,
+  formData: FormData
+): Promise<IntegrationFormState> {
+  const auth = await requireAuth()
+
+  const validated = EtsyIntegrationSchema.safeParse({
+    clientId: formData.get('clientId'),
+    clientSecret: formData.get('clientSecret'),
+  })
+
+  if (!validated.success) {
+    return { errors: validated.error.flatten().fieldErrors }
+  }
+
+  const { clientId, clientSecret } = validated.data
+
+  const [existing] = await db
+    .select({ id: marketplaceIntegrations.id })
+    .from(marketplaceIntegrations)
+    .where(
+      and(
+        eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
+        eq(marketplaceIntegrations.type, 'etsy')
+      )
+    )
+    .limit(1)
+
+  if (existing) {
+    await db
+      .update(marketplaceIntegrations)
+      .set({ clientId, clientSecret, updatedAt: new Date() })
+      .where(eq(marketplaceIntegrations.id, existing.id))
+  } else {
+    await db
+      .insert(marketplaceIntegrations)
+      .values({
+        companyId: auth.activeCompanyId,
+        type: 'etsy',
+        clientId,
+        clientSecret,
+        environment: 'production',
+      })
+  }
+
+  revalidatePath('/integrations')
+  return { success: true, message: 'Etsy Zugangsdaten wurden erfolgreich gespeichert! Bitte autorisiere die App nun im nächsten Schritt.' }
+}
+
 // ─── WooCommerce ───────────────────────────────────────────────────────────────
 const WooCommerceIntegrationSchema = z.object({
   environment: z.string().url({ message: 'Bitte gib eine gültige Shop URL an (inkl. https://).' }).trim(),

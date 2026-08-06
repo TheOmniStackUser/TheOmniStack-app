@@ -12,8 +12,8 @@ import { ShopifyIntegrationForm } from './shopify-form'
 import { AboutYouIntegrationForm } from './aboutyou-form'
 import { KauflandIntegrationForm } from './kaufland-form'
 import { EbayIntegrationForm } from './ebay-form'
-import { WooCommerceIntegrationForm } from './woocommerce-form'
 import { ShopwareIntegrationForm } from './shopware-form'
+import { EtsyIntegrationForm } from './etsy-form'
 import { SyncSettingsForm } from './sync-settings-form'
 import type { DhlConfig } from './dhl-form'
 import { CollapsibleSection } from '@/components/collapsible-section'
@@ -50,6 +50,7 @@ export default async function IntegrationsPage(props: {
     .map((i) => {
       let label: string = i.type
       if (i.type === 'otto') label = 'Otto.de'
+      else if (i.type === 'etsy') label = 'Etsy'
       else if (i.type === 'amazon') label = 'Amazon EU'
       else if (i.type === 'shopify') label = 'Shopify'
       else if (i.type === 'aboutyou') label = 'About You'
@@ -76,6 +77,7 @@ export default async function IntegrationsPage(props: {
 
       let label: string = i.type
       if (i.type === 'otto') label = 'Otto.de'
+      else if (i.type === 'etsy') label = 'Etsy'
       else if (i.type === 'amazon') label = 'Amazon EU'
       else if (i.type === 'shopify') label = 'Shopify'
       else if (i.type === 'aboutyou') label = 'About You'
@@ -141,6 +143,24 @@ export default async function IntegrationsPage(props: {
         </div>
       )}
 
+      {status === 'etsy_success' && (
+        <div className="mb-8 bg-green-50 border border-green-200 p-4 rounded-lg flex items-center text-green-700 animate-in fade-in slide-in-from-top-4 duration-500">
+          <svg className="w-5 h-5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+          </svg>
+          <span className="font-medium">Etsy wurde erfolgreich über OAuth2 verbunden!</span>
+        </div>
+      )}
+
+      {status?.startsWith('etsy_error') && (
+        <div className="mb-8 bg-red-50 border border-red-200 p-4 rounded-lg flex items-center text-red-700 animate-in fade-in slide-in-from-top-4 duration-500">
+          <svg className="w-5 h-5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+          </svg>
+          <span className="font-medium">Fehler bei der Etsy-Anbindung: {status === 'etsy_error_missing_creds' ? 'Zugangsdaten fehlen.' : 'Autorisierung fehlgeschlagen.'}</span>
+        </div>
+      )}
+
       <div className="space-y-12">
         {/* SECTION: AUTOMATION / SCHEDULE */}
         <CollapsibleSection
@@ -199,6 +219,36 @@ export default async function IntegrationsPage(props: {
                   companyId={auth.activeCompanyId}
                   initialEnvironment={ottoIntegration?.environment || 'production'}
                   initialReturnAddressCarrierId={(ottoIntegration?.metadata as any)?.returnAddressCarrierId || ''}
+                />
+              </div>
+            </CollapsibleSection>
+
+            {/* Etsy Card */}
+            <CollapsibleSection
+              title="Etsy"
+              subtitle="API Anbindung für Bestellimport & Bestandsabgleich"
+              icon={
+                <div className="w-10 h-10 bg-orange-50 border border-orange-200 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform duration-200 hover:scale-105">
+                  <span className="text-[#F16521] font-black text-xs tracking-tighter">Etsy</span>
+                </div>
+              }
+              badge={integrations.find((i: any) => i.type === 'etsy')?.accessToken ? (
+                <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  Verbunden
+                </span>
+              ) : (
+                <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
+                  Nicht verbunden
+                </span>
+              )}
+            >
+              <div className="p-6 bg-gray-50">
+                <EtsyIntegrationForm 
+                  companyId={auth.activeCompanyId}
+                  initialClientId={integrations.find((i: any) => i.type === 'etsy')?.clientId || ''}
+                  initialClientSecret={integrations.find((i: any) => i.type === 'etsy')?.clientSecret || ''}
+                  isConnected={!!integrations.find((i: any) => i.type === 'etsy')?.accessToken}
                 />
               </div>
             </CollapsibleSection>

@@ -38,6 +38,7 @@ export const shippingStatusEnum = pgEnum('shipping_status', [
 export const marketplaceEnum = pgEnum('marketplace', [
   'amazon',
   'otto',
+  'etsy',
   'mirakl_decathlon',
   'mirakl_decathlon_eu',
   'mirakl_mediamarkt',

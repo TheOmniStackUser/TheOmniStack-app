@@ -28,6 +28,7 @@ import { KauflandAdapter } from '@/adapters/marketplace/kaufland'
 import { EbayAdapter } from '@/adapters/marketplace/ebay'
 import { WooCommerceAdapter } from '@/adapters/marketplace/woocommerce'
 import { ShopwareAdapter } from '@/adapters/marketplace/shopware'
+import { EtsyAdapter } from '@/adapters/marketplace/etsy'
 import type { NormalizedOrder, MarketplaceAdapter } from '@/adapters/marketplace/base'
 import { createInvoiceForOrder, formatDocumentNumber, getDefaultSettings, extractPaymentInfo } from '@/lib/invoice-service'
 import { get2LetterCountryCode } from '@/lib/countries'
@@ -511,6 +512,10 @@ export function getAdapterForIntegration(
     if (!integration.environment) return null
     return new ShopifyAdapter()
   }
+  if (integration.type === 'etsy') {
+    if (!integration.clientId || !integration.clientSecret) return null
+    return new EtsyAdapter()
+  }
   if (integration.type === 'aboutyou') {
     if (!integration.apiKey) return null
     return new AboutYouAdapter({
@@ -956,7 +961,20 @@ export async function downloadAndSaveMarketplaceInvoice(
     return true
   } catch (err) {
     console.error(`[Worker] Error downloading and saving invoice for order ${order.marketplaceOrderId}:`, err)
-    if (err instanceof Error && err.message === 'RATE_LIMIT') {
+    if (err instanceof Error && err.message.startsWith('RATE_LIMIT')) {
+      if (err.message === 'RATE_LIMIT_403') {
+        await auditLog({
+          companyId,
+          userId: null,
+          action: 'sync_error',
+          entityType: 'marketplace_sync',
+          entityId: order.marketplace,
+          nextState: {
+            marketplace: order.marketplace,
+            error: `Otto API Error (403): Missing permissions for receipts or rate limited. Order: ${order.marketplaceOrderId}`,
+          },
+        }).catch(e => console.error("Failed to write audit log:", e))
+      }
       return 'RATE_LIMIT'
     }
     return false
@@ -1000,6 +1018,19 @@ export async function syncOttoCreditNotes(
       
       if (!res.ok) {
         console.warn(`[OttoCreditNoteSync] Failed to fetch receipts: ${res.status}`);
+        if (res.status === 403) {
+          await auditLog({
+            companyId,
+            userId: null,
+            action: 'sync_error',
+            entityType: 'marketplace_sync',
+            entityId: 'otto',
+            nextState: {
+              marketplace: 'otto',
+              error: `Otto API Error (403): Missing permissions for receipts or rate limited during Credit Note Sync.`,
+            },
+          }).catch(e => console.error("Failed to write audit log:", e));
+        }
         break;
       }
 
