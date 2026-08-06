@@ -1188,7 +1188,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
         <div className="flex justify-between items-center border-b border-slate-100 pb-4"><h2 className="text-xl font-bold text-slate-900">Positionen</h2><button type="button" onClick={addItem} className="text-sm font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1">+ Zeile hinzufügen</button></div>
         <div className="space-y-4">
           {items.map((item, index) => (
-            <div key={index} className="grid grid-cols-1 md:grid-cols-[8rem_1fr_5rem_6rem_6rem_5rem_6rem_auto] gap-4 items-start bg-slate-50/50 p-4 rounded-xl border border-slate-200">
+            <div key={index} className="grid grid-cols-1 md:grid-cols-[128px_1fr_80px_120px_120px_70px_120px_auto] gap-4 items-start bg-slate-50/50 p-4 rounded-xl border border-slate-200">
               <div className="w-full">
                 <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1 whitespace-nowrap">Art.-Nr.</label>
                 <input 
