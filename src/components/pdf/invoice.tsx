@@ -464,10 +464,10 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
             <View key={idx} style={styles.tableRow} wrap={false}>
               <Text style={styles.colPos}>{idx + 1}</Text>
               <View style={styles.colSkuTitle}>
-                <Text style={styles.bold}>{item.title}</Text>
                 {item.sku && (
-                  <Text style={{ fontSize: 8 }}>{item.sku}</Text>
+                  <Text style={styles.bold}>{item.sku}</Text>
                 )}
+                <Text>{item.title}</Text>
               </View>
               <Text style={styles.colMenge}>{item.quantity}</Text>
               <Text style={styles.colTax}>{Number((item.taxRate * 100).toFixed(2))}%</Text>
