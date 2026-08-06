@@ -353,6 +353,8 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
         discountRate: metadata.discountRate,
         skontoRate: metadata.skontoRate,
         skontoDays: metadata.skontoDays,
+        showServiceDateNote: metadata.showServiceDateNote,
+        serviceDate: metadata.serviceDate,
       }) as any
     )
   }
@@ -657,6 +659,8 @@ export async function regenerateInvoicePdf(invoiceId: string, companyId: string)
         discountRate: metadata.discountRate,
         skontoRate: metadata.skontoRate,
         skontoDays: metadata.skontoDays,
+        showServiceDateNote: metadata.showServiceDateNote,
+        serviceDate: metadata.serviceDate,
       }) as any
     )
   }

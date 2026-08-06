@@ -60,6 +60,7 @@ export async function createManualInvoiceAction(data: {
   documentType?: 'invoice' | 'quote' | 'delivery_note'
   cancelsInvoiceId?: string
   showServiceDateNote?: boolean
+  serviceDate?: string
 }) {
   try {
     const auth = await requireAuth()
@@ -222,6 +223,7 @@ export async function createManualInvoiceAction(data: {
             skontoDays: data.skontoDays,
             discountRate: data.discountRate,
             showServiceDateNote: data.showServiceDateNote,
+            serviceDate: data.serviceDate,
             ossEnabled: data.ossEnabled,
             dueDateDays: data.dueDateDays,
             createOrder: data.createOrder
@@ -739,6 +741,7 @@ export async function getDraftDetailsAction(draftId: string) {
       skontoDays: metadata.skontoDays,
       discountRate: metadata.discountRate,
       showServiceDateNote: metadata.showServiceDateNote,
+      serviceDate: metadata.serviceDate,
       ossEnabled: metadata.ossEnabled,
       dueDateDays: metadata.dueDateDays,
       createOrder: metadata.createOrder ?? false
@@ -820,6 +823,7 @@ export async function previewInvoiceAction(data: {
   externalId?: string
   documentType?: 'invoice' | 'quote' | 'delivery_note'
   showServiceDateNote?: boolean
+  serviceDate?: string
   discountRate?: number
   skontoRate?: number
   skontoDays?: number
@@ -847,6 +851,7 @@ export async function previewInvoiceAction(data: {
       taxOption: data.taxOption,
       documentType: data.documentType || 'invoice',
       showServiceDateNote: data.showServiceDateNote,
+      serviceDate: data.serviceDate,
       discountRate: data.discountRate,
       skontoRate: data.skontoRate,
       skontoDays: data.skontoDays,
@@ -941,6 +946,7 @@ export async function editManualInvoiceAction(data: {
   dueDateDays?: number
   vatCheckStatus?: { status: string, lastChecked?: Date }
   showServiceDateNote?: boolean
+  serviceDate?: string
 }) {
   try {
     const auth = await requireAuth()
@@ -1077,6 +1083,7 @@ export async function editManualInvoiceAction(data: {
             skontoDays: data.skontoDays,
             discountRate: data.discountRate,
             showServiceDateNote: data.showServiceDateNote,
+            serviceDate: data.serviceDate,
             ossEnabled: data.ossEnabled,
             dueDateDays: data.dueDateDays
           },

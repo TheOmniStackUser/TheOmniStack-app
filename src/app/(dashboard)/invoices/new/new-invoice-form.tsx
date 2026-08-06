@@ -66,7 +66,8 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
     isOss: false,
     taxOption: 'standard',
     createOrder: false,
-    showServiceDateNote: false
+    showServiceDateNote: false,
+    serviceDate: ''
   })
 
   const getAvailableVatRates = () => {
@@ -261,6 +262,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
         isOss: (invoice as any).ossEnabled || false,
         createOrder: (invoice as any).createOrder || false,
         showServiceDateNote: (invoice as any).showServiceDateNote || false,
+        serviceDate: (invoice as any).serviceDate || '',
       })
       setCustomText(invoice.customText || '')
       setShowDraftsList(false)
@@ -318,6 +320,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
         isOss: invoice.ossEnabled || false,
         createOrder: false,
         showServiceDateNote: false,
+        serviceDate: '',
       })
       
       if (isCreditNoteParam === 'true') {
@@ -515,6 +518,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
           discountRate: settings.discount,
           ossEnabled: settings.isOss,
           showServiceDateNote: settings.showServiceDateNote,
+          serviceDate: settings.serviceDate,
           dueDateDays: settings.dueDateDays,
           vatCheckStatus
         })
@@ -557,6 +561,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
         discountRate: settings.discount,
         ossEnabled: settings.isOss,
         showServiceDateNote: settings.showServiceDateNote,
+        serviceDate: settings.serviceDate,
         dueDateDays: settings.dueDateDays,
         createOrder: settings.createOrder,
         currentDraftId,
@@ -611,6 +616,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
         externalId: settings.externalId,
         documentType,
         showServiceDateNote: settings.showServiceDateNote,
+        serviceDate: settings.serviceDate,
         discountRate: settings.discount,
         skontoRate: settings.skontoPercent,
         skontoDays: settings.skontoDays,
@@ -871,25 +877,15 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   <span className="text-sm font-bold text-slate-700">OSS-Verfahren aktiv</span>
                 </label>
               </div>
-              <div className="flex items-center gap-3 pt-4">
-                <label className="flex items-center gap-3 cursor-pointer group">
-                  <div className={`w-12 h-6 shrink-0 rounded-full transition-all relative ${settings.showServiceDateNote ? 'bg-blue-600' : 'bg-slate-200'}`}>
-                    <input 
-                      type="checkbox" 
-                      checked={settings.showServiceDateNote} 
-                      onChange={e => {
-                        const checked = e.target.checked
-                        setSettings({ ...settings, showServiceDateNote: checked })
-                        if (typeof window !== 'undefined') {
-                          localStorage.setItem('billing_app_showServiceDateNote', checked.toString())
-                        }
-                      }} 
-                      className="sr-only" 
-                    />
-                    <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all ${settings.showServiceDateNote ? 'left-7' : 'left-1'}`} />
-                  </div>
-                  <span className="text-sm font-bold text-slate-700">Leistungsdatum entspricht Rechnungsdatum</span>
-                </label>
+              <div className="pt-2">
+                <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Leistungsdatum</label>
+                <input 
+                  type="date"
+                  className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-slate-900 placeholder:text-slate-500" 
+                  value={settings.serviceDate || ''}
+                  onChange={e => setSettings({ ...settings, serviceDate: e.target.value })} 
+                />
+                <p className="text-xs text-slate-500 mt-2">Wenn leer, wird automatisch gedruckt: "Das Rechnungsdatum entspricht dem Leistungsdatum"</p>
               </div>
             </div>
           </div>
