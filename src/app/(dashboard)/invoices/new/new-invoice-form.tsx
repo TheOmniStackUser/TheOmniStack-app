@@ -469,8 +469,8 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
     dueDate.setDate(dueDate.getDate() + settings.dueDateDays)
 
     // Validation
-    if (!customer.name.trim()) {
-      setNotification({ message: 'Bitte geben Sie einen Kundennamen ein.', type: 'error' })
+    if (!customer.name.trim() && !customer.companyName?.trim()) {
+      setNotification({ message: 'Bitte geben Sie eine Firma oder einen Vor-/Nachnamen ein.', type: 'error' })
       if (status === 'issued') setIsSubmitting(false)
       else setIsSavingDraft(false)
       return
@@ -909,9 +909,8 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                 />
               </div>
               <div className="md:col-span-2">
-                <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Vor- und Nachname *</label>
+                <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Vor- und Nachname</label>
                 <input 
-                  required 
                   className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-slate-900 placeholder:text-slate-500" 
                   value={customer.name} 
                   onChange={e => handleSearchCustomers(e.target.value)} 
@@ -1474,8 +1473,8 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                     <input className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-slate-900 placeholder:text-slate-500" value={customerFormData?.companyName || ''} onChange={e => setCustomerFormData({ ...customerFormData, companyName: e.target.value })} placeholder="Muster GmbH (Optional)" />
                   </div>
                   <div className="md:col-span-2">
-                    <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Vor- und Nachname *</label>
-                    <input required className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-slate-900 placeholder:text-slate-500" value={customerFormData?.name || ''} onChange={e => setCustomerFormData({ ...customerFormData, name: e.target.value })} placeholder="Erika Mustermann" />
+                    <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Vor- und Nachname</label>
+                    <input className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-slate-900 placeholder:text-slate-500" value={customerFormData?.name || ''} onChange={e => setCustomerFormData({ ...customerFormData, name: e.target.value })} placeholder="Erika Mustermann" />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-600 uppercase mb-1">E-Mail</label>
