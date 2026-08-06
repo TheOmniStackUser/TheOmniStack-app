@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { addUserAction, removeUserAction, getOrCreateInviteLinkAction, updateCurrentUserAction } from '@/app/actions/users'
+import { addUserAction, removeUserAction, getOrCreateInviteLinkAction, updateCurrentUserAction, updateUserRoleAction } from '@/app/actions/users'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
 import { CancelModal } from './cancel-modal'
@@ -41,6 +41,7 @@ export function UserList({
   const [isAdding, setIsAdding] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null)
   const [generatedLink, setGeneratedLink] = useState<string | null>(null)
   const [copiedLink, setCopiedLink] = useState(false)
 
@@ -140,8 +141,18 @@ export function UserList({
 
     const result = await removeUserAction(userId)
     if (result?.error) {
-      alert(result.error)
+      setError(result.error)
     }
+  }
+
+  const handleRoleChange = async (userId: string, newRole: string) => {
+    setUpdatingRoleId(userId)
+    setError(null)
+    const result = await updateUserRoleAction(userId, newRole)
+    if (result?.error) {
+      setError(result.error)
+    }
+    setUpdatingRoleId(null)
   }
 
   const canManage = currentUserRole === 'owner' || currentUserRole === 'admin' || currentUserRole === 'omnistack_support' || currentUserRole === 'omnistack_beta'
@@ -415,19 +426,51 @@ export function UserList({
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${
-                          member.role === 'owner' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                          member.role === 'admin' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                          member.role === 'omnistack_support' ? 'bg-purple-50 text-purple-700 border-purple-200' :
-                          member.role === 'omnistack_beta' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' :
-                          'bg-slate-50 text-slate-600 border-slate-200'
-                        }`}>
-                          {member.role === 'owner' ? 'Besitzer' : 
-                           member.role === 'admin' ? 'Administrator' : 
-                           member.role === 'omnistack_support' ? 'TheOmniStack Support (Vollzugriff)' :
-                           member.role === 'omnistack_beta' ? 'TheOmniStack Mitarbeiter' :
-                           'Mitarbeiter'}
-                        </span>
+                        {canManage && member.id !== currentUserId && member.role !== 'owner' ? (
+                          <div className="relative flex items-center">
+                            <select
+                              value={member.role}
+                              onChange={(e) => handleRoleChange(member.id, e.target.value)}
+                              disabled={updatingRoleId === member.id}
+                              className={`appearance-none outline-none cursor-pointer inline-flex items-center pl-2.5 pr-6 py-0.5 rounded-full text-xs font-bold border transition-colors ${
+                                member.role === 'admin' ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 focus:ring-2 focus:ring-blue-500' :
+                                member.role === 'omnistack_support' ? 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 focus:ring-2 focus:ring-purple-500' :
+                                member.role === 'omnistack_beta' ? 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 focus:ring-2 focus:ring-indigo-500' :
+                                'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 focus:ring-2 focus:ring-slate-500'
+                              }`}
+                              style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundPosition: 'right 0.3rem center', backgroundSize: '0.75em 0.75em', backgroundRepeat: 'no-repeat' }}
+                            >
+                              <option value="staff">Mitarbeiter</option>
+                              <option value="admin">Administrator</option>
+                              {currentUserRole === 'owner' && (
+                                <>
+                                  <option value="omnistack_support">TheOmniStack Support</option>
+                                  <option value="omnistack_beta">TheOmniStack Beta</option>
+                                </>
+                              )}
+                            </select>
+                            {updatingRoleId === member.id && (
+                              <svg className="animate-spin h-3.5 w-3.5 text-slate-500 ml-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                            )}
+                          </div>
+                        ) : (
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${
+                            member.role === 'owner' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                            member.role === 'admin' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                            member.role === 'omnistack_support' ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                            member.role === 'omnistack_beta' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' :
+                            'bg-slate-50 text-slate-700 border-slate-200'
+                          }`}>
+                            {member.role === 'owner' ? 'Besitzer' : 
+                             member.role === 'admin' ? 'Administrator' : 
+                             member.role === 'omnistack_support' ? 'TheOmniStack Support (Vollzugriff)' :
+                             member.role === 'omnistack_beta' ? 'TheOmniStack Mitarbeiter' :
+                             'Mitarbeiter'}
+                          </span>
+                        )}
                         {member.isPending && (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border bg-yellow-50 text-yellow-700 border-yellow-200">
                             Ausstehend

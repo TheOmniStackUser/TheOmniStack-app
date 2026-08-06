@@ -294,3 +294,54 @@ export async function updateCurrentUserAction(formData: FormData) {
   }
 }
 
+export async function updateUserRoleAction(userId: string, newRole: string) {
+  const auth = await requireAuth()
+  if (auth.role !== 'owner' && auth.role !== 'admin' && auth.role !== 'omnistack_support' && auth.role !== 'omnistack_beta') {
+    throw new Error('Keine Berechtigung')
+  }
+
+  // Check if target user exists and is member of company
+  const [member] = await db
+    .select()
+    .from(companyMembers)
+    .where(
+      and(
+        eq(companyMembers.userId, userId),
+        eq(companyMembers.companyId, auth.activeCompanyId)
+      )
+    )
+    .limit(1)
+
+  if (!member) return { error: 'Mitglied nicht gefunden' }
+
+  if (member.role === 'owner') {
+    return { error: 'Die Rolle des Besitzers kann nicht geändert werden' }
+  }
+  
+  if (newRole === 'owner') {
+    return { error: 'Die Besitzer-Rolle kann nicht manuell vergeben werden' }
+  }
+  
+  if ((newRole === 'omnistack_support' || newRole === 'omnistack_beta') && auth.role !== 'owner') {
+    return { error: 'Nur Besitzer können Support-Rollen vergeben' }
+  }
+
+  const validRoles = ['admin', 'staff', 'omnistack_support', 'omnistack_beta']
+  if (!validRoles.includes(newRole)) {
+    return { error: 'Ungültige Rolle' }
+  }
+
+  await db
+    .update(companyMembers)
+    .set({ role: newRole as any })
+    .where(
+      and(
+        eq(companyMembers.userId, userId),
+        eq(companyMembers.companyId, auth.activeCompanyId)
+      )
+    )
+
+  revalidatePath('/settings/users')
+  return { success: true }
+}
+
