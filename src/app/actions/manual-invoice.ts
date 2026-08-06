@@ -225,6 +225,14 @@ export async function createManualInvoiceAction(data: {
             ossEnabled: data.ossEnabled,
             dueDateDays: data.dueDateDays,
             createOrder: data.createOrder
+          },
+          manualBillingAddress: {
+            name: data.customer.name || '',
+            company: data.customer.companyName || '',
+            street: data.customer.street || '',
+            zip: data.customer.zip || '',
+            city: data.customer.city || '',
+            country: data.customer.country || 'DE'
           }
         }
       })
@@ -865,10 +873,11 @@ export async function previewInvoiceAction(data: {
         footerTextEn: data.documentType === 'quote' ? (company.offerFooterEn || undefined) : (company.invoiceFooterEn || undefined),
       },
       recipient: {
-        name: data.customer.name || 'Empfänger Name',
-        street: data.customer.street || 'Straße 1',
-        zip: data.customer.zip || '12345',
-        city: data.customer.city || 'Stadt',
+        name: data.customer.name || '',
+        company: data.customer.companyName || undefined,
+        street: data.customer.street || '',
+        zip: data.customer.zip || '',
+        city: data.customer.city || '',
         country: data.customer.country || 'DE',
       },
       items: data.items.map(i => ({
@@ -1052,7 +1061,9 @@ export async function editManualInvoiceAction(data: {
         totalAmount: total.toFixed(2),
         marketplacePurchaseDate: data.orderDate || new Date(),
         rawPayload: {
+          ...((linkedOrder.rawPayload as any) || {}),
           manualMetadata: {
+            ...((linkedOrder.rawPayload as any)?.manualMetadata || {}),
             customText: data.customText,
             taxOption: data.taxOption,
             shippingCountry: data.shippingCountry,
@@ -1068,6 +1079,14 @@ export async function editManualInvoiceAction(data: {
             showServiceDateNote: data.showServiceDateNote,
             ossEnabled: data.ossEnabled,
             dueDateDays: data.dueDateDays
+          },
+          manualBillingAddress: {
+            name: data.customer.name || '',
+            company: data.customer.companyName || '',
+            street: data.customer.street || '',
+            zip: data.customer.zip || '',
+            city: data.customer.city || '',
+            country: data.customer.country || 'DE'
           }
         }
       }).where(eq(orders.id, linkedOrder.id))
