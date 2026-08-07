@@ -13,14 +13,14 @@ export class EtsyAdapter implements MarketplaceAdapter {
     if (!integration) return []
 
     const accessToken = await this.getAccessToken(integration)
-    const shopId = await this.getShopId(integration.clientId!, accessToken)
+    const shopId = await this.getShopId(integration.clientId!, integration.clientSecret!, accessToken)
 
     // Fetch unshipped orders
     const endpoint = `${this.baseUrl}/shops/${shopId}/receipts?was_shipped=false&limit=100`
     const res = await fetch(endpoint, {
       method: 'GET',
       headers: {
-        'x-api-key': integration.clientId!,
+        'x-api-key': `${integration.clientId!}:${integration.clientSecret!}`,
         'Authorization': `Bearer ${accessToken}`,
       },
     })
@@ -97,7 +97,7 @@ export class EtsyAdapter implements MarketplaceAdapter {
     if (!integration) return
 
     const accessToken = await this.getAccessToken(integration)
-    const shopId = await this.getShopId(integration.clientId!, accessToken)
+    const shopId = await this.getShopId(integration.clientId!, integration.clientSecret!, accessToken)
 
     const payload = new URLSearchParams({
       tracking_code: trackingNumber,
@@ -108,7 +108,7 @@ export class EtsyAdapter implements MarketplaceAdapter {
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: {
-        'x-api-key': integration.clientId!,
+        'x-api-key': `${integration.clientId!}:${integration.clientSecret!}`,
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/x-www-form-urlencoded'
       },
@@ -126,7 +126,7 @@ export class EtsyAdapter implements MarketplaceAdapter {
     if (!integration) return []
 
     const accessToken = await this.getAccessToken(integration)
-    const shopId = await this.getShopId(integration.clientId!, accessToken)
+    const shopId = await this.getShopId(integration.clientId!, integration.clientSecret!, accessToken)
 
     let offset = 0
     let limit = 100
@@ -138,7 +138,7 @@ export class EtsyAdapter implements MarketplaceAdapter {
       const res = await fetch(endpoint, {
         method: 'GET',
         headers: {
-          'x-api-key': integration.clientId!,
+          'x-api-key': `${integration.clientId!}:${integration.clientSecret!}`,
           'Authorization': `Bearer ${accessToken}`,
         },
       })
@@ -156,7 +156,7 @@ export class EtsyAdapter implements MarketplaceAdapter {
         const inventoryRes = await fetch(`${this.baseUrl}/listings/${listing.listing_id}/inventory`, {
           method: 'GET',
           headers: {
-            'x-api-key': integration.clientId!,
+            'x-api-key': `${integration.clientId!}:${integration.clientSecret!}`,
             'Authorization': `Bearer ${accessToken}`,
           }
         })
@@ -267,12 +267,12 @@ export class EtsyAdapter implements MarketplaceAdapter {
     return newAccessToken
   }
 
-  private async getShopId(clientId: string, accessToken: string): Promise<string> {
+  private async getShopId(clientId: string, clientSecret: string, accessToken: string): Promise<string> {
     // 1. Get user id
     const userRes = await fetch(`${this.baseUrl}/users/me`, {
        method: 'GET',
        headers: {
-          'x-api-key': clientId,
+          'x-api-key': `${clientId}:${clientSecret}`,
           'Authorization': `Bearer ${accessToken}`
        }
     })
@@ -289,7 +289,7 @@ export class EtsyAdapter implements MarketplaceAdapter {
     const shopRes = await fetch(`${this.baseUrl}/users/${userId}/shops`, {
        method: 'GET',
        headers: {
-          'x-api-key': clientId,
+          'x-api-key': `${clientId}:${clientSecret}`,
           'Authorization': `Bearer ${accessToken}`
        }
     })
