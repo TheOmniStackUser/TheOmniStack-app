@@ -217,7 +217,7 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
   const { paymentMethod, isPaid } = extractPaymentInfo(order)
   const metadata = (order.rawPayload as any)?.manualMetadata || {}
 
-  let billingName = order.buyerName || order.shippingName || 'Kunde'
+  let billingName = order.buyerName || order.shippingName || ''
   let billingCompany = order.shippingCompany || ''
   let billingAddressAddition = order.shippingAddressAddition || ''
   let billingPhone = order.buyerPhone || ''
@@ -271,7 +271,7 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
   if (documentType === 'delivery_note') {
     const { DeliveryNoteDocument } = await import('@/components/pdf/delivery-note')
     const mappedOrder = {
-      shippingName: order.shippingName || order.buyerName || 'Kunde',
+      shippingName: order.shippingName || order.buyerName || '',
       shippingCompany: order.shippingCompany || '',
       shippingAddressAddition: order.shippingAddressAddition || '',
       shippingPhone: order.buyerPhone || '',
@@ -579,7 +579,7 @@ export async function regenerateInvoicePdf(invoiceId: string, companyId: string)
   if (invoice.documentType === 'delivery_note') {
     const { DeliveryNoteDocument } = await import('@/components/pdf/delivery-note')
     const mappedOrder = {
-      shippingName: invoice.recipientName || 'Kunde',
+      shippingName: invoice.recipientName || '',
       shippingCompany: invoice.recipientCompany || '',
       shippingAddressAddition: invoice.recipientAddressAddition || '',
       shippingPhone: invoice.recipientPhone || '',
@@ -640,7 +640,7 @@ export async function regenerateInvoicePdf(invoiceId: string, companyId: string)
           footerTextEn: invoice.documentType === 'quote' ? (company.offerFooterEn || undefined) : (company.invoiceFooterEn || undefined),
         },
         recipient: {
-          name: invoice.recipientName || 'Kunde',
+          name: invoice.recipientName || '',
           company: invoice.recipientCompany || '',
           addressAddition: invoice.recipientAddressAddition || '',
           phone: invoice.recipientPhone || '',

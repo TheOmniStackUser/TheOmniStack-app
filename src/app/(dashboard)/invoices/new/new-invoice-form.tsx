@@ -1445,7 +1445,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                         </div>
                         <div className="text-right space-y-2">
                           <div className="text-[10px] font-black text-blue-600 bg-blue-50 px-3 py-1 rounded-full uppercase tracking-tighter border border-blue-100 group-hover:bg-blue-600 group-hover:text-white transition-all">
-                            {c.customerNumber || 'Kunde'}
+                            {c.customerNumber || ''}
                           </div>
                           {c.vatCheckResult && (
                             <div className={`text-[9px] font-black px-2 py-0.5 rounded-md border uppercase flex flex-col items-end ${c.vatCheckResult === 'VALID' ? 'text-green-600 bg-green-50 border-green-100' : 'text-red-600 bg-red-50 border-red-100'}`}>
@@ -1484,7 +1484,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                         </div>
                         <div className="text-right">
                           <div className="text-[10px] font-black text-blue-600 bg-blue-50 px-3 py-1 rounded-full uppercase tracking-tighter border border-blue-100 group-hover:bg-blue-600 group-hover:text-white transition-all">
-                            {c.customerNumber || 'Kunde'}
+                            {c.customerNumber || ''}
                           </div>
                           <div 
                             onClick={(e) => {

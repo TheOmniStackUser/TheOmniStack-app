@@ -392,7 +392,7 @@ export async function getInvoiceDetailsAction(invoiceId: string) {
       invoiceNumber: order.deliveryNoteNumber,
       draftName: null,
       status: 'issued',
-      recipientName: order.shippingName || order.buyerName || 'Kunde',
+      recipientName: order.shippingName || order.buyerName || '',
       recipientStreet: order.shippingStreet || '',
       recipientZip: order.shippingZip || '',
       recipientCity: order.shippingCity || '',

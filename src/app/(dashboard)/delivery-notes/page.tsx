@@ -105,7 +105,7 @@ export default async function DeliveryNotesPage() {
     id: o.id,
     invoiceNumber: o.deliveryNoteNumber!,
     status: 'issued',
-    recipientName: o.shippingName || o.buyerName || 'Kunde',
+    recipientName: o.shippingName || o.buyerName || '',
     recipientCountry: o.shippingCountry,
     totalAmount: o.totalAmount || '0.00',
     currency: o.currency || 'EUR',
