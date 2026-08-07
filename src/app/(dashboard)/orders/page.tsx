@@ -304,6 +304,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         hasDecathlonIntegration={hasDecathlonIntegration}
         hasAmazonIntegration={hasAmazonIntegration}
         hasShopifyIntegration={hasShopifyIntegration}
+        hasEtsyIntegration={hasEtsyIntegration}
         allUniqueCountries={allUniqueCountries}
       />
     </div>

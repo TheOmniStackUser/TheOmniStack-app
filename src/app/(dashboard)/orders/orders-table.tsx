@@ -401,6 +401,7 @@ export function OrdersTable({
   hasDecathlonIntegration = false,
   hasAmazonIntegration = false,
   hasShopifyIntegration = false,
+  hasEtsyIntegration = false,
   allUniqueCountries = [],
 }: { 
   orders: OrderWithItems[]
@@ -418,6 +419,7 @@ export function OrdersTable({
   hasDecathlonIntegration?: boolean
   hasAmazonIntegration?: boolean
   hasShopifyIntegration?: boolean
+  hasEtsyIntegration?: boolean
   allUniqueCountries?: string[]
 }) {
   const configuredDhlProducts = useMemo(() => {
@@ -484,6 +486,7 @@ export function OrdersTable({
     if (hasKauflandIntegration) direct.push({ value: 'kaufland', label: 'Kaufland' })
     if (hasEbayIntegration) direct.push({ value: 'ebay', label: 'eBay' })
     if (hasAmazonIntegration) direct.push({ value: 'amazon', label: 'Amazon' })
+    if (hasEtsyIntegration) direct.push({ value: 'etsy', label: 'Etsy' })
 
     // 2. Decathlon (dynamic based on displayed names)
     const decathlonDisplayNames = new Set<string>()
