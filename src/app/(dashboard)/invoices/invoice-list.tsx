@@ -846,7 +846,8 @@ export function InvoiceList({
       addSuggestion('Kunde', invoice.recipientName, invoice.invoiceNumber || documentLabel)
       addSuggestion('Firma', invoice.recipientCompany, invoice.invoiceNumber || documentLabel)
       addSuggestion('Entwurf', invoice.draftName, invoice.recipientName || documentLabel)
-      addSuggestion(process.env.NEXT_PUBLIC_APP_VARIANT === 'craft' ? 'Auftragsnummer' : 'Bestellnummer', invoice.marketplaceOrderId, invoice.invoiceNumber || documentLabel)
+      const displayMarketplaceId = invoice.marketplaceOrderId?.startsWith('MAN-NO-ORDER-') ? '' : invoice.marketplaceOrderId
+      addSuggestion(process.env.NEXT_PUBLIC_APP_VARIANT === 'craft' ? 'Auftragsnummer' : 'Bestellnummer', displayMarketplaceId, invoice.invoiceNumber || documentLabel)
       if (suggestions.length >= 6) break
     }
 
@@ -1184,7 +1185,8 @@ export function InvoiceList({
     const matchInvoice = (invoice.invoiceNumber || '').toLowerCase().includes(q) || (invoice.draftName || '').toLowerCase().includes(q)
     const matchCustomer = (invoice.recipientName || '').toLowerCase().includes(q)
     const matchCompany = (invoice.recipientCompany || '').toLowerCase().includes(q)
-    const matchOrder = (invoice.marketplaceOrderId || '').toLowerCase().includes(q) || (invoice.displayOrderNumber || '').toLowerCase().includes(q)
+    const displayMarketplaceId = invoice.marketplaceOrderId?.startsWith('MAN-NO-ORDER-') ? '' : invoice.marketplaceOrderId
+    const matchOrder = (displayMarketplaceId || '').toLowerCase().includes(q) || (invoice.displayOrderNumber || '').toLowerCase().includes(q)
     const matchTracking = (invoice.trackingNumber || '').toLowerCase().includes(q) || (invoice.returnTrackingNumber || '').toLowerCase().includes(q)
 
     if (scope === 'invoice') return matchInvoice
@@ -1716,12 +1718,12 @@ export function InvoiceList({
                   </td>
                   <td className="px-6 py-4 font-mono text-xs text-slate-600 group/bestell">
                     <div className="flex items-center gap-2">
-                      <span>{invoice.displayOrderNumber || invoice.marketplaceOrderId || '–'}</span>
-                      {(invoice.displayOrderNumber || invoice.marketplaceOrderId) && (
+                      <span>{invoice.marketplaceOrderId?.startsWith('MAN-NO-ORDER-') ? '–' : (invoice.displayOrderNumber || invoice.marketplaceOrderId || '–')}</span>
+                      {(invoice.displayOrderNumber || (invoice.marketplaceOrderId && !invoice.marketplaceOrderId.startsWith('MAN-NO-ORDER-'))) && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
-                            navigator.clipboard.writeText(invoice.displayOrderNumber || invoice.marketplaceOrderId || '')
+                            navigator.clipboard.writeText(invoice.displayOrderNumber || (invoice.marketplaceOrderId?.startsWith('MAN-NO-ORDER-') ? '' : invoice.marketplaceOrderId) || '')
                             showToast('Bestellnummer kopiert', 'success')
                           }}
                           className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 opacity-0 group-hover/bestell:opacity-100 transition-all focus:opacity-100"

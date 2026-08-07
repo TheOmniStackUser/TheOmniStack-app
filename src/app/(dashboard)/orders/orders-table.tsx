@@ -33,7 +33,8 @@ const getOrderNumber = (order: OrderWithItems) => {
     }
   }
   const parsedPayload = payload as { orderNumber?: unknown, name?: unknown } | null
-  return String(parsedPayload?.name || parsedPayload?.orderNumber || order.marketplaceOrderId || '')
+  const displayMarketplaceId = order.marketplaceOrderId?.startsWith('MAN-NO-ORDER-') ? '' : order.marketplaceOrderId
+  return String(parsedPayload?.name || parsedPayload?.orderNumber || displayMarketplaceId || '')
 }
 
 const getOrderBuyerName = (order: OrderWithItems) => {
@@ -961,7 +962,7 @@ export function OrdersTable({
         return acc
       }, 0) || 0
   
-      const orderQty = parseInt(orderItem.quantity) || 1
+      const orderQty = Number(orderItem.quantity) || 1
   
       return {
         sku: orderItem.sku || 'N/A',
@@ -2497,8 +2498,8 @@ const filteredOrders = orders;
                                 <div>
                                   <span className="font-medium">System Auftrags-ID:</span>{' '}
                                   <div className="inline-flex items-center gap-2 group/copy">
-                                    <span className="text-gray-500">{order.marketplaceOrderId}</span>
-                                    {order.marketplaceOrderId && (
+                                    <span className="text-gray-500">{order.marketplaceOrderId?.startsWith('MAN-NO-ORDER-') ? '–' : order.marketplaceOrderId}</span>
+                                    {(order.marketplaceOrderId && !order.marketplaceOrderId.startsWith('MAN-NO-ORDER-')) && (
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation()
@@ -3417,7 +3418,7 @@ const filteredOrders = orders;
               <div>
                 <h3 className="text-lg font-bold text-slate-900">Retourenerstattung veranlassen</h3>
                 <p className="text-xs text-slate-500 mt-1">
-                  Veranlasse eine Erstattung für Bestellung <span className="font-bold">{refundOrder.marketplaceOrderId}</span>. Es wird eine entsprechende Gutschrift (Credit Note) generiert.
+                  Veranlasse eine Erstattung für Bestellung <span className="font-bold">{refundOrder.marketplaceOrderId?.startsWith('MAN-NO-ORDER-') ? '–' : refundOrder.marketplaceOrderId}</span>. Es wird eine entsprechende Gutschrift (Credit Note) generiert.
                 </p>
               </div>
               <button
@@ -3522,7 +3523,7 @@ const filteredOrders = orders;
                             min="0"
                             max={item.orderQty - item.returnedQty}
                             value={item.refundQty}
-                            onChange={(e) => handleRefundQtyChange(idx, parseInt(e.target.value) || 0)}
+                            onChange={(e) => handleRefundQtyChange(idx, Number(e.target.value) || 0)}
                             className="w-12 text-center border-x border-indigo-100 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-bold !text-slate-900"
                           />
                           <button
