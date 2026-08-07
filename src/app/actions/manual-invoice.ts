@@ -133,49 +133,59 @@ export async function createManualInvoiceAction(data: {
     if (!company) throw new Error('Company not found')
 
     let orderNumber = data.orderNumber?.trim()
+    let uniqueMarketplaceOrderId = orderNumber
     if (!orderNumber) {
       if (data.status === 'draft') {
         orderNumber = `MAN-DRAFT-${Date.now()}`
+        uniqueMarketplaceOrderId = orderNumber
       } else {
-        const dbSettings = company.documentNumberSettings as any
-        const settingsKey = 'purchaseOrder'
-        const config = dbSettings?.[settingsKey] || getDefaultSettings(settingsKey, company)
+        if (data.createOrder) {
+          const dbSettings = company.documentNumberSettings as any
+          const settingsKey = 'purchaseOrder'
+          const config = dbSettings?.[settingsKey] || getDefaultSettings(settingsKey, company)
 
-        if (config && config.auto) {
-          const nextNum = parseInt(config.next, 10) || 10001
-          const padding = config.padding || 5
-          const customerNumber = ''
-          orderNumber = formatDocumentNumber(
-            config.format || 'B-%nummer%',
-            nextNum,
-            padding,
-            customerNumber,
-            ''
-          )
+          if (config && config.auto) {
+            const nextNum = parseInt(config.next, 10) || 10001
+            const padding = config.padding || 5
+            const customerNumber = ''
+            orderNumber = formatDocumentNumber(
+              config.format || 'B-%nummer%',
+              nextNum,
+              padding,
+              customerNumber,
+              ''
+            )
 
-          // Increment document next number in settings
-          const updatedSettings = {
-            ...dbSettings,
-            [settingsKey]: {
-              ...config,
-              next: (nextNum + 1).toString()
+            // Increment document next number in settings
+            const updatedSettings = {
+              ...dbSettings,
+              [settingsKey]: {
+                ...config,
+                next: (nextNum + 1).toString()
+              }
             }
+            await tx.update(companies)
+              .set({
+                documentNumberSettings: updatedSettings,
+                updatedAt: new Date()
+              })
+              .where(eq(companies.id, companyId))
+          } else {
+            // Fallback if not auto
+            orderNumber = `B-${Date.now()}`
           }
-          await tx.update(companies)
-            .set({
-              documentNumberSettings: updatedSettings,
-              updatedAt: new Date()
-            })
-            .where(eq(companies.id, companyId))
+          uniqueMarketplaceOrderId = orderNumber
         } else {
-          // Fallback if not auto
-          orderNumber = `B-${Date.now()}`
+          orderNumber = ''
+          uniqueMarketplaceOrderId = `MAN-NO-ORDER-${Date.now()}`
         }
       }
     }
 
     // Ensure marketplaceOrderId is unique within the company to prevent unique constraint violation
-    let uniqueMarketplaceOrderId = orderNumber
+    if (!uniqueMarketplaceOrderId) {
+      uniqueMarketplaceOrderId = `MAN-${Date.now()}`
+    }
     const existingOrder = await tx.query.orders.findFirst({
       where: and(
         eq(orders.companyId, companyId),
@@ -243,9 +253,10 @@ export async function createManualInvoiceAction(data: {
       .returning({ id: orders.id })
 
     await tx.insert(orderItems).values(
-      data.items.map(item => ({
+      data.items.map((item, index) => ({
         orderId: newOrder.id,
         companyId,
+        position: (index + 1).toString(),
         title: item.title,
         sku: item.sku,
         quantity: item.quantity.toString(),

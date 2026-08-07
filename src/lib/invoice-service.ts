@@ -149,7 +149,11 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
 
   const order = await dbClient.query.orders.findFirst({
     where: and(eq(orders.id, orderId), eq(orders.companyId, companyId)),
-    with: { items: true }
+    with: { 
+      items: {
+        orderBy: (items: any, { asc }: any) => [asc(items.position)]
+      } 
+    }
   })
 
   if (!order) throw new Error('Order not found')
@@ -544,7 +548,9 @@ export async function regenerateInvoicePdf(invoiceId: string, companyId: string)
   const invoice = await db.query.invoices.findFirst({
     where: and(eq(invoices.id, invoiceId), eq(invoices.companyId, companyId)),
     with: {
-      items: true,
+      items: {
+        orderBy: (items: any, { asc }: any) => [asc(items.position)]
+      },
       originalInvoice: true,
     }
   })

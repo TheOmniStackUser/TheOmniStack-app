@@ -152,7 +152,9 @@ export default async function InvoicesPage({
   const invoicesWithDunning = uniqueInvoices.map((inv) => {
     const logs = companyDunningLogs.filter((log) => log.invoiceId === inv.id)
     const raw = inv.rawPayload as { orderNumber?: unknown, name?: unknown } | null
-    const displayOrderNumber = String(raw?.name || raw?.orderNumber || inv.marketplaceOrderId || '')
+    let rawOrderStr = String(raw?.name || raw?.orderNumber || inv.marketplaceOrderId || '')
+    if (rawOrderStr.startsWith('MAN-NO-ORDER-')) rawOrderStr = ''
+    const displayOrderNumber = rawOrderStr
     
     return {
       ...inv,

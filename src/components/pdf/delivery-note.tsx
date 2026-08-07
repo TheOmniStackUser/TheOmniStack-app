@@ -6,7 +6,7 @@ import { format } from 'date-fns'
 
 const styles = StyleSheet.create({
   page: {
-    padding: '40px 50px',
+    padding: '40px 50px 100px 50px',
     fontFamily: 'Helvetica',
     fontSize: 9,
     color: '#000',

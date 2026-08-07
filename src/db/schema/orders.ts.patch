@@ -1,0 +1,16 @@
+--- src/db/schema/orders.ts
++++ src/db/schema/orders.ts
+@@ -107,11 +107,12 @@
+ export const orderItems = pgTable('order_items', {
+   id: uuid('id').primaryKey().defaultRandom(),
+   orderId: uuid('order_id')
+     .notNull()
+     .references(() => orders.id, { onDelete: 'cascade' }),
+   companyId: uuid('company_id').notNull(), // denormalised for RLS
++  position: integer('position').notNull().default(0),
+   sku: text('sku'),
+   asin: text('asin'),
+   title: text('title').notNull(),
+-  quantity: numeric('quantity', { precision: 10, scale: 0 }).notNull().default('1'),
++  quantity: numeric('quantity', { precision: 10, scale: 2 }).notNull().default('1'),
+   unitPrice: numeric('unit_price', { precision: 12, scale: 2 }).notNull(),
