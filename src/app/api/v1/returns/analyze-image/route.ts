@@ -227,7 +227,7 @@ export async function POST(req: NextRequest) {
         if (matchedOrder.items && (!parsedData.items || parsedData.items.length === 0)) {
           parsedData.items = matchedOrder.items.map((item: any) => ({
             sku: item.sku || item.title || 'Unknown',
-            quantity: parseInt(item.quantity) || 1
+            quantity: Number(item.quantity) || 1
           }))
         }
       } else {

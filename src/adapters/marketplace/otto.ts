@@ -874,7 +874,7 @@ export class OttoAdapter implements MarketplaceAdapter {
             )
             for (const item of resources) {
               if (item.sku && item.quantity !== undefined) {
-                stockMap.set(item.sku, typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity)
+                stockMap.set(item.sku, typeof item.quantity === 'string' ? Number(item.quantity) : item.quantity)
               } else if (item.sku && item.availableQuantity !== undefined) {
                 stockMap.set(item.sku, item.availableQuantity)
               }

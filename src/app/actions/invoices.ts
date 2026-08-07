@@ -307,7 +307,7 @@ export async function regenerateInvoicePdfAction(invoiceId: string) {
         ...order,
         items: items.map(i => ({
           ...i,
-          quantity: parseInt(i.quantity)
+          quantity: Number(i.quantity)
         }))
       }
 

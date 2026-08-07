@@ -1250,7 +1250,7 @@ export function DeliveryNoteList({
                                     <div className="font-bold text-slate-800">{item.description}</div>
                                     {item.sku && <div className="text-[10px] text-slate-400 font-mono mt-0.5">{item.sku}</div>}
                                   </td>
-                                  <td className="px-4 py-3 text-right font-bold text-slate-800">{parseInt(item.quantity)}</td>
+                                  <td className="px-4 py-3 text-right font-bold text-slate-800">{Number(item.quantity)}</td>
                                 </tr>
                               ))}
                             </tbody>

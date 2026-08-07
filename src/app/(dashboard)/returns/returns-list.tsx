@@ -231,7 +231,7 @@ export function ReturnsList({
           return {
             sku: orderItem.sku || 'N/A',
             title: orderItem.title,
-            orderQty: parseInt(orderItem.quantity) || 1,
+            orderQty: Number(orderItem.quantity) || 1,
             returnedQty,
             refundQty: returnedQty, // default to the returned quantity
             restock: isNew
@@ -1523,7 +1523,7 @@ export function ReturnsList({
                           type="number"
                           min="1"
                           value={item.quantity}
-                          onChange={(e) => handleItemChange(idx, 'quantity', parseInt(e.target.value) || 1)}
+                          onChange={(e) => handleItemChange(idx, 'quantity', Number(e.target.value) || 1)}
                           className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs outline-none focus:ring-2 focus:ring-indigo-500 text-center text-slate-900"
                         />
                       </div>
@@ -1710,7 +1710,7 @@ export function ReturnsList({
                           min="0"
                           max={item.orderQty}
                           value={item.refundQty}
-                          onChange={(e) => handleRefundQtyChange(idx, parseInt(e.target.value) || 0)}
+                          onChange={(e) => handleRefundQtyChange(idx, Number(e.target.value) || 0)}
                           className="w-16 px-2.5 py-1 text-center rounded-lg border border-slate-250 bg-white font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         />
                       </div>

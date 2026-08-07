@@ -731,7 +731,7 @@ export async function generateOrDownloadDeliveryNote(
         ...order,
         items: order.items.map((i) => ({
           ...i,
-          quantity: parseInt(i.quantity)
+          quantity: Number(i.quantity)
         }))
       }
 
