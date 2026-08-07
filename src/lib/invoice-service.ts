@@ -284,7 +284,7 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
       marketplaceOrderId: order.marketplaceOrderId,
       marketplacePurchaseDate: order.marketplacePurchaseDate || new Date(),
       items: order.items.map((i: typeof orderItems.$inferSelect) => ({
-        quantity: parseInt(i.quantity),
+        quantity: Number(i.quantity),
         sku: i.sku,
         title: i.title || 'Produkt',
       }))
@@ -344,7 +344,7 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
         items: order.items.map((i: typeof orderItems.$inferSelect) => ({
           sku: i.sku,
           title: i.title || 'Produkt',
-          quantity: parseInt(i.quantity),
+          quantity: Number(i.quantity),
           unitPrice: parseFloat(i.unitPrice),
           taxRate: parseFloat(i.taxRate),
         })),
@@ -592,7 +592,7 @@ export async function regenerateInvoicePdf(invoiceId: string, companyId: string)
       marketplaceOrderId: order?.marketplaceOrderId || '–',
       marketplacePurchaseDate: order?.marketplacePurchaseDate || invoice.createdAt,
       items: invoice.items.map((i: any) => ({
-        quantity: parseInt(i.quantity),
+        quantity: Number(i.quantity),
         sku: i.sku,
         title: i.description || 'Produkt',
       }))
@@ -652,7 +652,7 @@ export async function regenerateInvoicePdf(invoiceId: string, companyId: string)
         items: invoice.items.map((i: any) => ({
           sku: i.sku,
           title: i.description,
-          quantity: parseInt(i.quantity),
+          quantity: Number(i.quantity),
           unitPrice: parseFloat(i.unitPrice),
           taxRate: parseFloat(i.taxRate),
         })),
