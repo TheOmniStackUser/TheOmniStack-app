@@ -62,7 +62,28 @@ export async function POST(req: Request) {
     }
 
     // 2. Parse and Validate Payload
-    const body = await req.json()
+    const rawText = await req.text()
+    let body
+    try {
+      body = JSON.parse(rawText)
+    } catch (parseError: any) {
+      console.warn('[API V1 Returns] JSON parse failed, attempting to auto-repair missing commas...', parseError.message)
+      // Fix missing commas between objects (e.g. } { -> }, {) commonly caused by iOS Shortcuts concatenation
+      let repairedText = rawText.replace(/\}\s*(?=\{)/g, '},')
+      // Fix missing commas between arrays (e.g. ] [ -> ], [)
+      repairedText = repairedText.replace(/\]\s*(?=\[)/g, '],')
+      // Fix missing commas between string elements and objects
+      repairedText = repairedText.replace(/"\s*(?=\{)/g, '",')
+      repairedText = repairedText.replace(/\}\s*(?=")/g, '},')
+      
+      try {
+        body = JSON.parse(repairedText)
+        console.log('[API V1 Returns] JSON payload successfully auto-repaired.')
+      } catch (repairError: any) {
+        // Throw the original error so it can be sent to the client
+        throw parseError
+      }
+    }
     const { customer_info, order_info, returned_items, return_metadata } = body
 
     const extractedOrderNumber = order_info?.order_number || body.order_number || return_metadata?.order_number || body.tracking_number;
