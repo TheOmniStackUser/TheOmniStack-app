@@ -5,6 +5,9 @@ import { eq, and } from 'drizzle-orm'
 import crypto from 'crypto'
 import { cookies } from 'next/headers'
 
+const ETSY_CLIENT_ID = 'c5j4zwilbc679dv552svbzbi'
+const ETSY_CLIENT_SECRET = 'pp0wbvvv22'
+
 export async function GET(request: NextRequest) {
   const url = new URL(request.url)
   const action = url.searchParams.get('action')
@@ -24,21 +27,6 @@ async function handleConnect(request: NextRequest) {
 
   if (!companyId) {
     return NextResponse.json({ error: 'Missing companyId' }, { status: 400 })
-  }
-
-  const [integration] = await db
-    .select()
-    .from(marketplaceIntegrations)
-    .where(
-      and(
-        eq(marketplaceIntegrations.companyId, companyId),
-        eq(marketplaceIntegrations.type, 'etsy')
-      )
-    )
-    .limit(1)
-
-  if (!integration || !integration.clientId) {
-    return NextResponse.redirect(new URL('/integrations?status=etsy_error_missing_creds', request.url))
   }
 
   // Generate PKCE code verifier and challenge
@@ -65,7 +53,7 @@ async function handleConnect(request: NextRequest) {
   authUrl.searchParams.set('response_type', 'code')
   authUrl.searchParams.set('redirect_uri', redirectUri)
   authUrl.searchParams.set('scope', scope)
-  authUrl.searchParams.set('client_id', integration.clientId)
+  authUrl.searchParams.set('client_id', ETSY_CLIENT_ID)
   authUrl.searchParams.set('state', state)
   authUrl.searchParams.set('code_challenge', codeChallenge)
   authUrl.searchParams.set('code_challenge_method', 'S256')
@@ -99,7 +87,7 @@ async function handleCallback(request: NextRequest) {
     return NextResponse.redirect(new URL('/integrations?status=etsy_error_state_mismatch', request.url))
   }
 
-  const [integration] = await db
+  let [integration] = await db
     .select()
     .from(marketplaceIntegrations)
     .where(
@@ -110,16 +98,11 @@ async function handleCallback(request: NextRequest) {
     )
     .limit(1)
 
-  if (!integration || !integration.clientId) {
-    console.error('[Etsy Auth] Integration not found for company:', companyId)
-    return NextResponse.redirect(new URL('/integrations?status=etsy_error_missing_creds', request.url))
-  }
-
   const redirectUri = `${url.origin}/api/auth/etsy`
   
   const tokenBody = new URLSearchParams({
     grant_type: 'authorization_code',
-    client_id: integration.clientId,
+    client_id: ETSY_CLIENT_ID,
     redirect_uri: redirectUri,
     code,
     code_verifier: codeVerifier,
@@ -142,15 +125,32 @@ async function handleCallback(request: NextRequest) {
   const tokenData = await tokenRes.json()
 
   // Save tokens to DB
-  await db
-    .update(marketplaceIntegrations)
-    .set({
-      accessToken: tokenData.access_token,
-      refreshToken: tokenData.refresh_token,
-      expiresAt: new Date(Date.now() + tokenData.expires_in * 1000),
-      updatedAt: new Date()
-    })
-    .where(eq(marketplaceIntegrations.id, integration.id))
+  if (integration) {
+    await db
+      .update(marketplaceIntegrations)
+      .set({
+        clientId: ETSY_CLIENT_ID,
+        clientSecret: ETSY_CLIENT_SECRET,
+        accessToken: tokenData.access_token,
+        refreshToken: tokenData.refresh_token,
+        expiresAt: new Date(Date.now() + tokenData.expires_in * 1000),
+        updatedAt: new Date()
+      })
+      .where(eq(marketplaceIntegrations.id, integration.id))
+  } else {
+    await db
+      .insert(marketplaceIntegrations)
+      .values({
+        companyId,
+        type: 'etsy',
+        clientId: ETSY_CLIENT_ID,
+        clientSecret: ETSY_CLIENT_SECRET,
+        environment: 'production',
+        accessToken: tokenData.access_token,
+        refreshToken: tokenData.refresh_token,
+        expiresAt: new Date(Date.now() + tokenData.expires_in * 1000),
+      })
+  }
 
   // Clean up cookie
   cookieStore.delete('etsy_oauth_state')
