@@ -47,7 +47,7 @@ async function handleConnect(request: NextRequest) {
   })
 
   const redirectUri = `${url.origin}/api/auth/etsy`
-  const scope = 'transactions_r transactions_w listings_r listings_w profile_r shops_r'
+  const scope = 'transactions_r transactions_w listings_r listings_w profile_r shops_r address_r'
 
   const authUrl = new URL('https://www.etsy.com/oauth/connect')
   authUrl.searchParams.set('response_type', 'code')

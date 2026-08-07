@@ -23,6 +23,7 @@ export class EtsyAdapter implements MarketplaceAdapter {
         'x-api-key': `${integration.clientId!}:${integration.clientSecret!}`,
         'Authorization': `Bearer ${accessToken}`,
       },
+      cache: 'no-store',
     })
 
     if (!res.ok) {
@@ -151,6 +152,7 @@ export class EtsyAdapter implements MarketplaceAdapter {
           'x-api-key': `${integration.clientId!}:${integration.clientSecret!}`,
           'Authorization': `Bearer ${accessToken}`,
         },
+        cache: 'no-store',
       })
 
       if (!res.ok) {
@@ -168,7 +170,8 @@ export class EtsyAdapter implements MarketplaceAdapter {
           headers: {
             'x-api-key': `${integration.clientId!}:${integration.clientSecret!}`,
             'Authorization': `Bearer ${accessToken}`,
-          }
+          },
+          cache: 'no-store',
         })
         
         let sku = listing.listing_id.toString()
@@ -284,7 +287,8 @@ export class EtsyAdapter implements MarketplaceAdapter {
        headers: {
           'x-api-key': `${clientId}:${clientSecret}`,
           'Authorization': `Bearer ${accessToken}`
-       }
+       },
+       cache: 'no-store',
     })
     
     if (!userRes.ok) {
@@ -301,7 +305,8 @@ export class EtsyAdapter implements MarketplaceAdapter {
        headers: {
           'x-api-key': `${clientId}:${clientSecret}`,
           'Authorization': `Bearer ${accessToken}`
-       }
+       },
+       cache: 'no-store'
     })
 
     if (!shopRes.ok) {
