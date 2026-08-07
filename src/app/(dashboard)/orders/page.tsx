@@ -69,7 +69,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   }
   if (marketplace !== 'all') {
     if (marketplace === 'group_direct') {
-      whereConditions.push(inArray(orders.marketplace, ['otto', 'aboutyou', 'shopify', 'kaufland', 'ebay', 'amazon']))
+      whereConditions.push(inArray(orders.marketplace, ['otto', 'aboutyou', 'shopify', 'kaufland', 'ebay', 'amazon', 'etsy']))
     } else if (marketplace === 'group_decathlon') {
       whereConditions.push(inArray(orders.marketplace, ['mirakl_decathlon', 'mirakl_decathlon_eu', 'mirakl_custom']))
     } else if (marketplace === 'manual') {
@@ -216,6 +216,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   const hasKauflandIntegration = integrations.some(i => i.type === 'kaufland' && i.clientId && i.clientSecret)
   const hasEbayIntegration = integrations.some(i => i.type === 'ebay' && i.clientId && i.clientSecret)
   const hasAboutYouIntegration = integrations.some(i => i.type === 'aboutyou' && i.apiKey)
+  const hasEtsyIntegration = integrations.some(i => i.type === 'etsy' && i.accessToken)
  
   // Optimize payload size for Client Component
   const optimizedOrders = allOrders.map(order => {
@@ -282,6 +283,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         hasDecathlonIntegration={hasDecathlonIntegration}
         hasShopifyIntegration={hasShopifyIntegration}
         hasAboutYouIntegration={hasAboutYouIntegration}
+        hasEtsyIntegration={hasEtsyIntegration}
       />
 
       <OrdersTable 

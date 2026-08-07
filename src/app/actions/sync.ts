@@ -48,6 +48,8 @@ export async function getActiveIntegrationsList() {
       label = 'Amazon'
     } else if (integration.type === 'shopify') {
       label = 'Shopify'
+    } else if (integration.type === 'etsy') {
+      label = 'Etsy'
     }
 
     return { label, value }
@@ -107,7 +109,7 @@ export async function triggerManualSyncAction(data: { marketplace: string, fromD
   if (data.marketplace !== 'all') {
     activeIntegrations = allActiveIntegrations.filter(integration => {
       if (data.marketplace === 'group_direct') {
-        return ['otto', 'aboutyou', 'shopify', 'kaufland', 'ebay', 'amazon'].includes(integration.type)
+        return ['otto', 'aboutyou', 'shopify', 'kaufland', 'ebay', 'amazon', 'etsy'].includes(integration.type)
       } else if (data.marketplace === 'group_decathlon') {
         const customName = ((integration.metadata as any)?.customName || '').toLowerCase()
         return integration.type === 'mirakl_decathlon' || integration.type === 'mirakl_decathlon_eu' || customName.startsWith('decathlon')
@@ -118,7 +120,7 @@ export async function triggerManualSyncAction(data: { marketplace: string, fromD
         const customName = ((integration.metadata as any)?.customName || '').toLowerCase()
         const isDecathlon = integration.type === 'mirakl_decathlon' || integration.type === 'mirakl_decathlon_eu' || customName.startsWith('decathlon')
         const isSecretSales = customName.startsWith('secret sales')
-        const isDirect = ['otto', 'aboutyou', 'shopify', 'kaufland', 'ebay', 'amazon'].includes(integration.type)
+        const isDirect = ['otto', 'aboutyou', 'shopify', 'kaufland', 'ebay', 'amazon', 'etsy'].includes(integration.type)
         return !isDecathlon && !isSecretSales && !isDirect
       } else if (data.marketplace.startsWith('mirakl_custom_')) {
         return integration.id === data.marketplace.replace('mirakl_custom_', '')
@@ -220,6 +222,14 @@ export async function triggerManualSyncAction(data: { marketplace: string, fromD
           environment: (integration.environment as 'sandbox' | 'production') || 'production'
         })
         adapter = ebayAdapter
+        rawOrders = await adapter.fetchUnshippedOrders(auth.activeCompanyId, {
+          fromDate: data.fromDate,
+          toDate: data.toDate
+        })
+      } else if (integration.type === 'etsy') {
+        const { EtsyAdapter } = await import('@/adapters/marketplace/etsy')
+        const etsyAdapter = new EtsyAdapter()
+        adapter = etsyAdapter
         rawOrders = await adapter.fetchUnshippedOrders(auth.activeCompanyId, {
           fromDate: data.fromDate,
           toDate: data.toDate
