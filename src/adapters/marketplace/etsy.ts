@@ -16,7 +16,7 @@ export class EtsyAdapter implements MarketplaceAdapter {
     const shopId = await this.getShopId(integration.clientId!, integration.clientSecret!, accessToken)
 
     // Fetch unshipped orders
-    const endpoint = `${this.baseUrl}/shops/${shopId}/receipts?was_shipped=false&limit=100`
+    const endpoint = `${this.baseUrl}/shops/${shopId}/receipts?was_shipped=false&was_paid=true&limit=100`
     const res = await fetch(endpoint, {
       method: 'GET',
       headers: {
@@ -32,7 +32,17 @@ export class EtsyAdapter implements MarketplaceAdapter {
 
     const data = await res.json()
     const receipts = data.results || []
-    return this.mapOrders(receipts)
+    
+    // API was_shipped=false still returns completed digital orders (which don't ship).
+    // So we manually filter out completed, canceled, and shipped orders.
+    const unshippedReceipts = receipts.filter((r: any) => {
+      if (r.is_shipped === true) return false
+      if (r.status?.toLowerCase() === 'completed') return false
+      if (r.status?.toLowerCase() === 'canceled') return false
+      return true
+    })
+    
+    return this.mapOrders(unshippedReceipts)
   }
 
   private mapOrders(receipts: any[]): NormalizedOrder[] {
