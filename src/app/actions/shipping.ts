@@ -302,9 +302,9 @@ export async function generateDhlLabelsAction(
       return { error: 'DHL Zugangsdaten fehlen. Bitte überprüfe die DHL-Konfiguration unter Integrationen.' }
     }
 
-    const apiKey = config.apiKey || process.env.DHL_API_KEY
+    const apiKey = (config.apiKey || '').trim() || process.env.DHL_API_KEY
     if (!apiKey) {
-      return { error: 'DHL API Key fehlt. Bitte hinterlege einen globalen DHL_API_KEY in der Server-Konfiguration.' }
+      return { error: 'Systemfehler: DHL API Key fehlt. Bitte kontaktiere den Support (globale Server-Konfiguration).' }
     }
 
     // 1.5 Fetch company details for sender address
