@@ -41,12 +41,12 @@ export async function GET(req: NextRequest) {
     authUrl.searchParams.set('redirect_uri', ruName)
     authUrl.searchParams.set('response_type', 'code')
     authUrl.searchParams.set('scope', SCOPES)
-    authUrl.searchParams.set('prompt', 'login')
-    
-    // We pass the companyId in the state parameter so we know which company to update in the callback
     authUrl.searchParams.set('state', companyId)
 
-    return NextResponse.redirect(authUrl.toString())
+    // eBay is very strict with URL encoding. URLSearchParams uses `+` for spaces, but eBay expects `%20`.
+    const finalUrl = authUrl.toString().replace(/\+/g, '%20')
+
+    return NextResponse.redirect(finalUrl)
   }
 
   return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
