@@ -532,12 +532,7 @@ export function getAdapterForIntegration(
     })
   }
   if (integration.type === 'ebay') {
-    if (!integration.clientId || !integration.clientSecret) return null
-    return new EbayAdapter({
-      clientId: integration.clientId,
-      clientSecret: integration.clientSecret,
-      environment: (integration.environment as 'sandbox' | 'production') || 'production'
-    })
+    return new EbayAdapter()
   }
   if (integration.type === 'woocommerce') {
     if (!integration.environment || !integration.clientId || !integration.clientSecret) return null

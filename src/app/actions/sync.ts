@@ -216,11 +216,7 @@ export async function triggerManualSyncAction(data: { marketplace: string, fromD
         })
       } else if (integration.type === 'ebay') {
         const { EbayAdapter } = await import('@/adapters/marketplace/ebay')
-        const ebayAdapter = new EbayAdapter({
-          clientId: integration.clientId!,
-          clientSecret: integration.clientSecret!,
-          environment: (integration.environment as 'sandbox' | 'production') || 'production'
-        })
+        const ebayAdapter = new EbayAdapter()
         adapter = ebayAdapter
         rawOrders = await adapter.fetchUnshippedOrders(auth.activeCompanyId, {
           fromDate: data.fromDate,
