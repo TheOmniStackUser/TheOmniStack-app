@@ -378,6 +378,24 @@ export function createMarketplaceSyncWorker() {
             const result = await persistOrders(companyId, rawOrders, isManualSync, integration, adapter)
             newlyImportedCount = result.affected
           }
+
+          if ((adapter as any).hasPendingAcceptances) {
+            console.log(`[Worker] Adapter has pending acceptances. Enqueueing a delayed sync job in 10 mins for ${marketplace}`)
+            await marketplaceSyncQueue.add(
+              `delayed-sync-${integration.type}`,
+              {
+                companyId: companyId,
+                marketplace: integration.type as any,
+                triggeredByUserId,
+                integrationId: integration.id,
+              },
+              {
+                delay: 10 * 60 * 1000, // 10 minutes
+                jobId: `delayed-sync-${integration.type}-${integration.id}-${Date.now()}`,
+                removeOnComplete: true
+              }
+            )
+          }
         }
 
         // Recovery: download invoices for shipped orders that are missing invoices

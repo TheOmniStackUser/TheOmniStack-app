@@ -20,6 +20,7 @@ type MiraklAdapterConfig = {
 
 export class MiraklAdapter implements MarketplaceAdapter {
   readonly marketplace: MiraklInstance
+  public hasPendingAcceptances?: boolean = false
 
   constructor(private readonly config: MiraklAdapterConfig) {
     this.marketplace = config.instance
@@ -207,6 +208,7 @@ export class MiraklAdapter implements MarketplaceAdapter {
       // If we accepted any orders, we must wait a few seconds for Mirakl to release the 
       // customer shipping addresses, and then re-fetch.
       if (acceptedAny) {
+        this.hasPendingAcceptances = true
         console.log(`[MiraklAdapter:${this.marketplace}] Waiting 3 seconds for Mirakl to release customer addresses...`)
         await new Promise(resolve => setTimeout(resolve, 3000))
         console.log(`[MiraklAdapter:${this.marketplace}] Re-fetching orders...`)

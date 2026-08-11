@@ -136,8 +136,7 @@ export async function triggerManualSyncAction(data: { marketplace: string, fromD
 
   let totalChecked = 0
   let totalAffected = 0
-
-
+  let hasPendingAcceptances = false
 
   for (const integration of activeIntegrations) {
     try {
@@ -242,6 +241,26 @@ export async function triggerManualSyncAction(data: { marketplace: string, fromD
         console.log(`[Sync] No orders found for ${integration.type}`)
       }
 
+      if (adapter && (adapter as any).hasPendingAcceptances) {
+        hasPendingAcceptances = true
+        console.log(`[Sync] Adapter has pending acceptances. Enqueueing a delayed sync job in 10 mins for ${integration.type}`)
+        const { marketplaceSyncQueue } = await import('@/workers/marketplace-sync')
+        await marketplaceSyncQueue.add(
+          `delayed-sync-${integration.type}`,
+          {
+            companyId: auth.activeCompanyId,
+            marketplace: integration.type as any,
+            triggeredByUserId: auth.userId,
+            integrationId: integration.id,
+          },
+          {
+            delay: 10 * 60 * 1000, // 10 minutes
+            jobId: `delayed-sync-${integration.type}-${integration.id}-${Date.now()}`,
+            removeOnComplete: true
+          }
+        )
+      }
+
       // Also sync shipped orders invoices for this integration
       const { syncShippedOrdersInvoices } = await import('@/workers/marketplace-sync')
       await syncShippedOrdersInvoices(auth.activeCompanyId, integration.type, integration.id)
@@ -263,7 +282,14 @@ export async function triggerManualSyncAction(data: { marketplace: string, fromD
   revalidatePath('/orders')
   
   if (totalAffected === 0) {
+    if (hasPendingAcceptances) {
+      return { success: true, message: `Import abgeschlossen. Einige Bestellungen wurden bestätigt und werden in ca. 10 Minuten automatisch importiert.`, affected: 0, checked: totalChecked }
+    }
     return { success: true, message: `Import abgeschlossen! Es wurden keine neuen Bestellungen gefunden.`, affected: 0, checked: totalChecked }
+  }
+
+  if (hasPendingAcceptances) {
+    return { success: true, message: `Import erfolgreich! ${totalAffected} neue Bestellung(en) hinzugefügt. Weitere wurden bestätigt und werden in ca. 10 Minuten importiert.`, affected: totalAffected, checked: totalChecked }
   }
 
   return { success: true, message: `Import erfolgreich! ${totalAffected} neue Bestellung(en) wurden hinzugefügt.`, affected: totalAffected, checked: totalChecked }
