@@ -397,8 +397,11 @@ export default async function IntegrationsPage(props: {
             >
               <div className="p-6 bg-gray-50">
                 <EbayIntegrationForm 
+                  companyId={auth.activeCompanyId}
                   initialClientId={integrations.find((i: any) => i.type === 'ebay')?.clientId || ''}
                   initialEnvironment={integrations.find((i: any) => i.type === 'ebay')?.environment || 'production'}
+                  initialRuName={(integrations.find((i: any) => i.type === 'ebay')?.metadata as any)?.ruName || ''}
+                  isConnected={!!integrations.find((i: any) => i.type === 'ebay')?.refreshToken}
                 />
               </div>
             </CollapsibleSection>

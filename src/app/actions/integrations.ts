@@ -575,6 +575,7 @@ const EbayIntegrationSchema = z.object({
   clientId: z.string().min(1, { message: 'Client ID ist erforderlich.' }).trim(),
   clientSecret: z.string().min(1, { message: 'Client Secret ist erforderlich.' }).trim(),
   environment: z.enum(['production', 'sandbox']).default('production'),
+  ruName: z.string().trim().optional(),
 })
 
 export async function saveEbayIntegrationAction(
@@ -587,13 +588,15 @@ export async function saveEbayIntegrationAction(
     clientId: formData.get('clientId'),
     clientSecret: formData.get('clientSecret'),
     environment: formData.get('environment'),
+    ruName: formData.get('ruName'),
   })
 
   if (!validated.success) {
     return { errors: validated.error.flatten().fieldErrors }
   }
 
-  const { clientId, clientSecret, environment } = validated.data
+  const { clientId, clientSecret, environment, ruName } = validated.data
+  const metadata = ruName ? { ruName } : null
 
   const [existing] = await db
     .select({ id: marketplaceIntegrations.id })
@@ -609,7 +612,7 @@ export async function saveEbayIntegrationAction(
   if (existing) {
     await db
       .update(marketplaceIntegrations)
-      .set({ clientId, clientSecret, environment, updatedAt: new Date() })
+      .set({ clientId, clientSecret, environment, metadata, updatedAt: new Date() })
       .where(eq(marketplaceIntegrations.id, existing.id))
   } else {
     await db
@@ -620,6 +623,7 @@ export async function saveEbayIntegrationAction(
         clientId,
         clientSecret,
         environment,
+        metadata,
       })
   }
 
