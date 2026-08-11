@@ -23,32 +23,21 @@ export async function GET(req: NextRequest) {
   }
 
   if (action === 'connect') {
-    // 1. Fetch the configured Client ID and RuName for this company
-    const [integration] = await db
-      .select()
-      .from(marketplaceIntegrations)
-      .where(
-        and(
-          eq(marketplaceIntegrations.companyId, companyId),
-          eq(marketplaceIntegrations.type, 'ebay')
-        )
-      )
-      .limit(1)
+    // We use global SaaS app credentials
+    const clientId = process.env.EBAY_CLIENT_ID
+    const ruName = process.env.EBAY_RU_NAME || 'F__L_Fashion_Gm-FLFashio-TheOmn-edszszsj'
+    
+    // Always use production for the SaaS platform OAuth unless specified
+    const isSandbox = process.env.EBAY_ENVIRONMENT === 'sandbox'
 
-    if (!integration || !integration.clientId) {
-      return NextResponse.json({ error: 'eBay Client ID not configured for this company' }, { status: 400 })
+    if (!clientId) {
+      return NextResponse.json({ error: 'eBay Client ID not configured in platform environment variables' }, { status: 500 })
     }
 
-    const ruName = (integration.metadata as any)?.ruName
-    if (!ruName) {
-      return NextResponse.json({ error: 'eBay RuName not configured for this company' }, { status: 400 })
-    }
-
-    const isSandbox = integration.environment === 'sandbox'
     const baseUrl = isSandbox ? EBAY_SANDBOX_OAUTH_URL : EBAY_OAUTH_URL
 
     const authUrl = new URL(baseUrl)
-    authUrl.searchParams.set('client_id', integration.clientId)
+    authUrl.searchParams.set('client_id', clientId)
     authUrl.searchParams.set('redirect_uri', ruName)
     authUrl.searchParams.set('response_type', 'code')
     authUrl.searchParams.set('scope', SCOPES)

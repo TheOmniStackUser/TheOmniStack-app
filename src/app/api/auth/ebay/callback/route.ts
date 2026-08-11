@@ -25,31 +25,18 @@ export async function GET(req: NextRequest) {
   const companyId = state
 
   try {
-    // Fetch integration info to get clientId and clientSecret
-    const [integration] = await db
-      .select()
-      .from(marketplaceIntegrations)
-      .where(
-        and(
-          eq(marketplaceIntegrations.companyId, companyId),
-          eq(marketplaceIntegrations.type, 'ebay')
-        )
-      )
-      .limit(1)
+    const clientId = process.env.EBAY_CLIENT_ID
+    const clientSecret = process.env.EBAY_CLIENT_SECRET
+    const ruName = process.env.EBAY_RU_NAME || 'F__L_Fashion_Gm-FLFashio-TheOmn-edszszsj'
+    const isSandbox = process.env.EBAY_ENVIRONMENT === 'sandbox'
 
-    if (!integration || !integration.clientId || !integration.clientSecret) {
-      throw new Error('eBay integration not found or missing credentials')
+    if (!clientId || !clientSecret) {
+      throw new Error('eBay client credentials not configured in environment')
     }
 
-    const ruName = (integration.metadata as any)?.ruName
-    if (!ruName) {
-      throw new Error('eBay RuName missing')
-    }
-
-    const isSandbox = integration.environment === 'sandbox'
     const tokenUrl = isSandbox ? EBAY_SANDBOX_TOKEN_URL : EBAY_TOKEN_URL
 
-    const credentials = Buffer.from(`${integration.clientId}:${integration.clientSecret}`).toString('base64')
+    const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
 
     const body = new URLSearchParams()
     body.append('grant_type', 'authorization_code')
@@ -72,21 +59,47 @@ export async function GET(req: NextRequest) {
     }
 
     const data = await response.json()
-
-    // eBay token response contains: access_token, expires_in, refresh_token, refresh_token_expires_in
-    // Save to DB
     const now = new Date()
-    await db
-      .update(marketplaceIntegrations)
-      .set({
-        accessToken: data.access_token,
-        refreshToken: data.refresh_token,
-        expiresAt: new Date(now.getTime() + data.expires_in * 1000),
-        updatedAt: now,
-      })
-      .where(eq(marketplaceIntegrations.id, integration.id))
 
-    // Redirect back to integrations page with success
+    // 1. Fetch integration to see if it exists
+    const [integration] = await db
+      .select()
+      .from(marketplaceIntegrations)
+      .where(
+        and(
+          eq(marketplaceIntegrations.companyId, companyId),
+          eq(marketplaceIntegrations.type, 'ebay')
+        )
+      )
+      .limit(1)
+
+    if (integration) {
+      await db
+        .update(marketplaceIntegrations)
+        .set({
+          accessToken: data.access_token,
+          refreshToken: data.refresh_token,
+          expiresAt: new Date(now.getTime() + data.expires_in * 1000),
+          updatedAt: now,
+          isActive: true
+        })
+        .where(eq(marketplaceIntegrations.id, integration.id))
+    } else {
+      await db
+        .insert(marketplaceIntegrations)
+        .values({
+          companyId,
+          type: 'ebay',
+          accessToken: data.access_token,
+          refreshToken: data.refresh_token,
+          expiresAt: new Date(now.getTime() + data.expires_in * 1000),
+          environment: isSandbox ? 'sandbox' : 'production',
+          isActive: true,
+          updatedAt: now,
+          createdAt: now
+        })
+    }
+
     return NextResponse.redirect(new URL('/integrations?status=ebay_success', req.url))
   } catch (err: any) {
     console.error('[eBay OAuth] Callback error:', err)

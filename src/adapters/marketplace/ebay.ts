@@ -365,12 +365,18 @@ export class EbayAdapter implements MarketplaceAdapter {
       throw new Error(`eBay: No refresh token available`)
     }
 
+    const clientId = process.env.EBAY_CLIENT_ID
+    const clientSecret = process.env.EBAY_CLIENT_SECRET
+    if (!clientId || !clientSecret) {
+      throw new Error(`eBay client credentials not configured in environment`)
+    }
+
     const isSandbox = integration.environment === 'sandbox'
     const tokenUrl = isSandbox 
       ? 'https://api.sandbox.ebay.com/identity/v1/oauth2/token' 
       : 'https://api.ebay.com/identity/v1/oauth2/token'
 
-    const credentials = Buffer.from(`${integration.clientId}:${integration.clientSecret}`).toString('base64')
+    const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
     
     // eBay specific: for refresh token we also pass scope in some cases, but not strictly required if we want the same scopes
     const body = new URLSearchParams()

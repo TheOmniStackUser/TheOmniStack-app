@@ -571,65 +571,7 @@ export async function saveKauflandIntegrationAction(
   return { success: true, message: 'Kaufland Zugangsdaten wurden erfolgreich gespeichert!' }
 }
 
-const EbayIntegrationSchema = z.object({
-  clientId: z.string().min(1, { message: 'Client ID ist erforderlich.' }).trim(),
-  clientSecret: z.string().min(1, { message: 'Client Secret ist erforderlich.' }).trim(),
-  environment: z.enum(['production', 'sandbox']).default('production'),
-  ruName: z.string().trim().optional(),
-})
 
-export async function saveEbayIntegrationAction(
-  _state: IntegrationFormState,
-  formData: FormData
-): Promise<IntegrationFormState> {
-  const auth = await requireAuth()
-
-  const validated = EbayIntegrationSchema.safeParse({
-    clientId: formData.get('clientId'),
-    clientSecret: formData.get('clientSecret'),
-    environment: formData.get('environment'),
-    ruName: formData.get('ruName'),
-  })
-
-  if (!validated.success) {
-    return { errors: validated.error.flatten().fieldErrors }
-  }
-
-  const { clientId, clientSecret, environment, ruName } = validated.data
-  const metadata = ruName ? { ruName } : null
-
-  const [existing] = await db
-    .select({ id: marketplaceIntegrations.id })
-    .from(marketplaceIntegrations)
-    .where(
-      and(
-        eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
-        eq(marketplaceIntegrations.type, 'ebay')
-      )
-    )
-    .limit(1)
-
-  if (existing) {
-    await db
-      .update(marketplaceIntegrations)
-      .set({ clientId, clientSecret, environment, metadata, updatedAt: new Date() })
-      .where(eq(marketplaceIntegrations.id, existing.id))
-  } else {
-    await db
-      .insert(marketplaceIntegrations)
-      .values({
-        companyId: auth.activeCompanyId,
-        type: 'ebay',
-        clientId,
-        clientSecret,
-        environment,
-        metadata,
-      })
-  }
-
-  revalidatePath('/integrations')
-  return { success: true, message: 'eBay Zugangsdaten wurden erfolgreich gespeichert!' }
-}
 
 // ─── Etsy ───────────────────────────────────────────────────────────────
 const EtsyIntegrationSchema = z.object({
