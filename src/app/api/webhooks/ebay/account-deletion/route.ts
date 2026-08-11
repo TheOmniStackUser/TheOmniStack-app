@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 
 // The verification token that eBay will use to verify this endpoint
-const EBAY_VERIFICATION_TOKEN = process.env.EBAY_VERIFICATION_TOKEN || 'OMNISTACK_EBAY_TOKEN_2026'
+const EBAY_VERIFICATION_TOKEN = process.env.EBAY_VERIFICATION_TOKEN || 'OMNISTACK_EBAY_TOKEN_2026_FOR_ACCOUNT_DELETION_MAD'
 
 /**
  * GET handler for eBay Endpoint Verification Challenge
