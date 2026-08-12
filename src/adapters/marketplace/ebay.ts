@@ -26,6 +26,9 @@ export class EbayAdapter implements MarketplaceAdapter {
       filter += `,creationdate:[${options.fromDate}T00:00:00.000Z..]`
     } else if (options?.toDate) {
       filter += `,creationdate:[..${options.toDate}T23:59:59.000Z]`
+    } else {
+      const defaultFromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+      filter += `,creationdate:[${defaultFromDate}..]`
     }
 
     const endpoint = `${baseUrl}/sell/fulfillment/v1/order?filter=${encodeURIComponent(filter)}&limit=100`
