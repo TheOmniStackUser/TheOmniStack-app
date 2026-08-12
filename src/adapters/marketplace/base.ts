@@ -87,6 +87,13 @@ export interface MarketplaceAdapter {
   ): Promise<Buffer | { pdfBuffer: Buffer; receiptNumber?: string } | null>
 
   /**
+   * Retrieves a list of available receipts (e.g. using fromDate) to avoid querying per order.
+   */
+  getAvailableReceipts?(
+    fromDate: Date
+  ): Promise<{ receiptNumber: string; salesOrderId: string; receiptType: string }[]>
+
+  /**
    * Fetches the official credit note PDF from the marketplace.
    */
   getCreditNote?(

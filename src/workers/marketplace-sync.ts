@@ -44,6 +44,7 @@ export type MarketplaceSyncJobData = {
   toDate?: string
   integrationId?: string | null
   isInvoiceSync?: boolean
+  orderId?: string
   syncGroupId?: string
   marketplaceDisplayName?: string
 }
@@ -399,7 +400,7 @@ export function createMarketplaceSyncWorker() {
         }
 
         // Recovery: download invoices for shipped orders that are missing invoices
-        await syncShippedOrdersInvoices(companyId, marketplace as any, integration.id)
+        await syncShippedOrdersInvoices(companyId, marketplace as any, integration.id, (job.data as any).orderId)
 
         // Also sync returns for Mirakl integrations
         if (integration.type.startsWith('mirakl_') || integration.type === 'mirakl_custom') {
@@ -574,7 +575,8 @@ export function getAdapterForIntegration(
 export async function syncShippedOrdersInvoices(
   companyId: string,
   marketplace?: NormalizedOrder['marketplace'] | null,
-  integrationId?: string | null
+  integrationId?: string | null,
+  specificOrderId?: string
 ) {
   console.log(`[Worker] Starting syncShippedOrdersInvoices for company ${companyId}...`)
   try {
@@ -616,7 +618,8 @@ export async function syncShippedOrdersInvoices(
           eq(orders.status, 'shipped'),
           isNull(orders.invoiceId),
           eq(orders.isArchived, false),
-          gte(orders.createdAt, new Date(Math.max(thresholdDate.getTime(), Date.now() - 14 * 24 * 60 * 60 * 1000)))
+          gte(orders.createdAt, new Date(Math.max(thresholdDate.getTime(), Date.now() - 14 * 24 * 60 * 60 * 1000))),
+          specificOrderId ? eq(orders.id, specificOrderId) : undefined
         ),
         with: {
           items: true
@@ -651,7 +654,24 @@ export async function syncShippedOrdersInvoices(
 
       const adapter = getAdapterForIntegration(integration)
 
-      for (const order of candidateOrders) {
+      // Bulk optimize: If adapter supports checking available receipts in bulk, filter candidate orders!
+      // Only do this if we are NOT fetching for a specific order (to allow manual recovery to try anyway).
+      let filteredCandidateOrders = candidateOrders
+      if (adapter && adapter.getAvailableReceipts && !specificOrderId) {
+        try {
+          // Fetch receipts starting from the oldest candidate order's createdAt
+          const oldestDate = new Date(Math.min(...candidateOrders.map(o => o.createdAt?.getTime() || Date.now())))
+          const availableReceipts = await adapter.getAvailableReceipts(oldestDate)
+          const availableSalesOrderIds = new Set(availableReceipts.map(r => r.salesOrderId))
+          
+          filteredCandidateOrders = candidateOrders.filter(order => availableSalesOrderIds.has(order.marketplaceOrderId))
+          console.log(`[Worker] Bulk optimization: Filtered down to ${filteredCandidateOrders.length} orders that have receipts ready on the marketplace.`)
+        } catch (err) {
+          console.error(`[Worker] Bulk optimization failed, proceeding with all candidates:`, err)
+        }
+      }
+
+      for (const order of filteredCandidateOrders) {
         try {
           if (downloadInvoice) {
             if (adapter) {

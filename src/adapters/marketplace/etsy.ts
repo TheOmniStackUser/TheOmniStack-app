@@ -22,6 +22,7 @@ export class EtsyAdapter implements MarketplaceAdapter {
       headers: {
         'x-api-key': `${integration.clientId!}:${integration.clientSecret!}`,
         'Authorization': `Bearer ${accessToken}`,
+        'Accept-Language': 'de-DE,de;q=0.9',
       },
       cache: 'no-store',
     })
@@ -145,12 +146,13 @@ export class EtsyAdapter implements MarketplaceAdapter {
     let hasMore = true
 
     while (hasMore) {
-      const endpoint = `${this.baseUrl}/shops/${shopId}/listings/active?limit=${limit}&offset=${offset}`
+      const endpoint = `${this.baseUrl}/shops/${shopId}/listings?limit=${limit}&offset=${offset}`
       const res = await fetch(endpoint, {
         method: 'GET',
         headers: {
           'x-api-key': `${integration.clientId!}:${integration.clientSecret!}`,
           'Authorization': `Bearer ${accessToken}`,
+          'Accept-Language': 'de-DE,de;q=0.9',
         },
         cache: 'no-store',
       })
@@ -164,12 +166,15 @@ export class EtsyAdapter implements MarketplaceAdapter {
       const listings = data.results || []
 
       for (const listing of listings) {
+        if (listing.state !== 'active') continue;
+
         // Fetch inventory to get SKUs, stock and price
         const inventoryRes = await fetch(`${this.baseUrl}/listings/${listing.listing_id}/inventory`, {
           method: 'GET',
           headers: {
             'x-api-key': `${integration.clientId!}:${integration.clientSecret!}`,
             'Authorization': `Bearer ${accessToken}`,
+            'Accept-Language': 'de-DE,de;q=0.9',
           },
           cache: 'no-store',
         })

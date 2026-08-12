@@ -260,7 +260,7 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
       billingCity = raw.billing_city || ''
       billingCountry = raw.billing_country_code || 'DE'
     }
-  } else if (order.marketplace === 'manual' && order.shippingStreet) {
+  } else if ((order.marketplace === 'manual' || order.marketplace === 'etsy') && order.shippingStreet) {
     billingStreet = order.shippingStreet
     billingZip = order.shippingZip || ''
     billingCity = order.shippingCity || ''

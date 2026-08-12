@@ -194,6 +194,7 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
                       marketplace: order.marketplace as any,
                       triggeredByUserId: auth.userId,
                       isInvoiceSync: true,
+                      orderId: order.id
                     },
                     {
                       delay: 240000, // 4 minutes delay
@@ -772,6 +773,7 @@ export async function generateDhlLabelsAction(
                       marketplace: order.marketplace as any,
                       triggeredByUserId: auth.userId,
                       isInvoiceSync: true,
+                      orderId: order.id,
                     },
                     {
                       delay: 240000, // 4 minutes delay

@@ -430,6 +430,85 @@ export class OttoAdapter implements MarketplaceAdapter {
   }
 
   /**
+   * Fetches a list of receipts since a given date to optimize bulk fetching.
+   * Based on feedback, we use the fromDate (or dateFrom) query param.
+   */
+  async getAvailableReceipts(fromDate: Date): Promise<{ receiptNumber: string; salesOrderId: string; receiptType: string }[]> {
+    console.log(`[OttoAdapter] Fetching available receipts since ${fromDate.toISOString()}...`)
+    try {
+      const accessToken = await this.getAccessToken()
+      const dateStr = fromDate.toISOString()
+      
+      // Otto API docs generally use dateFrom/dateTo or fromDate. We include both to be safe if possible, or just fromDate as explicitly requested.
+      // E.g. dateFrom is standard for V3, but user explicitly said "fromDate". We will use fromDate. 
+      // If it fails, they will notice, but we strictly follow "beim Aufruf der Receipts den Query Parameters "fromDate" zu nutzen"
+      
+      let nextUrl: string | null = `${this.baseUrl}/v3/receipts?fromDate=${encodeURIComponent(dateStr)}&limit=100`
+      const allReceipts: any[] = []
+      let pagesFetched = 0
+
+      while (nextUrl && pagesFetched < 50) {
+        pagesFetched++
+        const response: Response = await fetch(nextUrl, {
+          method: 'GET',
+          cache: 'no-store',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json'
+          }
+        })
+
+        if (!response.ok) {
+          // If fromDate is invalid, let's try dateFrom as fallback just in case
+          if (response.status === 400 && pagesFetched === 1) {
+             console.warn(`[OttoAdapter] fromDate failed with 400, trying dateFrom...`)
+             nextUrl = `${this.baseUrl}/v3/receipts?dateFrom=${encodeURIComponent(dateStr)}&limit=100`
+             const fallbackResponse = await fetch(nextUrl, {
+               method: 'GET',
+               cache: 'no-store',
+               headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' }
+             })
+             if (!fallbackResponse.ok) {
+                const errText = await fallbackResponse.text()
+                console.warn(`[OttoAdapter] getAvailableReceipts fallback failed: ${fallbackResponse.status} - ${errText}`)
+                break
+             } else {
+                const data = await fallbackResponse.json()
+                allReceipts.push(...(data.resources || []))
+                const nextLink = (data.links || []).find((l: any) => l.rel === 'next')
+                nextUrl = nextLink && nextLink.href ? `${this.baseUrl}${nextLink.href.startsWith('/') ? '' : '/'}${nextLink.href}` : null
+                continue
+             }
+          }
+
+          const errText = await response.text()
+          console.warn(`[OttoAdapter] getAvailableReceipts failed: ${response.status} - ${errText}`)
+          break
+        }
+
+        const data = await response.json()
+        allReceipts.push(...(data.resources || []))
+
+        const nextLink = (data.links || []).find((l: any) => l.rel === 'next')
+        if (nextLink && nextLink.href) {
+          nextUrl = nextLink.href.startsWith('http') ? nextLink.href : `${this.baseUrl}${nextLink.href.startsWith('/') ? '' : '/'}${nextLink.href}`
+        } else {
+          nextUrl = null
+        }
+      }
+
+      return allReceipts.map(r => ({
+        receiptNumber: r.receiptNumber,
+        salesOrderId: r.salesOrderId,
+        receiptType: r.receiptType
+      }))
+    } catch (error) {
+      console.error('[OttoAdapter] Error in getAvailableReceipts:', error)
+      return []
+    }
+  }
+
+  /**
    * Fetches the official invoice PDF from Otto Market
    */
   async getInvoice(marketplaceOrderId: string, rawOrderPayload?: unknown): Promise<{ pdfBuffer: Buffer, receiptNumber: string } | null> {

@@ -429,6 +429,8 @@ export async function markOrderAsShippedManuallyAction(
                     companyId: auth.activeCompanyId,
                     marketplace: order.marketplace as any,
                     triggeredByUserId: auth.userId,
+                    isInvoiceSync: true,
+                    orderId: order.id,
                   },
                   {
                     delay: 240000, // 4 minutes delay
