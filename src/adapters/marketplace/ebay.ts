@@ -20,8 +20,12 @@ export class EbayAdapter implements MarketplaceAdapter {
     // We only fetch orders with orderFulfillmentStatus=NOT_STARTED or IN_PROGRESS
     let filter = `orderFulfillmentStatus:{NOT_STARTED|IN_PROGRESS}`
     
-    if (options?.fromDate) {
-      filter += `,creationDate:[${options.fromDate}T00:00:00.000Z..]`
+    if (options?.fromDate && options?.toDate) {
+      filter += `,creationdate:[${options.fromDate}T00:00:00.000Z..${options.toDate}T23:59:59.000Z]`
+    } else if (options?.fromDate) {
+      filter += `,creationdate:[${options.fromDate}T00:00:00.000Z..]`
+    } else if (options?.toDate) {
+      filter += `,creationdate:[..${options.toDate}T23:59:59.000Z]`
     }
 
     const endpoint = `${baseUrl}/sell/fulfillment/v1/order?filter=${encodeURIComponent(filter)}&limit=100`
