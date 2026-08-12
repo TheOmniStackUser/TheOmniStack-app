@@ -384,7 +384,7 @@ export default async function IntegrationsPage(props: {
                   </span>
                 </div>
               }
-              badge={integrations.find((i: any) => i.type === 'ebay')?.clientId ? (
+              badge={integrations.find((i: any) => i.type === 'ebay')?.refreshToken ? (
                 <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
                   <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                   Verbunden

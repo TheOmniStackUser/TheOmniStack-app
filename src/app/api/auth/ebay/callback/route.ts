@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   try {
     const clientId = process.env.EBAY_CLIENT_ID
     const clientSecret = process.env.EBAY_CLIENT_SECRET
-    const ruName = process.env.EBAY_RU_NAME || 'F__L_Fashion_Gm-FLFashio-TheOmn-edszszsj'
+    const ruName = process.env.EBAY_RU_NAME || 'F__L_Fashion_Gm-FLFashio-TheOmn-ixunutlfx'
     const isSandbox = process.env.EBAY_ENVIRONMENT === 'sandbox'
 
     if (!clientId || !clientSecret) {

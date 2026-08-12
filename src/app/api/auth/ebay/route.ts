@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
   if (action === 'connect') {
     // We use global SaaS app credentials
     const clientId = process.env.EBAY_CLIENT_ID
-    const ruName = process.env.EBAY_RU_NAME || 'F__L_Fashion_Gm-FLFashio-TheOmn-edszszsj'
+    const ruName = process.env.EBAY_RU_NAME || 'F__L_Fashion_Gm-FLFashio-TheOmn-ixunutlfx'
     
     // Always use production for the SaaS platform OAuth unless specified
     const isSandbox = process.env.EBAY_ENVIRONMENT === 'sandbox'
