@@ -214,7 +214,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   const hasAmazonIntegration = integrations.some(i => i.type === 'amazon' && i.refreshToken)
   const hasShopifyIntegration = integrations.some(i => i.type === 'shopify' && i.accessToken)
   const hasKauflandIntegration = integrations.some(i => i.type === 'kaufland' && i.clientId && i.clientSecret)
-  const hasEbayIntegration = integrations.some(i => i.type === 'ebay' && i.clientId && i.clientSecret)
+  const hasEbayIntegration = integrations.some(i => i.type === 'ebay' && i.refreshToken)
   const hasAboutYouIntegration = integrations.some(i => i.type === 'aboutyou' && i.apiKey)
   const hasEtsyIntegration = integrations.some(i => i.type === 'etsy' && i.accessToken)
  

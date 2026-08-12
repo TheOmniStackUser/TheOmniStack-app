@@ -125,7 +125,7 @@ export default async function InvoicesPage({
   const customMiraklIntegrations = integrations.filter(i => i.type === 'mirakl_custom')
 
   const hasKauflandIntegration = integrations.some(i => i.type === 'kaufland' && i.clientId && i.clientSecret)
-  const hasEbayIntegration = integrations.some(i => i.type === 'ebay' && i.clientId && i.clientSecret)
+  const hasEbayIntegration = integrations.some(i => i.type === 'ebay' && i.refreshToken)
   const hasOttoIntegration = integrations.some(i => i.type === 'otto' && i.clientId)
   const hasAboutYouIntegration = integrations.some(i => i.type === 'aboutyou' && i.apiKey)
   const hasDecathlonIntegration = integrations.some(i => i.type === 'mirakl_decathlon' && i.clientId)
