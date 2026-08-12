@@ -180,6 +180,33 @@ export async function executeRefund({
         }
         if (apiSuccess) {
           console.log(`[RefundService] API refund processed successfully on marketplace.`)
+          
+          if (integration.type === 'otto') {
+            const downloadInvoice = !!(integration.metadata as any)?.downloadInvoice
+            if (downloadInvoice) {
+              try {
+                const { marketplaceSyncQueue } = await import('@/workers/marketplace-sync')
+                await marketplaceSyncQueue.add(
+                  `sync-${order.marketplace}-creditnotes-${order.id}`,
+                  {
+                    companyId: companyId,
+                    marketplace: order.marketplace as any,
+                    triggeredByUserId: userId || null,
+                    isInvoiceSync: true, // we use this flag to avoid re-syncing orders
+                    orderId: order.id,
+                  },
+                  {
+                    delay: 240000, // 4 minutes delay for credit note generation
+                    removeOnComplete: true,
+                    removeOnFail: true,
+                  }
+                )
+                console.log(`[RefundService] Enqueued delayed marketplace sync job for credit note recovery of order ${order.marketplaceOrderId}`)
+              } catch (queueErr) {
+                console.error(`[RefundService] Failed to enqueue delayed sync job:`, queueErr)
+              }
+            }
+          }
         } else {
           console.warn(`[RefundService] API refund call returned false status.`)
           return { 

@@ -409,7 +409,7 @@ export function createMarketplaceSyncWorker() {
 
         // Auto-download credit notes for Otto
         if (integration.type === 'otto') {
-          await syncOttoCreditNotes(companyId, integration, adapter as OttoAdapter)
+          await syncOttoCreditNotes(companyId, integration, adapter as OttoAdapter, (job.data as any).orderId)
         }
 
         if (!isInvoiceSync) {
@@ -1020,7 +1020,8 @@ export async function downloadAndSaveMarketplaceInvoice(
 export async function syncOttoCreditNotes(
   companyId: string,
   integration: any,
-  adapter: OttoAdapter
+  adapter: OttoAdapter,
+  specificOrderId?: string
 ) {
   const downloadInvoice = !!(integration.metadata as any)?.downloadInvoice
   if (!downloadInvoice) {
@@ -1030,56 +1031,61 @@ export async function syncOttoCreditNotes(
   console.log(`[OttoCreditNoteSync] Fetching global receipts to find credit notes for integration ${integration.id}...`)
 
   try {
-    const token = await (adapter as any).getAccessToken();
-    let url: string | null = `${(adapter as any).baseUrl}/v3/receipts?limit=100`;
-    let page = 0;
-    
-    // We only process receipts up to 60 days old
-    const thresholdDate = new Date();
-    thresholdDate.setDate(thresholdDate.getDate() - 60);
+    let downloadedCount = 0
+    const resourcesToProcess: any[] = []
 
-    let downloadedCount = 0;
-    let foundOlderReceipt = false;
-
-    while (url && page < 50 && !foundOlderReceipt) {
-      page++;
-      console.log(`[OttoCreditNoteSync] Fetching receipts page ${page}...`);
+    if (specificOrderId) {
+      // If we are triggered for a specific order (e.g. delayed job after refund), fetch exactly that order's refund receipt
+      console.log(`[OttoCreditNoteSync] Fetching refund receipt for specific order ${specificOrderId}...`)
       
-      const res: any = await fetch(url as string, {
-        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }
-      });
+      const orderInDb = await db.query.orders.findFirst({
+        where: eq(orders.id, specificOrderId)
+      })
       
-      if (!res.ok) {
-        console.warn(`[OttoCreditNoteSync] Failed to fetch receipts: ${res.status}`);
-        if (res.status === 403) {
-          await auditLog({
-            companyId,
-            userId: null,
-            action: 'sync_error',
-            entityType: 'marketplace_sync',
-            entityId: 'otto',
-            nextState: {
-              marketplace: 'otto',
-              error: `Otto API Error (403): Missing permissions for receipts or rate limited during Credit Note Sync.`,
-            },
-          }).catch(e => console.error("Failed to write audit log:", e));
+      if (orderInDb && orderInDb.marketplaceOrderId) {
+        // Find if we already have a credit note
+        let needsCreditNote = false
+        if (orderInDb.invoiceId) {
+          const creditNote = await db.query.invoices.findFirst({
+            where: and(
+              eq(invoices.cancelsInvoiceId, orderInDb.invoiceId), 
+              eq(invoices.isCreditNote, true),
+              eq(invoices.companyId, companyId)
+            )
+          })
+          if (!creditNote) needsCreditNote = true
         }
-        break;
+
+        if (needsCreditNote) {
+          const result = await adapter.getRefundReceipt(orderInDb.marketplaceOrderId)
+          if (result && result.receiptNumber) {
+            resourcesToProcess.push({ receiptType: 'REFUND', salesOrderId: orderInDb.marketplaceOrderId, receiptNumber: result.receiptNumber })
+          } else {
+            console.log(`[OttoCreditNoteSync] No refund receipt ready yet for order ${orderInDb.marketplaceOrderId}.`)
+          }
+        }
       }
-
-      const data = await res.json();
-      const resources = data.resources || [];
+    } else {
+      // Hourly fallback: bulk fetch all receipts using fromDate (last 3 days)
+      const thresholdDate = new Date();
+      thresholdDate.setDate(thresholdDate.getDate() - 3);
       
-      for (const receipt of resources) {
-        const creationDate = new Date(receipt.creationDate);
-        if (creationDate < thresholdDate) {
-          foundOlderReceipt = true;
-          break; // Stop processing further receipts as they are too old
-        }
+      if (adapter.getAvailableReceipts) {
+        const availableReceipts = await adapter.getAvailableReceipts(thresholdDate)
+        const refundReceipts = availableReceipts.filter(r => r.receiptType === 'REFUND')
+        resourcesToProcess.push(...refundReceipts)
+      }
+    }
 
-        if (receipt.receiptType === 'REFUND') {
-          // Check if this order is in our DB
-          const orderInDb = await db.query.orders.findFirst({
+    if (resourcesToProcess.length === 0) {
+      console.log(`[OttoCreditNoteSync] No refund receipts found to process.`)
+      return
+    }
+
+    for (const receipt of resourcesToProcess) {
+      if (receipt.receiptType === 'REFUND') {
+        // Check if this order is in our DB
+        const orderInDb = await db.query.orders.findFirst({
             where: and(
               eq(orders.marketplace, 'otto'), 
               eq(orders.marketplaceOrderId, receipt.salesOrderId),
@@ -1165,13 +1171,6 @@ export async function syncOttoCreditNotes(
           }
         }
       }
-
-      if (!foundOlderReceipt) {
-        const nextLink = (data.links || []).find((l:any) => l.rel === 'next');
-        url = nextLink ? (nextLink.href.startsWith('http') ? nextLink.href : (adapter as any).baseUrl + nextLink.href) : null;
-      }
-    }
-    
     console.log(`[OttoCreditNoteSync] Finished checking. Downloaded ${downloadedCount} new credit notes.`);
   } catch (error) {
     console.error(`[OttoCreditNoteSync] Error checking for Otto credit notes:`, error);
