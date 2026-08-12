@@ -346,7 +346,7 @@ export class EbayAdapter implements MarketplaceAdapter {
       )
       .limit(1)
 
-    if (!integration || !integration.clientId || !integration.clientSecret) {
+    if (!integration || !integration.refreshToken) {
       console.warn(`[Ebay] No active/valid credentials found for company ${companyId}`)
       return null
     }
