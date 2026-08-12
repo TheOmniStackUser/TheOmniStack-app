@@ -9,12 +9,6 @@ export function EbayIntegrationForm({
 }) {
   return (
     <div className="space-y-6 max-w-xl">
-      {isConnected && (
-        <div className="pt-2 flex flex-col gap-4 sm:flex-row sm:items-center">
-          <DisconnectButton type="ebay" />
-        </div>
-      )}
-
       {/* OAuth Connect Button */}
       <div className="pt-2 border-gray-200">
         <div className="p-5 bg-blue-50 border border-blue-200 rounded-xl space-y-4">
@@ -25,13 +19,16 @@ export function EbayIntegrationForm({
             </p>
           </div>
           
-          <a
-            href={`/api/auth/ebay?action=connect&companyId=${companyId}`}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#0064d2] hover:bg-[#0051a8] text-white font-semibold rounded-xl transition-colors shadow-sm"
-          >
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
-            {isConnected ? 'Verbindung erneuern' : 'Jetzt mit eBay verbinden'}
-          </a>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <a
+              href={`/api/auth/ebay?action=connect&companyId=${companyId}`}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-[#0064d2] hover:bg-[#0051a8] text-white font-semibold rounded-xl transition-colors shadow-sm"
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+              {isConnected ? 'Verbindung erneuern' : 'Jetzt mit eBay verbinden'}
+            </a>
+            {isConnected && <DisconnectButton type="ebay" />}
+          </div>
         </div>
       </div>
     </div>

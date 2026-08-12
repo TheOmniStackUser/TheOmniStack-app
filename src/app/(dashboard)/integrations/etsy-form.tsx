@@ -12,9 +12,7 @@ export function EtsyIntegrationForm({
 }) {
   return (
     <div className="space-y-6 max-w-xl">
-      <div className="pt-2 flex flex-col gap-4 sm:flex-row sm:items-center">
-        {isConnected && <DisconnectButton type="etsy" />}
-      </div>
+
 
       <div className="pt-6 border-t border-gray-200">
         <div className="p-5 bg-orange-50 border border-orange-200 rounded-xl space-y-4">
@@ -25,13 +23,16 @@ export function EtsyIntegrationForm({
             </p>
           </div>
           
-          <a
-            href={`/api/auth/etsy?action=connect&companyId=${companyId}`}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#F16521] hover:bg-[#D55315] text-white font-semibold rounded-xl transition-colors shadow-sm"
-          >
-            <ExternalLink className="w-4 h-4" />
-            {isConnected ? 'Verbindung erneuern' : 'Jetzt mit Etsy verbinden'}
-          </a>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <a
+              href={`/api/auth/etsy?action=connect&companyId=${companyId}`}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-[#F16521] hover:bg-[#D55315] text-white font-semibold rounded-xl transition-colors shadow-sm"
+            >
+              <ExternalLink className="w-4 h-4" />
+              {isConnected ? 'Verbindung erneuern' : 'Jetzt mit Etsy verbinden'}
+            </a>
+            {isConnected && <DisconnectButton type="etsy" />}
+          </div>
         </div>
       </div>
     </div>
