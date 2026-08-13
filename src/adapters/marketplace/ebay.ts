@@ -27,7 +27,7 @@ export class EbayAdapter implements MarketplaceAdapter {
     } else if (options?.toDate) {
       filter += `,creationdate:[..${options.toDate}T23:59:59.000Z]`
     } else {
-      const defaultFromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+      const defaultFromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('.')[0] + '.000Z'
       filter += `,creationdate:[${defaultFromDate}..]`
     }
 
