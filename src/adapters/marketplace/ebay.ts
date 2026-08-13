@@ -238,7 +238,7 @@ export class EbayAdapter implements MarketplaceAdapter {
     return true
   }
 
-  async fetchProducts(companyId: string): Promise<MarketplaceProduct[]> {
+  async fetchProducts(companyId: string, onProgress?: (progress: number, total: number, message: string) => Promise<void>): Promise<MarketplaceProduct[]> {
     const integration = await this.getIntegration(companyId)
     if (!integration) return []
 
@@ -249,6 +249,8 @@ export class EbayAdapter implements MarketplaceAdapter {
     let limit = 100
     const allProducts: MarketplaceProduct[] = []
     let hasMore = true
+    
+    if (onProgress) await onProgress(0, 0, 'Verbinde mit eBay...')
 
     while (hasMore) {
       const endpoint = `${baseUrl}/sell/inventory/v1/inventory_item?limit=${limit}&offset=${offset}`
@@ -271,6 +273,10 @@ export class EbayAdapter implements MarketplaceAdapter {
 
       const data = await res.json()
       const items = data.inventoryItems || []
+      
+      if (onProgress) {
+        await onProgress(allProducts.length, data.total || 0, `Lade Produkte von eBay... (${allProducts.length} bisher)`)
+      }
 
       for (const item of items) {
         allProducts.push({
