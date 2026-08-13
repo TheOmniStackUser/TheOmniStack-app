@@ -256,7 +256,9 @@ export class EbayAdapter implements MarketplaceAdapter {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Content-Language': 'de-DE',
+          'Accept-Language': 'de-DE'
         },
         cache: 'no-store',
       })
