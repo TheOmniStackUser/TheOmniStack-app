@@ -18,7 +18,7 @@ export class EbayAdapter implements MarketplaceAdapter {
 
     // Fulfillment API: Get Unshipped Orders
     // We only fetch orders with orderFulfillmentStatus=NOT_STARTED or IN_PROGRESS
-    let filter = `orderFulfillmentStatus:{NOT_STARTED|IN_PROGRESS}`
+    let filter = `orderfulfillmentstatus:{NOT_STARTED|IN_PROGRESS}`
     
     if (options?.fromDate && options?.toDate) {
       filter += `,creationdate:[${options.fromDate}T00:00:00.000Z..${options.toDate}T23:59:59.000Z]`
