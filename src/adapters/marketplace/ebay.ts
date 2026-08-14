@@ -380,11 +380,14 @@ export class EbayAdapter implements MarketplaceAdapter {
       throw new Error(`eBay: No refresh token available`)
     }
 
-    const clientId = process.env.EBAY_CLIENT_ID
-    const clientSecret = process.env.EBAY_CLIENT_SECRET
+    let clientId = process.env.EBAY_CLIENT_ID
+    let clientSecret = process.env.EBAY_CLIENT_SECRET
     if (!clientId || !clientSecret) {
       throw new Error(`eBay client credentials not configured in environment`)
     }
+    
+    clientId = clientId.replace(/['"]/g, '').trim()
+    clientSecret = clientSecret.replace(/['"]/g, '').trim()
 
     const isSandbox = integration.environment === 'sandbox'
     const tokenUrl = isSandbox 
