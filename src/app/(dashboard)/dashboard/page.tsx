@@ -243,19 +243,19 @@ export default async function DashboardPage() {
             <span className="text-sm font-medium text-gray-500">Gesamt</span>
             <span className="text-2xl font-bold text-gray-900 mt-1">{totalOrdersCount}</span>
           </Link>
-          <Link href="/orders" className="bg-white border border-yellow-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-yellow-300 hover:shadow-md transition-all">
+          <Link href="/orders?status=pending" className="bg-white border border-yellow-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-yellow-300 hover:shadow-md transition-all">
             <span className="text-sm font-medium text-yellow-700">Pending</span>
             <span className="text-2xl font-bold text-yellow-600 mt-1">{pendingCount}</span>
           </Link>
-          <Link href="/orders" className="bg-white border border-purple-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-purple-300 hover:shadow-md transition-all">
+          <Link href="/orders?status=later_shipment" className="bg-white border border-purple-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-purple-300 hover:shadow-md transition-all">
             <span className="text-sm font-medium text-purple-700">Späterer Versand</span>
             <span className="text-2xl font-bold text-purple-600 mt-1">{laterShipmentCount}</span>
           </Link>
-          <Link href="/orders" className="bg-white border border-green-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-green-300 hover:shadow-md transition-all">
+          <Link href="/orders?status=shipped" className="bg-white border border-green-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-green-300 hover:shadow-md transition-all">
             <span className="text-sm font-medium text-green-700">Versendet</span>
             <span className="text-2xl font-bold text-green-600 mt-1">{shippedCount}</span>
           </Link>
-          <Link href="/orders" className="bg-white border border-red-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-red-300 hover:shadow-md transition-all">
+          <Link href="/orders?status=cancelled" className="bg-white border border-red-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-red-300 hover:shadow-md transition-all">
             <span className="text-sm font-medium text-red-700">Storniert</span>
             <span className="text-2xl font-bold text-red-600 mt-1">{cancelledCount}</span>
           </Link>
