@@ -1097,6 +1097,19 @@ export async function syncOttoCreditNotes(
             continue; // Order not in DB, probably before OmniStack
           }
 
+          // Check if the credit note is already in the database by its number
+          const existingByNumber = await db.query.invoices.findFirst({
+            where: and(
+              eq(invoices.companyId, companyId),
+              eq(invoices.invoiceNumber, receipt.receiptNumber)
+            )
+          });
+
+          if (existingByNumber) {
+            console.log(`[OttoCreditNoteSync] Credit note ${receipt.receiptNumber} already exists in DB. Skipping.`);
+            continue;
+          }
+
           // Check if it already has a credit note
           let needsCreditNote = false;
           if (!orderInDb.invoiceId) {

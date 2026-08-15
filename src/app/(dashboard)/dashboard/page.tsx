@@ -100,7 +100,7 @@ export default async function DashboardPage() {
   const marketplaceStatsPromise = db
     .select({
       marketplace: orders.marketplace,
-      dayCount: sql<number>`count(case when coalesce(${orders.marketplacePurchaseDate}, ${orders.createdAt}) >= ${startOfDay.toISOString()} then 1 end)::int`,
+      dayCount: sql<number>`count(case when ${orders.createdAt} >= ${startOfDay.toISOString()} then 1 end)::int`,
       monthCount: sql<number>`count(case when coalesce(${orders.marketplacePurchaseDate}, ${orders.createdAt}) >= ${startOfMonth.toISOString()} then 1 end)::int`,
       yearCount: sql<number>`count(case when coalesce(${orders.marketplacePurchaseDate}, ${orders.createdAt}) >= ${startOfYear.toISOString()} then 1 end)::int`,
     })

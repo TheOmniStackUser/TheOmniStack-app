@@ -2137,6 +2137,18 @@ const filteredOrders = orders;
                 const rawVersandDate = order.status === 'shipped' ? order.updatedAt : null
                 const formattedVersandDate = formatDate(rawVersandDate, false)
 
+                const totalOrderedQty = order.items?.reduce((acc, item) => acc + Number(item.quantity || 1), 0) || 0;
+                const totalRefundedQty = order.returns?.reduce((acc, ret) => {
+                  if (ret.status === 'bearbeitet' && ret.metadata?.refundedItems) {
+                    const qty = (ret.metadata.refundedItems as any[]).reduce((sum, r) => sum + Number(r.quantity || 0), 0);
+                    return acc + qty;
+                  }
+                  return acc;
+                }, 0) || 0;
+
+                const isOrderFullyRefunded = totalOrderedQty > 0 && totalRefundedQty >= totalOrderedQty;
+                const isOrderPartiallyRefunded = totalRefundedQty > 0 && totalRefundedQty < totalOrderedQty;
+
                 const isSelected = selectedIds.has(order.id)
                 const isExpanded = expandedIds.has(order.id)
                 
@@ -2184,14 +2196,24 @@ const filteredOrders = orders;
                         </span>
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
-                          getDisplayStatus(order.status) === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                          getDisplayStatus(order.status) === 'later_shipment' ? 'bg-purple-100 text-purple-800' :
-                          getDisplayStatus(order.status) === 'shipped' ? 'bg-green-100 text-green-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {getDisplayStatus(order.status) === 'later_shipment' ? 'Späterer Versand' : getDisplayStatus(order.status)}
-                        </span>
+                        {isOrderFullyRefunded ? (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize bg-red-100 text-red-800">
+                            Erstattet
+                          </span>
+                        ) : isOrderPartiallyRefunded ? (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize bg-orange-100 text-orange-800">
+                            Teilerstattet
+                          </span>
+                        ) : (
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
+                            getDisplayStatus(order.status) === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                            getDisplayStatus(order.status) === 'later_shipment' ? 'bg-purple-100 text-purple-800' :
+                            getDisplayStatus(order.status) === 'shipped' ? 'bg-green-100 text-green-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {getDisplayStatus(order.status) === 'later_shipment' ? 'Späterer Versand' : getDisplayStatus(order.status)}
+                          </span>
+                        )}
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 group/order">
                         <div className="flex items-center gap-2">
