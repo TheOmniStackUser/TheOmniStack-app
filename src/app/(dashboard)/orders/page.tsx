@@ -45,28 +45,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     whereConditions.push(sql`${orders.marketplacePurchaseDate} <= ${end.toISOString()}`)
   }
 
-  if (search) {
-    const searchLower = search.toLowerCase()
-    const searchConditions: any[] = [
-      ilike(orders.marketplaceOrderId, `%${search}%`),
-      ilike(orders.buyerName, `%${search}%`),
-      ilike(orders.trackingNumber, `%${search}%`),
-      ilike(orders.deliveryNoteNumber, `%${search}%`),
-      ilike(sql`${orders.rawPayload}->>'orderNumber'`, `%${search}%`),
-      ilike(sql`${orders.rawPayload}->>'name'`, `%${search}%`)
-    ]
-    
-    // Support searching for refunded states via text input
-    if (searchLower.includes('erstattet')) {
-      if (searchLower === 'teilerstattet' || searchLower.includes('teil')) {
-        if (partiallyRefundedIds.length > 0) searchConditions.push(inArray(orders.id, partiallyRefundedIds))
-      } else {
-        if (fullyRefundedIds.length > 0) searchConditions.push(inArray(orders.id, fullyRefundedIds))
-      }
-    }
 
-    whereConditions.push(or(...searchConditions)!)
-  }
 
   // Calculate refund statuses for the entire company
   // This is needed for the stats cards and filtering
@@ -125,6 +104,29 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         partiallyRefundedIds.push(orderId)
       }
     }
+  }
+
+  if (search) {
+    const searchLower = search.toLowerCase()
+    const searchConditions: any[] = [
+      ilike(orders.marketplaceOrderId, `%${search}%`),
+      ilike(orders.buyerName, `%${search}%`),
+      ilike(orders.trackingNumber, `%${search}%`),
+      ilike(orders.deliveryNoteNumber, `%${search}%`),
+      ilike(sql`${orders.rawPayload}->>'orderNumber'`, `%${search}%`),
+      ilike(sql`${orders.rawPayload}->>'name'`, `%${search}%`)
+    ]
+    
+    // Support searching for refunded states via text input
+    if (searchLower.includes('erstattet')) {
+      if (searchLower === 'teilerstattet' || searchLower.includes('teil')) {
+        if (partiallyRefundedIds.length > 0) searchConditions.push(inArray(orders.id, partiallyRefundedIds))
+      } else {
+        if (fullyRefundedIds.length > 0) searchConditions.push(inArray(orders.id, fullyRefundedIds))
+      }
+    }
+
+    whereConditions.push(or(...searchConditions)!)
   }
 
   if (status !== 'all') {
