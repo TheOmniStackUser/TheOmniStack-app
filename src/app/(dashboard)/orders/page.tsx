@@ -9,6 +9,7 @@ import { OrdersTable } from './orders-table'
 import { ManualImport } from './manual-import'
 import type { HermesConfig } from '@/app/(dashboard)/integrations/hermes-form'
 import type { DhlConfig } from '@/app/(dashboard)/integrations/dhl-form'
+import Link from 'next/link'
 
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
   const auth = await requireAuth()
@@ -252,26 +253,26 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         <p className="text-gray-500 mt-2">Alle importierten Bestellungen im Überblick.</p>
         
         <div className="mt-6 grid grid-cols-2 md:grid-cols-5 gap-4">
-          <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm">
+          <Link href="/orders" className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all">
             <span className="text-sm font-medium text-gray-500">Gesamt</span>
             <span className="text-2xl font-bold text-gray-900">{stats.total}</span>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm">
+          </Link>
+          <Link href="/orders?status=pending" className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all">
             <span className="text-sm font-medium text-gray-500">Pending</span>
             <span className="text-2xl font-bold text-amber-600">{stats.pending}</span>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm">
+          </Link>
+          <Link href="/orders?status=later_shipment" className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all">
             <span className="text-sm font-medium text-gray-500">Späterer Versand</span>
             <span className="text-2xl font-bold text-blue-600">{stats.laterShipment}</span>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm">
+          </Link>
+          <Link href="/orders?status=shipped" className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all">
             <span className="text-sm font-medium text-gray-500">Versendet</span>
             <span className="text-2xl font-bold text-emerald-600">{stats.shipped}</span>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm">
+          </Link>
+          <Link href="/orders?status=cancelled" className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all">
             <span className="text-sm font-medium text-gray-500">Storniert</span>
             <span className="text-2xl font-bold text-red-600">{stats.cancelled}</span>
-          </div>
+          </Link>
         </div>
       </header>
 
