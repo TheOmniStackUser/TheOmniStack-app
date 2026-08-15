@@ -183,7 +183,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
           and(
             inArray(orders.marketplace, ['mirakl_decathlon', 'mirakl_decathlon_eu', 'mirakl_custom']),
             ilike(orders.shippingCountry, `${countryCode}%`)
-          )
+          )!
         )
       } else {
         whereConditions.push(inArray(orders.marketplace, ['mirakl_decathlon', 'mirakl_decathlon_eu', 'mirakl_custom']))
