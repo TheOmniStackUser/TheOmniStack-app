@@ -1915,6 +1915,8 @@ const filteredOrders = orders;
             <option value="later_shipment">Späterer Versand</option>
             <option value="shipped">Versendet</option>
             <option value="cancelled">Storniert</option>
+            <option value="refunded">Erstattet</option>
+            <option value="partially_refunded">Teilerstattet</option>
           </select>
 
           {/* Shipping status filter temporarily hidden per user request */}
@@ -2137,14 +2139,26 @@ const filteredOrders = orders;
                 const rawVersandDate = order.status === 'shipped' ? order.updatedAt : null
                 const formattedVersandDate = formatDate(rawVersandDate, false)
 
-                const totalOrderedQty = order.items?.reduce((acc, item) => acc + Number(item.quantity || 1), 0) || 0;
-                const totalRefundedQty = order.returns?.reduce((acc, ret) => {
-                  if (ret.status === 'bearbeitet' && ret.metadata?.refundedItems) {
-                    const qty = (ret.metadata.refundedItems as any[]).reduce((sum, r) => sum + Number(r.quantity || 0), 0);
-                    return acc + qty;
+                let totalOrderedQty = 0;
+                let totalRefundedQty = 0;
+
+                if (order.items) {
+                  for (const item of order.items) {
+                    totalOrderedQty += Number(item.quantity || 1);
+                    
+                    const refundedCount = order.returns?.reduce((acc, ret) => {
+                      if (ret.status === 'bearbeitet' && (ret.metadata as any)?.refundedItems) {
+                        const matched = ((ret.metadata as any).refundedItems as any[]).find((r: any) => r.sku === item.sku);
+                        if (matched && matched.quantity) {
+                          return acc + Number(matched.quantity);
+                        }
+                      }
+                      return acc;
+                    }, 0) || 0;
+                    
+                    totalRefundedQty += refundedCount;
                   }
-                  return acc;
-                }, 0) || 0;
+                }
 
                 const isOrderFullyRefunded = totalOrderedQty > 0 && totalRefundedQty >= totalOrderedQty;
                 const isOrderPartiallyRefunded = totalRefundedQty > 0 && totalRefundedQty < totalOrderedQty;

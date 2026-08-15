@@ -46,20 +46,103 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   }
 
   if (search) {
-    whereConditions.push(
-      or(
-        ilike(orders.marketplaceOrderId, `%${search}%`),
-        ilike(orders.buyerName, `%${search}%`),
-        ilike(orders.trackingNumber, `%${search}%`),
-        ilike(orders.deliveryNoteNumber, `%${search}%`),
-        ilike(sql`${orders.rawPayload}->>'orderNumber'`, `%${search}%`),
-        ilike(sql`${orders.rawPayload}->>'name'`, `%${search}%`)
-      )!
-    )
+    const searchLower = search.toLowerCase()
+    const searchConditions: any[] = [
+      ilike(orders.marketplaceOrderId, `%${search}%`),
+      ilike(orders.buyerName, `%${search}%`),
+      ilike(orders.trackingNumber, `%${search}%`),
+      ilike(orders.deliveryNoteNumber, `%${search}%`),
+      ilike(sql`${orders.rawPayload}->>'orderNumber'`, `%${search}%`),
+      ilike(sql`${orders.rawPayload}->>'name'`, `%${search}%`)
+    ]
+    
+    // Support searching for refunded states via text input
+    if (searchLower.includes('erstattet')) {
+      if (searchLower === 'teilerstattet' || searchLower.includes('teil')) {
+        if (partiallyRefundedIds.length > 0) searchConditions.push(inArray(orders.id, partiallyRefundedIds))
+      } else {
+        if (fullyRefundedIds.length > 0) searchConditions.push(inArray(orders.id, fullyRefundedIds))
+      }
+    }
+
+    whereConditions.push(or(...searchConditions)!)
+  }
+
+  // Calculate refund statuses for the entire company
+  // This is needed for the stats cards and filtering
+  const allReturns = await db.select({
+    orderId: returnsLog.orderId,
+    status: returnsLog.status,
+    metadata: returnsLog.metadata
+  }).from(returnsLog)
+    .where(and(
+      eq(returnsLog.companyId, auth.activeCompanyId),
+      eq(returnsLog.status, 'bearbeitet')
+    ))
+
+  const orderIdsWithReturns = Array.from(new Set(allReturns.map(r => r.orderId).filter(Boolean) as string[]))
+  
+  let fullyRefundedIds: string[] = []
+  let partiallyRefundedIds: string[] = []
+
+  if (orderIdsWithReturns.length > 0) {
+    const returnItems = await db.select({
+      orderId: orderItems.orderId,
+      quantity: orderItems.quantity
+    }).from(orderItems)
+      .where(inArray(orderItems.orderId, orderIdsWithReturns))
+    
+    const itemsByOrder = returnItems.reduce((acc, item) => {
+      acc[item.orderId] = acc[item.orderId] || []
+      acc[item.orderId].push(item)
+      return acc
+    }, {} as Record<string, typeof returnItems>)
+
+    const returnsByOrder = allReturns.reduce((acc, ret) => {
+      if (ret.orderId) {
+        acc[ret.orderId] = acc[ret.orderId] || []
+        acc[ret.orderId].push(ret)
+      }
+      return acc
+    }, {} as Record<string, typeof allReturns>)
+
+    for (const orderId of orderIdsWithReturns) {
+      const orderItemsList = itemsByOrder[orderId] || []
+      const orderReturnsList = returnsByOrder[orderId] || []
+
+      const totalOrderedQty = orderItemsList.reduce((acc, item) => acc + Number(item.quantity || 1), 0)
+      const totalRefundedQty = orderReturnsList.reduce((acc, ret) => {
+        const refundedItems = (ret.metadata as any)?.refundedItems
+        if (Array.isArray(refundedItems)) {
+          return acc + refundedItems.reduce((sum, r) => sum + Number(r.quantity || 0), 0)
+        }
+        return acc
+      }, 0)
+
+      if (totalOrderedQty > 0 && totalRefundedQty >= totalOrderedQty) {
+        fullyRefundedIds.push(orderId)
+      } else if (totalRefundedQty > 0 && totalRefundedQty < totalOrderedQty) {
+        partiallyRefundedIds.push(orderId)
+      }
+    }
   }
 
   if (status !== 'all') {
-    whereConditions.push(eq(orders.status, status as any))
+    if (status === 'refunded') {
+      if (fullyRefundedIds.length > 0) {
+        whereConditions.push(inArray(orders.id, fullyRefundedIds))
+      } else {
+        whereConditions.push(sql`1=0`)
+      }
+    } else if (status === 'partially_refunded') {
+      if (partiallyRefundedIds.length > 0) {
+        whereConditions.push(inArray(orders.id, partiallyRefundedIds))
+      } else {
+        whereConditions.push(sql`1=0`)
+      }
+    } else {
+      whereConditions.push(eq(orders.status, status as any))
+    }
   }
   if (shippingStatus !== 'all') {
     whereConditions.push(eq(orders.shippingStatus, shippingStatus as any))
@@ -252,7 +335,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         <h2 className="text-3xl font-bold text-gray-900">Bestellungen</h2>
         <p className="text-gray-500 mt-2">Alle importierten Bestellungen im Überblick.</p>
         
-        <div className="mt-6 grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="mt-6 grid grid-cols-2 md:grid-cols-7 gap-4">
           <Link href="/orders" className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all">
             <span className="text-sm font-medium text-gray-500">Gesamt</span>
             <span className="text-2xl font-bold text-gray-900">{stats.total}</span>
@@ -272,6 +355,14 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
           <Link href="/orders?status=cancelled" className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all">
             <span className="text-sm font-medium text-gray-500">Storniert</span>
             <span className="text-2xl font-bold text-red-600">{stats.cancelled}</span>
+          </Link>
+          <Link href="/orders?status=refunded" className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all">
+            <span className="text-sm font-medium text-gray-500">Erstattet</span>
+            <span className="text-2xl font-bold text-red-800">{fullyRefundedIds.length}</span>
+          </Link>
+          <Link href="/orders?status=partially_refunded" className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all">
+            <span className="text-sm font-medium text-gray-500">Teilerstattet</span>
+            <span className="text-2xl font-bold text-orange-800">{partiallyRefundedIds.length}</span>
           </Link>
         </div>
       </header>
