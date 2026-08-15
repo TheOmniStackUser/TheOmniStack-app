@@ -525,6 +525,20 @@ export function DeliveryNoteList({
         const isSecretSales = dnMp.startsWith('secret sales')
         const isDirect = ['otto', 'aboutyou', 'shopify', 'kaufland', 'ebay', 'amazon'].includes(dnMp)
         if (dnMp === 'manual' || dnMp === '' || isDecathlon || isSecretSales || isDirect) return false
+      } else if (targetMp.startsWith('display_decathlon')) {
+        const parts = targetMp.split(' ')
+        if (parts.length > 1) {
+          const countryCode = parts[1].trim()
+          const isDecathlon = dnMp === 'mirakl_decathlon' || dnMp === 'mirakl_decathlon_eu' || dnMp.startsWith('decathlon') || dnMp === 'mirakl_custom'
+          const isCountryMatch = formatCountry(dn.recipientCountry).toLowerCase() === countryCode.toLowerCase()
+          if (!isDecathlon || !isCountryMatch) return false
+        } else {
+          const isDecathlon = dnMp === 'mirakl_decathlon' || dnMp === 'mirakl_decathlon_eu' || dnMp.startsWith('decathlon') || dnMp === 'mirakl_custom'
+          if (!isDecathlon) return false
+        }
+      } else if (targetMp.startsWith('display_')) {
+        const mpName = targetMp.replace('display_', '').trim()
+        if (!dnMp.includes(mpName)) return false
       } else if (dnMp !== targetMp) {
         return false
       }

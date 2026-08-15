@@ -4,7 +4,7 @@ import { orders, orderItems } from '@/db/schema/orders'
 import { invoices, invoiceLogs } from '@/db/schema/invoices'
 import { returnsLog } from '@/db/schema/returns'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
-import { eq, desc, asc, and, ne, inArray, or, ilike, sql } from 'drizzle-orm'
+import { eq, desc, asc, and, ne, inArray, or, ilike, sql, notInArray } from 'drizzle-orm'
 import { OrdersTable } from './orders-table'
 import { ManualImport } from './manual-import'
 import type { HermesConfig } from '@/app/(dashboard)/integrations/hermes-form'
@@ -169,8 +169,28 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
       whereConditions.push(inArray(orders.marketplace, ['otto', 'aboutyou', 'shopify', 'kaufland', 'ebay', 'amazon', 'etsy']))
     } else if (marketplace === 'group_decathlon') {
       whereConditions.push(inArray(orders.marketplace, ['mirakl_decathlon', 'mirakl_decathlon_eu', 'mirakl_custom']))
+    } else if (marketplace === 'group_secret_sales') {
+      whereConditions.push(ilike(orders.marketplace, '%secret sales%'))
+    } else if (marketplace === 'group_other') {
+      whereConditions.push(notInArray(orders.marketplace, ['otto', 'aboutyou', 'shopify', 'kaufland', 'ebay', 'amazon', 'etsy', 'mirakl_decathlon', 'mirakl_decathlon_eu']))
     } else if (marketplace === 'manual') {
       whereConditions.push(eq(orders.marketplace, 'manual'))
+    } else if (marketplace.startsWith('display_decathlon')) {
+      const parts = marketplace.split(' ')
+      if (parts.length > 1) {
+        const countryCode = parts[1].trim()
+        whereConditions.push(
+          and(
+            inArray(orders.marketplace, ['mirakl_decathlon', 'mirakl_decathlon_eu', 'mirakl_custom']),
+            ilike(orders.shippingCountry, `${countryCode}%`)
+          )
+        )
+      } else {
+        whereConditions.push(inArray(orders.marketplace, ['mirakl_decathlon', 'mirakl_decathlon_eu', 'mirakl_custom']))
+      }
+    } else if (marketplace.startsWith('display_')) {
+      const mpName = marketplace.replace('display_', '').trim()
+      whereConditions.push(ilike(orders.marketplace, `%${mpName}%`))
     } else {
       whereConditions.push(eq(orders.marketplace, marketplace as any))
     }
