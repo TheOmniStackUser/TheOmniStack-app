@@ -87,7 +87,8 @@ export function SyncButton() {
     } catch (e) {
       console.error("Sync error:", e);
       let errorMessage = e instanceof Error ? e.message : String(e);
-      if (errorMessage.includes("An unexpected response was received from the server") || errorMessage.includes("fetch failed")) {
+      const lowerError = errorMessage.toLowerCase();
+      if (lowerError.includes("an unexpected response was received from the server") || lowerError.includes("fetch failed") || lowerError.includes("failed to fetch")) {
         errorMessage = "Zeitüberschreitung (Timeout) beim Verbindungsaufbau zum Marktplatz. Bitte versuchen Sie es in ein paar Minuten erneut.";
       }
       showNotification(`Ein unerwarteter Fehler ist beim Import aufgetreten: ${errorMessage}`, 'error')

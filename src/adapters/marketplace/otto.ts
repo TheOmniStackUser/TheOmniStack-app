@@ -173,10 +173,12 @@ export class OttoAdapter implements MarketplaceAdapter {
     try {
       const accessToken = await this.getAccessToken()
       
-      let nextUrl: string | null = `${this.baseUrl}/v4/orders?fulfillmentStatus=PROCESSABLE&limit=50`
-      // We intentionally ignore options.fromDate and options.toDate for PROCESSABLE orders
-      // because we want to fetch ALL unshipped orders. Otherwise users selecting "Today" 
-      // will miss orders from yesterday evening or due to UTC timezone offsets.
+      // By default, fetch processable orders from the last 30 days to avoid timeouts with too many historical orders.
+      // If a specific fromDate is provided, use that.
+      const defaultFrom = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+      const orderDateFrom = options?.fromDate ? new Date(options.fromDate).toISOString() : defaultFrom
+      
+      let nextUrl: string | null = `${this.baseUrl}/v4/orders?fulfillmentStatus=PROCESSABLE&limit=50&orderDateFrom=${encodeURIComponent(orderDateFrom)}`
 
       const allRawOrders: any[] = []
       let pagesFetched = 0
