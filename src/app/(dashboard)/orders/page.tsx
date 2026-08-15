@@ -67,7 +67,8 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   if (orderIdsWithReturns.length > 0) {
     const returnItems = await db.select({
       orderId: orderItems.orderId,
-      quantity: orderItems.quantity
+      quantity: orderItems.quantity,
+      sku: orderItems.sku
     }).from(orderItems)
       .where(inArray(orderItems.orderId, orderIdsWithReturns))
     
@@ -234,10 +235,10 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         eq(marketplaceIntegrations.isActive, true)
       )
     }),
-    db.select({ country: orders.shippingCountry })
+    db.select({ marketplace: orders.marketplace, country: orders.shippingCountry })
       .from(orders)
       .where(eq(orders.companyId, auth.activeCompanyId))
-      .groupBy(orders.shippingCountry)
+      .groupBy(orders.marketplace, orders.shippingCountry)
   ])
 
   const allUniqueCountries = Array.from(new Set(uniqueCountriesRows.map(r => {
@@ -249,6 +250,11 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     }
     return raw.length === 3 ? (iso3to2[raw] ?? raw.slice(0, 2)) : raw
   }))).filter(Boolean).sort()
+
+  const allUniqueMarketplaceCountries = uniqueCountriesRows.map(r => ({
+    marketplace: r.marketplace,
+    country: r.country
+  }))
 
   // Extract IDs for fetching relations ONLY FOR VISIBLE ORDERS
   const orderIds = baseOrders.map(o => o.id)
@@ -410,6 +416,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         hasShopifyIntegration={hasShopifyIntegration}
         hasEtsyIntegration={hasEtsyIntegration}
         allUniqueCountries={allUniqueCountries}
+        allUniqueMarketplaceCountries={allUniqueMarketplaceCountries}
       />
     </div>
   )

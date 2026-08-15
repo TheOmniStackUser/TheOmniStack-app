@@ -404,6 +404,7 @@ export function OrdersTable({
   hasShopifyIntegration = false,
   hasEtsyIntegration = false,
   allUniqueCountries = [],
+  allUniqueMarketplaceCountries = [],
 }: { 
   orders: OrderWithItems[]
   totalOrdersCount?: number
@@ -422,6 +423,7 @@ export function OrdersTable({
   hasShopifyIntegration?: boolean
   hasEtsyIntegration?: boolean
   allUniqueCountries?: string[]
+  allUniqueMarketplaceCountries?: { marketplace: string | null, country: string | null }[]
 }) {
   const configuredDhlProducts = useMemo(() => {
     if (!dhlConfig?.zones || dhlConfig.zones.length === 0) {
@@ -509,13 +511,22 @@ export function OrdersTable({
       }
     })
 
-    // Extract from actual orders
-    orders.forEach(o => {
-      const displayName = formatMarketplaceName(o.marketplace, o.shippingCountry)
-      if (displayName.toLowerCase().startsWith('decathlon')) {
-        decathlonDisplayNames.add(displayName)
-      }
-    })
+    // Extract from globally available combinations if passed (fixes pagination issue)
+    if (allUniqueMarketplaceCountries && allUniqueMarketplaceCountries.length > 0) {
+      allUniqueMarketplaceCountries.forEach(row => {
+        const displayName = formatMarketplaceName(row.marketplace, row.country)
+        if (displayName.toLowerCase().startsWith('decathlon')) {
+          decathlonDisplayNames.add(displayName)
+        }
+      })
+    } else {
+      orders.forEach(o => {
+        const displayName = formatMarketplaceName(o.marketplace, o.shippingCountry)
+        if (displayName.toLowerCase().startsWith('decathlon')) {
+          decathlonDisplayNames.add(displayName)
+        }
+      })
+    }
 
     const sortedDecathlon = Array.from(decathlonDisplayNames).sort()
     sortedDecathlon.forEach(name => {

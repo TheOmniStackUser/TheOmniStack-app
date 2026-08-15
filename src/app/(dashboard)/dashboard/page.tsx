@@ -221,7 +221,8 @@ export default async function DashboardPage() {
   if (orderIdsWithReturns.length > 0) {
     const returnItems = await db.select({
       orderId: orderItems.orderId,
-      quantity: orderItems.quantity
+      quantity: orderItems.quantity,
+      sku: orderItems.sku
     }).from(orderItems)
       .where(inArray(orderItems.orderId, orderIdsWithReturns))
     
