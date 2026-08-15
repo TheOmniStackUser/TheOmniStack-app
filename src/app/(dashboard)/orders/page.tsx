@@ -89,14 +89,24 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
       const orderItemsList = itemsByOrder[orderId] || []
       const orderReturnsList = returnsByOrder[orderId] || []
 
-      const totalOrderedQty = orderItemsList.reduce((acc, item) => acc + Number(item.quantity || 1), 0)
-      const totalRefundedQty = orderReturnsList.reduce((acc, ret) => {
-        const refundedItems = (ret.metadata as any)?.refundedItems
-        if (Array.isArray(refundedItems)) {
-          return acc + refundedItems.reduce((sum, r) => sum + Number(r.quantity || 0), 0)
-        }
-        return acc
-      }, 0)
+      let totalOrderedQty = 0
+      let totalRefundedQty = 0
+
+      for (const item of orderItemsList) {
+        totalOrderedQty += Number(item.quantity || 1)
+        
+        const refundedCount = orderReturnsList.reduce((acc, ret) => {
+          if (ret.status === 'bearbeitet' && (ret.metadata as any)?.refundedItems) {
+            const matched = ((ret.metadata as any).refundedItems as any[]).find((r: any) => r.sku === item.sku)
+            if (matched && matched.quantity) {
+              return acc + Number(matched.quantity)
+            }
+          }
+          return acc
+        }, 0)
+        
+        totalRefundedQty += refundedCount
+      }
 
       if (totalOrderedQty > 0 && totalRefundedQty >= totalOrderedQty) {
         fullyRefundedIds.push(orderId)
@@ -360,11 +370,11 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
           </Link>
           <Link href="/orders?status=refunded" className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all">
             <span className="text-sm font-medium text-gray-500">Erstattet</span>
-            <span className="text-2xl font-bold text-red-800">{fullyRefundedIds.length}</span>
+            <span className="text-2xl font-bold text-red-600">{fullyRefundedIds.length}</span>
           </Link>
           <Link href="/orders?status=partially_refunded" className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all">
             <span className="text-sm font-medium text-gray-500">Teilerstattet</span>
-            <span className="text-2xl font-bold text-orange-800">{partiallyRefundedIds.length}</span>
+            <span className="text-2xl font-bold text-red-600">{partiallyRefundedIds.length}</span>
           </Link>
         </div>
       </header>

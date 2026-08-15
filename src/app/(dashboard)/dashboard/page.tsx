@@ -2,7 +2,8 @@ import { requireAuth, getCurrentUser } from '@/lib/session'
 import { db } from '@/db/client'
 import { companies } from '@/db/schema/companies'
 import { eq, and, or, ne, sql, inArray, isNull, lt } from 'drizzle-orm'
-import { orders } from '@/db/schema/orders'
+import { orders, orderItems } from '@/db/schema/orders'
+import { returnsLog } from '@/db/schema/returns'
 import { invoices } from '@/db/schema/invoices'
 import { SyncButton } from './sync-button'
 import Link from 'next/link'
@@ -176,6 +177,17 @@ export default async function DashboardPage() {
       )
     )
 
+  // Refunds stats calculation
+  const allReturnsPromise = db.select({
+    orderId: returnsLog.orderId,
+    status: returnsLog.status,
+    metadata: returnsLog.metadata
+  }).from(returnsLog)
+    .where(and(
+      eq(returnsLog.companyId, auth.activeCompanyId),
+      eq(returnsLog.status, 'bearbeitet')
+    ))
+
   const [
     [company],
     [{ openOrdersCount }],
@@ -185,7 +197,8 @@ export default async function DashboardPage() {
     marketplaceStats,
     [invoicesStats],
     [openInvoicesStats],
-    [overdueInvoicesStats]
+    [overdueInvoicesStats],
+    allReturns
   ] = await Promise.all([
     companyPromise,
     openOrdersPromise,
@@ -195,8 +208,67 @@ export default async function DashboardPage() {
     marketplaceStatsPromise,
     invoicesStatsPromise,
     openInvoicesPromise,
-    overdueInvoicesPromise
+    overdueInvoicesPromise,
+    allReturnsPromise
   ])
+
+  // Process refunds logic precisely as in orders page
+  const orderIdsWithReturns = Array.from(new Set(allReturns.map(r => r.orderId).filter(Boolean) as string[]))
+  
+  let fullyRefundedCount = 0
+  let partiallyRefundedCount = 0
+
+  if (orderIdsWithReturns.length > 0) {
+    const returnItems = await db.select({
+      orderId: orderItems.orderId,
+      quantity: orderItems.quantity
+    }).from(orderItems)
+      .where(inArray(orderItems.orderId, orderIdsWithReturns))
+    
+    const itemsByOrder = returnItems.reduce((acc, item) => {
+      acc[item.orderId] = acc[item.orderId] || []
+      acc[item.orderId].push(item)
+      return acc
+    }, {} as Record<string, typeof returnItems>)
+
+    const returnsByOrder = allReturns.reduce((acc, ret) => {
+      if (ret.orderId) {
+        acc[ret.orderId] = acc[ret.orderId] || []
+        acc[ret.orderId].push(ret)
+      }
+      return acc
+    }, {} as Record<string, typeof allReturns>)
+
+    for (const orderId of orderIdsWithReturns) {
+      const orderItemsList = itemsByOrder[orderId] || []
+      const orderReturnsList = returnsByOrder[orderId] || []
+
+      let totalOrderedQty = 0
+      let totalRefundedQty = 0
+
+      for (const item of orderItemsList) {
+        totalOrderedQty += Number(item.quantity || 1)
+        
+        const refundedCount = orderReturnsList.reduce((acc, ret) => {
+          if (ret.status === 'bearbeitet' && (ret.metadata as any)?.refundedItems) {
+            const matched = ((ret.metadata as any).refundedItems as any[]).find((r: any) => r.sku === item.sku)
+            if (matched && matched.quantity) {
+              return acc + Number(matched.quantity)
+            }
+          }
+          return acc
+        }, 0)
+        
+        totalRefundedQty += refundedCount
+      }
+
+      if (totalOrderedQty > 0 && totalRefundedQty >= totalOrderedQty) {
+        fullyRefundedCount++
+      } else if (totalRefundedQty > 0 && totalRefundedQty < totalOrderedQty) {
+        partiallyRefundedCount++
+      }
+    }
+  }
 
   const pendingCount = orderStats.find(s => s.status === 'pending' || s.status === 'invoiced')?.count || 0
   const laterShipmentCount = orderStats.find(s => s.status === 'later_shipment')?.count || 0
@@ -238,26 +310,34 @@ export default async function DashboardPage() {
         <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2">
           Bestellungen Übersicht
         </h3>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
           <Link href="/orders" className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all">
-            <span className="text-sm font-medium text-gray-500">Gesamt</span>
+            <span className="text-sm font-medium text-gray-500 text-center">Gesamt</span>
             <span className="text-2xl font-bold text-gray-900 mt-1">{totalOrdersCount}</span>
           </Link>
           <Link href="/orders?status=pending" className="bg-white border border-yellow-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-yellow-300 hover:shadow-md transition-all">
-            <span className="text-sm font-medium text-yellow-700">Pending</span>
+            <span className="text-sm font-medium text-yellow-700 text-center">Pending</span>
             <span className="text-2xl font-bold text-yellow-600 mt-1">{pendingCount}</span>
           </Link>
           <Link href="/orders?status=later_shipment" className="bg-white border border-purple-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-purple-300 hover:shadow-md transition-all">
-            <span className="text-sm font-medium text-purple-700">Späterer Versand</span>
+            <span className="text-sm font-medium text-purple-700 text-center">Späterer Versand</span>
             <span className="text-2xl font-bold text-purple-600 mt-1">{laterShipmentCount}</span>
           </Link>
           <Link href="/orders?status=shipped" className="bg-white border border-green-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-green-300 hover:shadow-md transition-all">
-            <span className="text-sm font-medium text-green-700">Versendet</span>
+            <span className="text-sm font-medium text-green-700 text-center">Versendet</span>
             <span className="text-2xl font-bold text-green-600 mt-1">{shippedCount}</span>
           </Link>
           <Link href="/orders?status=cancelled" className="bg-white border border-red-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-red-300 hover:shadow-md transition-all">
-            <span className="text-sm font-medium text-red-700">Storniert</span>
+            <span className="text-sm font-medium text-red-700 text-center">Storniert</span>
             <span className="text-2xl font-bold text-red-600 mt-1">{cancelledCount}</span>
+          </Link>
+          <Link href="/orders?status=refunded" className="bg-white border border-red-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-red-300 hover:shadow-md transition-all">
+            <span className="text-sm font-medium text-gray-500 text-center">Erstattet</span>
+            <span className="text-2xl font-bold text-red-600 mt-1">{fullyRefundedCount}</span>
+          </Link>
+          <Link href="/orders?status=partially_refunded" className="bg-white border border-red-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-red-300 hover:shadow-md transition-all">
+            <span className="text-sm font-medium text-gray-500 text-center">Teilerstattet</span>
+            <span className="text-2xl font-bold text-red-600 mt-1">{partiallyRefundedCount}</span>
           </Link>
         </div>
       </section>
