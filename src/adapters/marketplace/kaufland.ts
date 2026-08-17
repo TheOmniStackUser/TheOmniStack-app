@@ -376,7 +376,7 @@ export class KauflandAdapter implements MarketplaceAdapter {
           const refundAmount = unit.price || 0 // price in cents
           const body = JSON.stringify({
             amount: refundAmount,
-            reason: 'return'
+            reason: 'other_refund'
           })
 
           console.log(`[KauflandAdapter] Refunding order unit ${idOrderUnit} (sku: ${sku}, amount: ${refundAmount} cents)...`)
