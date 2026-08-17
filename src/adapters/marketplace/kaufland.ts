@@ -394,7 +394,7 @@ export class KauflandAdapter implements MarketplaceAdapter {
 
       if (refundPromises.length === 0) {
         console.warn(`[KauflandAdapter] No matching active order units found for refund items.`)
-        return false
+        throw new Error(`Keine passenden und aktiven Bestellpositionen für die Rückerstattung gefunden.`)
       }
 
       await Promise.all(refundPromises)
@@ -402,7 +402,7 @@ export class KauflandAdapter implements MarketplaceAdapter {
       return true
     } catch (error) {
       console.error(`[KauflandAdapter] Error refunding order:`, error)
-      return false
+      throw error
     }
   }
 
