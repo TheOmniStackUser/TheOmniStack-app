@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
 
     // Modell-Fallback-Kette: bei 503 (Überlastung) oder 404 (Modell existiert nicht) wird automatisch auf
     // das nächste Modell gewechselt.
-    const MODEL_CHAIN = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-3.5-flash']
+    const MODEL_CHAIN = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-3.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro']
 
     const prompt = `
       Du bist ein Experte für Logistik-Belege.
@@ -102,7 +102,8 @@ export async function POST(req: NextRequest) {
       8. KUNDENADRESSE / VERSANDADRESSE (shipping_address):
          - Suche nach der vollständigen Adresse des Kunden (Absender auf dem Label oder Lieferanschrift auf dem Lieferschein). Gib sie als sauber formatierten String zurück (z.B. "Musterstraße 12, 12345 Musterstadt"). Wenn keine Adresse gefunden wird, gib null zurück.
 
-      Antworte AUSSCHLIESSLICH im folgenden JSON-Format ohne Markdown-Blöcke oder weiteren Text:
+      Antworte AUSSCHLIESSLICH im folgenden JSON-Format ohne Markdown-Blöcke oder weiteren Text. 
+      WICHTIG: Prüfe, dass dein JSON syntaktisch zu 100% korrekt ist (Kommata zwischen Array-Elementen, doppelte Anführungszeichen für Strings und Keys).
       {
         "order_number": "String",
         "customer_name": "String",
@@ -167,9 +168,28 @@ export async function POST(req: NextRequest) {
     console.log('AI Analysis Result for Company', companyName, ':', responseText)
     
     const jsonMatch = responseText.match(/\{[\s\S]*\}/)
-    const cleanJson = jsonMatch ? jsonMatch[0] : responseText
+    let cleanJson = jsonMatch ? jsonMatch[0] : responseText
     
-    const parsedData = JSON.parse(cleanJson)
+    let parsedData;
+    try {
+      parsedData = JSON.parse(cleanJson)
+    } catch (parseError: any) {
+      console.warn('[analyze-image] JSON parse failed, attempting auto-repair...', parseError.message)
+      // Fix missing commas between objects (e.g. } { -> }, {)
+      cleanJson = cleanJson.replace(/\}\s*(?=\{)/g, '},')
+      // Fix missing commas between arrays (e.g. ] [ -> ], [)
+      cleanJson = cleanJson.replace(/\]\s*(?=\[)/g, '],')
+      // Fix missing commas between string elements and objects
+      cleanJson = cleanJson.replace(/"\s*(?=\{)/g, '",')
+      cleanJson = cleanJson.replace(/\}\s*(?=")/g, '},')
+      
+      try {
+        parsedData = JSON.parse(cleanJson)
+        console.log('[analyze-image] JSON successfully auto-repaired.')
+      } catch (repairError) {
+        throw parseError // Throw the original error so it can be passed to the client
+      }
+    }
 
     // Ensure order_number and other crucial string fields are actual strings (prevents crashes when integers are returned for delivery notes)
     if (parsedData.order_number !== undefined && parsedData.order_number !== null) {
