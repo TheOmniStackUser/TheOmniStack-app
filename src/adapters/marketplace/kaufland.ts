@@ -374,7 +374,7 @@ export class KauflandAdapter implements MarketplaceAdapter {
         if (refundIndex !== -1) {
           // Trigger cancellation for full item refund
           const body = JSON.stringify({
-            reason: 'CustomerReturn'
+            reason: 'BuyerCancelled'
           })
 
           console.log(`[KauflandAdapter] Cancelling order unit ${idOrderUnit} (sku: ${sku}) for full refund...`)
