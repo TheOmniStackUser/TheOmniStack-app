@@ -376,12 +376,12 @@ export class KauflandAdapter implements MarketplaceAdapter {
           const refundAmount = unit.price || 0 // price in cents
           const body = JSON.stringify({
             amount: refundAmount,
-            reason: 'customer_return'
+            reason: 'return'
           })
 
           console.log(`[KauflandAdapter] Refunding order unit ${idOrderUnit} (sku: ${sku}, amount: ${refundAmount} cents)...`)
           refundPromises.push(
-            this.makeRequest('POST', `/order-units/${idOrderUnit}/refund`, body)
+            this.makeRequest('PATCH', `/order-units/${idOrderUnit}/refund`, body)
           )
 
           // Decrement remaining quantity
