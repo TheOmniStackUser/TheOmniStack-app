@@ -372,16 +372,14 @@ export class KauflandAdapter implements MarketplaceAdapter {
         const sku = unit.id_offer || unit.ean
         const refundIndex = remainingRefundItems.findIndex(ri => ri.sku === sku)
         if (refundIndex !== -1) {
-          // Trigger refund for this unit
-          const refundAmount = unit.price || 0 // price in cents
+          // Trigger cancellation for full item refund
           const body = JSON.stringify({
-            amount: refundAmount,
-            reason: 'other_refund'
+            reason: 'CustomerReturn'
           })
 
-          console.log(`[KauflandAdapter] Refunding order unit ${idOrderUnit} (sku: ${sku}, amount: ${refundAmount} cents)...`)
+          console.log(`[KauflandAdapter] Cancelling order unit ${idOrderUnit} (sku: ${sku}) for full refund...`)
           refundPromises.push(
-            this.makeRequest('PATCH', `/order-units/${idOrderUnit}/refund`, body)
+            this.makeRequest('PATCH', `/order-units/${idOrderUnit}/cancel`, body)
           )
 
           // Decrement remaining quantity
