@@ -191,12 +191,28 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Ensure order_number and other crucial string fields are actual strings (prevents crashes when integers are returned for delivery notes)
-    if (parsedData.order_number !== undefined && parsedData.order_number !== null) {
-      parsedData.order_number = String(parsedData.order_number)
+    // Strict Schema Normalization to prevent iOS Swift JSONDecoder crashes
+    if (Array.isArray(parsedData)) {
+      parsedData = parsedData[0] || {}
     }
-    if (parsedData.customer_name !== undefined && parsedData.customer_name !== null) {
-      parsedData.customer_name = String(parsedData.customer_name)
+    if (typeof parsedData !== 'object' || parsedData === null) {
+      parsedData = {}
+    }
+
+    parsedData = {
+      order_number: parsedData.order_number != null ? String(parsedData.order_number) : null,
+      customer_name: parsedData.customer_name != null ? String(parsedData.customer_name) : null,
+      shipping_address: parsedData.shipping_address != null ? String(parsedData.shipping_address) : null,
+      items: Array.isArray(parsedData.items) ? parsedData.items.map((i: any) => ({
+        sku: i?.sku != null ? String(i.sku) : 'Unknown',
+        quantity: Number(i?.quantity) || 1
+      })) : [],
+      document_type: parsedData.document_type != null ? String(parsedData.document_type) : null,
+      carrier: parsedData.carrier != null ? String(parsedData.carrier) : null,
+      tracking_number: parsedData.tracking_number != null ? String(parsedData.tracking_number) : null,
+      company_mismatch: parsedData.company_mismatch === true || parsedData.company_mismatch === 'true',
+      detected_company: parsedData.detected_company != null ? String(parsedData.detected_company) : null,
+      marketplace: parsedData.marketplace != null ? String(parsedData.marketplace) : null
     }
 
     // Match with database order and auto-populate metadata & items if needed
