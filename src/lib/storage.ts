@@ -222,7 +222,8 @@ export function buildInvoiceKey(
   year = new Date().getFullYear()
 ): string {
   const safeNumber = invoiceNumber.replace(/[^a-zA-Z0-9-_]/g, '_')
-  return `${companyId}/invoices/${year}/${safeNumber}.pdf`
+  const uniqueId = Math.random().toString(36).substring(2, 8)
+  return `${companyId}/invoices/${year}/${safeNumber}_${uniqueId}.pdf`
 }
 
 /**
