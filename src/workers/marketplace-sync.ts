@@ -97,7 +97,18 @@ async function reportChildResult(
   const redis = getRedisConnection()
   const groupKey = `sync-group:${companyId}:${syncGroupId}`
   
-  // Store this child's result
+  // Fetch existing to aggregate if delayed sync adds to the same marketplace
+  const existingStr = await redis.hget(`${groupKey}:results`, result.marketplace)
+  if (existingStr) {
+    const existing = JSON.parse(existingStr)
+    result.count = (existing.count || 0) + (result.count || 0)
+    result.newCount = (existing.newCount || 0) + (result.newCount || 0)
+    // If one succeeds and the other fails, keep the failure error message
+    result.success = existing.success && result.success
+    result.error = existing.error || result.error
+  }
+  
+  // Store this child's aggregated result
   await redis.hset(`${groupKey}:results`, result.marketplace, JSON.stringify(result))
   
   // Increment completed count
@@ -382,6 +393,13 @@ export function createMarketplaceSyncWorker() {
 
           if ((adapter as any).hasPendingAcceptances) {
             console.log(`[Worker] Adapter has pending acceptances. Enqueueing a delayed sync job in 10 mins for ${marketplace}`)
+            
+            if (job.data.syncGroupId) {
+              const redis = getRedisConnection()
+              const groupKey = `sync-group:${companyId}:${job.data.syncGroupId}`
+              await redis.incr(`${groupKey}:total`)
+            }
+
             await marketplaceSyncQueue.add(
               `delayed-sync-${integration.type}`,
               {
@@ -389,6 +407,8 @@ export function createMarketplaceSyncWorker() {
                 marketplace: integration.type as any,
                 triggeredByUserId,
                 integrationId: integration.id,
+                syncGroupId: job.data.syncGroupId,
+                marketplaceDisplayName: job.data.marketplaceDisplayName,
               },
               {
                 delay: 10 * 60 * 1000, // 10 minutes
