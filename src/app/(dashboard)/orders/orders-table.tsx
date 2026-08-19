@@ -3786,20 +3786,150 @@ const filteredOrders = orders;
                 
                 return (
                   <div key={order.id} className="p-5 border border-slate-100 rounded-2xl bg-slate-50/50 hover:bg-slate-50 transition-colors">
-                    <div className="flex justify-between items-start mb-4">
+                    <div className="flex justify-between items-start mb-3">
                       <div>
                         <div className="text-xs font-bold text-yellow-600 uppercase tracking-wider">Bestellung</div>
                         <div className="font-black text-slate-900">{orderNum}</div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Empfänger & Land</div>
-                        <div className="text-sm font-bold text-slate-700 flex items-center justify-end gap-1.5">
-                          {order.buyerName || 'Unbekannt'}
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-600 font-mono">
-                            {formatCountry(order.shippingCountry)}
-                          </span>
+                    </div>
+
+                    <div className="mb-4 bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
+                      {editingAddressId === order.id ? (
+                        <div>
+                          <span className="font-medium text-sm">Lieferadresse bearbeiten:</span>
+                          <div className="mt-2 space-y-2">
+                            <div>
+                              <label className="block text-[10px] uppercase font-bold text-slate-400">Name</label>
+                              <input 
+                                type="text" 
+                                value={editName} 
+                                onChange={(e) => setEditName(e.target.value)}
+                                className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-1.5 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-yellow-400" 
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="block text-[10px] uppercase font-bold text-slate-400">Firma</label>
+                                <input 
+                                  type="text" 
+                                  value={editCompany} 
+                                  onChange={(e) => setEditCompany(e.target.value)}
+                                  className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-1.5 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-yellow-400" 
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] uppercase font-bold text-slate-400">Adresszusatz</label>
+                                <input 
+                                  type="text" 
+                                  value={editAddressAddition} 
+                                  onChange={(e) => setEditAddressAddition(e.target.value)}
+                                  className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-1.5 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-yellow-400" 
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-[10px] uppercase font-bold text-slate-400">Straße & Hausnummer</label>
+                              <input 
+                                type="text" 
+                                value={editStreet} 
+                                onChange={(e) => setEditStreet(e.target.value)}
+                                className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-1.5 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-yellow-400" 
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="block text-[10px] uppercase font-bold text-slate-400">PLZ</label>
+                                <input 
+                                  type="text" 
+                                  value={editZip} 
+                                  onChange={(e) => setEditZip(e.target.value)}
+                                  className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-1.5 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-yellow-400" 
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] uppercase font-bold text-slate-400">Stadt</label>
+                                <input 
+                                  type="text" 
+                                  value={editCity} 
+                                  onChange={(e) => setEditCity(e.target.value)}
+                                  className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-1.5 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-yellow-400" 
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-[10px] uppercase font-bold text-slate-400">Land (ISO 2)</label>
+                              <input 
+                                type="text" 
+                                value={editCountry} 
+                                onChange={(e) => setEditCountry(e.target.value)}
+                                maxLength={3}
+                                className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-1.5 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-yellow-400" 
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="block text-[10px] uppercase font-bold text-slate-400">E-Mail</label>
+                                <input 
+                                  type="email" 
+                                  value={editEmail} 
+                                  onChange={(e) => setEditEmail(e.target.value)}
+                                  className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-1.5 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-yellow-400" 
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] uppercase font-bold text-slate-400">Telefon</label>
+                                <input 
+                                  type="text" 
+                                  value={editPhone} 
+                                  onChange={(e) => setEditPhone(e.target.value)}
+                                  className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-1.5 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-yellow-400" 
+                                />
+                              </div>
+                            </div>
+                            <div className="flex justify-end gap-2 pt-2">
+                              <button 
+                                onClick={() => setEditingAddressId(null)}
+                                disabled={isUpdatingAddress}
+                                className="text-xs px-2.5 py-1.5 border border-slate-300 hover:bg-slate-50 rounded-md transition-colors font-medium text-slate-600"
+                              >
+                                Abbrechen
+                              </button>
+                              <button 
+                                onClick={() => handleSaveAddress(order.id)}
+                                disabled={isUpdatingAddress}
+                                className="text-xs px-2.5 py-1.5 bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-bold rounded-md transition-colors disabled:opacity-50"
+                              >
+                                {isUpdatingAddress ? 'Speichert...' : 'Speichern'}
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                      </div>
+                      ) : (
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Lieferadresse</span>
+                            <button 
+                              onClick={() => startEditingAddress(order)}
+                              className="text-[11px] text-yellow-600 hover:text-yellow-700 font-bold flex items-center gap-1 transition-colors"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                              </svg>
+                              Bearbeiten
+                            </button>
+                          </div>
+                          <div className="text-sm text-slate-700">
+                            <div className="font-bold">{order.shippingName || 'Unbekannt'}</div>
+                            {(order as any).shippingCompany && <div>{(order as any).shippingCompany}</div>}
+                            <div>{order.shippingStreet}</div>
+                            {(order as any).shippingAddressAddition && <div>{(order as any).shippingAddressAddition}</div>}
+                            <div>{order.shippingZip} {order.shippingCity}</div>
+                            <div>{formatCountry(order.shippingCountry)}</div>
+                            {order.buyerEmail && <div className="text-slate-500 mt-0.5">{order.buyerEmail}</div>}
+                            {(order as any).buyerPhone && <div className="text-slate-500">{(order as any).buyerPhone}</div>}
+                          </div>
+                        </div>
+                      )}
                     </div>
                     
                     {skus.length > 0 && (
