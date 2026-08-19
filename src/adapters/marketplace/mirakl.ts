@@ -340,10 +340,17 @@ export class MiraklAdapter implements MarketplaceAdapter {
       // Mirakl uses multipart/form-data for document uploads
       const formData = new FormData()
       const blob = new Blob([new Uint8Array(pdfBuffer)], { type: 'application/pdf' })
-      formData.append('files', blob, fileName)
       
-      // Document type 'INVOICE' or 'CREDIT_NOTE'
-      formData.append('document_type_code', isCreditNote ? 'CREDIT_NOTE' : 'INVOICE')
+      const typeCode = isCreditNote ? 'CREDIT_NOTE' : 'CUSTOMER_INVOICE'
+      formData.append('order_documents', JSON.stringify({
+        order_documents: [
+          {
+            file_name: fileName,
+            type_code: typeCode
+          }
+        ]
+      }))
+      formData.append('files', blob, fileName)
 
       let url = `${this.config.baseUrl}/api/orders/${orderId}/documents`
       if (this.config.shopId) {
