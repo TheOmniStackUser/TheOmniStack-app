@@ -10,6 +10,9 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -25,8 +28,17 @@ jobs:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
         run: |
-          ADMIN_EMAIL=$(echo "$ADMIN_EMAIL" | tr -d '\r\n ')
-          DATABASE_URL=$(echo "$DATABASE_URL" | tr -d '\r\n ')
+          # Sanitize inputs (remove leading/trailing whitespace, preserve internal spaces)
+          trim() {
+            local var="$*"
+            var="${var#"${var%%[![:space:]]*}"}"
+            var="${var%"${var##*[![:space:]]}"}"
+            echo -n "$var"
+          }
+          ADMIN_EMAIL=$(trim "$ADMIN_EMAIL")
+          DATABASE_URL=$(trim "$DATABASE_URL")
+          SOURCE_S3_BUCKET=$(trim "$SOURCE_S3_BUCKET")
+          BACKUP_S3_BUCKET=$(trim "$BACKUP_S3_BUCKET")
           
           TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
           BACKUP_DIR="/tmp/theomnistack_backup_$TIMESTAMP"
