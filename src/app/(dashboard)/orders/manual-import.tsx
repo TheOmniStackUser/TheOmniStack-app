@@ -172,7 +172,8 @@ export function ManualImport({
         setTimeout(() => setNotification(null), 10000)
       }
     } catch (e) {
-      setNotification({ message: 'Ein unerwarteter Fehler ist aufgetreten.', type: 'error' })
+      console.error('MANUAL IMPORT ERROR:', e)
+      setNotification({ message: `Ein unerwarteter Fehler ist aufgetreten: ${e instanceof Error ? e.message : String(e)}`, type: 'error' })
     } finally {
       setIsSyncing(false)
       setTimeout(() => setSyncProgress(null), 2000)

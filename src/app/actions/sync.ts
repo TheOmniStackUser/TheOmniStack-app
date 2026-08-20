@@ -96,201 +96,209 @@ export async function triggerSyncAction() {
 }
 
 export async function triggerManualSyncAction(data: { marketplace: string, fromDate?: string, toDate?: string }) {
-  const auth = await requireAuth()
+  try {
+    const auth = await requireAuth()
 
-  let query: any = and(
-    eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
-    eq(marketplaceIntegrations.isActive, true)
-  )
+    let query: any = and(
+      eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
+      eq(marketplaceIntegrations.isActive, true)
+    )
 
-  const allActiveIntegrations = await db.select().from(marketplaceIntegrations).where(query)
+    const allActiveIntegrations = await db.select().from(marketplaceIntegrations).where(query)
 
-  let activeIntegrations = allActiveIntegrations
-  if (data.marketplace !== 'all') {
-    activeIntegrations = allActiveIntegrations.filter(integration => {
-      if (data.marketplace === 'group_direct') {
-        return ['otto', 'aboutyou', 'shopify', 'kaufland', 'ebay', 'amazon', 'etsy'].includes(integration.type)
-      } else if (data.marketplace === 'group_decathlon') {
-        const customName = ((integration.metadata as any)?.customName || '').toLowerCase()
-        return integration.type === 'mirakl_decathlon' || integration.type === 'mirakl_decathlon_eu' || customName.startsWith('decathlon')
-      } else if (data.marketplace === 'group_secret_sales') {
-        const customName = ((integration.metadata as any)?.customName || '').toLowerCase()
-        return customName.startsWith('secret sales')
-      } else if (data.marketplace === 'group_other') {
-        const customName = ((integration.metadata as any)?.customName || '').toLowerCase()
-        const isDecathlon = integration.type === 'mirakl_decathlon' || integration.type === 'mirakl_decathlon_eu' || customName.startsWith('decathlon')
-        const isSecretSales = customName.startsWith('secret sales')
-        const isDirect = ['otto', 'aboutyou', 'shopify', 'kaufland', 'ebay', 'amazon', 'etsy'].includes(integration.type)
-        return !isDecathlon && !isSecretSales && !isDirect
-      } else if (data.marketplace.startsWith('mirakl_custom_')) {
-        return integration.id === data.marketplace.replace('mirakl_custom_', '')
-      } else {
-        return integration.type === data.marketplace
-      }
-    })
-  }
-
-  if (activeIntegrations.length === 0) {
-    return { error: 'Für diese Auswahl sind keine aktiven Marktplätze verknüpft.' }
-  }
-
-  let totalChecked = 0
-  let totalAffected = 0
-  let hasPendingAcceptances = false
-
-  for (const integration of activeIntegrations) {
-    try {
-      let rawOrders: NormalizedOrder[] = []
-      let adapter: any = null
-      
-      if (integration.type === 'otto') {
-        const ottoAdapter = new OttoAdapter({
-          clientId: integration.clientId!,
-          clientSecret: integration.clientSecret!,
-          environment: integration.environment as 'sandbox' | 'production',
-          installationId: (integration.metadata as any)?.installationId,
-          appId: (integration.metadata as any)?.appId,
-          connectionType: (integration.metadata as any)?.connectionType || 'service_partner'
-        })
-        adapter = ottoAdapter
-        rawOrders = await adapter.fetchUnshippedOrders(auth.activeCompanyId, {
-          fromDate: data.fromDate,
-          toDate: data.toDate
-        })
-      } else if (integration.type.startsWith('mirakl_')) {
-        const customName = integration.type === 'mirakl_custom'
-          ? ((integration.metadata as any)?.customName || 'mirakl_custom')
-          : integration.type
-        const miraklAdapter = new MiraklAdapter({
-          instance: customName.toLowerCase(),
-          baseUrl: integration.environment!,
-          clientId: integration.clientId!,
-          clientSecret: integration.clientSecret!,
-          apiKey: integration.apiKey || undefined,
-          shopId: (integration.metadata as any)?.shopId || undefined
-        })
-        adapter = miraklAdapter
-        rawOrders = await adapter.fetchUnshippedOrders(auth.activeCompanyId, {
-          fromDate: data.fromDate,
-          toDate: data.toDate
-        })
-      } else if (integration.type === 'amazon') {
-        const amzAdapter = new AmazonAdapter({
-          sellerId: integration.sellerId!,
-          clientId: integration.clientId!,
-          clientSecret: integration.clientSecret!,
-          refreshToken: integration.refreshToken!
-        })
-        adapter = amzAdapter
-        rawOrders = await adapter.fetchUnshippedOrders(auth.activeCompanyId)
-      } else if (integration.type === 'shopify') {
-        const { ShopifyAdapter } = await import('@/adapters/marketplace/shopify')
-        const shopifyAdapter = new ShopifyAdapter()
-        adapter = shopifyAdapter
-        rawOrders = await adapter.fetchUnshippedOrders(auth.activeCompanyId, { 
-          fromDate: data.fromDate, 
-          toDate: data.toDate 
-        })
-      } else if (integration.type === 'aboutyou') {
-        const aboutYouAdapter = new AboutYouAdapter({
-          apiKey: integration.apiKey!,
-          environment: (integration.environment as 'sandbox' | 'production') || 'production'
-        })
-        adapter = aboutYouAdapter
-        rawOrders = await adapter.fetchUnshippedOrders(auth.activeCompanyId, {
-          fromDate: data.fromDate,
-          toDate: data.toDate
-        })
-      } else if (integration.type === 'kaufland') {
-        const { KauflandAdapter } = await import('@/adapters/marketplace/kaufland')
-        const kauflandAdapter = new KauflandAdapter({
-          clientId: integration.clientId!,
-          clientSecret: integration.clientSecret!,
-          environment: (integration.environment as 'sandbox' | 'production') || 'production'
-        })
-        adapter = kauflandAdapter
-        rawOrders = await adapter.fetchUnshippedOrders(auth.activeCompanyId, {
-          fromDate: data.fromDate,
-          toDate: data.toDate
-        })
-      } else if (integration.type === 'ebay') {
-        const { EbayAdapter } = await import('@/adapters/marketplace/ebay')
-        const ebayAdapter = new EbayAdapter()
-        adapter = ebayAdapter
-        rawOrders = await adapter.fetchUnshippedOrders(auth.activeCompanyId, {
-          fromDate: data.fromDate,
-          toDate: data.toDate
-        })
-      } else if (integration.type === 'etsy') {
-        const { EtsyAdapter } = await import('@/adapters/marketplace/etsy')
-        const etsyAdapter = new EtsyAdapter()
-        adapter = etsyAdapter
-        rawOrders = await adapter.fetchUnshippedOrders(auth.activeCompanyId, {
-          fromDate: data.fromDate,
-          toDate: data.toDate
-        })
-      }
-
-      if (rawOrders && rawOrders.length > 0) {
-        console.log(`[Sync] Found ${rawOrders.length} orders for ${integration.type}`)
-        const result = await persistOrders(auth.activeCompanyId, rawOrders, true, integration, adapter) // true = isManualSync
-        console.log(`[Sync] Result for ${integration.type}: Checked ${result.checked}, Affected ${result.affected}`)
-        totalChecked += result.checked
-        totalAffected += result.affected
-      } else {
-        console.log(`[Sync] No orders found for ${integration.type}`)
-      }
-
-      if (adapter && (adapter as any).hasPendingAcceptances) {
-        hasPendingAcceptances = true
-        console.log(`[Sync] Adapter has pending acceptances. Enqueueing a delayed sync job in 10 mins for ${integration.type}`)
-        const { marketplaceSyncQueue } = await import('@/workers/marketplace-sync')
-        await marketplaceSyncQueue.add(
-          `delayed-sync-${integration.type}`,
-          {
-            companyId: auth.activeCompanyId,
-            marketplace: integration.type as any,
-            triggeredByUserId: auth.userId,
-            integrationId: integration.id,
-          },
-          {
-            delay: 10 * 60 * 1000, // 10 minutes
-            jobId: `delayed-sync-${integration.type}-${integration.id}-${Date.now()}`,
-            removeOnComplete: true
-          }
-        )
-      }
-
-      // Also sync shipped orders invoices for this integration
-      const { syncShippedOrdersInvoices } = await import('@/workers/marketplace-sync')
-      await syncShippedOrdersInvoices(auth.activeCompanyId, integration.type, integration.id)
-
-      // Also sync returns/refunds for Mirakl integrations
-      if (integration.type.startsWith('mirakl_') || integration.type === 'mirakl_custom') {
-        const { syncMiraklReturns } = await import('@/workers/marketplace-sync')
-        await syncMiraklReturns(auth.activeCompanyId, integration, adapter)
-      }
-    } catch (error) {
-      console.error(`Error manually syncing ${integration.type}:`, error)
-      if (data.marketplace !== 'all') {
-        return { error: error instanceof Error ? error.message : String(error) }
-      }
-      // Continue to next integration even if one fails
+    let activeIntegrations = allActiveIntegrations
+    if (data.marketplace !== 'all') {
+      activeIntegrations = allActiveIntegrations.filter(integration => {
+        if (data.marketplace === 'group_direct') {
+          return ['otto', 'aboutyou', 'shopify', 'kaufland', 'ebay', 'amazon', 'etsy'].includes(integration.type)
+        } else if (data.marketplace === 'group_decathlon') {
+          const customName = ((integration.metadata as any)?.customName || '').toLowerCase()
+          return integration.type === 'mirakl_decathlon' || integration.type === 'mirakl_decathlon_eu' || customName.startsWith('decathlon')
+        } else if (data.marketplace === 'group_secret_sales') {
+          const customName = ((integration.metadata as any)?.customName || '').toLowerCase()
+          return customName.startsWith('secret sales')
+        } else if (data.marketplace === 'group_other') {
+          const customName = ((integration.metadata as any)?.customName || '').toLowerCase()
+          const isDecathlon = integration.type === 'mirakl_decathlon' || integration.type === 'mirakl_decathlon_eu' || customName.startsWith('decathlon')
+          const isSecretSales = customName.startsWith('secret sales')
+          const isDirect = ['otto', 'aboutyou', 'shopify', 'kaufland', 'ebay', 'amazon', 'etsy'].includes(integration.type)
+          return !isDecathlon && !isSecretSales && !isDirect
+        } else if (data.marketplace.startsWith('mirakl_custom_')) {
+          return integration.id === data.marketplace.replace('mirakl_custom_', '')
+        } else {
+          return integration.type === data.marketplace
+        }
+      })
     }
-  }
 
-  revalidatePath('/orders')
-  
-  if (totalAffected === 0) {
+    if (activeIntegrations.length === 0) {
+      return { error: 'Für diese Auswahl sind keine aktiven Marktplätze verknüpft.' }
+    }
+
+    let totalChecked = 0
+    let totalAffected = 0
+    let hasPendingAcceptances = false
+
+    for (const integration of activeIntegrations) {
+      try {
+        let rawOrders: NormalizedOrder[] = []
+        let adapter: any = null
+        
+        if (integration.type === 'otto') {
+          const ottoAdapter = new OttoAdapter({
+            clientId: integration.clientId!,
+            clientSecret: integration.clientSecret!,
+            environment: integration.environment as 'sandbox' | 'production',
+            installationId: (integration.metadata as any)?.installationId,
+            appId: (integration.metadata as any)?.appId,
+            connectionType: (integration.metadata as any)?.connectionType || 'service_partner'
+          })
+          adapter = ottoAdapter
+          rawOrders = await adapter.fetchUnshippedOrders(auth.activeCompanyId, {
+            fromDate: data.fromDate,
+            toDate: data.toDate
+          })
+        } else if (integration.type.startsWith('mirakl_')) {
+          const customName = integration.type === 'mirakl_custom'
+            ? ((integration.metadata as any)?.customName || 'mirakl_custom')
+            : integration.type
+          const miraklAdapter = new MiraklAdapter({
+            instance: customName.toLowerCase(),
+            baseUrl: integration.environment!,
+            clientId: integration.clientId!,
+            clientSecret: integration.clientSecret!,
+            apiKey: integration.apiKey || undefined,
+            shopId: (integration.metadata as any)?.shopId || undefined
+          })
+          adapter = miraklAdapter
+          rawOrders = await adapter.fetchUnshippedOrders(auth.activeCompanyId, {
+            fromDate: data.fromDate,
+            toDate: data.toDate
+          })
+        } else if (integration.type === 'amazon') {
+          const amzAdapter = new AmazonAdapter({
+            sellerId: integration.sellerId!,
+            clientId: integration.clientId!,
+            clientSecret: integration.clientSecret!,
+            refreshToken: integration.refreshToken!
+          })
+          adapter = amzAdapter
+          rawOrders = await adapter.fetchUnshippedOrders(auth.activeCompanyId)
+        } else if (integration.type === 'shopify') {
+          const { ShopifyAdapter } = await import('@/adapters/marketplace/shopify')
+          const shopifyAdapter = new ShopifyAdapter()
+          adapter = shopifyAdapter
+          rawOrders = await adapter.fetchUnshippedOrders(auth.activeCompanyId, { 
+            fromDate: data.fromDate, 
+            toDate: data.toDate 
+          })
+        } else if (integration.type === 'aboutyou') {
+          const aboutYouAdapter = new AboutYouAdapter({
+            apiKey: integration.apiKey!,
+            environment: (integration.environment as 'sandbox' | 'production') || 'production'
+          })
+          adapter = aboutYouAdapter
+          rawOrders = await adapter.fetchUnshippedOrders(auth.activeCompanyId, {
+            fromDate: data.fromDate,
+            toDate: data.toDate
+          })
+        } else if (integration.type === 'kaufland') {
+          const { KauflandAdapter } = await import('@/adapters/marketplace/kaufland')
+          const kauflandAdapter = new KauflandAdapter({
+            clientId: integration.clientId!,
+            clientSecret: integration.clientSecret!,
+            environment: (integration.environment as 'sandbox' | 'production') || 'production'
+          })
+          adapter = kauflandAdapter
+          rawOrders = await adapter.fetchUnshippedOrders(auth.activeCompanyId, {
+            fromDate: data.fromDate,
+            toDate: data.toDate
+          })
+        } else if (integration.type === 'ebay') {
+          const { EbayAdapter } = await import('@/adapters/marketplace/ebay')
+          const ebayAdapter = new EbayAdapter()
+          adapter = ebayAdapter
+          rawOrders = await adapter.fetchUnshippedOrders(auth.activeCompanyId, {
+            fromDate: data.fromDate,
+            toDate: data.toDate
+          })
+        } else if (integration.type === 'etsy') {
+          const { EtsyAdapter } = await import('@/adapters/marketplace/etsy')
+          const etsyAdapter = new EtsyAdapter()
+          adapter = etsyAdapter
+          rawOrders = await adapter.fetchUnshippedOrders(auth.activeCompanyId, {
+            fromDate: data.fromDate,
+            toDate: data.toDate
+          })
+        }
+
+        if (rawOrders && rawOrders.length > 0) {
+          console.log(`[Sync] Found ${rawOrders.length} orders for ${integration.type}`)
+          const result = await persistOrders(auth.activeCompanyId, rawOrders, true, integration, adapter) // true = isManualSync
+          console.log(`[Sync] Result for ${integration.type}: Checked ${result.checked}, Affected ${result.affected}`)
+          totalChecked += result.checked
+          totalAffected += result.affected
+        } else {
+          console.log(`[Sync] No orders found for ${integration.type}`)
+        }
+
+        if (adapter && (adapter as any).hasPendingAcceptances) {
+          hasPendingAcceptances = true
+          console.log(`[Sync] Adapter has pending acceptances. Enqueueing a delayed sync job in 10 mins for ${integration.type}`)
+          const { marketplaceSyncQueue } = await import('@/workers/marketplace-sync')
+          await marketplaceSyncQueue.add(
+            `delayed-sync-${integration.type}`,
+            {
+              companyId: auth.activeCompanyId,
+              marketplace: integration.type as any,
+              triggeredByUserId: auth.userId,
+              integrationId: integration.id,
+            },
+            {
+              delay: 10 * 60 * 1000, // 10 minutes
+              jobId: `delayed-sync-${integration.type}-${integration.id}-${Date.now()}`,
+              removeOnComplete: true
+            }
+          )
+        }
+
+        // Also sync shipped orders invoices for this integration
+        const { syncShippedOrdersInvoices } = await import('@/workers/marketplace-sync')
+        await syncShippedOrdersInvoices(auth.activeCompanyId, integration.type, integration.id)
+
+        // Also sync returns/refunds for Mirakl integrations
+        if (integration.type.startsWith('mirakl_') || integration.type === 'mirakl_custom') {
+          const { syncMiraklReturns } = await import('@/workers/marketplace-sync')
+          await syncMiraklReturns(auth.activeCompanyId, integration, adapter)
+        }
+      } catch (error) {
+        console.error(`Error manually syncing ${integration.type}:`, error)
+        if (data.marketplace !== 'all') {
+          return { error: error instanceof Error ? error.message : String(error) }
+        }
+        // Continue to next integration even if one fails
+      }
+    }
+
+    revalidatePath('/orders')
+    
+    if (totalAffected === 0) {
+      if (hasPendingAcceptances) {
+        return { success: true, message: `Import abgeschlossen. Einige Bestellungen wurden bestätigt und werden in ca. 10 Minuten automatisch importiert.`, affected: 0, checked: totalChecked }
+      }
+      return { success: true, message: `Import abgeschlossen! Es wurden keine neuen Bestellungen gefunden.`, affected: 0, checked: totalChecked }
+    }
+
     if (hasPendingAcceptances) {
-      return { success: true, message: `Import abgeschlossen. Einige Bestellungen wurden bestätigt und werden in ca. 10 Minuten automatisch importiert.`, affected: 0, checked: totalChecked }
+      return { success: true, message: `Import erfolgreich! ${totalAffected} neue Bestellung(en) hinzugefügt. Weitere wurden bestätigt und werden in ca. 10 Minuten importiert.`, affected: totalAffected, checked: totalChecked }
     }
-    return { success: true, message: `Import abgeschlossen! Es wurden keine neuen Bestellungen gefunden.`, affected: 0, checked: totalChecked }
-  }
 
-  if (hasPendingAcceptances) {
-    return { success: true, message: `Import erfolgreich! ${totalAffected} neue Bestellung(en) hinzugefügt. Weitere wurden bestätigt und werden in ca. 10 Minuten importiert.`, affected: totalAffected, checked: totalChecked }
+    return { success: true, message: `Import erfolgreich! ${totalAffected} neue Bestellung(en) wurden hinzugefügt.`, affected: totalAffected, checked: totalChecked }
+  } catch (error: any) {
+    console.error('FATAL ERROR IN triggerManualSyncAction:', error)
+    if (error && typeof error === 'object' && 'digest' in error && typeof error.digest === 'string' && error.digest.startsWith('NEXT_REDIRECT')) {
+      throw error
+    }
+    return { error: `Systemfehler: ${error instanceof Error ? error.message : String(error)}` }
   }
-
-  return { success: true, message: `Import erfolgreich! ${totalAffected} neue Bestellung(en) wurden hinzugefügt.`, affected: totalAffected, checked: totalChecked }
 }
