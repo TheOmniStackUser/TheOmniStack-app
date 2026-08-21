@@ -33,12 +33,13 @@ jobs:
             local var="$*"
             var="${var#"${var%%[![:space:]]*}"}"
             var="${var%"${var##*[![:space:]]}"}"
-            echo -n "$var"
+            printf "%s" "$var"
           }
           ADMIN_EMAIL=$(trim "$ADMIN_EMAIL")
           DATABASE_URL=$(trim "$DATABASE_URL")
           SOURCE_S3_BUCKET=$(trim "$SOURCE_S3_BUCKET")
           BACKUP_S3_BUCKET=$(trim "$BACKUP_S3_BUCKET")
+          RESEND_API_KEY=$(trim "$RESEND_API_KEY")
           
           TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
           BACKUP_DIR="/tmp/theomnistack_backup_$TIMESTAMP"
