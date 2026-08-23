@@ -33,6 +33,10 @@ jobs:
             local var="$*"
             var="${var#"${var%%[![:space:]]*}"}"
             var="${var%"${var##*[![:space:]]}"}"
+            var="${var#\'}"
+            var="${var%\'}"
+            var="${var#\"}"
+            var="${var%\"}"
             printf "%s" "$var"
           }
           ADMIN_EMAIL=$(trim "$ADMIN_EMAIL")
@@ -49,12 +53,15 @@ jobs:
           mkdir -p "$BACKUP_DIR"
           
           echo "Dumping PostgreSQL database (using Postgres 17)..."
-          if docker run --rm postgres:17-alpine pg_dump "$DATABASE_URL" > "$DB_DUMP_FILE"; then
+          if docker run --rm postgres:17-alpine pg_dump "$DATABASE_URL" > "$DB_DUMP_FILE" 2> error.log; then
               echo "Database dump successful."
               gzip "$DB_DUMP_FILE"
               DB_DUMP_FILE="$DB_DUMP_FILE.gz"
           else
               echo "Error: Database dump failed!"
+              # Read error, remove quotes/newlines, truncate to 250 chars for safe JSON insertion
+              ERR_MSG=$(cat error.log | tr -d '"' | tr -d "'" | tr '\n' ' ' | cut -c 1-250)
+              echo "Details: $ERR_MSG"
               curl -s -X POST https://api.resend.com/emails \
                 -H "Authorization: Bearer $RESEND_API_KEY" \
                 -H "Content-Type: application/json" \
@@ -62,7 +69,7 @@ jobs:
                   "from": "TheOmniStack Team <noreply@theomnistack.de>",
                   "to": "'"$ADMIN_EMAIL"'",
                   "subject": "❌ TheOmniStack Backup Failed",
-                  "html": "<p>The automated backup failed during the database dump.</p>"
+                  "html": "<p>The automated backup failed during the database dump.</p><p><strong>Error details:</strong> '"$ERR_MSG"'</p>"
                 }'
               exit 1
           fi
