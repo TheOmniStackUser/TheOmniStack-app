@@ -75,6 +75,12 @@ export async function triggerSyncAction() {
     return { error: 'Es sind keine aktiven Marktplätze verknüpft.' }
   }
 
+  const syncGroupId = `manual-${Date.now()}`
+  const { getRedisConnection } = await import('@/workers/marketplace-sync')
+  const redis = getRedisConnection()
+  const groupKey = `sync-group:${auth.activeCompanyId}:${syncGroupId}`
+  await redis.set(`${groupKey}:total`, activeIntegrations.length, 'EX', 86400) // 24h expire
+
   // Enqueue a job for each active integration
   for (const integration of activeIntegrations) {
     await marketplaceSyncQueue.add(
@@ -84,6 +90,8 @@ export async function triggerSyncAction() {
         marketplace: integration.type as any,
         triggeredByUserId: auth.userId,
         integrationId: integration.id,
+        syncGroupId,
+        marketplaceDisplayName: (integration.metadata as any)?.customName || integration.type,
       },
       {
         jobId: `sync-${integration.type}-${integration.id}-${auth.activeCompanyId}-${Date.now()}` // Prevent exact duplicates

@@ -97,6 +97,10 @@ async function reportChildResult(
   const redis = getRedisConnection()
   const groupKey = `sync-group:${companyId}:${syncGroupId}`
   
+  // Check if we already sent the combined email for this group to prevent duplicates
+  const alreadySent = await redis.get(`${groupKey}:sent`)
+  if (alreadySent) return
+
   // Fetch existing to aggregate if delayed sync adds to the same marketplace
   const existingStr = await redis.hget(`${groupKey}:results`, result.marketplace)
   if (existingStr) {
@@ -116,10 +120,13 @@ async function reportChildResult(
   const totalStr = await redis.get(`${groupKey}:total`)
   const total = totalStr ? parseInt(totalStr, 10) : 0
   
-  if (total > 0 && doneCount === total) {
+  if (total > 0 && doneCount >= total) {
     // All jobs are done! Fetch all results
     const resultsMap = await redis.hgetall(`${groupKey}:results`)
     const resultsArray = Object.values(resultsMap).map(v => JSON.parse(v))
+    
+    // Mark as sent to prevent any delayed or retried jobs from triggering a second email
+    await redis.set(`${groupKey}:sent`, '1', 'EX', 86400)
     
     // Send unified email
     await sendSyncNotificationEmail({
@@ -128,8 +135,10 @@ async function reportChildResult(
       results: resultsArray
     })
     
-    // Cleanup
-    await redis.del(`${groupKey}:total`, `${groupKey}:done`, `${groupKey}:results`)
+    // We don't delete the keys anymore, they have a 24h expiration on the total key. 
+    // We can explicitly set expiration on them to be clean.
+    await redis.expire(`${groupKey}:done`, 86400)
+    await redis.expire(`${groupKey}:results`, 86400)
   }
 }
 
@@ -442,7 +451,7 @@ export function createMarketplaceSyncWorker() {
             nextState: { marketplace, completedAt: new Date().toISOString(), ordersImported: rawOrders.length },
           })
           
-          if (companySettings?.syncNotificationEmail) {
+          if (companySettings?.syncNotificationEmail && !job.name.includes('webhook')) {
             if (job.data.syncGroupId) {
               await reportChildResult(
                 companyId, 
@@ -477,7 +486,7 @@ export function createMarketplaceSyncWorker() {
           })
           
           // Only send failure email on the LAST attempt to avoid spamming during retries
-          if (companySettings?.syncNotificationEmail && job.attemptsMade >= (job.opts.attempts || 1) - 1) {
+          if (companySettings?.syncNotificationEmail && job.attemptsMade >= (job.opts.attempts || 1) - 1 && !job.name.includes('webhook')) {
             if (job.data.syncGroupId) {
               await reportChildResult(
                 companyId, 
