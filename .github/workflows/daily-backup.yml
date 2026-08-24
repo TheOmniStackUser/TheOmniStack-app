@@ -13,22 +13,8 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
         
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: Run Backup Script
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          SOURCE_S3_BUCKET: ${{ secrets.AWS_BUCKET_NAME }}
-          BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+      - name: Sanitize Secrets
         run: |
-          # Sanitize inputs (remove leading/trailing whitespace, preserve internal spaces)
           trim() {
             local var="$*"
             var="${var#"${var%%[![:space:]]*}"}"
@@ -39,12 +25,34 @@ jobs:
             var="${var%\"}"
             printf "%s" "$var"
           }
-          ADMIN_EMAIL=$(trim "$ADMIN_EMAIL")
-          DATABASE_URL=$(trim "$DATABASE_URL")
-          SOURCE_S3_BUCKET=$(trim "$SOURCE_S3_BUCKET")
-          BACKUP_S3_BUCKET=$(trim "$BACKUP_S3_BUCKET")
-          RESEND_API_KEY=$(trim "$RESEND_API_KEY")
+          export_env() {
+            local name="$1"
+            local value="$(trim "$2")"
+            local delim="EOF_$(openssl rand -hex 8)"
+            echo "$name<<$delim" >> "$GITHUB_ENV"
+            printf "%s\n" "$value" >> "$GITHUB_ENV"
+            echo "$delim" >> "$GITHUB_ENV"
+            echo "::add-mask::$value"
+          }
           
+          export_env AWS_ACCESS_KEY_ID "${{ secrets.AWS_ACCESS_KEY_ID }}"
+          export_env AWS_SECRET_ACCESS_KEY "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+          export_env AWS_REGION "${{ secrets.AWS_REGION }}"
+          export_env DATABASE_URL "${{ secrets.DATABASE_URL }}"
+          export_env SOURCE_S3_BUCKET "${{ secrets.AWS_BUCKET_NAME }}"
+          export_env BACKUP_S3_BUCKET "${{ secrets.BACKUP_S3_BUCKET }}"
+          export_env RESEND_API_KEY "${{ secrets.RESEND_API_KEY }}"
+          export_env ADMIN_EMAIL "${{ secrets.ADMIN_EMAIL }}"
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Run Backup Script
+        run: |
           TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
           BACKUP_DIR="/tmp/theomnistack_backup_$TIMESTAMP"
           DB_DUMP_FILE="$BACKUP_DIR/database_$TIMESTAMP.sql"
