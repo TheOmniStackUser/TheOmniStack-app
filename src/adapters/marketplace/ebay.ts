@@ -120,12 +120,44 @@ export class EbayAdapter implements MarketplaceAdapter {
     const accessToken = await this.getAccessToken(integration)
     const baseUrl = integration.environment === 'sandbox' ? this.sandboxBaseUrl : this.productionBaseUrl
 
-    const payload = {
-      lineItems: [], // empty means all unfulfilled line items
+    let lineItemsPayload: { lineItemId: string }[] | undefined = undefined;
+    
+    if (rawOrderPayload && typeof rawOrderPayload === 'object' && 'lineItems' in rawOrderPayload) {
+      const items = (rawOrderPayload as any).lineItems;
+      if (Array.isArray(items)) {
+        lineItemsPayload = items
+          .filter(item => item.lineItemFulfillmentStatus === 'NOT_STARTED' || item.lineItemFulfillmentStatus === 'IN_PROGRESS')
+          .map(item => ({ lineItemId: item.lineItemId }));
+      }
+    }
+
+    const payload: any = {
       shippingFulfillmentDetails: {
         shippingCarrierCode: carrier,
         trackingNumber: trackingNumber
       }
+    }
+    
+    if (!lineItemsPayload || lineItemsPayload.length === 0) {
+      const orderEndpoint = `${baseUrl}/sell/fulfillment/v1/order/${marketplaceOrderId}`
+      const orderRes = await fetch(orderEndpoint, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      if (orderRes.ok) {
+        const orderData = await orderRes.json()
+        const items = orderData.lineItems || []
+        lineItemsPayload = items
+          .filter((item: any) => item.lineItemFulfillmentStatus === 'NOT_STARTED' || item.lineItemFulfillmentStatus === 'IN_PROGRESS')
+          .map((item: any) => ({ lineItemId: item.lineItemId }));
+      }
+    }
+
+    if (lineItemsPayload && lineItemsPayload.length > 0) {
+      payload.lineItems = lineItemsPayload;
     }
 
     const endpoint = `${baseUrl}/sell/fulfillment/v1/order/${marketplaceOrderId}/shipping_fulfillment`
