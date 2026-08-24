@@ -51,7 +51,7 @@ export type MarketplaceSyncJobData = {
 
 // ─── Lazy Redis Connection & Queue Initialization ─────────────────────────────
 let _redisConnection: IORedis | null = null
-function getRedisConnection(): IORedis {
+export function getRedisConnection(): IORedis {
   if (!_redisConnection) {
     _redisConnection = new IORedis(process.env.REDIS_URL ?? 'redis://localhost:6379', {
       maxRetriesPerRequest: null, // Required by BullMQ
