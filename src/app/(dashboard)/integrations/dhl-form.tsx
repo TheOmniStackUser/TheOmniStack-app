@@ -27,6 +27,7 @@ const DHL_SERVICES = [
   'Nachnahme',
   'Versandbestätigung',
   'Retoure sofort',
+  'GoGreen',
 ]
 
 const DHL_RETURN_TYPES = [

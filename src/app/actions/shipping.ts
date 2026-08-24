@@ -553,6 +553,9 @@ export async function generateDhlLabelsAction(
         if (additionalServices.includes('Versandbestätigung') && order.buyerEmail) {
           dhlServices.notification = { email: order.buyerEmail }
         }
+        if (additionalServices.includes('GoGreen')) {
+          dhlServices.goGreen = true
+        }
 
         const passEmail = additionalServices.includes('Paketankündigung')
 
