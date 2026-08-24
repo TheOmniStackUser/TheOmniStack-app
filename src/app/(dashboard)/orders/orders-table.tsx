@@ -79,7 +79,7 @@ const getDefaultDhlProductCode = (country: string | null | undefined, config: Dh
   if (isDomestic) {
     if (hasZone('V01PAK')) return 'V01PAK'
     if (hasZone('V62WP')) return 'V62WP'
-    if (hasZone('V86PARCEL')) return 'V86PARCEL'
+    if (hasZone('V62KP')) return 'V62KP'
     return getFirstConfigured()
   }
 
@@ -108,7 +108,6 @@ const getDefaultDhlProductCode = (country: string | null | undefined, config: Dh
   if (hasZone('V53WPAK')) return 'V53WPAK'
   if (hasZone('V55PAK')) return 'V55PAK'
   if (hasZone('V66WPI')) return 'V66WPI'
-  if (hasZone('V87PARCEL')) return 'V87PARCEL'
   
   return getFirstConfigured()
 }
@@ -117,8 +116,7 @@ const ALL_DHL_PRODUCTS = [
   { value: 'V01PAK', label: 'DHL Paket' },
   { value: 'V62WP', label: 'Warenpost' },
   { value: 'V66WPI', label: 'Warenpost International' },
-  { value: 'V86PARCEL', label: 'DHL Kleinpaket' },
-  { value: 'V87PARCEL', label: 'DHL Kleinpaket International' },
+  { value: 'V62KP', label: 'DHL Kleinpaket' },
   { value: 'V06PAK', label: 'DHL Paket International' },
   { value: 'V53WPAK', label: 'DHL Europaket' },
   { value: 'V55PAK', label: 'DHL Paket Connect' },
