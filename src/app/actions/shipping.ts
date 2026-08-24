@@ -463,7 +463,7 @@ export async function generateDhlLabelsAction(
         // Resolve billing number for this product code
         let zone = config.zones?.find(z => z.productCode === productCode && z.billingNumber)
         if (!zone) {
-          if (['V62WP', 'V66WPI', 'V86PARCEL', 'V87PARCEL'].includes(productCode)) {
+          if (['V62WP', 'V66WPI', 'V62KP'].includes(productCode)) {
             zone = config.zones?.find(z => z.id === 'warenpost' && z.billingNumber)
           }
         }
@@ -484,16 +484,17 @@ export async function generateDhlLabelsAction(
           '01': 'V01PAK',      // DHL Paket (National)
           '55': 'V55PAK',      // DHL Paket Connect
           '54': 'V54EPAK',     // DHL Europäisches Paket
-          '62': 'V62WP',       // Warenpost (National)
           '66': 'V66WPI',      // Warenpost International
-          '86': 'V86PARCEL',   // DHL Kleinpaket (National)
-          '87': 'V87PARCEL',   // DHL Kleinpaket International
         }
         if (verfahrensId === '53') {
           // Procedure 53 is valid for both DHL Paket International (V06PAK) and DHL Europaket (V53WPAK).
           // We keep the user's selection if it is one of these two, otherwise default to V06PAK.
           if (productCode !== 'V06PAK' && productCode !== 'V53WPAK') {
             resolvedProductCode = 'V06PAK'
+          }
+        } else if (verfahrensId === '62') {
+          if (productCode !== 'V62WP' && productCode !== 'V62KP') {
+            resolvedProductCode = 'V62WP'
           }
         } else if (verfahrensMap[verfahrensId]) {
           resolvedProductCode = verfahrensMap[verfahrensId]
@@ -516,10 +517,8 @@ export async function generateDhlLabelsAction(
               resolvedWeight = config.defaultWeightWarenpost ?? 0.2
             } else if (resolvedProductCode === 'V66WPI') {
               resolvedWeight = config.defaultWeightWarenpostInternational ?? 0.2
-            } else if (resolvedProductCode === 'V86PARCEL') {
+            } else if (resolvedProductCode === 'V62KP') {
               resolvedWeight = config.defaultWeightKleinpaket ?? 0.5
-            } else if (resolvedProductCode === 'V87PARCEL') {
-              resolvedWeight = config.defaultWeightKleinpaketInternational ?? 0.5
             } else {
               resolvedWeight = config.defaultWeight ?? 1
             }

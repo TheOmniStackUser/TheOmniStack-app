@@ -14,8 +14,7 @@ const DHL_PRODUCTS = [
   { value: 'V55PAK', label: 'DHL Paket Connect' },
   { value: 'V62WP', label: 'Warenpost' },
   { value: 'V66WPI', label: 'Warenpost International' },
-  { value: 'V86PARCEL', label: 'DHL Kleinpaket' },
-  { value: 'V87PARCEL', label: 'DHL Kleinpaket International' },
+  { value: 'V62KP', label: 'DHL Kleinpaket' },
   { value: 'V07PAK', label: 'DHL Retoure Online' },
 ]
 
@@ -586,7 +585,7 @@ export function DhlIntegrationForm({
 
           <div className="border-t border-gray-100 pt-6">
             <h4 className="text-sm font-semibold text-gray-700 mb-4">Standardgewichte für Warenpost & Kleinpaket</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Warenpost (National)</label>
                 <div className="flex">
@@ -628,22 +627,6 @@ export function DhlIntegrationForm({
                     step="0.01"
                     value={defaultWeightKleinpaket}
                     onChange={e => setDefaultWeightKleinpaket(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 text-gray-900"
-                  />
-                  <span className="px-3 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg text-gray-600 text-sm">kg</span>
-                </div>
-                <p className="mt-1 text-xs text-gray-400">z.B. 0.5 kg</p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Kleinpaket International</label>
-                <div className="flex">
-                  <input
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    value={defaultWeightKleinpaketInternational}
-                    onChange={e => setDefaultWeightKleinpaketInternational(Number(e.target.value))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 text-gray-900"
                   />
                   <span className="px-3 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg text-gray-600 text-sm">kg</span>

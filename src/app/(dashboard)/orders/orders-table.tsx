@@ -576,10 +576,8 @@ export function OrdersTable({
         weight = dhlConfig.defaultWeightWarenpost ?? 0.2
       } else if (productCode === 'V66WPI') {
         weight = dhlConfig.defaultWeightWarenpostInternational ?? 0.2
-      } else if (productCode === 'V86PARCEL') {
+      } else if (productCode === 'V62KP') {
         weight = dhlConfig.defaultWeightKleinpaket ?? 0.5
-      } else if (productCode === 'V87PARCEL') {
-        weight = dhlConfig.defaultWeightKleinpaketInternational ?? 0.5
       } else {
         weight = dhlConfig.defaultWeight ?? 1
       }
