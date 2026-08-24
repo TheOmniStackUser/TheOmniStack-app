@@ -132,10 +132,8 @@ export class EbayAdapter implements MarketplaceAdapter {
     }
 
     const payload: any = {
-      shippingFulfillmentDetails: {
-        shippingCarrierCode: carrier,
-        trackingNumber: trackingNumber
-      }
+      shippingCarrierCode: carrier,
+      trackingNumber: trackingNumber
     }
     
     if (!lineItemsPayload || lineItemsPayload.length === 0) {
