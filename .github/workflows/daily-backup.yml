@@ -17,12 +17,16 @@ jobs:
         run: |
           trim() {
             local var="$*"
-            var="${var#"${var%%[![:space:]]*}"}"
-            var="${var%"${var##*[![:space:]]}"}"
-            var="${var#\'}"
-            var="${var%\'}"
-            var="${var#\"}"
-            var="${var%\"}"
+            local old_var=""
+            while [ "$var" != "$old_var" ]; do
+              old_var="$var"
+              var="${var#"${var%%[![:space:]]*}"}"
+              var="${var%"${var##*[![:space:]]}"}"
+              var="${var#\'}"
+              var="${var%\'}"
+              var="${var#\"}"
+              var="${var%\"}"
+            done
             printf "%s" "$var"
           }
           export_env() {
