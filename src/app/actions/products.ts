@@ -1078,3 +1078,32 @@ export async function toggleProductSync(productId: string, field: 'stock' | 'pri
   revalidatePath('/products')
   return { success: true }
 }
+
+export async function bulkToggleProductSync(productIds: string[], field: 'stock' | 'price', value: boolean) {
+  const auth = await requireAuth()
+
+  if (!productIds || productIds.length === 0) return { success: true }
+
+  if (field === 'stock') {
+    await db.update(productMappings)
+      .set({ syncStock: value })
+      .where(
+        and(
+          inArray(productMappings.productId, productIds),
+          eq(productMappings.companyId, auth.activeCompanyId)
+        )
+      )
+  } else {
+    await db.update(productMappings)
+      .set({ syncPrice: value })
+      .where(
+        and(
+          inArray(productMappings.productId, productIds),
+          eq(productMappings.companyId, auth.activeCompanyId)
+        )
+      )
+  }
+
+  revalidatePath('/products')
+  return { success: true }
+}

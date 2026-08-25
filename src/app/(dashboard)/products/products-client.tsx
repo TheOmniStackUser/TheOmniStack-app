@@ -423,6 +423,53 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
             <span className="text-sm font-medium text-slate-500">
               {selectedProductIds.size} ausgewählt
             </span>
+            <div className="flex items-center gap-2 border-r border-slate-200 pr-3">
+              <button
+                onClick={async () => {
+                  const { bulkToggleProductSync } = await import('@/app/actions/products');
+                  await bulkToggleProductSync(Array.from(selectedProductIds), 'stock', false);
+                  showToast('Bestand-Sync deaktiviert', 'success');
+                  setSelectedProductIds(new Set());
+                }}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200 transition-colors"
+              >
+                Bestand-Sync AUS
+              </button>
+              <button
+                onClick={async () => {
+                  const { bulkToggleProductSync } = await import('@/app/actions/products');
+                  await bulkToggleProductSync(Array.from(selectedProductIds), 'stock', true);
+                  showToast('Bestand-Sync aktiviert', 'success');
+                  setSelectedProductIds(new Set());
+                }}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-cyan-50 text-cyan-700 hover:bg-cyan-100 border border-cyan-200 transition-colors"
+              >
+                Bestand-Sync AN
+              </button>
+              <div className="w-px h-4 bg-slate-200 mx-1"></div>
+              <button
+                onClick={async () => {
+                  const { bulkToggleProductSync } = await import('@/app/actions/products');
+                  await bulkToggleProductSync(Array.from(selectedProductIds), 'price', false);
+                  showToast('Preis-Sync deaktiviert', 'success');
+                  setSelectedProductIds(new Set());
+                }}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200 transition-colors"
+              >
+                Preis-Sync AUS
+              </button>
+              <button
+                onClick={async () => {
+                  const { bulkToggleProductSync } = await import('@/app/actions/products');
+                  await bulkToggleProductSync(Array.from(selectedProductIds), 'price', true);
+                  showToast('Preis-Sync aktiviert', 'success');
+                  setSelectedProductIds(new Set());
+                }}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-cyan-50 text-cyan-700 hover:bg-cyan-100 border border-cyan-200 transition-colors"
+              >
+                Preis-Sync AN
+              </button>
+            </div>
             <button
               onClick={() => setShowBulkDeleteConfirm(true)}
               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors text-sm font-semibold border border-rose-200"

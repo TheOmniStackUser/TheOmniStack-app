@@ -1,18 +1,24 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 export function MappingSyncRules({ mapping }: { mapping: any }) {
   const [syncStock, setSyncStock] = useState(mapping.syncStock)
   const [syncPrice, setSyncPrice] = useState(mapping.syncPrice)
   const [modifierType, setModifierType] = useState(mapping.priceModifierType)
 
+  useEffect(() => {
+    setSyncStock(mapping.syncStock)
+    setSyncPrice(mapping.syncPrice)
+    setModifierType(mapping.priceModifierType)
+  }, [mapping])
+
   return (
     <div className="space-y-4 mt-4 pt-4 border-t border-slate-100">
       <div className="flex items-center gap-3">
+        <input type="hidden" name={`mapping_${mapping.id}_syncStock`} value={syncStock ? 'on' : 'off'} />
         <input 
           type="checkbox" 
-          name={`mapping_${mapping.id}_syncStock`} 
           id={`syncStock_${mapping.id}`} 
           checked={syncStock}
           onChange={(e) => setSyncStock(e.target.checked)}
@@ -25,9 +31,9 @@ export function MappingSyncRules({ mapping }: { mapping: any }) {
       
       <div className="flex flex-col gap-3">
         <div className="flex items-center gap-3">
+          <input type="hidden" name={`mapping_${mapping.id}_syncPrice`} value={syncPrice ? 'on' : 'off'} />
           <input 
             type="checkbox" 
-            name={`mapping_${mapping.id}_syncPrice`} 
             id={`syncPrice_${mapping.id}`} 
             checked={syncPrice}
             onChange={(e) => setSyncPrice(e.target.checked)}
