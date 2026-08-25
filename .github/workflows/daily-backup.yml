@@ -32,10 +32,7 @@ jobs:
           export_env() {
             local name="$1"
             local value="$(trim "$2")"
-            local delim="EOF_$(openssl rand -hex 8)"
-            echo "$name<<$delim" >> "$GITHUB_ENV"
-            printf "%s\n" "$value" >> "$GITHUB_ENV"
-            echo "$delim" >> "$GITHUB_ENV"
+            echo "$name=$value" >> "$GITHUB_ENV"
             echo "::add-mask::$value"
           }
           
