@@ -14,6 +14,15 @@ jobs:
         uses: actions/checkout@v4
         
       - name: Sanitize Secrets
+        env:
+          SECRET_AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          SECRET_AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          SECRET_AWS_REGION: ${{ secrets.AWS_REGION }}
+          SECRET_DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SECRET_AWS_BUCKET_NAME: ${{ secrets.AWS_BUCKET_NAME }}
+          SECRET_BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+          SECRET_RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          SECRET_ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
         run: |
           trim() {
             local var="$*"
@@ -36,14 +45,14 @@ jobs:
             echo "::add-mask::$value"
           }
           
-          export_env AWS_ACCESS_KEY_ID "${{ secrets.AWS_ACCESS_KEY_ID }}"
-          export_env AWS_SECRET_ACCESS_KEY "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
-          export_env AWS_REGION "${{ secrets.AWS_REGION }}"
-          export_env DATABASE_URL "${{ secrets.DATABASE_URL }}"
-          export_env SOURCE_S3_BUCKET "${{ secrets.AWS_BUCKET_NAME }}"
-          export_env BACKUP_S3_BUCKET "${{ secrets.BACKUP_S3_BUCKET }}"
-          export_env RESEND_API_KEY "${{ secrets.RESEND_API_KEY }}"
-          export_env ADMIN_EMAIL "${{ secrets.ADMIN_EMAIL }}"
+          export_env AWS_ACCESS_KEY_ID "$SECRET_AWS_ACCESS_KEY_ID"
+          export_env AWS_SECRET_ACCESS_KEY "$SECRET_AWS_SECRET_ACCESS_KEY"
+          export_env AWS_REGION "$SECRET_AWS_REGION"
+          export_env DATABASE_URL "$SECRET_DATABASE_URL"
+          export_env SOURCE_S3_BUCKET "$SECRET_AWS_BUCKET_NAME"
+          export_env BACKUP_S3_BUCKET "$SECRET_BACKUP_S3_BUCKET"
+          export_env RESEND_API_KEY "$SECRET_RESEND_API_KEY"
+          export_env ADMIN_EMAIL "$SECRET_ADMIN_EMAIL"
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
