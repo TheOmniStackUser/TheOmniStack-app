@@ -153,7 +153,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
         <SubmitButton />
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div key={`product-form-${product.updatedAt ? new Date(product.updatedAt).getTime() : ''}`} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column: Master Data */}
         <div className="lg:col-span-2 space-y-8">
           <section className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -253,7 +253,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                 </div>
               ) : (
                 mappings.map(mapping => (
-                  <div key={mapping.id} className="p-5 hover:bg-slate-50/50 transition-colors">
+                  <div key={`${mapping.id}-${mapping.updatedAt ? new Date(mapping.updatedAt).getTime() : ''}`} className="p-5 hover:bg-slate-50/50 transition-colors">
                     <div className="flex justify-between items-start mb-3">
                       <div>
                         <span className="uppercase text-xs font-bold tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
