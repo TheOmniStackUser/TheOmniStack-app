@@ -437,6 +437,7 @@ export function OrdersTable({
     return configured.length > 0 ? configured : ALL_DHL_PRODUCTS
   }, [dhlConfig])
 
+  const [isPending, startTransition] = useTransition()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [isGenerating, setIsGenerating] = useState(false)
@@ -904,7 +905,9 @@ export function OrdersTable({
       else params.set(k, v)
     })
     
-    router.push(`${pathname}?${params.toString()}`)
+    startTransition(() => {
+      router.push(`${pathname}?${params.toString()}`)
+    })
   }
 
   const handleApplyFilters = () => {
@@ -928,7 +931,9 @@ export function OrdersTable({
       invoice: 'all',
       label: 'all'
     })
-    router.push(pathname)
+    startTransition(() => {
+      router.push(pathname)
+    })
   }
 
   const handleClearSearch = () => {
@@ -1815,6 +1820,12 @@ const filteredOrders = orders;
               onChange={(e) => {
                 setDraftSearch(e.target.value)
               }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  handleApplyFilters()
+                }
+              }}
               onFocus={() => setIsSearchFocused(true)}
               onBlur={() => setIsSearchFocused(false)}
               placeholder={process.env.NEXT_PUBLIC_APP_VARIANT === 'craft' ? "Nach Auftragsnummer, Kunde oder Sendungsnummer suchen..." : "Nach Bestellnummer, Kunde oder Sendungsnummer suchen..."}
@@ -1857,9 +1868,17 @@ const filteredOrders = orders;
           <button
             type="button"
             onClick={handleApplyFilters}
-            className="px-5 py-2 w-full sm:w-auto bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm whitespace-nowrap"
+            disabled={isPending}
+            className="px-5 py-2 w-full sm:w-auto bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm whitespace-nowrap flex items-center justify-center gap-2 disabled:opacity-75 disabled:cursor-not-allowed"
           >
-            Suchen
+            {isPending ? (
+              <>
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                Sucht...
+              </>
+            ) : (
+              'Suchen'
+            )}
           </button>
         </div>
           
