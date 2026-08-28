@@ -15,9 +15,6 @@ jobs:
         
       - name: Sanitize Secrets
         env:
-          SECRET_AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          SECRET_AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          SECRET_AWS_REGION: ${{ secrets.AWS_REGION }}
           SECRET_DATABASE_URL: ${{ secrets.DATABASE_URL }}
           SECRET_AWS_BUCKET_NAME: ${{ secrets.AWS_BUCKET_NAME }}
           SECRET_BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
@@ -45,9 +42,6 @@ jobs:
             echo "::add-mask::$value"
           }
           
-          export_env AWS_ACCESS_KEY_ID "$SECRET_AWS_ACCESS_KEY_ID"
-          export_env AWS_SECRET_ACCESS_KEY "$SECRET_AWS_SECRET_ACCESS_KEY"
-          export_env AWS_REGION "$SECRET_AWS_REGION"
           export_env DATABASE_URL "$SECRET_DATABASE_URL"
           export_env SOURCE_S3_BUCKET "$SECRET_AWS_BUCKET_NAME"
           export_env BACKUP_S3_BUCKET "$SECRET_BACKUP_S3_BUCKET"
@@ -57,9 +51,9 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Run Backup Script
         run: |
