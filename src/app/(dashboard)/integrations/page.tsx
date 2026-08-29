@@ -279,9 +279,7 @@ export default async function IntegrationsPage(props: {
               <div className="p-6 bg-gray-50">
                 <AmazonIntegrationForm 
                   initialSellerId={integrations.find((i: any) => i.type === 'amazon')?.sellerId || ''}
-                  initialClientId={integrations.find((i: any) => i.type === 'amazon')?.clientId || ''}
-                  initialClientSecret={integrations.find((i: any) => i.type === 'amazon')?.clientSecret || ''}
-                  initialRefreshToken={integrations.find((i: any) => i.type === 'amazon')?.refreshToken || ''}
+                  companyId={auth.activeCompanyId}
                 />
               </div>
             </CollapsibleSection>
