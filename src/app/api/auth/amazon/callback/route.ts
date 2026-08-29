@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
           sellerId: sellingPartnerId,
           refreshToken: refreshToken,
           accessToken: accessToken, // We can store the initial access token too (expires in 1hr)
-          tokenExpiresAt: new Date(Date.now() + (tokenData.expires_in * 1000)),
+          expiresAt: new Date(Date.now() + (tokenData.expires_in * 1000)),
           updatedAt: new Date(),
         })
         .where(eq(marketplaceIntegrations.id, existing[0].id))
@@ -80,7 +80,7 @@ export async function GET(req: NextRequest) {
         sellerId: sellingPartnerId,
         refreshToken: refreshToken,
         accessToken: accessToken,
-        tokenExpiresAt: new Date(Date.now() + (tokenData.expires_in * 1000)),
+        expiresAt: new Date(Date.now() + (tokenData.expires_in * 1000)),
         metadata: {},
       })
     }
