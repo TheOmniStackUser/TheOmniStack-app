@@ -82,6 +82,7 @@ export async function getInvoiceXmlAction(invoiceId: string) {
   const xml = generateZugferdXml({
     invoiceNumber: invoice.invoiceNumber,
     issueDate: invoice.createdAt,
+    dueDate: invoice.dueAt || undefined,
     seller: {
       name: company.legalName || company.name,
       vatId: company.vatId || undefined,
@@ -90,6 +91,13 @@ export async function getInvoiceXmlAction(invoiceId: string) {
       zip: company.zip || undefined,
       city: company.city || undefined,
       country: company.country,
+      contactName: 'Thomas Forster',
+      contactPhone: company.phone || '088093879505',
+      contactEmail: company.email || 'info@guggen-mountain.com',
+      bankName: company.bankName || undefined,
+      iban: company.iban || 'DE97700932000304340558',
+      bic: company.bic || 'GENODEF1STH',
+      paymentRecipient: company.paymentRecipient || 'F & L Fashion GmbH',
     },
     buyer: {
       name: invoice.recipientName,
