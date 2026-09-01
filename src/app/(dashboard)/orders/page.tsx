@@ -122,6 +122,9 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     const searchConditions: any[] = [
       ilike(orders.marketplaceOrderId, `%${search}%`),
       ilike(orders.buyerName, `%${search}%`),
+      ilike(orders.buyerCompany, `%${search}%`),
+      ilike(orders.shippingName, `%${search}%`),
+      ilike(orders.shippingCompany, `%${search}%`),
       ilike(orders.trackingNumber, `%${search}%`),
       ilike(orders.deliveryNoteNumber, `%${search}%`),
       ilike(sql`${orders.rawPayload}->>'orderNumber'`, `%${search}%`),
@@ -168,11 +171,21 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     if (marketplace === 'group_direct') {
       whereConditions.push(inArray(orders.marketplace, ['otto', 'aboutyou', 'shopify', 'kaufland', 'ebay', 'amazon', 'etsy']))
     } else if (marketplace === 'group_decathlon') {
-      whereConditions.push(inArray(orders.marketplace, ['mirakl_decathlon', 'mirakl_decathlon_eu', 'mirakl_custom']))
+      whereConditions.push(
+        or(
+          inArray(orders.marketplace, ['mirakl_decathlon', 'mirakl_decathlon_eu', 'mirakl_custom']),
+          ilike(orders.marketplace, 'decathlon %')
+        )!
+      )
     } else if (marketplace === 'group_secret_sales') {
       whereConditions.push(ilike(orders.marketplace, '%secret sales%'))
     } else if (marketplace === 'group_other') {
-      whereConditions.push(notInArray(orders.marketplace, ['otto', 'aboutyou', 'shopify', 'kaufland', 'ebay', 'amazon', 'etsy', 'mirakl_decathlon', 'mirakl_decathlon_eu']))
+      whereConditions.push(
+        and(
+          notInArray(orders.marketplace, ['otto', 'aboutyou', 'shopify', 'kaufland', 'ebay', 'amazon', 'etsy', 'mirakl_decathlon', 'mirakl_decathlon_eu', 'mirakl_custom']),
+          sql`${orders.marketplace} NOT ILIKE 'decathlon %'`
+        )!
+      )
     } else if (marketplace === 'manual') {
       whereConditions.push(eq(orders.marketplace, 'manual'))
     } else if (marketplace.startsWith('display_decathlon')) {
@@ -180,13 +193,21 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
       if (parts.length > 1) {
         const countryCode = parts[1].trim()
         whereConditions.push(
-          and(
-            inArray(orders.marketplace, ['mirakl_decathlon', 'mirakl_decathlon_eu', 'mirakl_custom']),
-            ilike(orders.shippingCountry, `${countryCode}%`)
+          or(
+            and(
+              inArray(orders.marketplace, ['mirakl_decathlon', 'mirakl_decathlon_eu', 'mirakl_custom']),
+              ilike(orders.shippingCountry, `${countryCode}%`)
+            ),
+            ilike(orders.marketplace, `decathlon ${countryCode}%`)
           )!
         )
       } else {
-        whereConditions.push(inArray(orders.marketplace, ['mirakl_decathlon', 'mirakl_decathlon_eu', 'mirakl_custom']))
+        whereConditions.push(
+          or(
+            inArray(orders.marketplace, ['mirakl_decathlon', 'mirakl_decathlon_eu', 'mirakl_custom']),
+            ilike(orders.marketplace, 'decathlon %')
+          )!
+        )
       }
     } else if (marketplace.startsWith('display_')) {
       const mpName = marketplace.replace('display_', '').trim()
