@@ -246,7 +246,7 @@ export function InvoiceList({
   // Payments Modal States
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null)
-  const [paymentDate, setPaymentDate] = useState(format(new Date(), 'yyyy-MM-dd'))
+  const [paymentDate, setPaymentDate] = useState(format(new Date(), 'dd.MM.yyyy'))
   const [paymentMethod, setPaymentMethod] = useState('Überweisung')
   const [paymentProvider, setPaymentProvider] = useState('')
   const [paymentReference, setPaymentReference] = useState('')
@@ -350,7 +350,7 @@ export function InvoiceList({
   // Open Payment modal
   const handleOpenPaymentModal = (invoice: Invoice) => {
     setPaymentInvoice(invoice)
-    setPaymentDate(format(new Date(), 'yyyy-MM-dd'))
+    setPaymentDate(format(new Date(), 'dd.MM.yyyy'))
     setPaymentMethod('Überweisung')
     setPaymentProvider('')
     setPaymentReference('')
@@ -566,8 +566,17 @@ export function InvoiceList({
     if (!paymentInvoice) return
     try {
       setIsSavingPayment(true)
+      
+      let formattedDate = paymentDate;
+      const match = paymentDate.match(/^(\d{1,2})[.,-/](\d{1,2})[.,-/](\d{2,4})$/);
+      if (match) {
+        let [_, day, month, year] = match;
+        if (year.length === 2) year = `20${year}`;
+        formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      }
+
       const result = await recordPaymentAction(paymentInvoice.id, {
-        date: paymentDate,
+        date: formattedDate,
         method: paymentMethod,
         provider: paymentProvider,
         reference: paymentReference,
@@ -3395,10 +3404,11 @@ export function InvoiceList({
                     <label className="text-xs font-black text-slate-500 uppercase tracking-wider">Datum</label>
                     <div className="col-span-2">
                       <input
-                        type="date"
+                        type="text"
+                        placeholder="z.B. 06.08.2026"
                         value={paymentDate}
                         onChange={(e) => setPaymentDate(e.target.value)}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/30"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm text-slate-900 font-medium placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/30"
                       />
                     </div>
                   </div>
