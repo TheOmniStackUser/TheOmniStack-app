@@ -1927,10 +1927,10 @@ export function InvoiceList({
                                Versenden
                              </button>
                            )}
-                           {invoice.status !== 'draft' && !isPaid(invoice) && invoice.status !== 'cancelled' && (
+                           {invoice.status !== 'draft' && invoice.status !== 'cancelled' && (
                              <button
                                type="button"
-                               onClick={() => handleOpenPaymentModal(invoice)}
+                               onClick={() => { handleOpenPaymentModal(invoice); setActiveRowMenuId(null); }}
                                className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors whitespace-nowrap"
                              >
                                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2452,11 +2452,16 @@ export function InvoiceList({
 
                         {/* Bezahlt */}
                         {(isPaid(details.invoice) || details.invoice.status === 'cancelled' || details.invoice.logs?.some((l: any) => l.action === 'payment')) ? (
-                          <div className={`inline-flex items-center gap-1.5 px-3 py-2 border rounded-xl text-xs font-bold shadow-sm ${
-                            details.invoice.status === 'cancelled' 
-                              ? 'bg-slate-100 border-slate-200 text-slate-700' 
-                              : 'bg-emerald-50 border-emerald-100 text-emerald-700'
-                          }`}>
+                          <button 
+                            type="button"
+                            onClick={() => details.invoice.status !== 'cancelled' ? handleOpenPaymentModal(details.invoice) : undefined}
+                            className={`inline-flex items-center gap-1.5 px-3 py-2 border rounded-xl text-xs font-bold shadow-sm ${
+                              details.invoice.status === 'cancelled' 
+                                ? 'bg-slate-100 border-slate-200 text-slate-700 cursor-default' 
+                                : 'bg-emerald-50 border-emerald-100 text-emerald-700 hover:bg-emerald-100 cursor-pointer'
+                            }`}
+                            title={details.invoice.status !== 'cancelled' ? "Zahlung erfassen" : ""}
+                          >
                             <svg className={`w-3.5 h-3.5 ${details.invoice.status === 'cancelled' ? 'text-slate-500' : 'text-emerald-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               {details.invoice.status === 'cancelled' ? (
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -2467,7 +2472,7 @@ export function InvoiceList({
                             {details.invoice.status === 'cancelled' 
                               ? 'Storniert' 
                               : (details.invoice.cancelsInvoiceId ? 'Verrechnet' : 'Bezahlt')}
-                          </div>
+                          </button>
                         ) : (
                           <button
                             onClick={() => handleOpenPaymentModal(details.invoice)}
