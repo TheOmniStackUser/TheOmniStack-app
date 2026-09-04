@@ -1,0 +1,74 @@
+﻿2026-08-25T19:42:41.6272595Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-08-25T19:42:41.6282449Z ##[group]Run actions/checkout@v4
+2026-08-25T19:42:41.6283299Z with:
+2026-08-25T19:42:41.6283970Z   repository: TheOmniStackUser/TheOmniStack-app
+2026-08-25T19:42:41.6287868Z   token: ***
+2026-08-25T19:42:41.6288379Z   ssh-strict: true
+2026-08-25T19:42:41.6288879Z   ssh-user: git
+2026-08-25T19:42:41.6289402Z   persist-credentials: true
+2026-08-25T19:42:41.6289966Z   clean: true
+2026-08-25T19:42:41.6290489Z   sparse-checkout-cone-mode: true
+2026-08-25T19:42:41.6291274Z   fetch-depth: 1
+2026-08-25T19:42:41.6291785Z   fetch-tags: false
+2026-08-25T19:42:41.6292302Z   show-progress: true
+2026-08-25T19:42:41.6292819Z   lfs: false
+2026-08-25T19:42:41.6293303Z   submodules: false
+2026-08-25T19:42:41.6293880Z   set-safe-directory: true
+2026-08-25T19:42:41.6294480Z   allow-unsafe-pr-checkout: false
+2026-08-25T19:42:41.6295357Z ##[endgroup]
+2026-08-25T19:42:41.7387113Z Syncing repository: TheOmniStackUser/TheOmniStack-app
+2026-08-25T19:42:41.7390298Z ##[group]Getting Git version info
+2026-08-25T19:42:41.7392023Z Working directory is '/home/runner/work/TheOmniStack-app/TheOmniStack-app'
+2026-08-25T19:42:41.7393316Z [command]/usr/bin/git version
+2026-08-25T19:42:41.7459798Z git version 2.55.0
+2026-08-25T19:42:41.7493637Z ##[endgroup]
+2026-08-25T19:42:41.7510179Z Temporarily overriding HOME='/home/runner/work/_temp/09f87597-b9c9-4a35-b68b-ef1b7fbac68d' before making global git config changes
+2026-08-25T19:42:41.7512729Z Adding repository directory to the temporary git global config as a safe directory
+2026-08-25T19:42:41.7517431Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/TheOmniStack-app/TheOmniStack-app
+2026-08-25T19:42:41.7576391Z Deleting the contents of '/home/runner/work/TheOmniStack-app/TheOmniStack-app'
+2026-08-25T19:42:41.7580412Z ##[group]Initializing the repository
+2026-08-25T19:42:41.7587268Z [command]/usr/bin/git init /home/runner/work/TheOmniStack-app/TheOmniStack-app
+2026-08-25T19:42:41.7701345Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-08-25T19:42:41.7703633Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-08-25T19:42:41.7706959Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-08-25T19:42:41.7708679Z hint: call:
+2026-08-25T19:42:41.7709859Z hint:
+2026-08-25T19:42:41.7711264Z hint: 	git config --global init.defaultBranch <name>
+2026-08-25T19:42:41.7712605Z hint:
+2026-08-25T19:42:41.7713840Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-08-25T19:42:41.7715771Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-08-25T19:42:41.7717307Z hint:
+2026-08-25T19:42:41.7718320Z hint: 	git branch -m <name>
+2026-08-25T19:42:41.7719442Z hint:
+2026-08-25T19:42:41.7720381Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-08-25T19:42:41.7722992Z Initialized empty Git repository in /home/runner/work/TheOmniStack-app/TheOmniStack-app/.git/
+2026-08-25T19:42:41.7726437Z [command]/usr/bin/git remote add origin https://github.com/TheOmniStackUser/TheOmniStack-app
+2026-08-25T19:42:41.7777201Z ##[endgroup]
+2026-08-25T19:42:41.7779027Z ##[group]Disabling automatic garbage collection
+2026-08-25T19:42:41.7781566Z [command]/usr/bin/git config --local gc.auto 0
+2026-08-25T19:42:41.7821222Z ##[endgroup]
+2026-08-25T19:42:41.7823271Z ##[group]Setting up auth
+2026-08-25T19:42:41.7829368Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-08-25T19:42:41.7866726Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-08-25T19:42:41.8288960Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-08-25T19:42:41.8333425Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-08-25T19:42:41.8571974Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-08-25T19:42:41.8614415Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-08-25T19:42:41.8854315Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-08-25T19:42:41.8901236Z ##[endgroup]
+2026-08-25T19:42:41.8902884Z ##[group]Fetching the repository
+2026-08-25T19:42:41.8912718Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +02d0c398fa838a9e60cba88421cba0a7484f878a:refs/remotes/origin/main
+2026-08-25T19:42:42.6606835Z From https://github.com/TheOmniStackUser/TheOmniStack-app
+2026-08-25T19:42:42.6609807Z  * [new ref]         02d0c398fa838a9e60cba88421cba0a7484f878a -> origin/main
+2026-08-25T19:42:42.6616010Z ##[endgroup]
+2026-08-25T19:42:42.6619095Z ##[group]Determining the checkout info
+2026-08-25T19:42:42.6622399Z ##[endgroup]
+2026-08-25T19:42:42.6624450Z [command]/usr/bin/git sparse-checkout disable
+2026-08-25T19:42:42.6687172Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-08-25T19:42:42.6726908Z ##[group]Checking out the ref
+2026-08-25T19:42:42.6732120Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2026-08-25T19:42:42.7128165Z Switched to a new branch 'main'
+2026-08-25T19:42:42.7132085Z branch 'main' set up to track 'origin/main'.
+2026-08-25T19:42:42.7144417Z ##[endgroup]
+2026-08-25T19:42:42.7201746Z [command]/usr/bin/git log -1 --format=%H
+2026-08-25T19:42:42.7231569Z 02d0c398fa838a9e60cba88421cba0a7484f878a

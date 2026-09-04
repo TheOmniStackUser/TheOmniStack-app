@@ -1,0 +1,176 @@
+﻿2026-08-30T21:53:33.8935862Z Current runner version: '2.336.0'
+2026-08-30T21:53:33.8960935Z ##[group]Runner Image Provisioner
+2026-08-30T21:53:33.8961970Z Hosted Compute Agent
+2026-08-30T21:53:33.8962697Z Version: 20260819.586
+2026-08-30T21:53:33.8963495Z Commit: 3cc4a88dfa507ef76119ad1bb3eccc6378bb2b76
+2026-08-30T21:53:33.8964681Z Build Date: 2026-08-18T23:20:18Z
+2026-08-30T21:53:33.8965534Z Worker ID: {b331b233-5c87-4616-829d-1a946c1de9ad}
+2026-08-30T21:53:33.8966357Z Azure Region: westus
+2026-08-30T21:53:33.8967093Z ##[endgroup]
+2026-08-30T21:53:33.8968747Z ##[group]Operating System
+2026-08-30T21:53:33.8969635Z Ubuntu
+2026-08-30T21:53:33.8970274Z 24.04.4
+2026-08-30T21:53:33.8970903Z LTS
+2026-08-30T21:53:33.8971936Z ##[endgroup]
+2026-08-30T21:53:33.8972683Z ##[group]Runner Image
+2026-08-30T21:53:33.8973394Z Image: ubuntu-24.04
+2026-08-30T21:53:33.8974585Z Version: 20260823.283.1
+2026-08-30T21:53:33.8976078Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260823.283/images/ubuntu/Ubuntu2404-Readme.md
+2026-08-30T21:53:33.8977758Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260823.283
+2026-08-30T21:53:33.8978914Z ##[endgroup]
+2026-08-30T21:53:33.8980241Z ##[group]GITHUB_TOKEN Permissions
+2026-08-30T21:53:33.8982557Z Contents: read
+2026-08-30T21:53:33.8983339Z Metadata: read
+2026-08-30T21:53:33.8984274Z Packages: read
+2026-08-30T21:53:33.8984970Z ##[endgroup]
+2026-08-30T21:53:33.8987251Z Secret source: Actions
+2026-08-30T21:53:33.8988606Z Prepare workflow directory
+2026-08-30T21:53:33.9352804Z Prepare all required actions
+2026-08-30T21:53:33.9430840Z Getting action download info
+2026-08-30T21:53:34.2814805Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-08-30T21:53:34.4222920Z Download action repository 'aws-actions/configure-aws-credentials@v4' (SHA:7474bc4690e29a8392af63c5b98e7449536d5c3a)
+2026-08-30T21:53:34.8867865Z Complete job name: backup
+2026-08-30T21:53:34.9634534Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-08-30T21:53:34.9643332Z ##[group]Run actions/checkout@v4
+2026-08-30T21:53:34.9644347Z with:
+2026-08-30T21:53:34.9644938Z   repository: TheOmniStackUser/TheOmniStack-app
+2026-08-30T21:53:34.9649048Z   token: ***
+2026-08-30T21:53:34.9649537Z   ssh-strict: true
+2026-08-30T21:53:34.9650037Z   ssh-user: git
+2026-08-30T21:53:34.9650550Z   persist-credentials: true
+2026-08-30T21:53:34.9651092Z   clean: true
+2026-08-30T21:53:34.9651600Z   sparse-checkout-cone-mode: true
+2026-08-30T21:53:34.9652176Z   fetch-depth: 1
+2026-08-30T21:53:34.9652653Z   fetch-tags: false
+2026-08-30T21:53:34.9653154Z   show-progress: true
+2026-08-30T21:53:34.9653660Z   lfs: false
+2026-08-30T21:53:34.9654460Z   submodules: false
+2026-08-30T21:53:34.9654991Z   set-safe-directory: true
+2026-08-30T21:53:34.9655573Z   allow-unsafe-pr-checkout: false
+2026-08-30T21:53:34.9656469Z ##[endgroup]
+2026-08-30T21:53:35.0674482Z Syncing repository: TheOmniStackUser/TheOmniStack-app
+2026-08-30T21:53:35.0677307Z ##[group]Getting Git version info
+2026-08-30T21:53:35.0678768Z Working directory is '/home/runner/work/TheOmniStack-app/TheOmniStack-app'
+2026-08-30T21:53:35.0680708Z [command]/usr/bin/git version
+2026-08-30T21:53:35.7898133Z git version 2.55.0
+2026-08-30T21:53:35.7956725Z ##[endgroup]
+2026-08-30T21:53:35.7976065Z Temporarily overriding HOME='/home/runner/work/_temp/6739238d-99f8-47d3-8beb-687c3310ee2b' before making global git config changes
+2026-08-30T21:53:35.7979256Z Adding repository directory to the temporary git global config as a safe directory
+2026-08-30T21:53:35.7981957Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/TheOmniStack-app/TheOmniStack-app
+2026-08-30T21:53:35.8402817Z Deleting the contents of '/home/runner/work/TheOmniStack-app/TheOmniStack-app'
+2026-08-30T21:53:35.8408285Z ##[group]Initializing the repository
+2026-08-30T21:53:35.8413736Z [command]/usr/bin/git init /home/runner/work/TheOmniStack-app/TheOmniStack-app
+2026-08-30T21:53:35.8951770Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-08-30T21:53:35.8953733Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-08-30T21:53:35.8955756Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-08-30T21:53:35.8957191Z hint: call:
+2026-08-30T21:53:35.8957992Z hint:
+2026-08-30T21:53:35.8958965Z hint: 	git config --global init.defaultBranch <name>
+2026-08-30T21:53:35.8960138Z hint:
+2026-08-30T21:53:35.8961254Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-08-30T21:53:35.8962945Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-08-30T21:53:35.8965582Z hint:
+2026-08-30T21:53:35.8966146Z hint: 	git branch -m <name>
+2026-08-30T21:53:35.8966926Z hint:
+2026-08-30T21:53:35.8968119Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-08-30T21:53:35.8969597Z Initialized empty Git repository in /home/runner/work/TheOmniStack-app/TheOmniStack-app/.git/
+2026-08-30T21:53:35.8972670Z [command]/usr/bin/git remote add origin https://github.com/TheOmniStackUser/TheOmniStack-app
+2026-08-30T21:53:35.9329889Z ##[endgroup]
+2026-08-30T21:53:35.9330938Z ##[group]Disabling automatic garbage collection
+2026-08-30T21:53:35.9331939Z [command]/usr/bin/git config --local gc.auto 0
+2026-08-30T21:53:35.9370693Z ##[endgroup]
+2026-08-30T21:53:35.9372249Z ##[group]Setting up auth
+2026-08-30T21:53:35.9382040Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-08-30T21:53:35.9422544Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-08-30T21:53:36.0628349Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-08-30T21:53:36.0673027Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-08-30T21:53:36.0916447Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-08-30T21:53:36.0953464Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-08-30T21:53:36.1192614Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-08-30T21:53:36.2952802Z ##[endgroup]
+2026-08-30T21:53:36.2955449Z ##[group]Fetching the repository
+2026-08-30T21:53:36.2966631Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +b12eadce08a358537ac1786cc3ccebd4b2944228:refs/remotes/origin/main
+2026-08-30T21:53:37.2993388Z From https://github.com/TheOmniStackUser/TheOmniStack-app
+2026-08-30T21:53:37.2995845Z  * [new ref]         b12eadce08a358537ac1786cc3ccebd4b2944228 -> origin/main
+2026-08-30T21:53:37.3007069Z ##[endgroup]
+2026-08-30T21:53:37.3015746Z ##[group]Determining the checkout info
+2026-08-30T21:53:37.3016545Z ##[endgroup]
+2026-08-30T21:53:37.3017027Z [command]/usr/bin/git sparse-checkout disable
+2026-08-30T21:53:37.3060847Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-08-30T21:53:37.3094184Z ##[group]Checking out the ref
+2026-08-30T21:53:37.3098359Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2026-08-30T21:53:37.3510761Z Switched to a new branch 'main'
+2026-08-30T21:53:37.3516432Z branch 'main' set up to track 'origin/main'.
+2026-08-30T21:53:37.3525089Z ##[endgroup]
+2026-08-30T21:53:37.3571732Z [command]/usr/bin/git log -1 --format=%H
+2026-08-30T21:53:37.3600366Z b12eadce08a358537ac1786cc3ccebd4b2944228
+2026-08-30T21:53:37.3851835Z ##[group]Run trim() {
+2026-08-30T21:53:37.3852506Z [36;1mtrim() {[0m
+2026-08-30T21:53:37.3853016Z [36;1m  local var="$*"[0m
+2026-08-30T21:53:37.3853556Z [36;1m  local old_var=""[0m
+2026-08-30T21:53:37.3854629Z [36;1m  while [ "$var" != "$old_var" ]; do[0m
+2026-08-30T21:53:37.3855276Z [36;1m    old_var="$var"[0m
+2026-08-30T21:53:37.3855849Z [36;1m    var="${var#"${var%%[![:space:]]*}"}"[0m
+2026-08-30T21:53:37.3856536Z [36;1m    var="${var%"${var##*[![:space:]]}"}"[0m
+2026-08-30T21:53:37.3857171Z [36;1m    var="${var#\'}"[0m
+2026-08-30T21:53:37.3857730Z [36;1m    var="${var%\'}"[0m
+2026-08-30T21:53:37.3858269Z [36;1m    var="${var#\"}"[0m
+2026-08-30T21:53:37.3858803Z [36;1m    var="${var%\"}"[0m
+2026-08-30T21:53:37.3859337Z [36;1m  done[0m
+2026-08-30T21:53:37.3859824Z [36;1m  printf "%s" "$var"[0m
+2026-08-30T21:53:37.3860358Z [36;1m}[0m
+2026-08-30T21:53:37.3860863Z [36;1mexport_env() {[0m
+2026-08-30T21:53:37.3861411Z [36;1m  local name="$1"[0m
+2026-08-30T21:53:37.3862001Z [36;1m  local value="$(trim "$2")"[0m
+2026-08-30T21:53:37.3862597Z [36;1m  echo "$name=$value" >> "$GITHUB_ENV"[0m
+2026-08-30T21:53:37.3863353Z [36;1m  echo "::add-mask::$value"[0m
+2026-08-30T21:53:37.3863908Z [36;1m}[0m
+2026-08-30T21:53:37.3864519Z [36;1m[0m
+2026-08-30T21:53:37.3865041Z [36;1mexport_env DATABASE_URL "$SECRET_DATABASE_URL"[0m
+2026-08-30T21:53:37.3865789Z [36;1mexport_env SOURCE_S3_BUCKET "$SECRET_AWS_BUCKET_NAME"[0m
+2026-08-30T21:53:37.3866552Z [36;1mexport_env BACKUP_S3_BUCKET "$SECRET_BACKUP_S3_BUCKET"[0m
+2026-08-30T21:53:37.3867316Z [36;1mexport_env RESEND_API_KEY "$SECRET_RESEND_API_KEY"[0m
+2026-08-30T21:53:37.3868026Z [36;1mexport_env ADMIN_EMAIL "$SECRET_ADMIN_EMAIL"[0m
+2026-08-30T21:53:37.3910509Z shell: /usr/bin/bash -e {0}
+2026-08-30T21:53:37.3911073Z env:
+2026-08-30T21:53:37.3912538Z   SECRET_DATABASE_URL: ***
+2026-08-30T21:53:37.3913171Z   SECRET_AWS_BUCKET_NAME: ***
+2026-08-30T21:53:37.3913805Z   SECRET_BACKUP_S3_BUCKET: ***
+2026-08-30T21:53:37.3914742Z   SECRET_RESEND_API_KEY: ***
+2026-08-30T21:53:37.3915318Z   SECRET_ADMIN_EMAIL: ***
+2026-08-30T21:53:37.3915801Z ##[endgroup]
+2026-08-30T21:53:37.4246418Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-08-30T21:53:37.4248823Z ##[group]Run aws-actions/configure-aws-credentials@v4
+2026-08-30T21:53:37.4249448Z with:
+2026-08-30T21:53:37.4250072Z   aws-access-key-id: ***
+2026-08-30T21:53:37.4250759Z   aws-secret-access-key: ***
+2026-08-30T21:53:37.4251383Z   aws-region: ***
+2026-08-30T21:53:37.4251885Z   audience: sts.amazonaws.com
+2026-08-30T21:53:37.4252450Z   output-env-credentials: true
+2026-08-30T21:53:37.4252977Z env:
+2026-08-30T21:53:37.4254440Z   DATABASE_URL: ***
+2026-08-30T21:53:37.4255046Z   SOURCE_S3_BUCKET: ***
+2026-08-30T21:53:37.4255666Z   BACKUP_S3_BUCKET: ***
+2026-08-30T21:53:37.4256277Z   RESEND_API_KEY: ***
+2026-08-30T21:53:37.4256844Z   ADMIN_EMAIL: ***
+2026-08-30T21:53:37.4257319Z ##[endgroup]
+2026-08-30T21:53:38.0391549Z ##[error]The security token included in the request is invalid.
+2026-08-30T21:53:38.0578227Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-08-30T21:53:38.0579544Z Post job cleanup.
+2026-08-30T21:53:38.1709620Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-08-30T21:53:38.1711105Z Post job cleanup.
+2026-08-30T21:53:38.2603822Z [command]/usr/bin/git version
+2026-08-30T21:53:38.2645430Z git version 2.55.0
+2026-08-30T21:53:38.2718241Z Temporarily overriding HOME='/home/runner/work/_temp/6d3ee477-8b36-4283-bc7d-8fc2875066ac' before making global git config changes
+2026-08-30T21:53:38.2719700Z Adding repository directory to the temporary git global config as a safe directory
+2026-08-30T21:53:38.2732538Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/TheOmniStack-app/TheOmniStack-app
+2026-08-30T21:53:38.2765732Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-08-30T21:53:38.2802576Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-08-30T21:53:38.3066331Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-08-30T21:53:38.3093802Z http.https://github.com/.extraheader
+2026-08-30T21:53:38.3106237Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-08-30T21:53:38.3158880Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-08-30T21:53:38.3433672Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-08-30T21:53:38.3490299Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-08-30T21:53:38.3864907Z Cleaning up orphan processes
+2026-08-30T21:53:38.4184245Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, aws-actions/configure-aws-credentials@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

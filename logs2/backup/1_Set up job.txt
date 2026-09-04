@@ -1,0 +1,32 @@
+﻿2026-08-24T19:40:07.4944246Z Current runner version: '2.336.0'
+2026-08-24T19:40:07.4961317Z ##[group]Runner Image Provisioner
+2026-08-24T19:40:07.4962046Z Hosted Compute Agent
+2026-08-24T19:40:07.4962569Z Version: 20260729.566
+2026-08-24T19:40:07.4963073Z Commit: cf7153fe6e25b664e8693c24944bf2b00355d109
+2026-08-24T19:40:07.4963647Z Build Date: 2026-07-29T19:17:02Z
+2026-08-24T19:40:07.4964217Z Worker ID: {dfdaab23-9e4b-42e7-bc10-92c9d98b70dc}
+2026-08-24T19:40:07.4964782Z Azure Region: centralus
+2026-08-24T19:40:07.4965269Z ##[endgroup]
+2026-08-24T19:40:07.4966223Z ##[group]Operating System
+2026-08-24T19:40:07.4966695Z Ubuntu
+2026-08-24T19:40:07.4967130Z 24.04.4
+2026-08-24T19:40:07.4967588Z LTS
+2026-08-24T19:40:07.4967985Z ##[endgroup]
+2026-08-24T19:40:07.4968443Z ##[group]Runner Image
+2026-08-24T19:40:07.4969207Z Image: ubuntu-24.04
+2026-08-24T19:40:07.4969962Z Version: 20260816.277.1
+2026-08-24T19:40:07.4970811Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260816.277/images/ubuntu/Ubuntu2404-Readme.md
+2026-08-24T19:40:07.4972058Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260816.277
+2026-08-24T19:40:07.4972782Z ##[endgroup]
+2026-08-24T19:40:07.4973692Z ##[group]GITHUB_TOKEN Permissions
+2026-08-24T19:40:07.4975416Z Contents: read
+2026-08-24T19:40:07.4975900Z Metadata: read
+2026-08-24T19:40:07.4976368Z Packages: read
+2026-08-24T19:40:07.4976794Z ##[endgroup]
+2026-08-24T19:40:07.4978269Z Secret source: Actions
+2026-08-24T19:40:07.4979335Z Prepare workflow directory
+2026-08-24T19:40:07.5233805Z Prepare all required actions
+2026-08-24T19:40:07.5270151Z Getting action download info
+2026-08-24T19:40:07.7481700Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-08-24T19:40:07.9586932Z Download action repository 'aws-actions/configure-aws-credentials@v4' (SHA:7474bc4690e29a8392af63c5b98e7449536d5c3a)
+2026-08-24T19:40:08.5157161Z Complete job name: backup

@@ -367,9 +367,8 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
   return (
     <div className="space-y-6">
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 w-full">
-          <div className="flex flex-col sm:flex-row gap-4 items-center w-full lg:max-w-4xl">
-            <select
+        <div className="flex flex-col sm:flex-row gap-4 items-center w-full">
+          <select
             value={searchField}
             onChange={(e) => setSearchField(e.target.value as any)}
             className="w-48 px-3 py-2 pr-8 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all text-slate-900 font-medium"
@@ -419,7 +418,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
         </div>
         
         {selectedProductIds.size > 0 && (
-          <div className="flex items-center gap-3 animate-in fade-in slide-in-from-left-4">
+          <div className="flex flex-wrap items-center gap-3 animate-in fade-in slide-in-from-top-2 pt-4 mt-4 border-t border-slate-100">
             <span className="text-sm font-medium text-slate-500">
               {selectedProductIds.size} ausgewählt
             </span>
@@ -485,7 +484,6 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
             </button>
           </div>
         )}
-        </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
