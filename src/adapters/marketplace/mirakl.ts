@@ -191,7 +191,7 @@ export class MiraklAdapter implements MarketplaceAdapter {
       let acceptedAny = false
       if (waitingAcceptanceOrders.length > 0) {
         console.log(`[MiraklAdapter:${this.marketplace}] Found ${waitingAcceptanceOrders.length} orders in WAITING_ACCEPTANCE state. Auto-accepting...`)
-        for (const raw of waitingAcceptanceOrders) {
+        await Promise.all(waitingAcceptanceOrders.map(async (raw: any) => {
           const lines = (raw.order_lines || []).map((line: any) => ({
             id: line.order_line_id,
             accepted: true
@@ -202,7 +202,7 @@ export class MiraklAdapter implements MarketplaceAdapter {
           } else {
             console.warn(`[MiraklAdapter:${this.marketplace}] Order ${raw.order_id} has no order lines, skipping auto-accept.`)
           }
-        }
+        }))
       }
 
       // If we accepted any orders, we must wait a few seconds for Mirakl to release the 
