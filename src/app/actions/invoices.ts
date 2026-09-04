@@ -851,16 +851,41 @@ export async function recordPaymentAction(invoiceId: string, data: {
   const companyId = auth.activeCompanyId
 
   const [invoice] = await db
-    .select({ id: invoices.id })
+    .select({ 
+      id: invoices.id,
+      totalAmount: invoices.totalAmount
+    })
     .from(invoices)
     .where(and(eq(invoices.id, invoiceId), eq(invoices.companyId, companyId)))
     .limit(1)
 
   if (!invoice) throw new Error('Rechnung nicht gefunden')
 
+  // Calculate already paid amount from logs
+  const previousLogs = await db
+    .select({ note: invoiceLogs.note })
+    .from(invoiceLogs)
+    .where(and(eq(invoiceLogs.invoiceId, invoiceId), eq(invoiceLogs.action, 'payment')))
+    
+  let alreadyPaid = 0
+  for (const log of previousLogs) {
+    if (log.note && log.note.includes('Betrag:')) {
+      const match = log.note.match(/Betrag:\s*([\d,.]+)/)
+      if (match) {
+        const amountStr = match[1].replace(/\./g, '').replace(',', '.')
+        alreadyPaid += parseFloat(amountStr) || 0
+      }
+    }
+  }
+
+  const currentPaymentStr = data.amount.replace(/\./g, '').replace(',', '.')
+  const currentPayment = parseFloat(currentPaymentStr) || 0
+  const totalPaid = alreadyPaid + currentPayment
+
   const paymentDate = data.date ? new Date(data.date) : new Date()
 
-  if (data.isSettled) {
+  // Mark as paid if user explicitly checked isSettled OR if total payments >= total invoice amount
+  if (data.isSettled || totalPaid >= parseFloat(invoice.totalAmount)) {
     await db
       .update(invoices)
       .set({ paidAt: paymentDate })

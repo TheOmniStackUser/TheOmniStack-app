@@ -379,7 +379,7 @@ export function InvoiceList({
     setPaymentNote('')
     // Set default amount to remaining balance if there is one, otherwise fallback to total
     setPaymentAmount(remaining > 0 ? remaining.toFixed(2) : invoice.totalAmount)
-    setPaymentIsSettled(remaining <= 0)
+    setPaymentIsSettled(false)
     setPaymentHasDunningFee(false)
     setShowPaymentModal(true)
     setActiveRowMenuId(null)
