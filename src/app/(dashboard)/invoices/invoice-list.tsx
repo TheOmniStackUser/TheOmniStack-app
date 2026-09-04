@@ -252,6 +252,7 @@ export function InvoiceList({
   const [paymentReference, setPaymentReference] = useState('')
   const [paymentNote, setPaymentNote] = useState('')
   const [paymentAmount, setPaymentAmount] = useState('')
+  const [paymentAlreadyPaid, setPaymentAlreadyPaid] = useState(0)
   const [paymentIsSettled, setPaymentIsSettled] = useState(false)
   const [paymentHasDunningFee, setPaymentHasDunningFee] = useState(false)
   const [isSavingPayment, setIsSavingPayment] = useState(false)
@@ -348,15 +349,37 @@ export function InvoiceList({
   }, [])
 
   // Open Payment modal
-  const handleOpenPaymentModal = (invoice: Invoice) => {
-    setPaymentInvoice(invoice)
+  const handleOpenPaymentModal = async (invoice: Invoice) => {
+    // Falls wir die Logs nicht haben, laden wir die Details nach
+    const fullInvoice = (invoice as any).logs ? invoice : await getInvoiceDetailsAction(invoice.id).then(res => res.invoice)
+    
+    let alreadyPaid = 0;
+    if ((fullInvoice as any).logs) {
+      for (const log of (fullInvoice as any).logs) {
+        if (log.action === 'payment' && log.note.includes('Betrag:')) {
+          const match = log.note.match(/Betrag:\s*([\d,.]+)/);
+          if (match) {
+            // Deutsches Format: Punkte entfernen, Komma zu Punkt
+            const amountStr = match[1].replace(/\./g, '').replace(',', '.');
+            alreadyPaid += parseFloat(amountStr) || 0;
+          }
+        }
+      }
+    }
+
+    const total = parseFloat(invoice.totalAmount) || 0;
+    const remaining = Math.max(0, total - alreadyPaid);
+
+    setPaymentInvoice(fullInvoice as Invoice)
+    setPaymentAlreadyPaid(alreadyPaid)
     setPaymentDate(format(new Date(), 'dd.MM.yyyy'))
     setPaymentMethod('Überweisung')
     setPaymentProvider('')
     setPaymentReference('')
     setPaymentNote('')
-    setPaymentAmount(invoice.totalAmount)
-    setPaymentIsSettled(true)
+    // Set default amount to remaining balance if there is one, otherwise fallback to total
+    setPaymentAmount(remaining > 0 ? remaining.toFixed(2) : invoice.totalAmount)
+    setPaymentIsSettled(remaining <= 0)
     setPaymentHasDunningFee(false)
     setShowPaymentModal(true)
     setActiveRowMenuId(null)
@@ -3516,7 +3539,8 @@ export function InvoiceList({
                       <button
                         type="button"
                         onClick={() => {
-                          const val = (parseFloat(paymentInvoice.totalAmount) * 0.98).toFixed(2);
+                          const total = parseFloat(paymentInvoice.totalAmount) || 0;
+                          const val = Math.max(0, (total * 0.98) - paymentAlreadyPaid).toFixed(2);
                           setPaymentAmount(val);
                         }}
                         className="px-3 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm shrink-0 bg-white"
@@ -3525,10 +3549,14 @@ export function InvoiceList({
                       </button>
                       <button
                         type="button"
-                        onClick={() => setPaymentAmount(paymentInvoice.totalAmount)}
+                        onClick={() => {
+                          const total = parseFloat(paymentInvoice.totalAmount) || 0;
+                          const val = Math.max(0, total - paymentAlreadyPaid).toFixed(2);
+                          setPaymentAmount(val);
+                        }}
                         className="px-3 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm shrink-0 bg-white"
                       >
-                        Vollständiger Betrag
+                        Vollständiger Restbetrag
                       </button>
                     </div>
                   </div>
@@ -3595,10 +3623,18 @@ export function InvoiceList({
                 </div>
 
                 <div className="p-4 bg-white border border-slate-100 rounded-xl flex flex-col gap-1.5 shadow-sm text-center">
+                  {paymentAlreadyPaid > 0 && (
+                    <div className="flex flex-col mb-2">
+                      <span className="text-[10px] font-black uppercase text-emerald-600 tracking-wider">Bereits bezahlt</span>
+                      <span className="text-sm font-black text-emerald-600">
+                        {new Intl.NumberFormat('de-DE', { style: 'currency', currency: paymentInvoice.currency }).format(paymentAlreadyPaid)}
+                      </span>
+                    </div>
+                  )}
                   <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Noch zu zahlen</span>
                   <span className="text-2xl font-black text-rose-600 tracking-tight leading-none">
                     {new Intl.NumberFormat('de-DE', { style: 'currency', currency: paymentInvoice.currency }).format(
-                      Math.max(0, Number(paymentInvoice.totalAmount) - (parseFloat(paymentAmount) || 0))
+                      Math.max(0, Number(paymentInvoice.totalAmount) - paymentAlreadyPaid - (parseFloat(paymentAmount) || 0))
                     )}
                   </span>
                 </div>

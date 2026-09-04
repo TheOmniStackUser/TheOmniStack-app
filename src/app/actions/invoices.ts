@@ -860,10 +860,12 @@ export async function recordPaymentAction(invoiceId: string, data: {
 
   const paymentDate = data.date ? new Date(data.date) : new Date()
 
-  await db
-    .update(invoices)
-    .set({ paidAt: paymentDate })
-    .where(and(eq(invoices.id, invoiceId), eq(invoices.companyId, companyId)))
+  if (data.isSettled) {
+    await db
+      .update(invoices)
+      .set({ paidAt: paymentDate })
+      .where(and(eq(invoices.id, invoiceId), eq(invoices.companyId, companyId)))
+  }
 
   const noteMessage = `Zahlungseingang erfasst.
 Betrag: ${data.amount} €
