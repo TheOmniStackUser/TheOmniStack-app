@@ -3,7 +3,8 @@
 import { requireAuth } from '@/lib/session'
 import { HermesAdapter } from '@/adapters/shipping/hermes'
 import { db } from '@/db/client'
-import { orders } from '@/db/schema/orders'
+import { orders, orderItems } from '@/db/schema/orders'
+import { products } from '@/db/schema/products'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { companies } from '@/db/schema/companies'
 import { eq, and, inArray, ne } from 'drizzle-orm'
@@ -605,6 +606,37 @@ export async function generateDhlLabelsAction(
               billingNumber: resolvedReturnBillingNum,
               returnAddress: shipmentPayload.shipments[0].shipper
             }
+          }
+        }
+        
+        // --- CUSTOMS LOGIC FOR NON-EU COUNTRIES (e.g., CH, NO, GB, US) ---
+        const euIso3 = ['AUT', 'BEL', 'BGR', 'HRV', 'CYP', 'CZE', 'DNK', 'EST', 'FIN', 'FRA', 'DEU', 'GRC', 'HUN', 'IRL', 'ITA', 'LVA', 'LTU', 'LUX', 'MLT', 'NLD', 'POL', 'PRT', 'ROU', 'SVK', 'SVN', 'ESP', 'SWE', 'MCO']
+        const isNonEu = !euIso3.includes(toIso3(order.shippingCountry))
+
+        if (isNonEu) {
+          const items = await db.select({
+            orderItem: orderItems,
+            product: products
+          }).from(orderItems)
+          .leftJoin(products, and(eq(orderItems.sku, products.sku), eq(products.companyId, auth.activeCompanyId)))
+          .where(eq(orderItems.orderId, order.id))
+
+          const customsItems = items.map((row) => {
+            return {
+              description: (row.product?.title ?? row.orderItem.title ?? 'Goods').slice(0, 255),
+              countryOfOrigin: row.product?.countryOfOrigin ?? 'DE',
+              hsCode: row.product?.hsCode ?? '000000',
+              value: { uom: order.currency || 'EUR', value: Number(row.orderItem.unitPrice) || 0 },
+              itemWeight: { uom: 'kg', value: row.product?.weight ? Number(row.product.weight) : 0.5 },
+              packagedQuantity: Number(row.orderItem.quantity) || 1
+            }
+          })
+
+          shipmentPayload.shipments[0].customs = {
+            exportType: 'OTHER',
+            exportDescription: 'Sale of Goods',
+            postalCharges: { uom: order.currency || 'EUR', value: 0 }, // DHL requires this field
+            items: customsItems
           }
         }
 

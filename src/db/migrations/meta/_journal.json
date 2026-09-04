@@ -232,6 +232,13 @@
       "when": 1786088370889,
       "tag": "0032_fast_skullbuster",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1788514325446,
+      "tag": "0033_luxuriant_logan",
+      "breakpoints": true
     }
   ]
 }

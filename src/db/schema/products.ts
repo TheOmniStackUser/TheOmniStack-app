@@ -50,6 +50,8 @@ export const products = pgTable('products', {
   // Optional Fields
   weight: numeric('weight', { precision: 8, scale: 3 }), // kg
   storageLocation: text('storage_location'),
+  hsCode: text('hs_code'),
+  countryOfOrigin: text('country_of_origin').default('DE'),
   
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
