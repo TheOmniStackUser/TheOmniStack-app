@@ -1,5 +1,7 @@
 'use server'
 
+export const maxDuration = 300;
+
 import { requireAuth } from '@/lib/session'
 import { marketplaceSyncQueue } from '@/workers/marketplace-sync'
 import { db } from '@/db/client'

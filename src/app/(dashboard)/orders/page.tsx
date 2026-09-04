@@ -1,4 +1,6 @@
 import { requireAuth } from '@/lib/session'
+
+export const maxDuration = 300;
 import { db } from '@/db/client'
 import { orders, orderItems } from '@/db/schema/orders'
 import { invoices, invoiceLogs } from '@/db/schema/invoices'
