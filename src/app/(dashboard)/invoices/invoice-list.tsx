@@ -3623,6 +3623,16 @@ export function InvoiceList({
                         )}
                       </span>
                     </div>
+                    {paymentAlreadyPaid > 0 && (
+                      <div className="flex justify-between items-center">
+                        <span>Offener Betrag:</span>
+                        <span className="text-slate-950 font-black text-sm">
+                          {new Intl.NumberFormat('de-DE', { style: 'currency', currency: paymentInvoice.currency }).format(
+                            Math.max(0, Number(paymentInvoice.totalAmount) - paymentAlreadyPaid)
+                          )}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
