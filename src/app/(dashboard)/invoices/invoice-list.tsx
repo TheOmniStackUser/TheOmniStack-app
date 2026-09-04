@@ -3448,7 +3448,7 @@ export function InvoiceList({
                         placeholder="z.B. Stripe, PayPal Inc., Sparkasse"
                         value={paymentProvider}
                         onChange={(e) => setPaymentProvider(e.target.value)}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm text-slate-900 font-medium placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm text-slate-900 font-medium placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
                   </div>
@@ -3462,7 +3462,7 @@ export function InvoiceList({
                         placeholder="z.B. Transaktions-ID, Verwendungszweck"
                         value={paymentReference}
                         onChange={(e) => setPaymentReference(e.target.value)}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm text-slate-900 font-medium placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm text-slate-900 font-medium placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
                   </div>
@@ -3476,7 +3476,7 @@ export function InvoiceList({
                         placeholder="Interne Notiz zum Zahlungseingang..."
                         value={paymentNote}
                         onChange={(e) => setPaymentNote(e.target.value)}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm text-slate-900 font-medium placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm text-slate-900 font-medium placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
                   </div>
@@ -3486,8 +3486,8 @@ export function InvoiceList({
                     <label className="text-xs font-black text-slate-500 uppercase tracking-wider">
                       <span className="text-rose-500 mr-0.5">*</span>Betrag
                     </label>
-                    <div className="col-span-2 flex items-center gap-2">
-                      <div className="relative flex-1">
+                    <div className="col-span-2 flex flex-wrap items-center gap-2">
+                      <div className="relative flex-1 min-w-[150px]">
                         <input
                           type="number"
                           step="0.01"

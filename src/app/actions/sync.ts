@@ -271,9 +271,20 @@ export async function triggerManualSyncAction(data: { marketplace: string, fromD
           )
         }
 
-        // Also sync shipped orders invoices for this integration
-        const { syncShippedOrdersInvoices } = await import('@/workers/marketplace-sync')
-        await syncShippedOrdersInvoices(auth.activeCompanyId, integration.type, integration.id)
+        // Also sync shipped orders invoices for this integration (in background to avoid timeout)
+        const { marketplaceSyncQueue } = await import('@/workers/marketplace-sync')
+        await marketplaceSyncQueue.add(
+          `sync-invoices-${integration.type}`,
+          {
+            companyId: auth.activeCompanyId,
+            marketplace: integration.type as any,
+            integrationId: integration.id,
+            isInvoiceSync: true,
+          },
+          {
+            jobId: `manual-sync-invoices-${integration.id}-${Date.now()}`
+          }
+        )
 
         // Also sync returns/refunds for Mirakl integrations
         if (integration.type.startsWith('mirakl_') || integration.type === 'mirakl_custom') {
