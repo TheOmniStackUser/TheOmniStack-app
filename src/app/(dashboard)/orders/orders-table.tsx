@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, Fragment, ReactNode, useEffect, useMemo, useTransition } from 'react'
+import { useState, Fragment, ReactNode, useEffect, useMemo, useTransition, useRef } from 'react'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
 import { Package, Truck, CheckCircle2, Store, Clock, XCircle, RefreshCw, Copy, Check } from 'lucide-react'
@@ -831,6 +831,57 @@ export function OrdersTable({
   })
   const [isProgressDropdownOpen, setIsProgressDropdownOpen] = useState(false)
   const [isSearchFocused, setIsSearchFocused] = useState(false)
+
+  const prevUrlParamsRef = useRef(urlParams)
+  useEffect(() => {
+    // Only sync if urlParams actually changed (e.g. after a navigation)
+    if (prevUrlParamsRef.current !== urlParams) {
+      if (urlParams.marketplace !== draftMarketplace) {
+        setDraftMarketplace(urlParams.marketplace || 'all')
+      }
+      if (urlParams.status !== draftStatus) {
+        setDraftStatus(urlParams.status || 'all')
+      }
+      if (urlParams.shippingStatus !== draftShippingStatus) {
+        setDraftShippingStatus(urlParams.shippingStatus || 'all')
+      }
+      if (urlParams.country !== draftCountry) {
+        setDraftCountry(urlParams.country || 'all')
+      }
+      if (urlParams.fromDate !== draftFromDate) {
+        setDraftFromDate(urlParams.fromDate || '')
+      }
+      if (urlParams.toDate !== draftToDate) {
+        setDraftToDate(urlParams.toDate || '')
+      }
+      if (urlParams.invoiceFilter !== draftInvoiceFilter) {
+        setDraftInvoiceFilter(urlParams.invoiceFilter || 'all')
+      }
+      if (urlParams.dateType !== draftDateType) {
+        setDraftDateType(urlParams.dateType || 'purchase')
+      }
+
+      const nextProgress = {
+        ordered: urlParams.ordered || 'all',
+        paid: urlParams.paid || 'all',
+        shipped: urlParams.shipped || 'all',
+        invoice: urlParams.invoice || 'all',
+        label: urlParams.label || 'all'
+      }
+      if (JSON.stringify(nextProgress) !== JSON.stringify(draftProgress)) {
+        setDraftProgress(nextProgress)
+      }
+
+      // For search: Sync if not focused, OR if search is completely cleared from the URL (e.g. clicking a status link)
+      if (urlParams.search !== draftSearch) {
+        if (!isSearchFocused || !urlParams.search) {
+          setDraftSearch(urlParams.search || '')
+        }
+      }
+      
+      prevUrlParamsRef.current = urlParams
+    }
+  }, [urlParams, draftMarketplace, draftStatus, draftShippingStatus, draftCountry, draftFromDate, draftToDate, draftInvoiceFilter, draftDateType, draftProgress, draftSearch, isSearchFocused])
 
   const searchSuggestions = useMemo<SearchSuggestion[]>(() => {
     const q = draftSearch.trim().toLowerCase()
@@ -3335,6 +3386,22 @@ const filteredOrders = orders;
                         <div className="text-xs font-bold text-blue-600 uppercase tracking-wider">Bestellung</div>
                         <div className="font-black text-slate-900">{orderNum}</div>
                       </div>
+                      <button
+                        onClick={() => {
+                          const newSelections = { ...hermesSelections }
+                          delete newSelections[order.id]
+                          setHermesSelections(newSelections)
+                          if (Object.keys(newSelections).length === 0) {
+                            setShowHermesModal(false)
+                          }
+                        }}
+                        className="text-[11px] text-red-500 hover:text-red-700 font-bold flex items-center gap-1 transition-colors"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        Entfernen
+                      </button>
                     </div>
 
                     <div className="mb-4 bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
@@ -3806,6 +3873,22 @@ const filteredOrders = orders;
                         <div className="text-xs font-bold text-yellow-600 uppercase tracking-wider">Bestellung</div>
                         <div className="font-black text-slate-900">{orderNum}</div>
                       </div>
+                      <button
+                        onClick={() => {
+                          const newSelections = { ...dhlSelections }
+                          delete newSelections[order.id]
+                          setDhlSelections(newSelections)
+                          if (Object.keys(newSelections).length === 0) {
+                            setShowDhlModal(false)
+                          }
+                        }}
+                        className="text-[11px] text-red-500 hover:text-red-700 font-bold flex items-center gap-1 transition-colors"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        Entfernen
+                      </button>
                     </div>
 
                     <div className="mb-4 bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
