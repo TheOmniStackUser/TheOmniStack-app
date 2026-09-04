@@ -18,6 +18,7 @@ import {
   sendInvoiceEmailAction,
   saveEmailTemplateAction,
   recordPaymentAction,
+  deletePaymentAction,
   sendDunningNoticeAction
 } from '@/app/actions/invoices'
 import { getInvoiceLogsAction, deleteDraftAction } from '@/app/actions/manual-invoice'
@@ -253,6 +254,7 @@ export function InvoiceList({
   const [paymentNote, setPaymentNote] = useState('')
   const [paymentAmount, setPaymentAmount] = useState('')
   const [paymentAlreadyPaid, setPaymentAlreadyPaid] = useState(0)
+  const [editingPaymentLogId, setEditingPaymentLogId] = useState<string | null>(null)
   const [paymentIsSettled, setPaymentIsSettled] = useState(false)
   const [paymentHasDunningFee, setPaymentHasDunningFee] = useState(false)
   const [isSavingPayment, setIsSavingPayment] = useState(false)
@@ -379,6 +381,7 @@ export function InvoiceList({
     setPaymentNote('')
     // Set default amount to remaining balance if there is one, otherwise fallback to total
     setPaymentAmount(remaining > 0 ? remaining.toFixed(2) : invoice.totalAmount)
+    setEditingPaymentLogId(null)
     setPaymentIsSettled(false)
     setPaymentHasDunningFee(false)
     setShowPaymentModal(true)
@@ -599,6 +602,7 @@ export function InvoiceList({
       }
 
       const result = await recordPaymentAction(paymentInvoice.id, {
+        logId: editingPaymentLogId || undefined,
         date: formattedDate,
         method: paymentMethod,
         provider: paymentProvider,
@@ -3638,6 +3642,72 @@ export function InvoiceList({
                     )}
                   </span>
                 </div>
+
+                {/* Previous Payments List */}
+                {((paymentInvoice as any)?.logs?.filter((l: any) => l.action === 'payment') || []).length > 0 && (
+                  <div className="flex flex-col gap-3">
+                    <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider mb-1">Erfasste Zahlungen</h4>
+                    {((paymentInvoice as any)?.logs?.filter((l: any) => l.action === 'payment') || []).map((log: any) => {
+                      const amountMatch = log.note.match(/Betrag:\s*([\d,.]+)/)
+                      const dateMatch = log.note.match(/Datum:\s*([\d.-]+)/)
+                      const amount = amountMatch ? amountMatch[1] : ''
+                      const date = dateMatch ? dateMatch[1] : ''
+                      
+                      return (
+                        <div key={log.id} className={`p-3 bg-white border ${editingPaymentLogId === log.id ? 'border-blue-500 ring-1 ring-blue-500' : 'border-slate-200'} rounded-xl flex flex-col gap-2 group transition-all`}>
+                          <div className="flex items-center justify-between">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-sm font-bold text-slate-900">{amount} €</span>
+                              <span className="text-xs font-medium text-slate-500">{date}</span>
+                            </div>
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                type="button"
+                                title="Zahlung bearbeiten"
+                                onClick={() => {
+                                  const mMethod = log.note.match(/Zahlung per:\s*(.+)/)
+                                  const mProvider = log.note.match(/Zahlungsdienstleister:\s*(.+)/)
+                                  const mRef = log.note.match(/Referenz:\s*(.+)/)
+                                  const mNote = log.note.match(/Bemerkung:\s*(.+)/)
+                                  
+                                  setEditingPaymentLogId(log.id)
+                                  setPaymentAmount(amount.replace(/\./g, '').replace(',', '.'))
+                                  setPaymentDate(date)
+                                  setPaymentMethod(mMethod ? mMethod[1].split('\n')[0].trim() : 'Überweisung')
+                                  setPaymentProvider(mProvider ? mProvider[1].split('\n')[0].trim() : '')
+                                  setPaymentReference(mRef ? mRef[1].split('\n')[0].trim() : '')
+                                  setPaymentNote(mNote ? mNote[1].split('\n')[0].trim() : '')
+                                }}
+                                className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                              </button>
+                              <button
+                                type="button"
+                                title="Zahlung löschen"
+                                onClick={async () => {
+                                  if (confirm('Diese Zahlung wirklich löschen?')) {
+                                    try {
+                                      await deletePaymentAction(log.id, paymentInvoice.id)
+                                      showToast('Zahlung wurde gelöscht.', 'success')
+                                      setShowPaymentModal(false)
+                                      router.refresh()
+                                    } catch (err) {
+                                      showToast('Fehler beim Löschen der Zahlung.', 'error')
+                                    }
+                                  }
+                                }}
+                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             </div>
 

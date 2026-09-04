@@ -839,6 +839,7 @@ export async function saveEmailTemplateAction(content: string, templateName: str
 }
 
 export async function recordPaymentAction(invoiceId: string, data: {
+  logId?: string
   date: string
   method: string
   provider?: string
@@ -861,7 +862,28 @@ export async function recordPaymentAction(invoiceId: string, data: {
 
   if (!invoice) throw new Error('Rechnung nicht gefunden')
 
-  // Calculate already paid amount from logs
+  const noteMessage = `Zahlungseingang erfasst.
+Betrag: ${data.amount} €
+Datum: ${data.date}
+Zahlung per: ${data.method}
+${data.provider ? `Zahlungsdienstleister: ${data.provider}\n` : ''}${data.reference ? `Referenz: ${data.reference}\n` : ''}${data.note ? `Bemerkung: ${data.note}\n` : ''}${data.isSettled ? 'Restbetrag als Skonto/Nachlass verbucht (vollständig bezahlt).' : ''}`
+
+  if (data.logId) {
+    await db
+      .update(invoiceLogs)
+      .set({ note: noteMessage.trim() })
+      .where(and(eq(invoiceLogs.id, data.logId), eq(invoiceLogs.companyId, companyId)))
+  } else {
+    await db.insert(invoiceLogs).values({
+      invoiceId,
+      companyId,
+      userId: auth.userId,
+      action: 'payment',
+      note: noteMessage.trim()
+    })
+  }
+
+  // Recalculate already paid amount from logs (now includes our newly inserted/updated log)
   const previousLogs = await db
     .select({ note: invoiceLogs.note })
     .from(invoiceLogs)
@@ -878,33 +900,21 @@ export async function recordPaymentAction(invoiceId: string, data: {
     }
   }
 
-  const currentPaymentStr = data.amount.replace(/\./g, '').replace(',', '.')
-  const currentPayment = parseFloat(currentPaymentStr) || 0
-  const totalPaid = alreadyPaid + currentPayment
-
   const paymentDate = data.date ? new Date(data.date) : new Date()
 
   // Mark as paid if user explicitly checked isSettled OR if total payments >= total invoice amount
-  if (data.isSettled || totalPaid >= parseFloat(invoice.totalAmount)) {
+  if (data.isSettled || alreadyPaid >= parseFloat(invoice.totalAmount)) {
     await db
       .update(invoices)
       .set({ paidAt: paymentDate })
       .where(and(eq(invoices.id, invoiceId), eq(invoices.companyId, companyId)))
+  } else {
+    // If it was edited and now the total is less than the invoice amount, we might need to un-settle it
+    await db
+      .update(invoices)
+      .set({ paidAt: null })
+      .where(and(eq(invoices.id, invoiceId), eq(invoices.companyId, companyId)))
   }
-
-  const noteMessage = `Zahlungseingang erfasst.
-Betrag: ${data.amount} €
-Datum: ${data.date}
-Zahlung per: ${data.method}
-${data.provider ? `Zahlungsdienstleister: ${data.provider}\n` : ''}${data.reference ? `Referenz: ${data.reference}\n` : ''}${data.note ? `Bemerkung: ${data.note}\n` : ''}${data.isSettled ? 'Restbetrag als Skonto/Nachlass verbucht (vollständig bezahlt).' : ''}`
-
-  await db.insert(invoiceLogs).values({
-    invoiceId,
-    companyId,
-    userId: auth.userId,
-    action: 'payment',
-    note: noteMessage.trim()
-  })
 
   return { success: true }
 }
@@ -1003,6 +1013,54 @@ export async function sendDunningNoticeAction(data: {
     action: 'email',
     note: logNote,
   })
+
+  return { success: true }
+}
+
+export async function deletePaymentAction(logId: string, invoiceId: string) {
+  const auth = await requireAuth()
+  const companyId = auth.activeCompanyId
+
+  const [invoice] = await db
+    .select({ 
+      id: invoices.id,
+      totalAmount: invoices.totalAmount
+    })
+    .from(invoices)
+    .where(and(eq(invoices.id, invoiceId), eq(invoices.companyId, companyId)))
+    .limit(1)
+
+  if (!invoice) throw new Error('Rechnung nicht gefunden')
+
+  // Delete the log
+  await db
+    .delete(invoiceLogs)
+    .where(and(eq(invoiceLogs.id, logId), eq(invoiceLogs.companyId, companyId)))
+
+  // Recalculate total paid
+  const previousLogs = await db
+    .select({ note: invoiceLogs.note })
+    .from(invoiceLogs)
+    .where(and(eq(invoiceLogs.invoiceId, invoiceId), eq(invoiceLogs.action, 'payment')))
+    
+  let alreadyPaid = 0
+  for (const log of previousLogs) {
+    if (log.note && log.note.includes('Betrag:')) {
+      const match = log.note.match(/Betrag:\s*([\d,.]+)/)
+      if (match) {
+        const amountStr = match[1].replace(/\./g, '').replace(',', '.')
+        alreadyPaid += parseFloat(amountStr) || 0
+      }
+    }
+  }
+
+  // If after deletion, it is no longer fully paid, un-pay it
+  if (alreadyPaid < parseFloat(invoice.totalAmount)) {
+    await db
+      .update(invoices)
+      .set({ paidAt: null })
+      .where(and(eq(invoices.id, invoiceId), eq(invoices.companyId, companyId)))
+  }
 
   return { success: true }
 }
