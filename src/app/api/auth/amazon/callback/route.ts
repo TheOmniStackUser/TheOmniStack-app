@@ -67,6 +67,8 @@ export async function GET(req: NextRequest) {
         .update(marketplaceIntegrations)
         .set({
           sellerId: sellingPartnerId,
+          clientId: clientId,
+          clientSecret: clientSecret,
           refreshToken: refreshToken,
           accessToken: accessToken, // We can store the initial access token too (expires in 1hr)
           expiresAt: new Date(Date.now() + (tokenData.expires_in * 1000)),
@@ -78,6 +80,8 @@ export async function GET(req: NextRequest) {
         companyId,
         type: 'amazon',
         sellerId: sellingPartnerId,
+        clientId: clientId,
+        clientSecret: clientSecret,
         refreshToken: refreshToken,
         accessToken: accessToken,
         expiresAt: new Date(Date.now() + (tokenData.expires_in * 1000)),
