@@ -1,6 +1,6 @@
 import { requireAuth } from '@/lib/session'
 import { db } from '@/db/client'
-import { invoices } from '@/db/schema/invoices'
+import { invoices, invoiceLogs } from '@/db/schema/invoices'
 import { incomingInvoices } from '@/db/schema/incoming-invoices'
 import { orders } from '@/db/schema/orders'
 import { eq, desc, and, ne, or } from 'drizzle-orm'
