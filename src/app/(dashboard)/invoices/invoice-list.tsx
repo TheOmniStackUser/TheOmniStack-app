@@ -49,6 +49,8 @@ interface Invoice {
   displayOrderNumber?: string | null
   lastDunningStage?: string | null
   lastDunningSentAt?: Date | string | null
+  openAmount?: number
+  alreadyPaid?: number
   trackingNumber?: string | null
   returnTrackingNumber?: string | null
 }
@@ -3645,12 +3647,20 @@ export function InvoiceList({
                       </span>
                     </div>
                   )}
-                  <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Noch zu zahlen</span>
-                  <span className="text-2xl font-black text-rose-600 tracking-tight leading-none">
-                    {new Intl.NumberFormat('de-DE', { style: 'currency', currency: paymentInvoice.currency }).format(
-                      Math.max(0, Number(paymentInvoice.totalAmount) - paymentAlreadyPaid - (parseFloat(paymentAmount) || 0))
-                    )}
-                  </span>
+                  {(() => {
+                    const remaining = Math.max(0, Number(paymentInvoice.totalAmount) - paymentAlreadyPaid - (parseFloat(String(paymentAmount).replace(',', '.')) || 0));
+                    const isFullyPaid = remaining === 0;
+                    return (
+                      <>
+                        <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                          {isFullyPaid ? 'Nach Zahlung ausgeglichen' : 'Verbleibender Restbetrag'}
+                        </span>
+                        <span className={`text-2xl font-black tracking-tight leading-none ${isFullyPaid ? 'text-emerald-600' : 'text-rose-600'}`}>
+                          {new Intl.NumberFormat('de-DE', { style: 'currency', currency: paymentInvoice.currency }).format(remaining)}
+                        </span>
+                      </>
+                    );
+                  })()}
                 </div>
 
                 {/* Previous Payments List */}
