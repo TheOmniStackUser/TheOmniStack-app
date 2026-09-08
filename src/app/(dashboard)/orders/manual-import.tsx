@@ -12,7 +12,7 @@ export function ManualImport({
   hasDecathlonIntegration = false,
   hasShopifyIntegration = false,
   hasAboutYouIntegration = false,
-  hasEtsyIntegration = false,
+  hasAmazonIntegration = false,
 }: { 
   customMiraklIntegrations?: any[]
   hasKauflandIntegration?: boolean
@@ -22,6 +22,7 @@ export function ManualImport({
   hasShopifyIntegration?: boolean
   hasAboutYouIntegration?: boolean
   hasEtsyIntegration?: boolean
+  hasAmazonIntegration?: boolean
 }) {
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(true)
@@ -61,6 +62,7 @@ export function ManualImport({
     if (hasKauflandIntegration) direct.push({ value: 'kaufland', label: 'Kaufland' })
     if (hasEbayIntegration) direct.push({ value: 'ebay', label: 'eBay' })
     if (hasEtsyIntegration) direct.push({ value: 'etsy', label: 'Etsy' })
+    if (hasAmazonIntegration) direct.push({ value: 'amazon', label: 'Amazon' })
 
     // Decathlon
     if (hasDecathlonIntegration) decathlon.push({ value: 'mirakl_decathlon', label: 'Decathlon DE' })

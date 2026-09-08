@@ -437,6 +437,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         hasShopifyIntegration={hasShopifyIntegration}
         hasAboutYouIntegration={hasAboutYouIntegration}
         hasEtsyIntegration={hasEtsyIntegration}
+        hasAmazonIntegration={hasAmazonIntegration}
       />
 
       <OrdersTable 
