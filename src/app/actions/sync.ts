@@ -189,7 +189,8 @@ export async function triggerManualSyncAction(data: { marketplace: string, fromD
             sellerId: integration.sellerId!,
             clientId: integration.clientId!,
             clientSecret: integration.clientSecret!,
-            refreshToken: integration.refreshToken!
+            refreshToken: integration.refreshToken!,
+            importFba: (integration.metadata as any)?.importFba || false
           })
           adapter = amzAdapter
           rawOrders = await adapter.fetchUnshippedOrders(auth.activeCompanyId)

@@ -47,6 +47,7 @@ export type NormalizedOrder = {
   totalAmount: number
   taxAmount: number
   totalWeight?: number // total weight in kg
+  fulfillmentType?: 'MFN' | 'FBA'
   rawPayload: unknown // preserved verbatim for audit trail
 }
 

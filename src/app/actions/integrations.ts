@@ -918,3 +918,20 @@ export async function disconnectIntegrationAction(type: string, id?: string) {
   revalidatePath('/integrations')
   return { success: true }
 }
+
+export async function updateAmazonConfigAction(importFba: boolean) {
+  const { activeCompanyId } = await requireAuth()
+  const existing = await db.query.marketplaceIntegrations.findFirst({
+    where: and(
+      eq(marketplaceIntegrations.companyId, activeCompanyId),
+      eq(marketplaceIntegrations.type, 'amazon')
+    )
+  })
+  if (existing) {
+    const existingMetadata = existing.metadata as any || {}
+    await db.update(marketplaceIntegrations)
+      .set({ metadata: { ...existingMetadata, importFba } })
+      .where(eq(marketplaceIntegrations.id, existing.id))
+  }
+  revalidatePath('/integrations')
+}

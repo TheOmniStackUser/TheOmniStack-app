@@ -280,6 +280,7 @@ export default async function IntegrationsPage(props: {
                 <AmazonIntegrationForm 
                   initialSellerId={integrations.find((i: any) => i.type === 'amazon')?.sellerId || ''}
                   companyId={auth.activeCompanyId}
+                  initialImportFba={(integrations.find((i: any) => i.type === 'amazon')?.metadata as any)?.importFba || false}
                 />
               </div>
             </CollapsibleSection>

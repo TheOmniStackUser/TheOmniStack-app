@@ -553,7 +553,8 @@ export function getAdapterForIntegration(
       sellerId: integration.sellerId,
       clientId: integration.clientId,
       clientSecret: integration.clientSecret,
-      refreshToken: integration.refreshToken
+      refreshToken: integration.refreshToken,
+      importFba: (integration.metadata as any)?.importFba || false
     })
   }
   if (integration.type === 'shopify') {
@@ -1858,8 +1859,8 @@ export async function persistOrders(
           totalAmount: String(order.totalAmount),
           taxAmount: String(finalTaxAmount.toFixed(2)),
           totalWeight: order.totalWeight ? String(order.totalWeight) : null,
+          status: order.fulfillmentType === 'FBA' ? 'shipped' : 'pending',
           rawPayload: order.rawPayload,
-          status: 'pending',
           customerNumber,
           deliveryNoteNumber,
         })

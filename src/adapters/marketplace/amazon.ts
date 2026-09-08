@@ -5,6 +5,7 @@ type AmazonAdapterConfig = {
   clientId: string
   clientSecret: string
   refreshToken: string
+  importFba?: boolean
 }
 
 export class AmazonAdapter implements MarketplaceAdapter {
@@ -40,10 +41,16 @@ export class AmazonAdapter implements MarketplaceAdapter {
       console.log(`[AmazonAdapter] Fetching access token...`)
       const accessToken = await this.getAccessToken()
 
-      console.log(`[AmazonAdapter] Fetching orders...`)
+      console.log(`[AmazonAdapter] Fetching MFN orders...`)
+      
+      // SP-API requires CreatedAfter or LastUpdatedAfter. We fetch the last 14 days.
+      const createdAfter = new Date()
+      createdAfter.setDate(createdAfter.getDate() - 14)
+      const createdAfterStr = createdAfter.toISOString()
+      
       // Get Unshipped MFN orders
-      const ordersUrl = `${this.baseUrl}/orders/v0/orders?MarketplaceIds=${this.marketplaceId}&FulfillmentChannels=MFN&OrderStatuses=Unshipped`
-      const ordersResponse = await fetch(ordersUrl, {
+      const mfnOrdersUrl = `${this.baseUrl}/orders/v0/orders?MarketplaceIds=${this.marketplaceId}&FulfillmentChannels=MFN&OrderStatuses=Unshipped&CreatedAfter=${encodeURIComponent(createdAfterStr)}`
+      const mfnResponse = await fetch(mfnOrdersUrl, {
       method: 'GET',
       cache: 'no-store',
       headers: {
@@ -52,13 +59,38 @@ export class AmazonAdapter implements MarketplaceAdapter {
         }
       })
 
-      if (!ordersResponse.ok) {
-        const err = await ordersResponse.text()
+      if (!mfnResponse.ok) {
+        const err = await mfnResponse.text()
+        console.error(`Amazon MFN Orders API Error: ${err}`)
         throw new Error(`Amazon Orders API Error: ${err}`)
       }
 
-      const ordersData = await ordersResponse.json()
-      const rawOrders = ordersData.payload?.Orders || []
+      const mfnData = await mfnResponse.json()
+      let rawOrders = mfnData.payload?.Orders || []
+      
+      if (this.config.importFba) {
+        console.log(`[AmazonAdapter] Fetching FBA (AFN) orders...`)
+        // FBA orders are shipped by Amazon, so they are in Shipped state
+        const afnOrdersUrl = `${this.baseUrl}/orders/v0/orders?MarketplaceIds=${this.marketplaceId}&FulfillmentChannels=AFN&OrderStatuses=Shipped&CreatedAfter=${encodeURIComponent(createdAfterStr)}`
+        const afnResponse = await fetch(afnOrdersUrl, {
+          method: 'GET',
+          cache: 'no-store',
+          headers: {
+            'x-amz-access-token': accessToken,
+            'Accept': 'application/json'
+          }
+        })
+
+        if (!afnResponse.ok) {
+          const err = await afnResponse.text()
+          console.error(`Amazon AFN Orders API Error: ${err}`)
+          throw new Error(`Amazon AFN Orders API Error: ${err}`)
+        }
+
+        const afnData = await afnResponse.json()
+        const afnOrders = afnData.payload?.Orders || []
+        rawOrders = [...rawOrders, ...afnOrders]
+      }
       
       const normalizedOrders: NormalizedOrder[] = []
 
@@ -126,6 +158,7 @@ export class AmazonAdapter implements MarketplaceAdapter {
       })),
       totalAmount,
       taxAmount,
+      fulfillmentType: rawOrder.FulfillmentChannel === 'AFN' ? 'FBA' : 'MFN',
       rawPayload: { rawOrder, rawItems }
     }
   }
