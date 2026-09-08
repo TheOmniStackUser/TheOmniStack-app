@@ -12,6 +12,7 @@ export function ManualImport({
   hasDecathlonIntegration = false,
   hasShopifyIntegration = false,
   hasAboutYouIntegration = false,
+  hasEtsyIntegration = false,
   hasAmazonIntegration = false,
 }: { 
   customMiraklIntegrations?: any[]
