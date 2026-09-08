@@ -30,7 +30,7 @@ export default async function InvoicesPage({
   const isIncoming = searchParams.type === 'incoming'
 
   // Fetch data concurrently based on tab
-  const [allInvoices, incomingInvs, companyDunningLogs, integrations, company, emailTemplate, currentUser] = await Promise.all([
+  const [allInvoices, incomingInvs, companyDunningLogs, integrations, company, emailTemplate, currentUser, companyPaymentLogs] = await Promise.all([
     // Only fetch outgoing if not on incoming tab
     !isIncoming ? db
       .select({
@@ -119,7 +119,17 @@ export default async function InvoicesPage({
       .from(users)
       .where(eq(users.id, auth.userId))
       .limit(1)
-      .then(rows => rows[0] || null)
+      .then(rows => rows[0] || null),
+    db
+      .select({
+        invoiceId: invoiceLogs.invoiceId,
+        note: invoiceLogs.note,
+      })
+      .from(invoiceLogs)
+      .where(and(
+        eq(invoiceLogs.companyId, auth.activeCompanyId),
+        eq(invoiceLogs.action, 'payment')
+      ))
   ])
 
   const customMiraklIntegrations = integrations.filter(i => i.type === 'mirakl_custom')
@@ -148,9 +158,24 @@ export default async function InvoicesPage({
   }
   const uniqueInvoices = Array.from(uniqueInvoicesMap.values())
 
-  // Map dunning stage info
+  // Map dunning stage info and payment info
   const invoicesWithDunning = uniqueInvoices.map((inv) => {
     const logs = companyDunningLogs.filter((log) => log.invoiceId === inv.id)
+    const pLogs = companyPaymentLogs.filter((log) => log.invoiceId === inv.id)
+    
+    let alreadyPaid = 0
+    for (const log of pLogs) {
+      if (log.note && log.note.includes('Betrag:')) {
+        const match = log.note.match(/Betrag:\s*([\d,.]+)/)
+        if (match) {
+          const amountStr = match[1].replace(/\./g, '').replace(',', '.')
+          alreadyPaid += parseFloat(amountStr) || 0
+        }
+      }
+    }
+    const isActuallyPaid = !!inv.paidAt || (inv.marketplace && inv.marketplace.toLowerCase() !== 'manual') || inv.isCreditNote || !!inv.cancelsInvoiceId;
+    const openAmount = isActuallyPaid ? 0 : Math.max(0, parseFloat(inv.totalAmount) - alreadyPaid)
+
     const raw = inv.rawPayload as { orderNumber?: unknown, name?: unknown } | null
     let rawOrderStr = String(raw?.name || raw?.orderNumber || inv.marketplaceOrderId || '')
     if (rawOrderStr.startsWith('MAN-NO-ORDER-')) rawOrderStr = ''
@@ -161,6 +186,8 @@ export default async function InvoicesPage({
       displayOrderNumber,
       lastDunningStage: logs[0]?.stage || null,
       lastDunningSentAt: logs[0]?.sentAt || null,
+      alreadyPaid,
+      openAmount,
     }
   })
 

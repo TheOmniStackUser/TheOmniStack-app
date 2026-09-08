@@ -1666,6 +1666,7 @@ export function InvoiceList({
               {renderSortableHeader('Kunde', 'recipientName')}
               {renderSortableHeader('Land', 'recipientCountry')}
               {renderSortableHeader('Betrag', 'totalAmount', 'right')}
+              {renderSortableHeader('Offen', 'openAmount', 'right')}
               <th className="px-4 py-4 w-12"></th>
             </tr>
           </thead>
@@ -1852,6 +1853,21 @@ export function InvoiceList({
                         invoice.cancelsInvoiceId ? -Number(invoice.totalAmount) : Number(invoice.totalAmount)
                       )}
                     </span>
+                  </div>
+                </td>
+                <td className="px-6 py-4 text-right font-medium text-slate-900">
+                  <div className="flex items-center justify-end">
+                    {(invoice.openAmount !== undefined && invoice.openAmount > 0) || (invoice.openAmount === undefined && !isPaid(invoice)) ? (
+                      <span className="shrink-0 text-slate-900 font-bold">
+                        {new Intl.NumberFormat('de-DE', { style: 'currency', currency: invoice.currency }).format(
+                          invoice.cancelsInvoiceId ? -(invoice.openAmount || Number(invoice.totalAmount)) : (invoice.openAmount || Number(invoice.totalAmount))
+                        )}
+                      </span>
+                    ) : (
+                      <span className="shrink-0 text-slate-400 font-medium text-sm flex items-center justify-end gap-1.5 w-full">
+                        <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
+                      </span>
+                    )}
                   </div>
                 </td>
                  {/* ··· action menu – last column, right-aligned */}
