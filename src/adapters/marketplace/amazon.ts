@@ -49,7 +49,7 @@ export class AmazonAdapter implements MarketplaceAdapter {
       const createdAfterStr = createdAfter.toISOString()
       
       // Get Unshipped MFN orders
-      const mfnOrdersUrl = `${this.baseUrl}/orders/v0/orders?MarketplaceIds=${this.marketplaceId}&FulfillmentChannels=MFN&OrderStatuses=Unshipped&CreatedAfter=${encodeURIComponent(createdAfterStr)}`
+      const mfnOrdersUrl = `${this.baseUrl}/orders/v0/orders?MarketplaceIds=${this.marketplaceId}&FulfillmentChannels=MFN&OrderStatuses=Unshipped&CreatedAfter=${encodeURIComponent(createdAfterStr)}&dataElements=buyerInfo,shippingAddress`
       const mfnResponse = await fetch(mfnOrdersUrl, {
       method: 'GET',
       cache: 'no-store',
@@ -71,7 +71,7 @@ export class AmazonAdapter implements MarketplaceAdapter {
       if (this.config.importFba) {
         console.log(`[AmazonAdapter] Fetching FBA (AFN) orders...`)
         // FBA orders are shipped by Amazon, so they are in Shipped state
-        const afnOrdersUrl = `${this.baseUrl}/orders/v0/orders?MarketplaceIds=${this.marketplaceId}&FulfillmentChannels=AFN&OrderStatuses=Shipped&CreatedAfter=${encodeURIComponent(createdAfterStr)}`
+        const afnOrdersUrl = `${this.baseUrl}/orders/v0/orders?MarketplaceIds=${this.marketplaceId}&FulfillmentChannels=AFN&OrderStatuses=Shipped&CreatedAfter=${encodeURIComponent(createdAfterStr)}&dataElements=buyerInfo,shippingAddress`
         const afnResponse = await fetch(afnOrdersUrl, {
           method: 'GET',
           cache: 'no-store',
@@ -205,6 +205,57 @@ export class AmazonAdapter implements MarketplaceAdapter {
     } catch (error) {
       console.error(`[AmazonAdapter] Error during simulated refund:`, error)
       return false
+    }
+  }
+
+  async confirmShipment(
+    marketplaceOrderId: string, 
+    trackingNumber: string, 
+    carrierCode: string, 
+    returnTrackingNumber?: string,
+    rawOrderPayload?: unknown
+  ): Promise<void> {
+    const payload = rawOrderPayload as { rawItems?: any[] } | undefined
+    if (!payload?.rawItems || payload.rawItems.length === 0) {
+      throw new Error(`Fehlende OrderItems für Amazon Bestellung ${marketplaceOrderId}`)
+    }
+
+    const orderItemsList = payload.rawItems.map((item: any) => ({
+      orderItemId: item.OrderItemId,
+      quantity: Number(item.QuantityOrdered || 1)
+    }))
+
+    const amazonCarrierName = carrierCode.toUpperCase() === 'DHL' ? 'DHL' : carrierCode.toUpperCase() === 'HERMES' ? 'Hermes' : carrierCode
+
+    const requestBody = {
+      marketplaceId: this.marketplaceId,
+      packageDetail: {
+        packageReferenceId: "1",
+        carrierCode: amazonCarrierName,
+        carrierName: amazonCarrierName,
+        shippingMethod: "Standard",
+        trackingNumber: trackingNumber,
+        shipDate: new Date().toISOString(),
+        orderItems: orderItemsList
+      }
+    }
+
+    const accessToken = await this.getAccessToken()
+    const url = `${this.baseUrl}/orders/v0/orders/${marketplaceOrderId}/shipmentConfirmation`
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'x-amz-access-token': accessToken,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(requestBody)
+    })
+
+    if (!res.ok) {
+      const errText = await res.text()
+      throw new Error(`Amazon shipment confirmation failed: ${res.status} ${errText}`)
     }
   }
 
