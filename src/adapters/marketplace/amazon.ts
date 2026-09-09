@@ -36,10 +36,44 @@ export class AmazonAdapter implements MarketplaceAdapter {
     return data.access_token
   }
 
+  private async getRestrictedDataToken(accessToken: string, targetMethod: string, targetPath: string, dataElements: string[]): Promise<string> {
+    const url = `${this.baseUrl}/tokens/2021-03-01/restrictedDataToken`
+    const body = {
+      restrictedResources: [
+        {
+          method: targetMethod,
+          path: targetPath,
+          dataElements
+        }
+      ]
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      cache: 'no-store',
+      headers: {
+        'x-amz-access-token': accessToken,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(body)
+    })
+
+    if (!response.ok) {
+      const err = await response.text()
+      console.warn(`[AmazonAdapter] Failed to get RDT (PII may be missing): ${err}`)
+      return accessToken // Fallback to standard token, but PII won't be returned
+    }
+
+    const data = await response.json()
+    return data.restrictedDataToken
+  }
+
   async fetchUnshippedOrders(_companyId: string): Promise<NormalizedOrder[]> {
     try {
       console.log(`[AmazonAdapter] Fetching access token...`)
-      const accessToken = await this.getAccessToken()
+      const baseAccessToken = await this.getAccessToken()
+      const rdtToken = await this.getRestrictedDataToken(baseAccessToken, 'GET', '/orders/v0/orders', ['buyerInfo', 'shippingAddress'])
 
       console.log(`[AmazonAdapter] Fetching MFN orders...`)
       
@@ -54,7 +88,7 @@ export class AmazonAdapter implements MarketplaceAdapter {
       method: 'GET',
       cache: 'no-store',
       headers: {
-          'x-amz-access-token': accessToken,
+          'x-amz-access-token': rdtToken,
           'Accept': 'application/json'
         }
       })
@@ -76,7 +110,7 @@ export class AmazonAdapter implements MarketplaceAdapter {
           method: 'GET',
           cache: 'no-store',
           headers: {
-            'x-amz-access-token': accessToken,
+            'x-amz-access-token': rdtToken,
             'Accept': 'application/json'
           }
         })
@@ -101,7 +135,7 @@ export class AmazonAdapter implements MarketplaceAdapter {
       method: 'GET',
       cache: 'no-store',
       headers: {
-            'x-amz-access-token': accessToken,
+            'x-amz-access-token': baseAccessToken,
             'Accept': 'application/json'
           }
         })
