@@ -49,74 +49,85 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
 
 
 
-  // Calculate refund statuses for the entire company
-  // This is needed for the stats cards and filtering
-  const allReturns = await db.select({
-    orderId: returnsLog.orderId,
-    status: returnsLog.status,
-    metadata: returnsLog.metadata
-  }).from(returnsLog)
-    .where(and(
-      eq(returnsLog.companyId, auth.activeCompanyId),
-      eq(returnsLog.status, 'bearbeitet')
-    ))
+  const refundStatsPromise = (async () => {
+    const allReturns = await db.select({
+      orderId: returnsLog.orderId,
+      status: returnsLog.status,
+      metadata: returnsLog.metadata
+    }).from(returnsLog)
+      .where(and(
+        eq(returnsLog.companyId, auth.activeCompanyId),
+        eq(returnsLog.status, 'bearbeitet')
+      ))
 
-  const orderIdsWithReturns = Array.from(new Set(allReturns.map(r => r.orderId).filter(Boolean) as string[]))
-  
-  let fullyRefundedIds: string[] = []
-  let partiallyRefundedIds: string[] = []
-
-  if (orderIdsWithReturns.length > 0) {
-    const returnItems = await db.select({
-      orderId: orderItems.orderId,
-      quantity: orderItems.quantity,
-      sku: orderItems.sku
-    }).from(orderItems)
-      .where(inArray(orderItems.orderId, orderIdsWithReturns))
+    const orderIdsWithReturns = Array.from(new Set(allReturns.map(r => r.orderId).filter(Boolean) as string[]))
     
-    const itemsByOrder = returnItems.reduce((acc, item) => {
-      acc[item.orderId] = acc[item.orderId] || []
-      acc[item.orderId].push(item)
-      return acc
-    }, {} as Record<string, typeof returnItems>)
+    let fullyRefundedIds: string[] = []
+    let partiallyRefundedIds: string[] = []
 
-    const returnsByOrder = allReturns.reduce((acc, ret) => {
-      if (ret.orderId) {
-        acc[ret.orderId] = acc[ret.orderId] || []
-        acc[ret.orderId].push(ret)
-      }
-      return acc
-    }, {} as Record<string, typeof allReturns>)
+    if (orderIdsWithReturns.length > 0) {
+      const returnItems = await db.select({
+        orderId: orderItems.orderId,
+        quantity: orderItems.quantity,
+        sku: orderItems.sku
+      }).from(orderItems)
+        .where(inArray(orderItems.orderId, orderIdsWithReturns))
+      
+      const itemsByOrder = returnItems.reduce((acc, item) => {
+        acc[item.orderId] = acc[item.orderId] || []
+        acc[item.orderId].push(item)
+        return acc
+      }, {} as Record<string, typeof returnItems>)
 
-    for (const orderId of orderIdsWithReturns) {
-      const orderItemsList = itemsByOrder[orderId] || []
-      const orderReturnsList = returnsByOrder[orderId] || []
+      const returnsByOrder = allReturns.reduce((acc, ret) => {
+        if (ret.orderId) {
+          acc[ret.orderId] = acc[ret.orderId] || []
+          acc[ret.orderId].push(ret)
+        }
+        return acc
+      }, {} as Record<string, typeof allReturns>)
 
-      let totalOrderedQty = 0
-      let totalRefundedQty = 0
+      for (const orderId of orderIdsWithReturns) {
+        const orderItemsList = itemsByOrder[orderId] || []
+        const orderReturnsList = returnsByOrder[orderId] || []
 
-      for (const item of orderItemsList) {
-        totalOrderedQty += Number(item.quantity || 1)
-        
-        const refundedCount = orderReturnsList.reduce((acc, ret) => {
-          if (ret.status === 'bearbeitet' && (ret.metadata as any)?.refundedItems) {
-            const matched = ((ret.metadata as any).refundedItems as any[]).find((r: any) => r.sku === item.sku)
-            if (matched && matched.quantity) {
-              return acc + Number(matched.quantity)
+        let totalOrderedQty = 0
+        let totalRefundedQty = 0
+
+        for (const item of orderItemsList) {
+          totalOrderedQty += Number(item.quantity || 1)
+          
+          const refundedCount = orderReturnsList.reduce((acc, ret) => {
+            if (ret.status === 'bearbeitet' && (ret.metadata as any)?.refundedItems) {
+              const matched = ((ret.metadata as any).refundedItems as any[]).find((r: any) => r.sku === item.sku)
+              if (matched && matched.quantity) {
+                return acc + Number(matched.quantity)
+              }
             }
-          }
-          return acc
-        }, 0)
-        
-        totalRefundedQty += refundedCount
-      }
+            return acc
+          }, 0)
+          
+          totalRefundedQty += refundedCount
+        }
 
-      if (totalOrderedQty > 0 && totalRefundedQty >= totalOrderedQty) {
-        fullyRefundedIds.push(orderId)
-      } else if (totalRefundedQty > 0 && totalRefundedQty < totalOrderedQty) {
-        partiallyRefundedIds.push(orderId)
+        if (totalOrderedQty > 0 && totalRefundedQty >= totalOrderedQty) {
+          fullyRefundedIds.push(orderId)
+        } else if (totalRefundedQty > 0 && totalRefundedQty < totalOrderedQty) {
+          partiallyRefundedIds.push(orderId)
+        }
       }
     }
+    
+    return { fullyRefundedIds, partiallyRefundedIds }
+  })();
+
+  let refunds: { fullyRefundedIds: string[], partiallyRefundedIds: string[] } | null = null;
+
+
+  if (search && search.toLowerCase().includes('erstattet')) {
+    refunds = await refundStatsPromise;
+  } else if (status === 'refunded' || status === 'partially_refunded') {
+    refunds = await refundStatsPromise;
   }
 
   if (search) {
@@ -129,16 +140,15 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
       ilike(orders.shippingCompany, `%${search}%`),
       ilike(orders.trackingNumber, `%${search}%`),
       ilike(orders.deliveryNoteNumber, `%${search}%`),
-      ilike(sql`${orders.rawPayload}->>'orderNumber'`, `%${search}%`),
-      ilike(sql`${orders.rawPayload}->>'name'`, `%${search}%`)
+      ilike(sql`${orders.rawPayload}::text`, `%${search}%`)
     ]
     
     // Support searching for refunded states via text input
-    if (searchLower.includes('erstattet')) {
+    if (searchLower.includes('erstattet') && refunds) {
       if (searchLower === 'teilerstattet' || searchLower.includes('teil')) {
-        if (partiallyRefundedIds.length > 0) searchConditions.push(inArray(orders.id, partiallyRefundedIds))
+        if (refunds.partiallyRefundedIds.length > 0) searchConditions.push(inArray(orders.id, refunds.partiallyRefundedIds))
       } else {
-        if (fullyRefundedIds.length > 0) searchConditions.push(inArray(orders.id, fullyRefundedIds))
+        if (refunds.fullyRefundedIds.length > 0) searchConditions.push(inArray(orders.id, refunds.fullyRefundedIds))
       }
     }
 
@@ -146,15 +156,15 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   }
 
   if (status !== 'all') {
-    if (status === 'refunded') {
-      if (fullyRefundedIds.length > 0) {
-        whereConditions.push(inArray(orders.id, fullyRefundedIds))
+    if (status === 'refunded' && refunds) {
+      if (refunds.fullyRefundedIds.length > 0) {
+        whereConditions.push(inArray(orders.id, refunds.fullyRefundedIds))
       } else {
         whereConditions.push(sql`1=0`)
       }
-    } else if (status === 'partially_refunded') {
-      if (partiallyRefundedIds.length > 0) {
-        whereConditions.push(inArray(orders.id, partiallyRefundedIds))
+    } else if (status === 'partially_refunded' && refunds) {
+      if (refunds.partiallyRefundedIds.length > 0) {
+        whereConditions.push(inArray(orders.id, refunds.partiallyRefundedIds))
       } else {
         whereConditions.push(sql`1=0`)
       }
@@ -390,6 +400,10 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     }
   })
 
+  if (!refunds) {
+    refunds = await refundStatsPromise;
+  }
+
   return (
     <div className="max-w-[1600px] mx-auto">
       <header className="mb-8">
@@ -419,11 +433,11 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
           </Link>
           <Link href="/orders?status=refunded" className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all">
             <span className="text-sm font-medium text-gray-500">Erstattet</span>
-            <span className="text-2xl font-bold text-red-600">{fullyRefundedIds.length}</span>
+            <span className="text-2xl font-bold text-red-600">{refunds.fullyRefundedIds.length}</span>
           </Link>
           <Link href="/orders?status=partially_refunded" className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all">
             <span className="text-sm font-medium text-gray-500">Teilerstattet</span>
-            <span className="text-2xl font-bold text-red-600">{partiallyRefundedIds.length}</span>
+            <span className="text-2xl font-bold text-red-600">{refunds.partiallyRefundedIds.length}</span>
           </Link>
         </div>
       </header>
