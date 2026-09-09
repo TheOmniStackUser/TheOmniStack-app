@@ -1107,3 +1107,25 @@ export async function bulkToggleProductSync(productIds: string[], field: 'stock'
   revalidatePath('/products')
   return { success: true }
 }
+
+export async function bulkUpdateCustomsData(productIds: string[], hsCode: string, countryOfOrigin: string) {
+  const auth = await requireAuth()
+
+  if (!productIds || productIds.length === 0) return { success: true }
+
+  await db.update(products)
+    .set({
+      hsCode: hsCode || null,
+      countryOfOrigin: countryOfOrigin || 'DE',
+      updatedAt: new Date()
+    })
+    .where(
+      and(
+        inArray(products.id, productIds),
+        eq(products.companyId, auth.activeCompanyId)
+      )
+    )
+
+  revalidatePath('/products')
+  return { success: true }
+}

@@ -216,6 +216,29 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
+  const [showBulkCustomsModal, setShowBulkCustomsModal] = useState(false)
+  const [bulkHsCode, setBulkHsCode] = useState('')
+  const [bulkOrigin, setBulkOrigin] = useState('DE')
+  const [isBulkUpdatingCustoms, setIsBulkUpdatingCustoms] = useState(false)
+
+  const handleBulkCustomsUpdate = async () => {
+    setIsBulkUpdatingCustoms(true)
+    try {
+      const { bulkUpdateCustomsData } = await import('@/app/actions/products')
+      await bulkUpdateCustomsData(Array.from(selectedProductIds), bulkHsCode, bulkOrigin)
+      setSelectedProductIds(new Set())
+      setShowBulkCustomsModal(false)
+      setBulkHsCode('')
+      setBulkOrigin('DE')
+      showToast('Zolldaten erfolgreich aktualisiert', 'success')
+      router.refresh()
+    } catch (e) {
+      console.error(e)
+      showToast('Fehler beim Aktualisieren der Zolldaten', 'error')
+    } finally {
+      setIsBulkUpdatingCustoms(false)
+    }
+  }
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToast({ message, type })
@@ -476,6 +499,13 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
               </div>
             </div>
             <button
+              onClick={() => setShowBulkCustomsModal(true)}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors text-sm font-semibold border border-indigo-200"
+            >
+              <FileText className="w-4 h-4" />
+              Zolldaten setzen
+            </button>
+            <button
               onClick={() => setShowBulkDeleteConfirm(true)}
               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors text-sm font-semibold border border-rose-200"
             >
@@ -723,6 +753,65 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
         </table>
       </div>
     </div>
+
+      {showBulkCustomsModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowBulkCustomsModal(false)}>
+          <div 
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col animate-in zoom-in-95 duration-200 relative overflow-hidden text-left" 
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center mb-4">
+                <FileText className="w-6 h-6 text-indigo-600" />
+              </div>
+              <h3 className="font-bold text-slate-900 text-xl mb-2">Zolldaten für {selectedProductIds.size} Produkte setzen</h3>
+              <p className="text-slate-500 text-sm mb-6">
+                Die eingegebenen Zolldaten werden für alle {selectedProductIds.size} ausgewählten Produkte übernommen. Bestehende Einträge werden überschrieben.
+              </p>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700">Zolltarifnr. (HS-Code)</label>
+                  <input 
+                    type="text" 
+                    value={bulkHsCode} 
+                    onChange={e => setBulkHsCode(e.target.value)} 
+                    placeholder="z.B. 64041100" 
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 placeholder:text-slate-500" 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700">Ursprungsland</label>
+                  <input 
+                    type="text" 
+                    value={bulkOrigin} 
+                    onChange={e => setBulkOrigin(e.target.value)} 
+                    placeholder="z.B. DE" 
+                    maxLength={2} 
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono uppercase focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 placeholder:text-slate-500" 
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+              <button 
+                onClick={() => setShowBulkCustomsModal(false)}
+                className="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 transition-colors"
+                disabled={isBulkUpdatingCustoms}
+              >
+                Abbrechen
+              </button>
+              <button 
+                onClick={handleBulkCustomsUpdate}
+                className="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 shadow-sm shadow-indigo-600/20 transition-all flex items-center gap-2"
+                disabled={isBulkUpdatingCustoms}
+              >
+                {isBulkUpdatingCustoms ? 'Speichert...' : 'Zolldaten anwenden'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showBulkDeleteConfirm && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowBulkDeleteConfirm(false)}>
