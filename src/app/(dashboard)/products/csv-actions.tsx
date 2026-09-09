@@ -8,8 +8,14 @@ import { useRouter } from 'next/navigation'
 export function CsvActions() {
   const [isExporting, setIsExporting] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
+  const [statusMsg, setStatusMsg] = useState<{ text: string, type: 'error'|'success' } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
+
+  const showStatus = (text: string, type: 'error'|'success') => {
+    setStatusMsg({ text, type })
+    setTimeout(() => setStatusMsg(null), 5000)
+  }
 
   const handleExport = async () => {
     try {
@@ -27,7 +33,7 @@ export function CsvActions() {
       document.body.removeChild(link)
     } catch (error) {
       console.error('Export error:', error)
-      alert('Fehler beim Exportieren der Produkte.')
+      showStatus('Fehler beim Exportieren der Produkte.', 'error')
     } finally {
       setIsExporting(false)
     }
@@ -42,12 +48,12 @@ export function CsvActions() {
       const text = await file.text()
       const result = await importProductsCsvAction(text)
       if (result.success) {
-        alert(`${result.count} Produkte wurden erfolgreich importiert.`)
+        showStatus(`${result.count} Produkte wurden erfolgreich importiert.`, 'success')
         router.refresh()
       }
     } catch (error: any) {
       console.error('Import error:', error)
-      alert(error.message || 'Fehler beim Importieren der Produkte.')
+      showStatus(error.message || 'Fehler beim Importieren der Produkte.', 'error')
     } finally {
       setIsImporting(false)
       if (fileInputRef.current) {
@@ -57,7 +63,14 @@ export function CsvActions() {
   }
 
   return (
-    <div className="flex gap-2">
+    <div className="flex gap-2 items-center relative">
+      {statusMsg && (
+        <div className={`absolute bottom-full mb-2 right-0 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap shadow-sm border animate-in slide-in-from-bottom-2 ${
+          statusMsg.type === 'error' ? 'bg-red-50 text-red-600 border-red-200' : 'bg-emerald-50 text-emerald-600 border-emerald-200'
+        }`}>
+          {statusMsg.text}
+        </div>
+      )}
       <input 
         type="file" 
         accept=".csv" 

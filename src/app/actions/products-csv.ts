@@ -37,7 +37,9 @@ export async function exportProductsCsv() {
       'Reduzierter Preis': p.reducedPrice?.toString() || '',
       Einkaufspreis: p.purchasePrice?.toString() || '',
       Gewicht: p.weight?.toString() || '',
-      Lagerort: p.storageLocation || ''
+      Lagerort: p.storageLocation || '',
+      'HS-Code': p.hsCode || '',
+      'Ursprungsland': p.countryOfOrigin || 'DE'
     }
 
     // Add mapping columns dynamically
@@ -102,6 +104,8 @@ export async function importProductsCsvAction(csvString: string) {
     const purchasePrice = parseNumber(row['Einkaufspreis'])
     const weight = parseNumber(row['Gewicht'])
     const storageLocation = row['Lagerort']?.trim() || null
+    const hsCode = row['HS-Code']?.trim() || null
+    const countryOfOrigin = row['Ursprungsland']?.trim() || 'DE'
     
     const [insertedProduct] = await db.insert(products).values({
       companyId: auth.activeCompanyId,
@@ -116,6 +120,8 @@ export async function importProductsCsvAction(csvString: string) {
       purchasePrice,
       weight,
       storageLocation,
+      hsCode,
+      countryOfOrigin,
       updatedAt: sql`now()`
     }).onConflictDoUpdate({
       target: [products.companyId, products.sku],
@@ -130,6 +136,8 @@ export async function importProductsCsvAction(csvString: string) {
         purchasePrice,
         weight,
         storageLocation,
+        hsCode,
+        countryOfOrigin,
         updatedAt: sql`now()`
       }
     }).returning({ id: products.id })
