@@ -320,8 +320,7 @@ export class AmazonAdapter implements MarketplaceAdapter {
       if (!response.ok) {
         const err = await response.text()
         console.error(`[AmazonAdapter] Amazon Catalog API Error: ${err}`)
-        // Return empty array for now instead of throwing if we don't have catalog access
-        return []
+        throw new Error("Der direkte Amazon-Produktimport wird aktuell nicht unterstützt. Produkte werden automatisch angelegt, sobald die erste Bestellung dafür eingeht.")
       }
 
       const data = await response.json()
