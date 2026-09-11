@@ -1330,8 +1330,8 @@ const filteredOrders = orders;
       }
     }
 
-    // 5. Fallback for manual and etsy orders (use shipping address if no invoice is linked yet)
-    if ((order.marketplace === 'manual' || order.marketplace === 'etsy') && order.shippingStreet) {
+    // 5. General Fallback (use shipping address if no invoice is linked yet and no other format matched)
+    if (order.shippingStreet) {
       return {
         street: order.shippingStreet,
         zip: order.shippingZip || '',
