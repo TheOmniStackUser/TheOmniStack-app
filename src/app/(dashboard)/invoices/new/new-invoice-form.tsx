@@ -95,7 +95,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
     settings.taxCountry,
     settings.shippingCountry
   ])
-  const standardRate = availableVatRates[0] || 19
+  const standardRate = availableVatRates[0] ?? 19
 
   const [items, setItems] = useState([{ sku: '', title: '', quantity: 1, unitPrice: 0 as number | string, taxRate: standardRate }])
 
@@ -669,7 +669,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
   useEffect(() => {
     setItems(currentItems => {
       const validRates = new Set(availableVatRates)
-      const standardRate = availableVatRates[0] || 0
+      const standardRate = availableVatRates[0] ?? 0
       const isTaxExempt = ['kleinunternehmer', 'drittland', 'eu_vat_id', 'reverse_charge', 'innergemeinschaftlich', 'ausfuhr', 'sonstige', 'innenumsatz'].includes(settings.taxOption)
 
       let changed = false
@@ -685,7 +685,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
 
       return changed ? nextItems : currentItems
     })
-  }, [availableVatRates, settings.taxOption])
+  }, [availableVatRates, settings.taxOption, items])
 
   const subtotal = items.reduce((sum, i) => sum + (Number(i.quantity || 0) * Number(i.unitPrice || 0)), 0)
   const discountAmount = subtotal * (settings.discount / 100)
