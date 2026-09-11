@@ -134,6 +134,8 @@ export function ManualImport({
     let totalAffected = 0
     let totalChecked = 0
     let hasError = false
+    let isBackground = false
+    let backgroundMessage = ''
 
     try {
       for (let i = 0; i < selectedToSync.length; i++) {
@@ -151,19 +153,25 @@ export function ManualImport({
           setNotification({ message: result.error, type: 'error' })
           break
         }
-        
-        if (result.affected !== undefined) {
-          totalAffected += result.affected
+        if (result.background) {
+          isBackground = true
+          backgroundMessage = result.message || 'Import wurde im Hintergrund gestartet!'
         }
-        if (result.checked !== undefined) {
-          totalChecked += result.checked
+        
+        if ((result as any).affected !== undefined) {
+          totalAffected += (result as any).affected
+        }
+        if ((result as any).checked !== undefined) {
+          totalChecked += (result as any).checked
         }
       }
 
       if (!hasError) {
         setSyncProgress({ current: selectedToSync.length, total: selectedToSync.length, label: 'Abgeschlossen', simulatedProgress: 100 })
         let message = 'Import abgeschlossen! Es wurden keine neuen Bestellungen gefunden.'
-        if (totalAffected > 0) {
+        if (isBackground) {
+          message = backgroundMessage
+        } else if (totalAffected > 0) {
           message = `Import erfolgreich! ${totalAffected} neue Bestellung(en) wurden hinzugefügt.`
         } else if (totalChecked > 0) {
           message = `Import abgeschlossen. Es wurden ${totalChecked} Bestellungen geprüft, aber alle waren bereits vorhanden (z.B. durch den automatischen Webhook-Import).`

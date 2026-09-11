@@ -65,11 +65,11 @@ export function SyncButton() {
           break
         }
 
-        if (result?.affected !== undefined) {
-          totalAffected += result.affected
+        if ((result as any)?.affected !== undefined) {
+          totalAffected += (result as any).affected
         }
-        if (result?.checked !== undefined) {
-          totalChecked += result.checked
+        if ((result as any)?.checked !== undefined) {
+          totalChecked += (result as any).checked
         }
       }
 
