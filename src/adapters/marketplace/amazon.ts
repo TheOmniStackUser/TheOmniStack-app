@@ -1,3 +1,4 @@
+import * as zlib from 'zlib'
 import type { MarketplaceAdapter, NormalizedOrder } from './base'
 
 type AmazonAdapterConfig = {
@@ -296,46 +297,126 @@ export class AmazonAdapter implements MarketplaceAdapter {
   /**
    * Fetch products from Amazon SP-API
    */
-  async fetchProducts(companyId: string): Promise<import('./base').MarketplaceProduct[]> {
+  async fetchProducts(companyId: string, onProgress?: (progress: number, total: number, message: string) => void): Promise<import('./base').MarketplaceProduct[]> {
     try {
-      console.log(`[AmazonAdapter] Fetching access token...`)
+      if (onProgress) onProgress(0, 100, 'Fordere Amazon-Report (GET_MERCHANT_LISTINGS_ALL_DATA) an...')
       const accessToken = await this.getAccessToken()
 
-      // SP-API doesn't have a simple "get all listings" endpoint without using Reports API.
-      // We'll simulate fetching from catalog/listings using the Catalog Items API v2022-04-01 
-      // with a generic search, or using the Reports API in a real scenario.
-      // For this implementation, we simulate fetching items via Catalog API.
-      const catalogUrl = `${this.baseUrl}/catalog/2022-04-01/items?marketplaceIds=${this.marketplaceId}&sellerId=${this.config.sellerId}`
-      
-      console.log(`[AmazonAdapter] Fetching products via GET ${catalogUrl}...`)
-      const response = await fetch(catalogUrl, {
-      method: 'GET',
-      cache: 'no-store',
-      headers: {
+      // 1. Request the report
+      const createReportUrl = `${this.baseUrl}/reports/2021-06-30/reports`
+      const createReportRes = await fetch(createReportUrl, {
+        method: 'POST',
+        headers: {
           'x-amz-access-token': accessToken,
+          'Content-Type': 'application/json',
           'Accept': 'application/json'
-        }
+        },
+        body: JSON.stringify({
+          reportType: 'GET_MERCHANT_LISTINGS_ALL_DATA',
+          marketplaceIds: [this.marketplaceId]
+        })
       })
 
-      if (!response.ok) {
-        const err = await response.text()
-        console.error(`[AmazonAdapter] Amazon Catalog API Error: ${err}`)
-        throw new Error("Der direkte Amazon-Produktimport wird aktuell nicht unterstützt. Produkte werden automatisch angelegt, sobald die erste Bestellung dafür eingeht.")
+      if (!createReportRes.ok) {
+        const err = await createReportRes.text()
+        throw new Error(`Fehler beim Anfordern des Reports: ${err}`)
       }
 
-      const data = await response.json()
-      const items = data.items || []
+      const { reportId } = await createReportRes.json()
+      
+      // 2. Poll until DONE
+      let processingStatus = 'IN_QUEUE'
+      let reportDocumentId = ''
+      
+      while (processingStatus === 'IN_QUEUE' || processingStatus === 'IN_PROGRESS') {
+        await new Promise(resolve => setTimeout(resolve, 30000)) // 30s
+        if (onProgress) onProgress(50, 100, `Warte auf Generierung des Reports durch Amazon (Status: ${processingStatus})...`)
 
-      return items.map((item: any) => ({
-        marketplaceProductId: item.asin,
-        sku: item.identifiers?.[0]?.identifiers?.find((i: any) => i.identifierType === 'SKU')?.identifier || item.asin,
-        title: item.summaries?.[0]?.itemName || item.asin,
-        price: item.offers?.[0]?.price?.amount || 0,
-        stock: item.offers?.[0]?.quantity || 0,
-        rawPayload: item
-      }))
+        const pollRes = await fetch(`${createReportUrl}/${reportId}`, {
+          headers: { 'x-amz-access-token': await this.getAccessToken(), 'Accept': 'application/json' }
+        })
+        const pollData = await pollRes.json()
+        
+        processingStatus = pollData.processingStatus
+        
+        if (processingStatus === 'FATAL' || processingStatus === 'CANCELLED') {
+          throw new Error(`Report-Generierung fehlgeschlagen mit Status: ${processingStatus}`)
+        }
+        if (processingStatus === 'DONE') {
+          reportDocumentId = pollData.reportDocumentId
+        }
+      }
+
+      if (!reportDocumentId) {
+        throw new Error('Keine ReportDocumentId von Amazon erhalten.')
+      }
+
+      // 3. Get document URL
+      if (onProgress) onProgress(80, 100, 'Lade Report-Dokument von Amazon herunter...')
+      const docRes = await fetch(`${this.baseUrl}/reports/2021-06-30/documents/${reportDocumentId}`, {
+        headers: { 'x-amz-access-token': await this.getAccessToken(), 'Accept': 'application/json' }
+      })
+      const docData = await docRes.json()
+
+      // 4. Download and decompress document
+      const fileRes = await fetch(docData.url)
+      const buffer = await fileRes.arrayBuffer()
+      let text = ''
+      
+      if (docData.compressionAlgorithm === 'GZIP') {
+        text = zlib.gunzipSync(Buffer.from(buffer)).toString('utf-8')
+      } else {
+        text = Buffer.from(buffer).toString('utf-8')
+      }
+
+      // 5. Parse TSV
+      if (onProgress) onProgress(90, 100, 'Verarbeite Report-Daten...')
+      
+      const lines = text.split(/\r?\n/).filter(l => l.trim())
+      if (lines.length < 2) return []
+
+      const headers = lines[0].split('\t').map(h => h.toLowerCase().trim())
+      const skuIdx = headers.findIndex(h => h.includes('sku') && !h.includes('fnsku'))
+      const asinIdx = headers.findIndex(h => h === 'asin1' || h === 'asin')
+      const titleIdx = headers.findIndex(h => h.includes('name') || h.includes('title'))
+      const priceIdx = headers.findIndex(h => h.includes('price'))
+      const quantityIdx = headers.findIndex(h => h.includes('quantity'))
+
+      const products = []
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split('\t')
+        const sku = cols[skuIdx]?.trim()
+        if (!sku) continue
+
+        const asin = asinIdx !== -1 ? cols[asinIdx]?.trim() : sku
+        const title = titleIdx !== -1 ? cols[titleIdx]?.trim() : sku
+        
+        let price = 0
+        if (priceIdx !== -1 && cols[priceIdx]) {
+          price = parseFloat(cols[priceIdx].trim().replace(',', '.'))
+          if (isNaN(price)) price = 0
+        }
+        
+        let stock = null
+        if (quantityIdx !== -1 && cols[quantityIdx]) {
+          stock = parseInt(cols[quantityIdx].trim(), 10)
+          if (isNaN(stock)) stock = null
+        }
+
+        products.push({
+          marketplaceProductId: asin,
+          sku: sku,
+          title: title,
+          price: price,
+          stock: stock !== null ? stock : undefined,
+          rawPayload: { _source: 'reports_api', row: lines[i] }
+        })
+      }
+
+      if (onProgress) onProgress(100, 100, 'Amazon-Produkte erfolgreich verarbeitet.')
+      return products
     } catch (error: any) {
-      console.error(`[AmazonAdapter] Error fetching products:`, error)
+      console.error(`[AmazonAdapter] Error fetching products via Reports API:`, error)
       throw error
     }
   }

@@ -5,6 +5,7 @@ import { DownloadCloud, Play, Loader2, CheckCircle2, AlertCircle, X, Info } from
 import { useRouter } from 'next/navigation'
 
 import { triggerProductImport, getImportSyncStatus } from '@/app/actions/products'
+import { importAmazonCsvAction } from '@/app/actions/amazon-csv'
 
 function getMarketplaceName(integration: any) {
   if (integration.type === 'mirakl_custom' && integration.metadata?.customName) {
@@ -33,6 +34,8 @@ export function ImportClient({ marketplaces }: { marketplaces: any[] }) {
   const [isImporting, setIsImporting] = useState(false)
   const [notification, setNotification] = useState<{ message: string; description?: string; type: 'success' | 'error' | 'info' } | null>(null)
   const [syncStatus, setSyncStatus] = useState<any>(null)
+  const [amazonFile, setAmazonFile] = useState<File | null>(null)
+  const [isUploadingCsv, setIsUploadingCsv] = useState(false)
   const wasRunningRef = useRef(false)
 
   const showNotification = (message: string, description?: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -68,6 +71,28 @@ export function ImportClient({ marketplaces }: { marketplaces: any[] }) {
     const intervalId = setInterval(checkStatus, 2000)
     return () => clearInterval(intervalId)
   }, [selectedMarketplace, router])
+
+  const handleAmazonCsvUpload = async () => {
+    if (!amazonFile || !selectedMarketplace) return
+    setIsUploadingCsv(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', amazonFile)
+      formData.append('integrationId', selectedMarketplace)
+      
+      const res = await importAmazonCsvAction(formData)
+      if (res.error) {
+        showNotification('Fehler beim CSV-Import', res.error, 'error')
+      } else {
+        showNotification('Import erfolgreich', res.message, 'success')
+        setAmazonFile(null)
+      }
+    } catch (e: any) {
+      showNotification('Fehler beim Upload', e.message, 'error')
+    } finally {
+      setIsUploadingCsv(false)
+    }
+  }
 
   const handleImport = async () => {
     if (!selectedMarketplace) return
