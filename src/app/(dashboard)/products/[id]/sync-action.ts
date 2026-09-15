@@ -8,11 +8,11 @@ export async function triggerProductSync(productId: string, sku: string, current
   const { pushUpdatesToMarketplaces } = await import('@/workers/product-sync')
   
   // Await the push so the UI can wait for it and show loading state
-  await pushUpdatesToMarketplaces(auth.activeCompanyId, [{
+  const result = await pushUpdatesToMarketplaces(auth.activeCompanyId, [{
     sku,
     stock: Math.max(0, currentStock || 0),
     price: price || 0
   }])
   
-  return { success: true }
+  return { success: true, ...result }
 }

@@ -20,13 +20,20 @@ export function SyncButton({ productId, sku, currentStock, price }: { productId:
     showToast('Synchronisierung an Marktplätze gestartet...', 'info')
     startTransition(async () => {
       try {
-        await triggerProductSync(productId, sku, currentStock, price)
-        setSynced(true)
-        showToast('Erfolgreich an alle aktiven Marktplätze gesendet!', 'success')
-        setTimeout(() => setSynced(false), 3000)
+        const result = await triggerProductSync(productId, sku, currentStock, price)
+        if (result.failedMarketplaces && result.failedMarketplaces.length > 0) {
+          const errors = result.failedMarketplaces.map((f: any) => `${f.name}: ${f.error}`).join(' | ')
+          showToast(`Fehler bei: ${errors}`, 'error')
+        } else if (result.activeMarketplaces && result.activeMarketplaces.length > 0) {
+          setSynced(true)
+          showToast('Erfolgreich an alle aktiven Marktplätze gesendet!', 'success')
+          setTimeout(() => setSynced(false), 3000)
+        } else {
+          showToast('Keine aktiven Marktplätze für diesen Artikel konfiguriert.', 'info')
+        }
       } catch (error) {
         console.error('Failed to sync:', error)
-        showToast('Fehler bei der Synchronisierung. Bitte Logs prüfen.', 'error')
+        showToast('Systemfehler bei der Synchronisierung.', 'error')
       }
     })
   }
