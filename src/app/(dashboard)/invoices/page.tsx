@@ -10,6 +10,7 @@ import { InvoiceList } from './invoice-list'
 import { IncomingInvoiceList } from './incoming-invoice-list'
 import { GenerateMissingButton } from './generate-missing-button'
 import { DraftsDropdown } from './drafts-dropdown'
+import { DatevExportDialog } from './datev-export-dialog'
 import { getDraftsAction } from '@/app/actions/manual-invoice'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { companies } from '@/db/schema/companies'
@@ -199,6 +200,7 @@ export default async function InvoicesPage({
           <p className="text-slate-500">Übersicht aller generierten Rechnungen und Ausgaben.</p>
         </div>
         <div className="flex gap-3">
+          <DatevExportDialog />
           <Link 
             href="/invoices/import"
             className="inline-flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-slate-800 transition-all shadow-sm"

@@ -1,7 +1,7 @@
 import { requireAuth } from '@/lib/session'
 import { db } from '@/db/client'
 import { products, productMappings } from '@/db/schema/products'
-import { eq, isNull } from 'drizzle-orm'
+import { eq, isNull, and } from 'drizzle-orm'
 import Link from 'next/link'
 import { Plus, Package, Settings, ServerCrash, AlertTriangle, Info, History } from 'lucide-react'
 import { CsvActions } from './csv-actions'

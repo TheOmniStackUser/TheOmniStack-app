@@ -13,10 +13,11 @@ import type { HermesConfig } from '@/app/(dashboard)/integrations/hermes-form'
 import type { DhlConfig } from '@/app/(dashboard)/integrations/dhl-form'
 import Link from 'next/link'
 
+import { ManufacturerCsvDialog } from './manufacturer-csv-dialog'
+
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
   const auth = await requireAuth()
   const params = await searchParams
-
   // Parse URL parameters
   const page = parseInt(params.page as string || '1', 10)
   const pageSize = parseInt(params.pageSize as string || '25', 10)
@@ -407,8 +408,13 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   return (
     <div className="max-w-[1600px] mx-auto">
       <header className="mb-8">
-        <h2 className="text-3xl font-bold text-gray-900">Bestellungen</h2>
-        <p className="text-gray-500 mt-2">Alle importierten Bestellungen im Überblick.</p>
+        <div className="flex justify-between items-start">
+          <div>
+            <h2 className="text-3xl font-bold text-gray-900">Bestellungen</h2>
+            <p className="text-gray-500 mt-2">Alle importierten Bestellungen im Überblick.</p>
+          </div>
+          <ManufacturerCsvDialog />
+        </div>
         
         <div className="mt-6 grid grid-cols-2 md:grid-cols-7 gap-4">
           <Link href="/orders" className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all">
