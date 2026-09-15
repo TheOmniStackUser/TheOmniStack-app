@@ -84,6 +84,7 @@ export async function saveOttoIntegrationAction(
         clientSecret, 
         environment, 
         metadata: { ...existingMetadata, ...metadata }, 
+        isActive: true,
         updatedAt: new Date() 
       })
       .where(eq(marketplaceIntegrations.id, existing.id))
@@ -158,6 +159,7 @@ export async function saveHermesIntegrationAction(
         clientId, 
         clientSecret: finalSecret, 
         metadata: metadata ?? existing.metadata,
+        isActive: true,
         updatedAt: new Date() 
       })
       .where(eq(marketplaceIntegrations.id, existing.id))
@@ -251,7 +253,7 @@ export async function saveMiraklIntegrationAction(
   if (existing) {
     await db
       .update(marketplaceIntegrations)
-      .set({ clientId, clientSecret, environment, apiKey, metadata: finalMetadata, updatedAt: new Date() })
+      .set({ clientId, clientSecret, environment, apiKey, metadata: finalMetadata,isActive: true, updatedAt: new Date() })
       .where(eq(marketplaceIntegrations.id, existing.id))
   } else {
     await db
@@ -311,7 +313,7 @@ export async function saveAmazonIntegrationAction(
   if (existing) {
     await db
       .update(marketplaceIntegrations)
-      .set({ sellerId, clientId, clientSecret, refreshToken, updatedAt: new Date() })
+      .set({ sellerId, clientId, clientSecret, refreshToken, isActive: true, updatedAt: new Date() })
       .where(eq(marketplaceIntegrations.id, existing.id))
   } else {
     await db
@@ -362,7 +364,7 @@ export async function saveDhlIntegrationAction(
   if (existing) {
     await db
       .update(marketplaceIntegrations)
-      .set({ metadata: config, updatedAt: new Date() })
+      .set({ metadata: config,isActive: true, updatedAt: new Date() })
       .where(eq(marketplaceIntegrations.id, existing.id))
   } else {
     await db
@@ -444,7 +446,7 @@ export async function saveShopifyIntegrationAction(
   if (existing) {
     await db
       .update(marketplaceIntegrations)
-      .set({ environment, clientId, clientSecret, updatedAt: new Date() })
+      .set({ environment, clientId, clientSecret,isActive: true, updatedAt: new Date() })
       .where(eq(marketplaceIntegrations.id, existing.id))
   } else {
     await db
@@ -498,7 +500,7 @@ export async function saveAboutYouIntegrationAction(
   if (existing) {
     await db
       .update(marketplaceIntegrations)
-      .set({ apiKey, environment, updatedAt: new Date() })
+      .set({ apiKey, environment,isActive: true, updatedAt: new Date() })
       .where(eq(marketplaceIntegrations.id, existing.id))
   } else {
     await db
@@ -553,7 +555,7 @@ export async function saveKauflandIntegrationAction(
   if (existing) {
     await db
       .update(marketplaceIntegrations)
-      .set({ clientId, clientSecret, environment, updatedAt: new Date() })
+      .set({ clientId, clientSecret, environment,isActive: true, updatedAt: new Date() })
       .where(eq(marketplaceIntegrations.id, existing.id))
   } else {
     await db
@@ -610,7 +612,7 @@ export async function saveEtsyIntegrationAction(
   if (existing) {
     await db
       .update(marketplaceIntegrations)
-      .set({ clientId, clientSecret, updatedAt: new Date() })
+      .set({ clientId, clientSecret,isActive: true, updatedAt: new Date() })
       .where(eq(marketplaceIntegrations.id, existing.id))
   } else {
     await db
@@ -690,7 +692,7 @@ export async function saveWooCommerceIntegrationAction(
   if (existing) {
     await db
       .update(marketplaceIntegrations)
-      .set({ environment, clientId, clientSecret, updatedAt: new Date() })
+      .set({ environment, clientId, clientSecret,isActive: true, updatedAt: new Date() })
       .where(eq(marketplaceIntegrations.id, existing.id))
   } else {
     await db
@@ -771,7 +773,7 @@ export async function saveShopwareIntegrationAction(
   if (existing) {
     await db
       .update(marketplaceIntegrations)
-      .set({ environment, clientId, clientSecret, updatedAt: new Date() })
+      .set({ environment, clientId, clientSecret,isActive: true, updatedAt: new Date() })
       .where(eq(marketplaceIntegrations.id, existing.id))
   } else {
     await db
@@ -897,7 +899,8 @@ export async function disconnectIntegrationAction(type: string, id?: string) {
 
   if (id) {
     await db
-      .delete(marketplaceIntegrations)
+      .update(marketplaceIntegrations)
+      .set({ isActive: false, accessToken: null, refreshToken: null, clientSecret: null })
       .where(
         and(
           eq(marketplaceIntegrations.companyId, activeCompanyId),
@@ -906,7 +909,8 @@ export async function disconnectIntegrationAction(type: string, id?: string) {
       )
   } else {
     await db
-      .delete(marketplaceIntegrations)
+      .update(marketplaceIntegrations)
+      .set({ isActive: false, accessToken: null, refreshToken: null, clientSecret: null })
       .where(
         and(
           eq(marketplaceIntegrations.companyId, activeCompanyId),

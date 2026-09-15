@@ -99,8 +99,8 @@ export default async function IntegrationsPage(props: {
       }
     })
 
-  const ottoIntegration = integrations.find((i: any) => i.type === 'otto')
-  const customMiraklIntegrations = integrations.filter((i: any) => i.type === 'mirakl_custom')
+  const ottoIntegration = integrations.find((i: any) => i.type === 'otto' && i.isActive)
+  const customMiraklIntegrations = integrations.filter((i: any) => i.type === 'mirakl_custom' && i.isActive)
 
   return (
     <div className="max-w-4xl">
@@ -235,7 +235,7 @@ export default async function IntegrationsPage(props: {
                   <span className="text-[#F16521] font-black text-xs tracking-tighter">Etsy</span>
                 </div>
               }
-              badge={integrations.find((i: any) => i.type === 'etsy')?.accessToken ? (
+              badge={integrations.find((i: any) => i.type === 'etsy' && i.isActive)?.accessToken ? (
                 <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
                   <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                   Verbunden
@@ -249,9 +249,9 @@ export default async function IntegrationsPage(props: {
               <div className="p-6 bg-gray-50">
                 <EtsyIntegrationForm 
                   companyId={auth.activeCompanyId}
-                  initialClientId={integrations.find((i: any) => i.type === 'etsy')?.clientId || ''}
-                  initialClientSecret={integrations.find((i: any) => i.type === 'etsy')?.clientSecret || ''}
-                  isConnected={!!integrations.find((i: any) => i.type === 'etsy')?.accessToken}
+                  initialClientId={integrations.find((i: any) => i.type === 'etsy' && i.isActive)?.clientId || ''}
+                  initialClientSecret={integrations.find((i: any) => i.type === 'etsy' && i.isActive)?.clientSecret || ''}
+                  isConnected={!!integrations.find((i: any) => i.type === 'etsy' && i.isActive)?.accessToken}
                 />
               </div>
             </CollapsibleSection>
@@ -265,7 +265,7 @@ export default async function IntegrationsPage(props: {
                   <span className="text-[#FF9900] font-black text-[10px] tracking-tighter">amazon</span>
                 </div>
               }
-              badge={integrations.find((i: any) => i.type === 'amazon')?.refreshToken ? (
+              badge={integrations.find((i: any) => i.type === 'amazon' && i.isActive)?.refreshToken ? (
                 <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
                   <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                   Verbunden
@@ -278,9 +278,9 @@ export default async function IntegrationsPage(props: {
             >
               <div className="p-6 bg-gray-50">
                 <AmazonIntegrationForm 
-                  initialSellerId={integrations.find((i: any) => i.type === 'amazon')?.sellerId || ''}
+                  initialSellerId={integrations.find((i: any) => i.type === 'amazon' && i.isActive)?.sellerId || ''}
                   companyId={auth.activeCompanyId}
-                  initialImportFba={(integrations.find((i: any) => i.type === 'amazon')?.metadata as any)?.importFba || false}
+                  initialImportFba={(integrations.find((i: any) => i.type === 'amazon' && i.isActive)?.metadata as any)?.importFba || false}
                 />
               </div>
             </CollapsibleSection>
@@ -294,7 +294,7 @@ export default async function IntegrationsPage(props: {
                   <span className="text-green-800 font-black text-xs tracking-tighter">Shopify</span>
                 </div>
               }
-              badge={integrations.find((i: any) => i.type === 'shopify')?.accessToken ? (
+              badge={integrations.find((i: any) => i.type === 'shopify' && i.isActive)?.accessToken ? (
                 <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
                   <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                   Verbunden
@@ -307,7 +307,7 @@ export default async function IntegrationsPage(props: {
             >
               <div className="p-6 bg-gray-50">
                 <ShopifyIntegrationForm
-                  initialData={integrations.find((i: any) => i.type === 'shopify')}
+                  initialData={integrations.find((i: any) => i.type === 'shopify' && i.isActive)}
                 />
               </div>
             </CollapsibleSection>
@@ -322,7 +322,7 @@ export default async function IntegrationsPage(props: {
                   <span className="text-white font-black text-[9px] uppercase tracking-tighter leading-none mt-0.5">You</span>
                 </div>
               }
-              badge={integrations.find((i: any) => i.type === 'aboutyou')?.apiKey ? (
+              badge={integrations.find((i: any) => i.type === 'aboutyou' && i.isActive)?.apiKey ? (
                 <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
                   <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                   Verbunden
@@ -335,8 +335,8 @@ export default async function IntegrationsPage(props: {
             >
               <div className="p-6 bg-gray-50">
                 <AboutYouIntegrationForm 
-                  initialApiKey={integrations.find((i: any) => i.type === 'aboutyou')?.apiKey || ''}
-                  initialEnvironment={integrations.find((i: any) => i.type === 'aboutyou')?.environment || 'production'}
+                  initialApiKey={integrations.find((i: any) => i.type === 'aboutyou' && i.isActive)?.apiKey || ''}
+                  initialEnvironment={integrations.find((i: any) => i.type === 'aboutyou' && i.isActive)?.environment || 'production'}
                 />
               </div>
             </CollapsibleSection>
@@ -350,7 +350,7 @@ export default async function IntegrationsPage(props: {
                   <span className="text-red-600 font-black text-[9px] tracking-tighter">Kaufland</span>
                 </div>
               }
-              badge={integrations.find((i: any) => i.type === 'kaufland')?.clientId ? (
+              badge={integrations.find((i: any) => i.type === 'kaufland' && i.isActive)?.clientId ? (
                 <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
                   <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                   Verbunden
@@ -363,8 +363,8 @@ export default async function IntegrationsPage(props: {
             >
               <div className="p-6 bg-gray-50">
                 <KauflandIntegrationForm 
-                  initialClientId={integrations.find((i: any) => i.type === 'kaufland')?.clientId || ''}
-                  initialEnvironment={integrations.find((i: any) => i.type === 'kaufland')?.environment || 'production'}
+                  initialClientId={integrations.find((i: any) => i.type === 'kaufland' && i.isActive)?.clientId || ''}
+                  initialEnvironment={integrations.find((i: any) => i.type === 'kaufland' && i.isActive)?.environment || 'production'}
                 />
               </div>
             </CollapsibleSection>
@@ -383,7 +383,7 @@ export default async function IntegrationsPage(props: {
                   </span>
                 </div>
               }
-              badge={integrations.find((i: any) => i.type === 'ebay')?.refreshToken ? (
+              badge={integrations.find((i: any) => i.type === 'ebay' && i.isActive)?.refreshToken ? (
                 <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
                   <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                   Verbunden
@@ -397,7 +397,7 @@ export default async function IntegrationsPage(props: {
               <div className="p-6 bg-gray-50">
                 <EbayIntegrationForm 
                   companyId={auth.activeCompanyId}
-                  isConnected={!!integrations.find((i: any) => i.type === 'ebay')?.refreshToken}
+                  isConnected={!!integrations.find((i: any) => i.type === 'ebay' && i.isActive)?.refreshToken}
                 />
               </div>
             </CollapsibleSection>
@@ -410,7 +410,7 @@ export default async function IntegrationsPage(props: {
                   <span className="text-[#0082C3] font-black text-[8px] tracking-tighter">DECATHLON</span>
                 </div>
               }
-              badge={integrations.find((i: any) => i.type === 'mirakl_decathlon')?.clientId ? (
+              badge={integrations.find((i: any) => i.type === 'mirakl_decathlon' && i.isActive)?.clientId ? (
                 <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
                   <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                   Verbunden
@@ -423,13 +423,13 @@ export default async function IntegrationsPage(props: {
             >
               <div className="p-6 bg-gray-50">
                 <MiraklIntegrationForm 
-                  key={`mirakl_decathlon_${integrations.find((i: any) => i.type === 'mirakl_decathlon')?.updatedAt?.getTime() || 'new'}`}
+                  key={`mirakl_decathlon_${integrations.find((i: any) => i.type === 'mirakl_decathlon' && i.isActive)?.updatedAt?.getTime() || 'new'}`}
                   type="mirakl_decathlon"
-                  initialClientId={integrations.find((i: any) => i.type === 'mirakl_decathlon')?.clientId || ''}
-                  initialClientSecret={integrations.find((i: any) => i.type === 'mirakl_decathlon')?.clientSecret || ''} 
-                  initialEnvironment={integrations.find((i: any) => i.type === 'mirakl_decathlon')?.environment || ''}
-                  initialApiKey={integrations.find((i: any) => i.type === 'mirakl_decathlon')?.apiKey || ''}
-                  initialShopId={(integrations.find((i: any) => i.type === 'mirakl_decathlon')?.metadata as any)?.shopId || ''}
+                  initialClientId={integrations.find((i: any) => i.type === 'mirakl_decathlon' && i.isActive)?.clientId || ''}
+                  initialClientSecret={integrations.find((i: any) => i.type === 'mirakl_decathlon' && i.isActive)?.clientSecret || ''} 
+                  initialEnvironment={integrations.find((i: any) => i.type === 'mirakl_decathlon' && i.isActive)?.environment || ''}
+                  initialApiKey={integrations.find((i: any) => i.type === 'mirakl_decathlon' && i.isActive)?.apiKey || ''}
+                  initialShopId={(integrations.find((i: any) => i.type === 'mirakl_decathlon' && i.isActive)?.metadata as any)?.shopId || ''}
                 />
               </div>
             </CollapsibleSection>
@@ -500,7 +500,7 @@ export default async function IntegrationsPage(props: {
                   <span className="text-[#96588a] font-black text-[8px] tracking-tighter">WooCommerce</span>
                 </div>
               }
-              badge={integrations.find((i: any) => i.type === 'woocommerce')?.clientId ? (
+              badge={integrations.find((i: any) => i.type === 'woocommerce' && i.isActive)?.clientId ? (
                 <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
                   <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                   Verbunden
@@ -513,8 +513,8 @@ export default async function IntegrationsPage(props: {
             >
               <div className="p-6 bg-gray-50">
                 <WooCommerceIntegrationForm
-                  initialEnvironment={integrations.find((i: any) => i.type === 'woocommerce')?.environment || ''}
-                  initialClientId={integrations.find((i: any) => i.type === 'woocommerce')?.clientId || ''}
+                  initialEnvironment={integrations.find((i: any) => i.type === 'woocommerce' && i.isActive)?.environment || ''}
+                  initialClientId={integrations.find((i: any) => i.type === 'woocommerce' && i.isActive)?.clientId || ''}
                 />
               </div>
             </CollapsibleSection>
@@ -528,7 +528,7 @@ export default async function IntegrationsPage(props: {
                   <span className="text-[#189EFF] font-black text-[8px] tracking-tighter">Shopware</span>
                 </div>
               }
-              badge={integrations.find((i: any) => i.type === 'shopware')?.clientId ? (
+              badge={integrations.find((i: any) => i.type === 'shopware' && i.isActive)?.clientId ? (
                 <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
                   <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                   Verbunden
@@ -541,8 +541,8 @@ export default async function IntegrationsPage(props: {
             >
               <div className="p-6 bg-gray-50">
                 <ShopwareIntegrationForm
-                  initialEnvironment={integrations.find((i: any) => i.type === 'shopware')?.environment || ''}
-                  initialClientId={integrations.find((i: any) => i.type === 'shopware')?.clientId || ''}
+                  initialEnvironment={integrations.find((i: any) => i.type === 'shopware' && i.isActive)?.environment || ''}
+                  initialClientId={integrations.find((i: any) => i.type === 'shopware' && i.isActive)?.clientId || ''}
                 />
               </div>
             </CollapsibleSection>
@@ -565,7 +565,7 @@ export default async function IntegrationsPage(props: {
                   <span className="text-gray-900 font-black text-sm tracking-tighter">DHL</span>
                 </div>
               }
-              badge={(integrations.find((i: any) => i.type === 'dhl')?.metadata as any)?.username ? (
+              badge={(integrations.find((i: any) => i.type === 'dhl' && i.isActive)?.metadata as any)?.username ? (
                 <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
                   <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                   Konfiguriert
@@ -578,7 +578,7 @@ export default async function IntegrationsPage(props: {
             >
               <div className="p-6 bg-gray-50">
                 <DhlIntegrationForm
-                  initialConfig={(integrations.find((i: any) => i.type === 'dhl')?.metadata as DhlConfig) ?? undefined}
+                  initialConfig={(integrations.find((i: any) => i.type === 'dhl' && i.isActive)?.metadata as DhlConfig) ?? undefined}
                   activeMarketplaces={activeMarketplacesList}
                 />
               </div>
@@ -593,7 +593,7 @@ export default async function IntegrationsPage(props: {
                   <span className="text-[#005A9C] font-black text-xs tracking-tight">Hermes</span>
                 </div>
               }
-              badge={integrations.find((i: any) => i.type === 'hermes')?.clientId ? (
+              badge={integrations.find((i: any) => i.type === 'hermes' && i.isActive)?.clientId ? (
                 <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
                   <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                   Aktiv
@@ -606,8 +606,8 @@ export default async function IntegrationsPage(props: {
             >
               <div className="p-6 bg-gray-50 flex justify-center">
                 <HermesIntegrationForm 
-                  initialClientId={integrations.find((i: any) => i.type === 'hermes')?.clientId || ''}
-                  initialConfig={(integrations.find((i: any) => i.type === 'hermes')?.metadata as any) ?? undefined}
+                  initialClientId={integrations.find((i: any) => i.type === 'hermes' && i.isActive)?.clientId || ''}
+                  initialConfig={(integrations.find((i: any) => i.type === 'hermes' && i.isActive)?.metadata as any) ?? undefined}
                   activeMarketplaces={activeMarketplacesList}
                 />
               </div>

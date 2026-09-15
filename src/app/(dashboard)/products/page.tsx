@@ -30,6 +30,8 @@ export default async function ProductsPage() {
 
     // Fetch all mappings to include their SKUs and EANs in the client search
 
+  const { marketplaceIntegrations } = await import('@/db/schema/integrations')
+  
   const allMappings = await db
     .select({
       productId: productMappings.productId,
@@ -40,7 +42,13 @@ export default async function ProductsPage() {
       marketplace: productMappings.marketplace,
     })
     .from(productMappings)
-    .where(eq(productMappings.companyId, auth.activeCompanyId))
+    .innerJoin(marketplaceIntegrations, eq(productMappings.integrationId, marketplaceIntegrations.id))
+    .where(
+      and(
+        eq(productMappings.companyId, auth.activeCompanyId),
+        eq(marketplaceIntegrations.isActive, true)
+      )
+    )
 
   const productsWithMappings = productList.map(p => {
     const pMappings = allMappings.filter(m => m.productId === p.id)

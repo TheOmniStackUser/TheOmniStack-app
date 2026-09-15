@@ -38,9 +38,30 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
   // Fetch Mappings
   const mappings = await db
-    .select()
+    .select({
+      id: productMappings.id,
+      productId: productMappings.productId,
+      companyId: productMappings.companyId,
+      marketplace: productMappings.marketplace,
+      integrationId: productMappings.integrationId,
+      marketplaceSku: productMappings.marketplaceSku,
+      marketplaceProductId: productMappings.marketplaceProductId,
+      ean: productMappings.ean,
+      syncStock: productMappings.syncStock,
+      syncPrice: productMappings.syncPrice,
+      priceModifierType: productMappings.priceModifierType,
+      priceModifierValue: productMappings.priceModifierValue,
+      createdAt: productMappings.createdAt,
+      updatedAt: productMappings.updatedAt
+    })
     .from(productMappings)
-    .where(eq(productMappings.productId, product.id))
+    .innerJoin(marketplaceIntegrations, eq(productMappings.integrationId, marketplaceIntegrations.id))
+    .where(
+      and(
+        eq(productMappings.productId, product.id),
+        eq(marketplaceIntegrations.isActive, true)
+      )
+    )
 
   // Fetch Integrations
   const integrations = await db
