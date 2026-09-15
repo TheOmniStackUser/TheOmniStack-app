@@ -540,7 +540,13 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                 showToast('Sync wird gestartet...', 'info');
                 try {
                   const result = await triggerMarketplaceSyncForProducts(Array.from(selectedProductIds));
-                  showToast(`Sync für ${result.totalUpdatesSent} Updates gestartet!`, 'success');
+                  if (result.failedMarketplaces && result.failedMarketplaces.length > 0) {
+                    showToast(`Sync für ${result.totalUpdatesSent} Updates teilweise fehlgeschlagen (${result.failedMarketplaces.join(', ')})`, 'error');
+                  } else if (result.totalUpdatesSent > 0) {
+                    showToast(`Sync für ${result.totalUpdatesSent} Updates erfolgreich!`, 'success');
+                  } else {
+                    showToast(`Keine Marktplätze für Sync konfiguriert oder aktiv.`, 'info');
+                  }
                   setSelectedProductIds(new Set());
                 } catch (error) {
                   showToast('Fehler beim Sync', 'error');
@@ -693,7 +699,31 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                             {openMenuId === product.id && (
                               <>
                                 <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); }} />
-                                <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-xl shadow-lg border border-slate-200 py-1.5 z-50 text-left overflow-hidden">
+                                <div className="absolute right-0 top-full mt-1 w-64 bg-white rounded-xl shadow-lg border border-slate-200 py-1.5 z-50 text-left overflow-hidden">
+                                  <button 
+                                    onClick={async (e) => { 
+                                      e.stopPropagation();
+                                      setOpenMenuId(null);
+                                      showToast('Sync wird gestartet...', 'info');
+                                      try {
+                                        const { triggerMarketplaceSyncForProducts } = await import('@/app/actions/products');
+                                        const result = await triggerMarketplaceSyncForProducts([product.id]);
+                                        if (result.failedMarketplaces && result.failedMarketplaces.length > 0) {
+                                          showToast(`Sync teilweise fehlgeschlagen (${result.failedMarketplaces.join(', ')})`, 'error');
+                                        } else if (result.totalUpdatesSent > 0) {
+                                          showToast(`Sync erfolgreich!`, 'success');
+                                        } else {
+                                          showToast(`Keine Marktplätze für Sync konfiguriert.`, 'info');
+                                        }
+                                      } catch (error) {
+                                        showToast('Fehler beim Sync', 'error');
+                                      }
+                                    }}
+                                    className="w-full text-left px-4 py-2.5 text-sm transition-colors font-medium text-slate-700 hover:bg-slate-50 border-b border-slate-100 flex items-center gap-2"
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-500"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.59-9.21l5.67-1.35"/></svg>
+                                    Jetzt synchronisieren
+                                  </button>
                                   <button 
                                     onClick={(e) => { e.stopPropagation(); if (product.hasSyncStockOff) handleToggleSync(product.id, 'stock', true); }}
                                     disabled={!product.hasSyncStockOff}
