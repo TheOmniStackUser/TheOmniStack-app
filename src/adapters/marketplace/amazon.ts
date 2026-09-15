@@ -178,6 +178,32 @@ export class AmazonAdapter implements MarketplaceAdapter {
     // Default tax calculation if not provided by SP-API
     const taxAmount = totalAmount - (totalAmount / 1.19) // Exact 19% back-calculation or 0 if unknown
 
+    let street = rawOrder.ShippingAddress?.AddressLine1 || '';
+    let addressAddition = rawOrder.ShippingAddress?.AddressLine2 || undefined;
+    let company = rawOrder.ShippingAddress?.CompanyName || undefined;
+    const addressLine3 = rawOrder.ShippingAddress?.AddressLine3 || undefined;
+
+    const hasNoNumber = (str: string) => !/\d/.test(str);
+    const hasLetterAndNumber = (str: string) => /[a-zA-ZäöüßÄÖÜ]/.test(str) && /\d/.test(str);
+
+    if (street && addressAddition && hasNoNumber(street) && hasLetterAndNumber(addressAddition) && addressAddition.length > 4) {
+      if (!company) {
+        company = street;
+        street = addressAddition;
+        addressAddition = addressLine3 || undefined;
+      } else {
+        const temp = street;
+        street = addressAddition;
+        addressAddition = temp + (addressLine3 ? `, ${addressLine3}` : '');
+      }
+    } else {
+      if (addressAddition && addressLine3) {
+        addressAddition = `${addressAddition}, ${addressLine3}`;
+      } else if (!addressAddition && addressLine3) {
+        addressAddition = addressLine3;
+      }
+    }
+
     return {
       marketplaceOrderId: rawOrder.AmazonOrderId,
       marketplace: 'amazon',
@@ -189,10 +215,10 @@ export class AmazonAdapter implements MarketplaceAdapter {
       },
       shippingAddress: {
         name: rawOrder.ShippingAddress?.Name || '',
-        company: rawOrder.ShippingAddress?.CompanyName || undefined,
-        addressAddition: rawOrder.ShippingAddress?.AddressLine2 || undefined,
+        company,
+        addressAddition,
         phone: rawOrder.ShippingAddress?.Phone || undefined,
-        street: rawOrder.ShippingAddress?.AddressLine1 || '',
+        street,
         city: rawOrder.ShippingAddress?.City || '',
         zip: rawOrder.ShippingAddress?.PostalCode || '',
         country: rawOrder.ShippingAddress?.CountryCode || 'DE',
