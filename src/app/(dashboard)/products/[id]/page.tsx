@@ -13,6 +13,7 @@ import { ArrowLeft, Save, Package, Link as LinkIcon, Settings2, Trash2 } from 'l
 import { notFound } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { after } from 'next/server'
+import { SyncButton } from './sync-button'
 
 export const metadata = {
   title: 'Produkt bearbeiten - TheOmniStack',
@@ -136,23 +137,24 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
   return (
     <ProductFormClient action={saveProduct}>
-      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-        <div>
+      <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+        <div className="flex-1 min-w-0">
           <Link href="/products" className="inline-flex items-center text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors mb-2">
             <ArrowLeft className="w-4 h-4 mr-1" />
             Zurück zur Übersicht
           </Link>
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
-              {product.title}
-            </h1>
-            <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-sm font-bold font-mono">
-              {product.sku}
-            </span>
-          </div>
+          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight truncate whitespace-normal">
+            {product.title}
+          </h1>
         </div>
 
-        <SubmitButton />
+        <div className="flex flex-wrap items-center gap-3 shrink-0">
+          <span className="px-4 py-2.5 bg-slate-50 text-slate-700 rounded-xl text-sm font-bold font-mono border border-slate-200 flex items-center justify-center">
+            {product.sku}
+          </span>
+          <SyncButton productId={product.id} sku={product.sku} currentStock={Number(product.currentStock || 0)} price={Number(product.price || 0)} />
+          <SubmitButton />
+        </div>
       </header>
 
       <div key={`product-form-${product.updatedAt ? new Date(product.updatedAt).getTime() : ''}`} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
