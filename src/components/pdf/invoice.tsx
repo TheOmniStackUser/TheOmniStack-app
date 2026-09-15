@@ -2,6 +2,17 @@ import React from 'react'
 import { Page, Text, View, Document, StyleSheet, Image, Font } from '@react-pdf/renderer'
 import { format } from 'date-fns'
 
+const decodeHtmlEntities = (text?: string) => {
+  if (!text) return text || ''
+  return text
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(Number(dec)))
+}
+
 const styles = StyleSheet.create({
   page: { 
     padding: '40px 50px 100px 50px', 
@@ -325,11 +336,11 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
           <View style={styles.leftCol}>
             <Text style={styles.senderLine}>{senderLineText}</Text>
             <View style={styles.recipientBlock}>
-              {recipient.company && <Text style={styles.bold}>{recipient.company}</Text>}
-              {recipient.addressAddition && <Text style={styles.bold}>{recipient.addressAddition}</Text>}
-              {!!recipient.name && <Text style={styles.bold}>{recipient.name}</Text>}
-              {!!recipient.street && <Text style={styles.bold}>{recipient.street}</Text>}
-              <Text style={styles.bold}>{recipient.zip} {recipient.city}</Text>
+              {recipient.company && <Text style={styles.bold}>{decodeHtmlEntities(recipient.company)}</Text>}
+              {recipient.addressAddition && <Text style={styles.bold}>{decodeHtmlEntities(recipient.addressAddition)}</Text>}
+              {!!recipient.name && <Text style={styles.bold}>{decodeHtmlEntities(recipient.name)}</Text>}
+              {!!recipient.street && <Text style={styles.bold}>{decodeHtmlEntities(recipient.street)}</Text>}
+              <Text style={styles.bold}>{recipient.zip} {decodeHtmlEntities(recipient.city)}</Text>
               <Text style={styles.bold}>{countryDisplay}</Text>
               {recipient.phone && <Text style={{ ...styles.bold, marginTop: 5 }}>Tel: {recipient.phone}</Text>}
             </View>
@@ -466,9 +477,9 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
               <Text style={styles.colPos}>{idx + 1}</Text>
               <View style={styles.colSkuTitle}>
                 {item.sku && (
-                  <Text style={styles.bold}>{item.sku}</Text>
+                  <Text style={styles.bold}>{decodeHtmlEntities(item.sku)}</Text>
                 )}
-                <Text>{item.title}</Text>
+                <Text>{decodeHtmlEntities(item.title)}</Text>
               </View>
               <Text style={styles.colMenge}>{String(item.quantity).replace('.', ',')}</Text>
               <Text style={styles.colTax}>{Number((item.taxRate * 100).toFixed(2))}%</Text>
@@ -482,7 +493,7 @@ export const InvoiceDocument: React.FC<InvoiceProps> = ({
           <View style={{ flex: 1, marginRight: 20 }}>
             <View style={{ fontSize: 8 }}>
               {cancelsInvoiceNumber ? null : (customText !== undefined ? (
-                customText.split('\n').map((line, i) => (
+                decodeHtmlEntities(customText).split('\n').map((line, i) => (
                   <Text key={i} style={{ marginBottom: 2 }}>{line}</Text>
                 ))
               ) : (
