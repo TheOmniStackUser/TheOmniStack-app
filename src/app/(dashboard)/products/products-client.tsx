@@ -535,6 +535,23 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
               Zolldaten setzen
             </button>
             <button
+              onClick={async () => {
+                const { triggerMarketplaceSyncForProducts } = await import('@/app/actions/products');
+                showToast('Sync wird gestartet...', 'info');
+                try {
+                  const result = await triggerMarketplaceSyncForProducts(Array.from(selectedProductIds));
+                  showToast(`Sync für ${result.totalUpdatesSent} Updates gestartet!`, 'success');
+                  setSelectedProductIds(new Set());
+                } catch (error) {
+                  showToast('Fehler beim Sync', 'error');
+                }
+              }}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors text-sm font-semibold border border-emerald-200"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.59-9.21l5.67-1.35"/></svg>
+              Jetzt synchronisieren
+            </button>
+            <button
               onClick={() => setShowBulkDeleteConfirm(true)}
               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors text-sm font-semibold border border-rose-200"
             >

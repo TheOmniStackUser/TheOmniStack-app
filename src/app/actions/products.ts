@@ -798,6 +798,42 @@ export async function triggerGlobalMarketplaceSync() {
   return await pushUpdatesToMarketplaces(auth.activeCompanyId, updates)
 }
 
+export async function triggerMarketplaceSyncForProducts(productIds: string[]) {
+  const auth = await requireAuth()
+  
+  if (!productIds || productIds.length === 0) return { totalUpdatesSent: 0, activeMarketplaces: [], failedMarketplaces: [] }
+
+  const { inArray, and } = await import('drizzle-orm')
+
+  const selectedProducts = await db
+    .select({
+      sku: products.sku,
+      currentStock: products.currentStock,
+      price: products.price
+    })
+    .from(products)
+    .where(
+      and(
+        eq(products.companyId, auth.activeCompanyId),
+        inArray(products.id, productIds)
+      )
+    )
+
+  if (selectedProducts.length === 0) return { totalUpdatesSent: 0, activeMarketplaces: [], failedMarketplaces: [] }
+
+  // Prepare updates payload
+  const updates = selectedProducts.map(p => ({
+    sku: p.sku,
+    stock: p.currentStock !== null && p.currentStock !== undefined ? Number(p.currentStock) : undefined,
+    price: p.price !== null && p.price !== undefined ? Number(p.price) : undefined
+  }))
+
+  const { pushUpdatesToMarketplaces } = await import('@/workers/product-sync')
+
+  // Push all updates. pushUpdatesToMarketplaces groups them by integration
+  return await pushUpdatesToMarketplaces(auth.activeCompanyId, updates)
+}
+
 export async function getAutoMappableProducts() {
   const auth = await requireAuth()
 
