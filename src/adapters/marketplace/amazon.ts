@@ -14,6 +14,20 @@ export class AmazonAdapter implements MarketplaceAdapter {
   private readonly baseUrl = 'https://sellingpartnerapi-eu.amazon.com'
   private readonly marketplaceId = 'A1PA6795UKMFR9' // Default Amazon.de
 
+  
+  private escapeXml(unsafe: string): string {
+    return unsafe.replace(/[<>&'"]/g, function (c) {
+      switch (c) {
+        case '<': return '&lt;';
+        case '>': return '&gt;';
+        case '&': return '&amp;';
+        case '\'': return '&apos;';
+        case '"': return '&quot;';
+      }
+      return c;
+    });
+  }
+
   constructor(private readonly config: AmazonAdapterConfig) {}
 
   private async getAccessToken(): Promise<string> {
@@ -424,6 +438,67 @@ export class AmazonAdapter implements MarketplaceAdapter {
   /**
    * Sync inventory and/or prices back to Amazon SP-API.
    */
+  
+  private async submitXmlFeed(feedType: string, xmlContent: string): Promise<string> {
+    const accessToken = await this.getAccessToken()
+
+    // 1. Create Feed Document
+    const createDocRes = await fetch(`${this.baseUrl}/feeds/2021-06-30/documents`, {
+      method: 'POST',
+      headers: {
+        'x-amz-access-token': accessToken,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({ contentType: 'text/xml; charset=UTF-8' })
+    })
+
+    if (!createDocRes.ok) {
+      const err = await createDocRes.text()
+      throw new Error(`Failed to create feed document: ${createDocRes.status} ${err}`)
+    }
+
+    const { feedDocumentId, url } = await createDocRes.json()
+
+    // 2. Upload XML to Document URL
+    const uploadRes = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'text/xml; charset=UTF-8'
+      },
+      body: xmlContent
+    })
+
+    if (!uploadRes.ok) {
+      const err = await uploadRes.text()
+      throw new Error(`Failed to upload XML to feed document: ${uploadRes.status} ${err}`)
+    }
+
+    // 3. Submit Feed
+    const submitRes = await fetch(`${this.baseUrl}/feeds/2021-06-30/feeds`, {
+      method: 'POST',
+      headers: {
+        'x-amz-access-token': accessToken,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        feedType,
+        marketplaceIds: [this.marketplaceId],
+        inputFeedDocumentId: feedDocumentId
+      })
+    })
+
+    if (!submitRes.ok) {
+      const err = await submitRes.text()
+      throw new Error(`Failed to submit feed ${feedType}: ${submitRes.status} ${err}`)
+    }
+
+    const { feedId } = await submitRes.json()
+    console.log(`[AmazonAdapter] Successfully submitted ${feedType} feed. FeedId: ${feedId}`)
+    return feedId
+  }
+
   async updateListings(
     companyId: string, 
     updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number }[]
@@ -431,52 +506,59 @@ export class AmazonAdapter implements MarketplaceAdapter {
     if (!updates || updates.length === 0) return
 
     try {
-      const accessToken = await this.getAccessToken()
+      const inventoryUpdates = updates.filter(u => u.stock !== undefined)
+      const priceUpdates = updates.filter(u => u.price !== undefined)
 
-      for (const update of updates) {
-        // Use Listings Items API v2021-08-01 for patching stock/price
-        const sku = encodeURIComponent(update.sku)
-        const patchUrl = `${this.baseUrl}/listings/2021-08-01/items/${this.config.sellerId}/${sku}?marketplaceIds=${this.marketplaceId}`
-        
-        const patches: any[] = []
-        if (update.stock !== undefined) {
-          patches.push({
-            op: 'replace',
-            path: '/attributes/fulfillment_availability',
-            value: [{ fulfillment_channel_code: 'DEFAULT', quantity: update.stock }]
-          })
-        }
-        if (update.price !== undefined) {
-          patches.push({
-            op: 'replace',
-            path: '/attributes/purchasable_offer',
-            value: [{ currency: 'EUR', our_price: [{ schedule: [{ value_with_tax: update.price }] }] }]
-          })
-        }
+      if (inventoryUpdates.length > 0) {
+        let msgId = 1
+        const inventoryMessages = inventoryUpdates.map(u => `
+  <Message>
+    <MessageID>${msgId++}</MessageID>
+    <OperationType>Update</OperationType>
+    <Inventory>
+      <SKU>${this.escapeXml(u.sku)}</SKU>
+      <Quantity>${u.stock}</Quantity>
+    </Inventory>
+  </Message>`).join('')
 
-        if (patches.length === 0) continue
+        const inventoryXml = `<?xml version="1.0" encoding="utf-8"?>
+<AmazonEnvelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="amzn-envelope.xsd">
+  <Header>
+    <DocumentVersion>1.01</DocumentVersion>
+    <MerchantIdentifier>${this.config.sellerId}</MerchantIdentifier>
+  </Header>
+  <MessageType>Inventory</MessageType>
+  ${inventoryMessages}
+</AmazonEnvelope>`
 
-        console.log(`[AmazonAdapter] Patching listing ${sku} via PATCH ${patchUrl}...`)
-        const response = await fetch(patchUrl, {
-          method: 'PATCH',
-          headers: {
-            'x-amz-access-token': accessToken,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify({
-            productType: 'PRODUCT',
-            patches
-          })
-        })
-
-        if (!response.ok) {
-          const errText = await response.text()
-          console.error(`[AmazonAdapter] Update listing failed for ${sku}: ${errText}`)
-        } else {
-          console.log(`[AmazonAdapter] Successfully updated listing ${sku}.`)
-        }
+        await this.submitXmlFeed('POST_INVENTORY_AVAILABILITY_DATA', inventoryXml)
       }
+
+      if (priceUpdates.length > 0) {
+        let msgId = 1
+        const priceMessages = priceUpdates.map(u => `
+  <Message>
+    <MessageID>${msgId++}</MessageID>
+    <OperationType>Update</OperationType>
+    <Price>
+      <SKU>${this.escapeXml(u.sku)}</SKU>
+      <StandardPrice currency="EUR">${u.price}</StandardPrice>
+    </Price>
+  </Message>`).join('')
+
+        const priceXml = `<?xml version="1.0" encoding="utf-8"?>
+<AmazonEnvelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="amzn-envelope.xsd">
+  <Header>
+    <DocumentVersion>1.01</DocumentVersion>
+    <MerchantIdentifier>${this.config.sellerId}</MerchantIdentifier>
+  </Header>
+  <MessageType>Price</MessageType>
+  ${priceMessages}
+</AmazonEnvelope>`
+
+        await this.submitXmlFeed('POST_PRODUCT_PRICING_DATA', priceXml)
+      }
+
     } catch (error) {
       console.error(`[AmazonAdapter] Error updating listings:`, error)
       throw error
