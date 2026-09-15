@@ -37,6 +37,7 @@ export default async function ProductsPage() {
       ean: productMappings.ean,
       syncStock: productMappings.syncStock,
       syncPrice: productMappings.syncPrice,
+      marketplace: productMappings.marketplace,
     })
     .from(productMappings)
     .where(eq(productMappings.companyId, auth.activeCompanyId))
@@ -51,6 +52,7 @@ export default async function ProductsPage() {
       hasSyncStockOff: pMappings.some(m => !m.syncStock),
       hasSyncPriceOn: pMappings.some(m => m.syncPrice),
       hasSyncPriceOff: pMappings.some(m => !m.syncPrice),
+      marketplaces: Array.from(new Set(pMappings.map(m => m.marketplace))),
     }
   })
 

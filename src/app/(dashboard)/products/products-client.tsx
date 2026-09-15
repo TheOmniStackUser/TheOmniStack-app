@@ -208,6 +208,17 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
   const [searchQuery, setSearchQuery] = useState('')
   const [searchField, setSearchField] = useState<'all' | 'sku' | 'title' | 'ean'>('all')
   const [syncFilter, setSyncFilter] = useState<'all' | 'stock_on' | 'stock_off' | 'price_on' | 'price_off'>('all')
+  const [marketplaceFilter, setMarketplaceFilter] = useState<string>('all')
+
+  const availableMarketplaces = useMemo(() => {
+    const s = new Set<string>()
+    initialProducts.forEach(p => {
+      if (p.marketplaces) {
+        p.marketplaces.forEach((m: string) => s.add(m))
+      }
+    })
+    return Array.from(s).sort()
+  }, [initialProducts])
   const [sortColumn, setSortColumn] = useState<string>('createdAt')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
@@ -325,6 +336,10 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
       })
     }
 
+    if (marketplaceFilter !== 'all') {
+      result = result.filter(p => p.marketplaces && p.marketplaces.includes(marketplaceFilter))
+    }
+
     if (searchQuery.trim()) {
       const terms = searchQuery.toLowerCase().trim().split(/\s+/).filter(Boolean)
       result = result.filter(p => {
@@ -368,7 +383,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
     })
 
     return result
-  }, [initialProducts, searchQuery, sortColumn, sortDirection, searchField, syncFilter])
+  }, [initialProducts, searchQuery, sortColumn, sortDirection, searchField, syncFilter, marketplaceFilter])
 
   const SortIcon = ({ column }: { column: string }) => {
     if (sortColumn !== column) return <ChevronUp className="w-3 h-3 opacity-20" />
@@ -412,6 +427,20 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
             <option value="price_on">Preis Sync: AN</option>
             <option value="price_off">Preis Sync: AUS</option>
           </select>
+          {availableMarketplaces.length > 0 && (
+            <select
+              value={marketplaceFilter}
+              onChange={(e) => setMarketplaceFilter(e.target.value)}
+              className="w-48 px-3 py-2 pr-8 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all text-slate-900 font-medium"
+            >
+              <option value="all">Alle Marktplätze</option>
+              {availableMarketplaces.map(m => (
+                <option key={m} value={m}>
+                  {m.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                </option>
+              ))}
+            </select>
+          )}
           <div className="relative flex-1 flex gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
