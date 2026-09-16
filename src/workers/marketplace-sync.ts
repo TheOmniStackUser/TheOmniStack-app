@@ -9,6 +9,7 @@ import { sendSyncNotificationEmail } from '@/lib/email'
 import IORedis from 'ioredis'
 import { db } from '@/db/client'
 import { orders, orderItems } from '@/db/schema/orders'
+import { customers } from '@/db/schema/customers'
 import { companies } from '@/db/schema/companies'
 import { vatSettings } from '@/db/schema/vat-settings'
 import { auditLog } from '@/lib/audit'
@@ -1795,6 +1796,37 @@ export async function persistOrders(
         customerNumber = comp.nextCustomerNumber
         const nextVal = (parseInt(customerNumber) + 1).toString()
         await tx.update(companies).set({ nextCustomerNumber: nextVal }).where(eq(companies.id, companyId))
+      }
+
+      // Automatically sync customer details to the customers table so they are searchable in Address Book
+      if (customerNumber) {
+        await tx.insert(customers)
+          .values({
+            companyId,
+            customerNumber,
+            name: order.buyer.name || order.shippingAddress.name || 'Unbekannt',
+            companyName: order.shippingAddress.company || null,
+            email: order.buyer.email || null,
+            phone: order.buyer.phone || order.shippingAddress.phone || null,
+            street: order.shippingAddress.street || null,
+            zip: order.shippingAddress.zip || null,
+            city: order.shippingAddress.city || null,
+            country: get2LetterCountryCode(order.shippingAddress.country) || 'DE',
+          })
+          .onConflictDoUpdate({
+            target: [customers.companyId, customers.customerNumber],
+            set: {
+              name: order.buyer.name || order.shippingAddress.name || 'Unbekannt',
+              companyName: order.shippingAddress.company || null,
+              email: order.buyer.email || null,
+              phone: order.buyer.phone || order.shippingAddress.phone || null,
+              street: order.shippingAddress.street || null,
+              zip: order.shippingAddress.zip || null,
+              city: order.shippingAddress.city || null,
+              country: get2LetterCountryCode(order.shippingAddress.country) || 'DE',
+              updatedAt: new Date()
+            }
+          })
       }
 
       // Determine Delivery Note Number
