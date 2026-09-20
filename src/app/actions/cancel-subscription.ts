@@ -54,6 +54,69 @@ export async function cancelSubscriptionAction(formData: FormData) {
       ...(details && { details }),
     }
 
+    const { marketplaceIntegrations } = await import('@/db/schema/integrations')
+    const { and } = await import('drizzle-orm')
+    const [shopifyIntegration] = await db
+      .select()
+      .from(marketplaceIntegrations)
+      .where(
+        and(
+          eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
+          eq(marketplaceIntegrations.type, 'shopify')
+        )
+      )
+      .limit(1)
+
+    if (shopifyIntegration) {
+      const metadata = (shopifyIntegration.metadata as any) || {}
+      if (metadata.isShopifyBilled && metadata.shopifySubscriptionId) {
+        const shop = shopifyIntegration.environment?.replace('https://', '').replace(/\/$/, '')
+        const mutation = `
+          mutation {
+            appSubscriptionCancel(
+              id: "gid://shopify/AppSubscription/${metadata.shopifySubscriptionId}"
+            ) {
+              appSubscription {
+                id
+                status
+              }
+              userErrors {
+                field
+                message
+              }
+            }
+          }
+        `
+        try {
+          const response = await fetch(`https://${shop}/admin/api/2024-01/graphql.json`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Shopify-Access-Token': shopifyIntegration.accessToken || '',
+            },
+            body: JSON.stringify({ query: mutation })
+          })
+          const data = await response.json()
+          if (data.errors || data.data?.appSubscriptionCancel?.userErrors?.length > 0) {
+            console.error('[Shopify Billing] Error cancelling subscription:', data.errors || data.data.appSubscriptionCancel.userErrors)
+            // We might still proceed with internal cancellation, or return an error. Let's proceed.
+          } else {
+            // Update metadata to canceled
+            await db.update(marketplaceIntegrations)
+              .set({
+                metadata: {
+                  ...metadata,
+                  shopifySubscriptionStatus: 'CANCELLED'
+                }
+              })
+              .where(eq(marketplaceIntegrations.id, shopifyIntegration.id))
+          }
+        } catch (e) {
+          console.error('[Shopify Billing] Exception cancelling subscription:', e)
+        }
+      }
+    }
+
     await db.update(companies)
       .set({
         canceledAt: now,
@@ -102,6 +165,27 @@ export async function undoCancelSubscriptionAction() {
     
     if (auth.role !== 'owner' && auth.role !== 'admin') {
       return { error: 'Nur der Besitzer oder Administrator kann die Kündigung aufheben.' }
+    }
+
+    const { marketplaceIntegrations } = await import('@/db/schema/integrations')
+    const { and } = await import('drizzle-orm')
+    const [shopifyIntegration] = await db
+      .select()
+      .from(marketplaceIntegrations)
+      .where(
+        and(
+          eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
+          eq(marketplaceIntegrations.type, 'shopify')
+        )
+      )
+      .limit(1)
+
+    if (shopifyIntegration) {
+      const metadata = (shopifyIntegration.metadata as any) || {}
+      if (metadata.isShopifyBilled) {
+        // They need to approve a new charge before we can reactivate!
+        return { redirectTo: '/api/billing/shopify/check' }
+      }
     }
 
     await db.update(companies)

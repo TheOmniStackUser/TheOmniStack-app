@@ -21,9 +21,8 @@ export default async function Setup2FAPage({
 
   // If already enabled, get out of here
   if (user?.twoFactorEnabled) {
-    const clientId = process.env.SHOPIFY_CLIENT_ID
-    if (shop && clientId) {
-      redirect(`https://admin.shopify.com/store/${shop.replace('.myshopify.com', '')}/apps/${clientId}`)
+    if (shop) {
+      redirect(`/api/billing/shopify/check?shop=${shop}`)
     } else {
       redirect('/dashboard')
     }

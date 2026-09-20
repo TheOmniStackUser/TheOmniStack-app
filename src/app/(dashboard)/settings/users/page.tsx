@@ -44,7 +44,7 @@ export default async function UserManagementPage() {
       .limit(1)
       .then(res => res[0]),
     db
-      .select({ id: marketplaceIntegrations.id })
+      .select({ metadata: marketplaceIntegrations.metadata })
       .from(marketplaceIntegrations)
       .where(
         and(
@@ -53,7 +53,7 @@ export default async function UserManagementPage() {
         )
       )
       .limit(1)
-      .then(res => res.length > 0)
+      .then(res => (res[0]?.metadata as any)?.isShopifyBilled === true)
   ])
 
   const enrichedMembers = members.map((m) => {

@@ -220,10 +220,7 @@ export async function loginAction(
   }
 
   if (shopForRedirect) {
-    const clientId = process.env.SHOPIFY_CLIENT_ID
-    if (clientId) {
-      redirect(`https://admin.shopify.com/store/${shopForRedirect.replace('.myshopify.com', '')}/apps/${clientId}`)
-    }
+    redirect(`/api/billing/shopify/check?shop=${shopForRedirect}`)
   }
 
   redirect(membership ? '/dashboard' : '/select-company')
@@ -339,10 +336,7 @@ export async function verifyTwoFactorLoginAction(
   }
 
   if (shopForRedirect) {
-    const clientId = process.env.SHOPIFY_CLIENT_ID
-    if (clientId) {
-      redirect(`https://admin.shopify.com/store/${shopForRedirect.replace('.myshopify.com', '')}/apps/${clientId}`)
-    }
+    redirect(`/api/billing/shopify/check?shop=${shopForRedirect}`)
   }
 
   redirect(membership ? '/dashboard' : '/select-company')
@@ -510,7 +504,7 @@ export async function completeRegistrationAction(
         environment: pendingShopify.shop,
         accessToken: pendingShopify.accessToken,
         isActive: true,
-        metadata: { shop: pendingShopify.shopMetadata }
+        metadata: { shop: pendingShopify.shopMetadata, isShopifyBilled: true }
       })
     }
 
@@ -632,9 +626,8 @@ export async function enableTwoFactorAction(
 
   await enableTwoFactor(userId, secret)
   
-  const clientId = process.env.SHOPIFY_CLIENT_ID
-  const redirectUrl = shop && clientId 
-    ? `https://admin.shopify.com/store/${shop.replace('.myshopify.com', '')}/apps/${clientId}` 
+  const redirectUrl = shop
+    ? `/api/billing/shopify/check?shop=${shop}` 
     : '/dashboard'
 
   return { message: 'Zweistufige Authentifizierung wurde erfolgreich aktiviert.', fields: { redirectTo: redirectUrl } }
