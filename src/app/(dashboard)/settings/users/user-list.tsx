@@ -21,7 +21,8 @@ export function UserList({
   initialMembers, 
   currentUserRole,
   currentUserId,
-  subscriptionDetails
+  subscriptionDetails,
+  isShopifyUser = false
 }: { 
   initialMembers: Member[]
   currentUserRole: string
@@ -37,6 +38,7 @@ export function UserList({
     isTrialPeriod: boolean
     nextBillingDate: Date
   }
+  isShopifyUser?: boolean
 }) {
   const [isAdding, setIsAdding] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -528,8 +530,8 @@ export function UserList({
         </>
       )}
 
-      {/* Subscription Management (Owner & Admin Only) */}
-      {(currentUserRole === 'owner' || currentUserRole === 'admin') && (
+      {/* Subscription Management (Owner & Admin Only) - Hidden for Shopify App Users */}
+      {(currentUserRole === 'owner' || currentUserRole === 'admin') && !isShopifyUser && (
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 mt-8">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-3 rounded-xl bg-slate-50 text-slate-600">

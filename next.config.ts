@@ -3,15 +3,11 @@ import type { NextConfig } from "next";
 const securityHeaders = [
   {
     key: 'Content-Security-Policy',
-    value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; connect-src 'self' https: wss:; object-src 'none'; frame-ancestors 'self'; frame-src 'self' https: blob: data:;"
+    value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; connect-src 'self' https: wss:; object-src 'none'; frame-ancestors 'self' https://*.shopify.com https://admin.shopify.com; frame-src 'self' https: blob: data:;"
   },
   {
     key: 'Strict-Transport-Security',
     value: 'max-age=63072000; includeSubDomains; preload'
-  },
-  {
-    key: 'X-Frame-Options',
-    value: 'SAMEORIGIN'
   },
   {
     key: 'X-Content-Type-Options',
@@ -25,6 +21,11 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  experimental: {
+    serverActions: {
+      allowedOrigins: ['admin.shopify.com', '*.myshopify.com', '*.shopify.com', 'app.theomnistack.de']
+    }
+  },
   async headers() {
     return [
       {
@@ -46,3 +47,4 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+

@@ -4,13 +4,14 @@ import { companyMembers, companies } from '@/db/schema/companies'
 import { users, verificationTokens } from '@/db/schema/auth'
 import { orders } from '@/db/schema/orders'
 import { invoices } from '@/db/schema/invoices'
+import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { eq, gt, gte, lt, and, count } from 'drizzle-orm'
 import { UserList } from './user-list'
 
 export default async function UserManagementPage() {
   const auth = await requireAuth()
 
-  const [members, tokens, company] = await Promise.all([
+  const [members, tokens, company, hasShopify] = await Promise.all([
     db
       .select({
         id: users.id,
@@ -41,7 +42,18 @@ export default async function UserManagementPage() {
       .from(companies)
       .where(eq(companies.id, auth.activeCompanyId))
       .limit(1)
-      .then(res => res[0])
+      .then(res => res[0]),
+    db
+      .select({ id: marketplaceIntegrations.id })
+      .from(marketplaceIntegrations)
+      .where(
+        and(
+          eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
+          eq(marketplaceIntegrations.type, 'shopify')
+        )
+      )
+      .limit(1)
+      .then(res => res.length > 0)
   ])
 
   const enrichedMembers = members.map((m) => {
@@ -124,6 +136,7 @@ export default async function UserManagementPage() {
         currentUserRole={auth.role} 
         currentUserId={auth.userId} 
         subscriptionDetails={enhancedCompany}
+        isShopifyUser={hasShopify}
       />
     </div>
   )
