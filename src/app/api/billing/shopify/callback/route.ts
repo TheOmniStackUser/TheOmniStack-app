@@ -26,7 +26,7 @@ export async function GET(request: Request) {
       )
       .limit(1)
 
-    if (!integration || !integration.accessToken) {
+    if (!integration || !integration.accessToken || !integration.environment) {
       return NextResponse.redirect(new URL('/integrations?error=shopify_not_found', process.env.NEXT_PUBLIC_APP_URL))
     }
 
