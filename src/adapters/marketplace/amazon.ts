@@ -421,6 +421,8 @@ export class AmazonAdapter implements MarketplaceAdapter {
       const titleIdx = headers.findIndex(h => h.includes('name') || h.includes('title'))
       const priceIdx = headers.findIndex(h => h.includes('price'))
       const quantityIdx = headers.findIndex(h => h.includes('quantity'))
+      const productIdIdx = headers.findIndex(h => h === 'product-id')
+      const productIdTypeIdx = headers.findIndex(h => h === 'product-id-type')
 
       const products = []
       for (let i = 1; i < lines.length; i++) {
@@ -442,6 +444,21 @@ export class AmazonAdapter implements MarketplaceAdapter {
           stock = parseInt(cols[quantityIdx].trim(), 10)
           if (isNaN(stock)) stock = null
         }
+        
+        const rowData: Record<string, string> = {}
+        for (let j = 0; j < headers.length; j++) {
+          if (cols[j]) rowData[headers[j]] = cols[j].trim()
+        }
+        
+        let ean: string | undefined = undefined
+        if (productIdIdx !== -1 && cols[productIdIdx]) {
+          const pid = cols[productIdIdx].trim()
+          const pType = productIdTypeIdx !== -1 ? cols[productIdTypeIdx]?.trim() : null
+          // Amazon product-id-type: 1=ASIN, 2=ISBN, 3=UPC, 4=EAN
+          if (pType === '4' || pType === '3' || pid.length === 13) {
+            ean = pid
+          }
+        }
 
         products.push({
           marketplaceProductId: asin,
@@ -449,7 +466,11 @@ export class AmazonAdapter implements MarketplaceAdapter {
           title: title,
           price: price,
           stock: stock !== null ? stock : undefined,
-          rawPayload: { _source: 'reports_api', row: lines[i] }
+          rawPayload: { 
+            _source: 'reports_api',
+            ean: ean || rowData['product-id'], // expose so frontend finds it
+            ...rowData 
+          }
         })
       }
 
