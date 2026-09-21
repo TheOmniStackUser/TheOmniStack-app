@@ -4,17 +4,18 @@ import { orders } from '@/db/schema/orders'
 import { companies } from '@/db/schema/companies'
 import { users } from '@/db/schema/auth'
 import { companyMembers } from '@/db/schema/companies'
-import { sql, count, gte, and } from 'drizzle-orm'
+import { sql, count, gte, and, lte } from 'drizzle-orm'
 import Link from 'next/link'
 
 import { PeriodSelector } from './components/period-selector'
+import { Suspense } from 'react'
 
 export default async function AdminDashboardPage(props: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
   await requireSuperAdmin()
 
-  const searchParams = await props.searchParams
+  const searchParams = (await props.searchParams) || {}
   const period = typeof searchParams.period === 'string' ? searchParams.period : 'current_month'
 
   const now = new Date()
@@ -63,7 +64,7 @@ export default async function AdminDashboardPage(props: {
     .where(gte(orders.createdAt, startOfMonth))
 
   // Orders per company in selected period
-  let topMerchantsQuery = db
+  const topMerchants = await db
     .select({
       companyId: orders.companyId,
       companyName: companies.name,
@@ -71,14 +72,11 @@ export default async function AdminDashboardPage(props: {
     })
     .from(orders)
     .leftJoin(companies, sql`${orders.companyId} = ${companies.id}`)
-
-  if (startDate && endDate) {
-    topMerchantsQuery = topMerchantsQuery.where(
-      and(gte(orders.createdAt, startDate), sql`${orders.createdAt} <= ${endDate}`)
-    ) as any
-  }
-  
-  const topMerchants = await topMerchantsQuery
+    .where(
+      startDate && endDate
+        ? and(gte(orders.createdAt, startDate), lte(orders.createdAt, endDate))
+        : undefined
+    )
     .groupBy(orders.companyId, companies.name)
     .orderBy(sql`count(${orders.id}) desc`)
     .limit(5)
@@ -156,7 +154,9 @@ export default async function AdminDashboardPage(props: {
       <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <h2 className="text-base font-semibold text-white">Top Händler – {periodLabel}</h2>
-          <PeriodSelector />
+          <Suspense fallback={<div className="h-8 w-32 bg-white/5 animate-pulse rounded-lg" />}>
+            <PeriodSelector />
+          </Suspense>
         </div>
         {topMerchants.length === 0 ? (
           <p className="text-white/30 text-sm">Keine Daten für diesen Zeitraum.</p>
