@@ -7,10 +7,51 @@ import { companyMembers } from '@/db/schema/companies'
 import { sql, count, gte, and } from 'drizzle-orm'
 import Link from 'next/link'
 
-export default async function AdminDashboardPage() {
+import { PeriodSelector } from './components/period-selector'
+
+export default async function AdminDashboardPage(props: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
   await requireSuperAdmin()
 
+  const searchParams = await props.searchParams
+  const period = typeof searchParams.period === 'string' ? searchParams.period : 'current_month'
+
   const now = new Date()
+  
+  let startDate: Date | null = new Date(now.getFullYear(), now.getMonth(), 1)
+  let endDate: Date | null = new Date()
+  let periodLabel = now.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })
+
+  switch (period) {
+    case 'last_month':
+      startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+      endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999)
+      periodLabel = startDate.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })
+      break
+    case 'current_year':
+      startDate = new Date(now.getFullYear(), 0, 1)
+      endDate = new Date()
+      periodLabel = now.getFullYear().toString()
+      break
+    case 'last_year':
+      startDate = new Date(now.getFullYear() - 1, 0, 1)
+      endDate = new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59, 999)
+      periodLabel = (now.getFullYear() - 1).toString()
+      break
+    case 'all_time':
+      startDate = null
+      endDate = null
+      periodLabel = 'Gesamter Zeitraum'
+      break
+    case 'current_month':
+    default:
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1)
+      endDate = new Date()
+      periodLabel = now.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })
+      break
+  }
+
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 
   const [totalCompanies] = await db.select({ count: count() }).from(companies)
@@ -21,8 +62,8 @@ export default async function AdminDashboardPage() {
     .from(orders)
     .where(gte(orders.createdAt, startOfMonth))
 
-  // Orders per company this month
-  const topMerchants = await db
+  // Orders per company in selected period
+  let topMerchantsQuery = db
     .select({
       companyId: orders.companyId,
       companyName: companies.name,
@@ -30,7 +71,14 @@ export default async function AdminDashboardPage() {
     })
     .from(orders)
     .leftJoin(companies, sql`${orders.companyId} = ${companies.id}`)
-    .where(gte(orders.createdAt, startOfMonth))
+
+  if (startDate && endDate) {
+    topMerchantsQuery = topMerchantsQuery.where(
+      and(gte(orders.createdAt, startDate), sql`${orders.createdAt} <= ${endDate}`)
+    ) as any
+  }
+  
+  const topMerchants = await topMerchantsQuery
     .groupBy(orders.companyId, companies.name)
     .orderBy(sql`count(${orders.id}) desc`)
     .limit(5)
@@ -106,9 +154,12 @@ export default async function AdminDashboardPage() {
 
       {/* Top Merchants This Month */}
       <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-        <h2 className="text-base font-semibold text-white mb-4">Top Händler – {monthName}</h2>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <h2 className="text-base font-semibold text-white">Top Händler – {periodLabel}</h2>
+          <PeriodSelector />
+        </div>
         {topMerchants.length === 0 ? (
-          <p className="text-white/30 text-sm">Keine Daten für diesen Monat.</p>
+          <p className="text-white/30 text-sm">Keine Daten für diesen Zeitraum.</p>
         ) : (
           <div className="space-y-3">
             {topMerchants.map((m, i) => (
