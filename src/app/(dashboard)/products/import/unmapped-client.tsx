@@ -741,6 +741,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
                     </div>
                     <h3 className="text-lg font-bold text-slate-900">{p.title}</h3>
                     <div className="flex gap-4 mt-2 text-sm text-slate-500 font-medium">
+                      {p.parsedEan && <span>EAN: {p.parsedEan}</span>}
                       <span>Preis: {p.price} €</span>
                       <span>Bestand: {p.stock !== null ? p.stock : 'Unbekannt'}</span>
                     </div>
@@ -803,12 +804,10 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
                  <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">SKU</p>
                  <p className="font-bold font-mono text-slate-900 text-base">{detailsProduct.marketplaceSku}</p>
                </div>
-               {ean && (
-                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col">
-                   <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">EAN</p>
-                   <p className="font-bold font-mono text-slate-900 text-base break-all">{ean}</p>
-                 </div>
-               )}
+               <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col">
+                 <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">EAN</p>
+                 <p className="font-bold font-mono text-slate-900 text-base break-all">{ean || '-'}</p>
+               </div>
                {detailsProduct.marketplaceProductId && (
                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col">
                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Produkt ID</p>
