@@ -13,8 +13,8 @@ export default async function AdminMerchantsPage({
 }) {
   await requireSuperAdmin()
 
-  const params = await searchParams
-  const sort = typeof params.sort === 'string' ? params.sort : 'createdAt'
+  const params = (await searchParams) || {}
+  const sort = typeof params.sort === 'string' ? params.sort : 'total'
   const order = typeof params.order === 'string' ? params.order : 'desc'
 
   const now = new Date()
