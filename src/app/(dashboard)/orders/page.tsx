@@ -256,11 +256,12 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   const totalOrdersCount = Number(totalCountRow.count)
 
   // Order By
-  let orderBy = desc(orders.marketplacePurchaseDate)
+  const getSortDate = () => sql`COALESCE(${orders.marketplacePurchaseDate}, ${orders.createdAt})`
+  let orderBy = desc(getSortDate()) as any
   if (sortField && sortDirection) {
     const dir = sortDirection === 'asc' ? asc : desc
     switch (sortField) {
-      case 'bestelldatum': orderBy = dir(orders.marketplacePurchaseDate); break;
+      case 'bestelldatum': orderBy = dir(getSortDate()) as any; break;
       case 'marketplace': orderBy = dir(orders.marketplace); break;
       case 'status': orderBy = dir(orders.status); break;
       case 'kunde': orderBy = dir(orders.buyerName); break;
