@@ -460,17 +460,21 @@ export class AmazonAdapter implements MarketplaceAdapter {
           }
         }
 
+        const payloadObj: any = {
+            _source: 'reports_api',
+            ...rowData
+        }
+        if (ean) {
+            payloadObj.ean = ean
+        }
+
         products.push({
           marketplaceProductId: asin,
           sku: sku,
           title: title,
           price: price,
           stock: stock !== null ? stock : undefined,
-          rawPayload: { 
-            _source: 'reports_api',
-            ean: ean || rowData['product-id'], // expose so frontend finds it
-            ...rowData 
-          }
+          rawPayload: payloadObj
         })
       }
 
