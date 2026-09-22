@@ -356,18 +356,18 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
   const integrationEntries = Object.entries(updatesByIntegration)
   let currentIndex = 0
 
-  for (const [integrationId, mpUpdates] of integrationEntries) {
+  await Promise.all(integrationEntries.map(async ([integrationId, mpUpdates]) => {
     const integration = activeIntegrations.find(i => i.id === integrationId)
     if (!integration) {
       currentIndex++
-      continue
+      return
     }
 
     const marketplace = integration.type
     const adapter = getAdapterForIntegration(integration)
     if (!adapter || !adapter.updateListings) {
       currentIndex++
-      continue
+      return
     }
 
     const meta = integration.metadata as any
@@ -452,8 +452,8 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
       }
     }
     
-    currentIndex++
-  }
+        currentIndex++
+  }))
 
   if (job) {
     await job.updateProgress({ step: 'completed', totalUpdatesSent, activeMarketplaces, failedMarketplaces })
