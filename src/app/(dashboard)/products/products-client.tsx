@@ -279,7 +279,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
       const { triggerMarketplaceSyncForProducts } = await import('@/app/actions/products')
       const result = await triggerMarketplaceSyncForProducts([productId])
       if (result.failedMarketplaces && result.failedMarketplaces.length > 0) {
-        showToast(`Sync teilweise fehlgeschlagen (${result.failedMarketplaces.join(', ')})`, 'error')
+        showToast(`Sync teilweise fehlgeschlagen (${result.failedMarketplaces.map((f: any) => f.name).join(', ')})`, 'error')
       } else if (result.totalUpdatesSent > 0) {
         showToast(`Sync erfolgreich!`, 'success')
       } else {
