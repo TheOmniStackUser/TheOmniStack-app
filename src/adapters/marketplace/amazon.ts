@@ -669,7 +669,7 @@ export class AmazonAdapter implements MarketplaceAdapter {
 
   async updateListings(
     companyId: string, 
-    updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number; reducedPrice?: number; fallbackPrice?: number }[]
+    updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number; reducedPrice?: number; fallbackPrice?: number; saleStartDate?: Date | null; saleEndDate?: Date | null; }[]
   ): Promise<void> {
     if (!updates || updates.length === 0) return
 
@@ -703,7 +703,9 @@ export class AmazonAdapter implements MarketplaceAdapter {
           if (update.reducedPrice) {
             offerValue.discounted_price = [{
               schedule: [{
-                value_with_tax: update.reducedPrice
+                value_with_tax: update.reducedPrice,
+                start_at: update.saleStartDate ? update.saleStartDate.toISOString() : new Date().toISOString(),
+                end_at: update.saleEndDate ? update.saleEndDate.toISOString() : new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000).toISOString()
               }]
             }]
           }

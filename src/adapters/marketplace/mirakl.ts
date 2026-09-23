@@ -1659,7 +1659,7 @@ export class MiraklAdapter implements MarketplaceAdapter {
    */
   async updateListings(
     companyId: string, 
-    updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number; reducedPrice?: number; fallbackPrice?: number }[]
+    updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number; reducedPrice?: number; fallbackPrice?: number; saleStartDate?: Date | null; saleEndDate?: Date | null; }[]
   ): Promise<void> {
     if (!updates || updates.length === 0) return
 
@@ -1765,14 +1765,10 @@ export class MiraklAdapter implements MarketplaceAdapter {
         if (update.reducedPrice !== undefined) {
           if (update.reducedPrice > 0) {
             // Set new discount
-            const startDate = new Date();
-            const endDate = new Date();
-            endDate.setFullYear(endDate.getFullYear() + 10); // 10 years from now
-            
             offer.discount = {
               discount_price: update.reducedPrice,
-              start_date: startDate.toISOString(),
-              end_date: endDate.toISOString()
+              start_date: update.saleStartDate ? update.saleStartDate.toISOString() : new Date().toISOString(),
+              end_date: update.saleEndDate ? update.saleEndDate.toISOString() : new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000).toISOString()
             }
           } else {
             // Remove discount (Mirakl allows removing by passing empty strings)

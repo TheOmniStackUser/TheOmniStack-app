@@ -46,6 +46,8 @@ export const products = pgTable('products', {
   purchasePrice: numeric('purchase_price', { precision: 12, scale: 2 }),
   msrp: numeric('msrp', { precision: 12, scale: 2 }),
   reducedPrice: numeric('reduced_price', { precision: 12, scale: 2 }),
+  saleStartDate: timestamp('sale_start_date', { withTimezone: true }),
+  saleEndDate: timestamp('sale_end_date', { withTimezone: true }),
   
   // Optional Fields
   weight: numeric('weight', { precision: 8, scale: 3 }), // kg

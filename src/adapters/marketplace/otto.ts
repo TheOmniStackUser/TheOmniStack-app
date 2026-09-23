@@ -1034,7 +1034,7 @@ export class OttoAdapter implements MarketplaceAdapter {
    */
   async updateListings(
     companyId: string, 
-    updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number; reducedPrice?: number; fallbackPrice?: number }[]
+    updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number; reducedPrice?: number; fallbackPrice?: number; saleStartDate?: Date | null; saleEndDate?: Date | null; }[]
   ): Promise<void> {
     if (!updates || updates.length === 0) return
 
@@ -1086,7 +1086,9 @@ export class OttoAdapter implements MarketplaceAdapter {
             salePrice: {
               amount: u.reducedPrice,
               currency: 'EUR'
-            }
+            },
+            startDate: u.saleStartDate ? u.saleStartDate.toISOString() : new Date().toISOString(),
+            endDate: u.saleEndDate ? u.saleEndDate.toISOString() : new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000).toISOString()
           }
         }
         return payload

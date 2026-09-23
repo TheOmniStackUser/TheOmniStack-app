@@ -126,7 +126,7 @@ export async function syncProductsForCompany(companyId: string, integrationId?: 
 
       // Bulk Load existing data
       const existingMappings = await db.select().from(productMappings).where(and(eq(productMappings.companyId, companyId), eq(productMappings.integrationId, integration.id)))
-      const existingProducts = await db.select({ id: products.id, sku: products.sku, reducedPrice: products.reducedPrice, price: products.price, msrp: products.msrp }).from(products).where(eq(products.companyId, companyId))
+      const existingProducts = await db.select({ id: products.id, sku: products.sku, reducedPrice: products.reducedPrice, price: products.price, msrp: products.msrp, saleStartDate: products.saleStartDate, saleEndDate: products.saleEndDate }).from(products).where(eq(products.companyId, companyId))
 
       const mappedSkus = new Set(existingMappings.map(m => m.marketplaceSku))
       const centralProductMap = new Map(existingProducts.map(p => [p.sku, p]))
@@ -208,7 +208,7 @@ export async function syncProductsForCompany(companyId: string, integrationId?: 
 /**
  * Pushes inventory and price updates from OmniStack to the mapped marketplaces.
  */
-export async function pushUpdatesToMarketplaces(companyId: string, updates: { sku: string, stock?: number, price?: number, msrp?: number }[], job?: Job<any>, targetIntegrationId?: string) {
+export async function pushUpdatesToMarketplaces(companyId: string, updates: { sku: string, stock?: number, price?: number, msrp?: number, saleStartDate?: Date | null, saleEndDate?: Date | null }[], job?: Job<any>, targetIntegrationId?: string) {
   console.log(`[ProductSync] Pushing updates for ${updates.length} products for company ${companyId}...`)
   
   if (updates.length === 0) return { totalUpdatesSent: 0, activeMarketplaces: [] }
@@ -217,11 +217,11 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
 
   // Find all mappings for these SKUs
   // First find central products
-  const centralProducts: { id: string, sku: string, price?: string | null, msrp?: string | null }[] = []
+  const centralProducts: { id: string, sku: string, price?: string | null, msrp?: string | null, saleStartDate?: Date | null, saleEndDate?: Date | null }[] = []
   for (let i = 0; i < skus.length; i += 1000) {
     const chunkSkus = skus.slice(i, i + 1000)
     const chunkProducts = await db
-      .select({ id: products.id, sku: products.sku, reducedPrice: products.reducedPrice, price: products.price, msrp: products.msrp })
+      .select({ id: products.id, sku: products.sku, reducedPrice: products.reducedPrice, price: products.price, msrp: products.msrp, saleStartDate: products.saleStartDate, saleEndDate: products.saleEndDate })
       .from(products)
       .where(
         and(
@@ -329,6 +329,11 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
       }
     }
 
+let modifiedSaleStartDate = updateDef.saleStartDate !== undefined ? (updateDef.saleStartDate ? new Date(updateDef.saleStartDate) : null) : centralProduct.saleStartDate
+    let modifiedSaleEndDate = updateDef.saleEndDate !== undefined ? (updateDef.saleEndDate ? new Date(updateDef.saleEndDate) : null) : centralProduct.saleEndDate
+
+    if (modifiedSaleStartDate) mUpdate.saleStartDate = modifiedSaleStartDate;
+    if (modifiedSaleEndDate) mUpdate.saleEndDate = modifiedSaleEndDate;
     // Price -> Sales Price (Marketplace reducedPrice)
     let modifiedReducedPrice = updateDef.price !== undefined ? updateDef.price : (centralProduct.price ? parseFloat(centralProduct.price) : undefined)
     if (modifiedReducedPrice !== undefined && modifiedReducedPrice > 0) {

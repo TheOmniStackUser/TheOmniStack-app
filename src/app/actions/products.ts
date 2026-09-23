@@ -1171,11 +1171,11 @@ export async function bulkUpdateCustomsData(productIds: string[], hsCode: string
 }
 
 
-export async function bulkUpdateStockAndPrice(productIds: string[], newStock?: number, newPrice?: number, newReducedPrice?: number, newMsrp?: number) {
+export async function bulkUpdateStockAndPrice(productIds: string[], newStock?: number, newPrice?: number, newReducedPrice?: number, newMsrp?: number, newSaleStartDate?: Date | null, newSaleEndDate?: Date | null) {
   const auth = await requireAuth()
   if (productIds.length === 0) return { success: true }
 
-  const updates: Partial<{ currentStock: string; price: string; reducedPrice: string | null; msrp: string | null; updatedAt: Date }> = { updatedAt: new Date() }
+  const updates: Partial<{ currentStock: string; price: string; reducedPrice: string | null; msrp: string | null; saleStartDate: Date | null; saleEndDate: Date | null; updatedAt: Date }> = { updatedAt: new Date() }
   let safeStock: number | undefined
   let safePrice: number | undefined
   let safeReducedPrice: number | undefined
@@ -1194,6 +1194,12 @@ export async function bulkUpdateStockAndPrice(productIds: string[], newStock?: n
       safeMsrp = Math.max(0, newMsrp)
       updates.msrp = safeMsrp.toString()
     }
+  }
+if (newSaleStartDate !== undefined) {
+    updates.saleStartDate = newSaleStartDate
+  }
+  if (newSaleEndDate !== undefined) {
+    updates.saleEndDate = newSaleEndDate
   }
   if (newPrice !== undefined) {
     safePrice = Math.max(0, newPrice)
@@ -1237,7 +1243,9 @@ export async function bulkUpdateStockAndPrice(productIds: string[], newStock?: n
           sku: p.sku,
           stock: safeStock,
           price: safePrice,
-          msrp: safeMsrp
+          msrp: safeMsrp,
+          saleStartDate: newSaleStartDate,
+          saleEndDate: newSaleEndDate
         }))
         await pushUpdatesToMarketplaces(auth.activeCompanyId, syncPayload)
       } catch (error) {
