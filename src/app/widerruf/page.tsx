@@ -1,10 +1,14 @@
 'use client'
 
-import { useState, useActionState } from 'react'
+import { useState, useActionState, Suspense } from 'react'
 import { submitWiderruf } from './actions'
 import { Loader2, CheckCircle2, ShieldCheck } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
 
-export default function WiderrufPage() {
+function WiderrufFormContent() {
+  const searchParams = useSearchParams()
+  const shop = searchParams.get('shop') || 'peroyork' // Fallback zu peroyork
+
   const [state, formAction, isPending] = useActionState(submitWiderruf, {
     success: false,
     message: '',
@@ -80,6 +84,8 @@ export default function WiderrufPage() {
         )}
 
         <form action={formAction} className="space-y-6">
+          <input type="hidden" name="shop" value={shop} />
+          
           <div className="space-y-5">
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-slate-700 mb-1">
@@ -173,5 +179,13 @@ export default function WiderrufPage() {
 
       </div>
     </div>
+  )
+}
+
+export default function WiderrufPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-slate-400" /></div>}>
+      <WiderrufFormContent />
+    </Suspense>
   )
 }

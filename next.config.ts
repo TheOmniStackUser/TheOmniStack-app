@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const securityHeaders = [
   {
     key: 'Content-Security-Policy',
-    value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; connect-src 'self' https: wss:; object-src 'none'; frame-ancestors 'self' https://*.shopify.com https://admin.shopify.com https://peroyork.de https://*.peroyork.de; frame-src 'self' https: blob: data:;"
+    value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; connect-src 'self' https: wss:; object-src 'none'; frame-ancestors 'self' https://*.shopify.com https://admin.shopify.com https://peroyork.de https://*.peroyork.de https://tinyloaders.de https://*.tinyloaders.de; frame-src 'self' https: blob: data:;"
   },
   {
     key: 'Strict-Transport-Security',
@@ -23,7 +23,7 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   experimental: {
     serverActions: {
-      allowedOrigins: ['admin.shopify.com', '*.myshopify.com', '*.shopify.com', 'app.theomnistack.de', 'peroyork.de', '*.peroyork.de']
+      allowedOrigins: ['admin.shopify.com', '*.myshopify.com', '*.shopify.com', 'app.theomnistack.de', 'peroyork.de', '*.peroyork.de', 'tinyloaders.de', '*.tinyloaders.de']
     }
   },
   async headers() {

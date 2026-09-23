@@ -11,12 +11,24 @@ export async function submitWiderruf(prevState: any, formData: FormData) {
     const dateOfOrder = formData.get('dateOfOrder') as string
     const email = formData.get('email') as string
     const details = formData.get('details') as string
+    const shop = formData.get('shop') as string
 
     if (!name || !orderNumber || !email) {
       return { success: false, message: 'Bitte füllen Sie alle Pflichtfelder aus.' }
     }
 
     const timestamp = new Date().toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })
+
+    let senderEmail = 'info@peroyork.de'
+    let shopNameStr = 'Peroyork'
+
+    if (shop === 'tinyloaders') {
+      senderEmail = 'info@tinyloaders.de'
+      shopNameStr = 'Tinyloaders'
+    } else if (shop === 'guggen') {
+      senderEmail = 'info@guggen-mountain.com'
+      shopNameStr = 'Guggen Mountain'
+    }
 
     // E-Mail an den Kunden (Eingangsbestätigung)
     const customerHtml = `
@@ -33,7 +45,7 @@ export async function submitWiderruf(prevState: any, formData: FormData) {
         <p>Wir werden Ihr Anliegen schnellstmöglich prüfen und uns bei Bedarf mit Ihnen in Verbindung setzen.</p>
         <br/>
         <p style="margin: 0;">Viele Grüße,</p>
-        <p style="margin: 0;"><strong>Ihr Peroyork-Team</strong></p>
+        <p style="margin: 0;"><strong>Ihr ${shopNameStr}-Team</strong></p>
       </div>
     `
 
@@ -43,6 +55,7 @@ export async function submitWiderruf(prevState: any, formData: FormData) {
         <h2>Neuer Widerruf eingegangen</h2>
         <p>Ein Kunde hat soeben das Widerrufsformular ausgefüllt:</p>
         <ul>
+          <li><strong>Shop:</strong> ${shopNameStr}</li>
           <li><strong>Name:</strong> ${name}</li>
           <li><strong>E-Mail:</strong> ${email}</li>
           <li><strong>Bestellnummer:</strong> ${orderNumber}</li>
@@ -53,11 +66,9 @@ export async function submitWiderruf(prevState: any, formData: FormData) {
       </div>
     `
 
-    const senderEmail = 'info@peroyork.de'
-
     // 1. E-Mail an den Kunden senden
     const { error: customerError } = await resend.emails.send({
-      from: `Peroyork <${senderEmail}>`,
+      from: `${shopNameStr} <${senderEmail}>`,
       to: [email],
       subject: 'Eingangsbestätigung Ihres Widerrufs',
       html: customerHtml,
@@ -69,9 +80,9 @@ export async function submitWiderruf(prevState: any, formData: FormData) {
       return { success: false, message: `Fehler beim Senden: ${customerError.message || 'Unbekannter Resend-Fehler'}` }
     }
 
-    // 2. E-Mail an info@peroyork.de senden
+    // 2. E-Mail an den Shopbetreiber senden
     const { error: adminError } = await resend.emails.send({
-      from: `Peroyork System <${senderEmail}>`,
+      from: `${shopNameStr} System <${senderEmail}>`,
       to: [senderEmail],
       subject: `Neuer Widerruf: Bestellung ${orderNumber}`,
       html: adminHtml,
