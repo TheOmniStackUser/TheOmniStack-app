@@ -66,7 +66,7 @@ export async function submitWiderruf(prevState: any, formData: FormData) {
 
     if (customerError) {
       console.error('[Widerruf Action] Error sending customer email:', customerError)
-      return { success: false, message: 'Fehler beim Senden der Bestätigungs-E-Mail.' }
+      return { success: false, message: `Fehler beim Senden: ${customerError.message || 'Unbekannter Resend-Fehler'}` }
     }
 
     // 2. E-Mail an info@peroyork.de senden
