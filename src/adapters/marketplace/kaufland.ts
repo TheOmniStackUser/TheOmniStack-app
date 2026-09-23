@@ -474,7 +474,7 @@ export class KauflandAdapter implements MarketplaceAdapter {
 
         if (Object.keys(patchBody).length === 0) continue
 
-        await this.makeRequest('PATCH', `/units/${idUnit}`, JSON.stringify(patchBody))
+        await this.makeRequest('PATCH', `/units/${idUnit}`, JSON.stringify(patchBody), { storefront: this.storefront })
       }
 
       console.log(`[KauflandAdapter] Listings successfully updated.`)
