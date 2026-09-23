@@ -778,7 +778,8 @@ export async function triggerGlobalMarketplaceSync() {
     .select({
       sku: products.sku,
       currentStock: products.currentStock,
-      price: products.price
+      price: products.price,
+      msrp: products.msrp
     })
     .from(products)
     .where(eq(products.companyId, auth.activeCompanyId))
@@ -789,7 +790,8 @@ export async function triggerGlobalMarketplaceSync() {
   const updates = allProducts.map(p => ({
     sku: p.sku,
     stock: p.currentStock !== null && p.currentStock !== undefined ? Number(p.currentStock) : undefined,
-    price: p.price !== null && p.price !== undefined ? Number(p.price) : undefined
+    price: p.price !== null && p.price !== undefined ? Number(p.price) : undefined,
+    msrp: p.msrp !== null && p.msrp !== undefined ? Number(p.msrp) : undefined
   }))
 
   const { pushUpdatesToMarketplaces } = await import('@/workers/product-sync')
@@ -809,7 +811,8 @@ export async function triggerMarketplaceSyncForProducts(productIds: string[]) {
     .select({
       sku: products.sku,
       currentStock: products.currentStock,
-      price: products.price
+      price: products.price,
+      msrp: products.msrp
     })
     .from(products)
     .where(
@@ -825,7 +828,8 @@ export async function triggerMarketplaceSyncForProducts(productIds: string[]) {
   const updates = selectedProducts.map(p => ({
     sku: p.sku,
     stock: p.currentStock !== null && p.currentStock !== undefined ? Number(p.currentStock) : undefined,
-    price: p.price !== null && p.price !== undefined ? Number(p.price) : undefined
+    price: p.price !== null && p.price !== undefined ? Number(p.price) : undefined,
+    msrp: p.msrp !== null && p.msrp !== undefined ? Number(p.msrp) : undefined
   }))
 
   const { pushUpdatesToMarketplaces } = await import('@/workers/product-sync')
@@ -1167,20 +1171,30 @@ export async function bulkUpdateCustomsData(productIds: string[], hsCode: string
 }
 
 
-export async function bulkUpdateStockAndPrice(productIds: string[], newStock?: number, newPrice?: number, newReducedPrice?: number) {
+export async function bulkUpdateStockAndPrice(productIds: string[], newStock?: number, newPrice?: number, newReducedPrice?: number, newMsrp?: number) {
   const auth = await requireAuth()
   if (productIds.length === 0) return { success: true }
 
-  const updates: Partial<{ currentStock: string; price: string; reducedPrice: string | null; updatedAt: Date }> = { updatedAt: new Date() }
+  const updates: Partial<{ currentStock: string; price: string; reducedPrice: string | null; msrp: string | null; updatedAt: Date }> = { updatedAt: new Date() }
   let safeStock: number | undefined
   let safePrice: number | undefined
   let safeReducedPrice: number | undefined
+  let safeMsrp: number | undefined
 
   if (newStock !== undefined) {
     safeStock = Math.max(0, newStock)
     updates.currentStock = safeStock.toString()
   }
   
+  if (newMsrp !== undefined) {
+    if (newMsrp === 0 || newMsrp === null) {
+      updates.msrp = null
+      safeMsrp = 0
+    } else {
+      safeMsrp = Math.max(0, newMsrp)
+      updates.msrp = safeMsrp.toString()
+    }
+  }
   if (newPrice !== undefined) {
     safePrice = Math.max(0, newPrice)
     updates.price = safePrice.toString()
@@ -1223,7 +1237,7 @@ export async function bulkUpdateStockAndPrice(productIds: string[], newStock?: n
           sku: p.sku,
           stock: safeStock,
           price: safePrice,
-          reducedPrice: safeReducedPrice === 0 ? undefined : safeReducedPrice // 0 means remove sale price
+          msrp: safeMsrp
         }))
         await pushUpdatesToMarketplaces(auth.activeCompanyId, syncPayload)
       } catch (error) {
