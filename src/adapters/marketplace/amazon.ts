@@ -675,71 +675,74 @@ ${feedXml}`)
     if (!updates || updates.length === 0) return
 
     try {
-      const accessToken = await this.getAccessToken()
+      const inventoryUpdates = updates.filter(u => u.stock !== undefined)
+      const priceUpdates = updates.filter(u => u.price !== undefined || u.reducedPrice !== undefined)
 
-      for (const update of updates) {
-        if (update.stock === undefined && update.price === undefined) continue
+      if (inventoryUpdates.length > 0) {
+        let msgId = 1
+        const inventoryMessages = inventoryUpdates.map(u => `
+  <Message>
+    <MessageID>${msgId++}</MessageID>
+    <OperationType>Update</OperationType>
+    <Inventory>
+      <SKU>${this.escapeXml(u.sku)}</SKU>
+      <Quantity>${u.stock}</Quantity>
+    </Inventory>
+  </Message>`).join('')
 
-        const patches = []
-        if (update.stock !== undefined) {
-          patches.push({
-            op: "replace",
-            path: "/attributes/fulfillment_availability",
-            value: [{
-              fulfillment_channel_code: "DEFAULT",
-              quantity: update.stock
-            }]
-          })
-        }
-        
-        if (update.price !== undefined || update.reducedPrice !== undefined) {
-          const offerValue: any = {
-            marketplace_id: this.marketplaceId,
-            currency: "EUR",
-            our_price: [{
-              schedule: [{
-                value_with_tax: update.price !== undefined ? update.price : update.fallbackPrice
-              }]
-            }]
-          }
-          if (update.reducedPrice) {
-            offerValue.discounted_price = [{
-              schedule: [{
-                value_with_tax: update.reducedPrice,
-                start_at: update.saleStartDate ? update.saleStartDate.toISOString() : new Date().toISOString(),
-                end_at: update.saleEndDate ? update.saleEndDate.toISOString() : new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000).toISOString()
-              }]
-            }]
-          }
-          patches.push({
-            op: "replace",
-            path: "/attributes/purchasable_offer",
-            value: [offerValue]
-          })
-        }
+        const inventoryXml = `<?xml version="1.0" encoding="utf-8"?>
+<AmazonEnvelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="amzn-envelope.xsd">
+  <Header>
+    <DocumentVersion>1.01</DocumentVersion>
+    <MerchantIdentifier>${this.config.sellerId}</MerchantIdentifier>
+  </Header>
+  <MessageType>Inventory</MessageType>
+  ${inventoryMessages}
+</AmazonEnvelope>`
 
-        const url = `${this.baseUrl}/listings/2021-08-01/items/${this.config.sellerId}/${encodeURIComponent(update.sku)}?marketplaceIds=${this.marketplaceId}`
-        const payload = {
-          productType: "PRODUCT",
-          patches
-        }
-
-        const res = await fetch(url, {
-          method: 'PATCH',
-          headers: {
-            'x-amz-access-token': accessToken,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify(payload)
-        })
-
-        if (!res.ok) {
-          const errText = await res.text()
-          console.error(`[AmazonAdapter] Failed to update listing ${update.sku}: ${res.status} ${errText}`)
-          throw new Error(`Amazon listing update failed for ${update.sku}: ${res.status} ${errText}`)
-        }
+        await this.submitXmlFeed('POST_INVENTORY_AVAILABILITY_DATA', inventoryXml)
       }
+
+      if (priceUpdates.length > 0) {
+        let msgId = 1
+        const priceMessages = priceUpdates.map(u => {
+          const standardPrice = u.price !== undefined ? u.price : (u.fallbackPrice || 0)
+          let saleBlock = ''
+          if (u.reducedPrice !== undefined && u.reducedPrice > 0) {
+            const startStr = (u.saleStartDate ? u.saleStartDate : new Date()).toISOString()
+            const endStr = (u.saleEndDate ? u.saleEndDate : new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000)).toISOString()
+            saleBlock = `
+      <Sale>
+        <StartDate>${startStr}</StartDate>
+        <EndDate>${endStr}</EndDate>
+        <SalePrice currency="EUR">${u.reducedPrice}</SalePrice>
+      </Sale>`
+          }
+
+          return `
+  <Message>
+    <MessageID>${msgId++}</MessageID>
+    <OperationType>Update</OperationType>
+    <Price>
+      <SKU>${this.escapeXml(u.sku)}</SKU>
+      <StandardPrice currency="EUR">${standardPrice}</StandardPrice>${saleBlock}
+    </Price>
+  </Message>`
+        }).join('')
+
+        const priceXml = `<?xml version="1.0" encoding="utf-8"?>
+<AmazonEnvelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="amzn-envelope.xsd">
+  <Header>
+    <DocumentVersion>1.01</DocumentVersion>
+    <MerchantIdentifier>${this.config.sellerId}</MerchantIdentifier>
+  </Header>
+  <MessageType>Price</MessageType>
+  ${priceMessages}
+</AmazonEnvelope>`
+
+        await this.submitXmlFeed('POST_PRODUCT_PRICING_DATA', priceXml)
+      }
+
     } catch (error) {
       console.error(`[AmazonAdapter] Error updating listings:`, error)
       throw error
