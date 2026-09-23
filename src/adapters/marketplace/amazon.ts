@@ -561,7 +561,7 @@ export class AmazonAdapter implements MarketplaceAdapter {
         headers: {
           'Content-Type': 'application/pdf'
         },
-        body: pdfBuffer
+        body: pdfBuffer as unknown as BodyInit as any
       })
 
       if (!uploadRes.ok) {
