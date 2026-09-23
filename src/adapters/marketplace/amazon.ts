@@ -262,8 +262,7 @@ export class AmazonAdapter implements MarketplaceAdapter {
               <Quantity>${item.quantity}</Quantity>
             </AdjustedItem>
           </PaymentAdjustment>
-        </Message>`).join('
-')
+        </Message>`).join('\n')
 
       const feedXml = `<?xml version="1.0" encoding="utf-8"?>
 <AmazonEnvelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="amzn-envelope.xsd">
@@ -414,8 +413,7 @@ ${feedXml}`)
       // 5. Parse TSV
       if (onProgress) onProgress(90, 100, 'Verarbeite Report-Daten...')
       
-      const lines = text.split(/\r?
-/).filter(l => l.trim())
+      const lines = text.split(/\r?\n/).filter(l => l.trim())
       if (lines.length < 2) return []
 
       const headers = lines[0].split('\t').map(h => h.toLowerCase().trim())
