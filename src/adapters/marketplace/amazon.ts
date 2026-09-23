@@ -262,7 +262,8 @@ export class AmazonAdapter implements MarketplaceAdapter {
               <Quantity>${item.quantity}</Quantity>
             </AdjustedItem>
           </PaymentAdjustment>
-        </Message>`).join('\n')
+        </Message>`).join('
+')
 
       const feedXml = `<?xml version="1.0" encoding="utf-8"?>
 <AmazonEnvelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="amzn-envelope.xsd">
@@ -274,7 +275,8 @@ export class AmazonAdapter implements MarketplaceAdapter {
   ${xmlItems}
 </AmazonEnvelope>`
 
-      console.log(`[AmazonAdapter] Generated Payment Adjustment XML Feed:\n${feedXml}`)
+      console.log(`[AmazonAdapter] Generated Payment Adjustment XML Feed:
+${feedXml}`)
       console.log(`[AmazonAdapter] Refund simulated successfully for Amazon Order ${marketplaceOrderId}`)
       return true
     } catch (error) {
@@ -412,7 +414,8 @@ export class AmazonAdapter implements MarketplaceAdapter {
       // 5. Parse TSV
       if (onProgress) onProgress(90, 100, 'Verarbeite Report-Daten...')
       
-      const lines = text.split(/\r?\n/).filter(l => l.trim())
+      const lines = text.split(/\r?
+/).filter(l => l.trim())
       if (lines.length < 2) return []
 
       const headers = lines[0].split('\t').map(h => h.toLowerCase().trim())
@@ -693,6 +696,7 @@ export class AmazonAdapter implements MarketplaceAdapter {
         
         if (update.price !== undefined || update.reducedPrice !== undefined) {
           const offerValue: any = {
+            marketplace_id: this.marketplaceId,
             currency: "EUR",
             our_price: [{
               schedule: [{
