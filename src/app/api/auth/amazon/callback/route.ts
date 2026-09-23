@@ -73,6 +73,7 @@ export async function GET(req: NextRequest) {
           accessToken: accessToken, // We can store the initial access token too (expires in 1hr)
           expiresAt: new Date(Date.now() + (tokenData.expires_in * 1000)),
           updatedAt: new Date(),
+          isActive: true,
         })
         .where(eq(marketplaceIntegrations.id, existing[0].id))
     } else {
