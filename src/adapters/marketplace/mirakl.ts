@@ -1659,7 +1659,7 @@ export class MiraklAdapter implements MarketplaceAdapter {
    */
   async updateListings(
     companyId: string, 
-    updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number; fallbackPrice?: number }[]
+    updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number; reducedPrice?: number; fallbackPrice?: number }[]
   ): Promise<void> {
     if (!updates || updates.length === 0) return
 
@@ -1761,14 +1761,35 @@ export class MiraklAdapter implements MarketplaceAdapter {
           console.warn(`[MiraklAdapter:${this.marketplace}] Warning: SKU ${update.sku} has no price available, import might fail.`)
         }
 
-        // Always preserve discount if it exists
-        if (currentOffersMap[update.sku] && currentOffersMap[update.sku].discount) {
+        // Handle discount (sales price)
+        if (update.reducedPrice !== undefined) {
+          if (update.reducedPrice > 0) {
+            // Set new discount
+            const startDate = new Date();
+            const endDate = new Date();
+            endDate.setFullYear(endDate.getFullYear() + 10); // 10 years from now
+            
+            offer.discount = {
+              discount_price: update.reducedPrice,
+              start_date: startDate.toISOString(),
+              end_date: endDate.toISOString()
+            }
+          } else {
+            // Remove discount (Mirakl allows removing by passing empty strings)
+            offer.discount = {
+              discount_price: null,
+              start_date: null,
+              end_date: null
+            }
+          }
+        } else if (currentOffersMap[update.sku] && currentOffersMap[update.sku].discount) {
+          // Preserve existing discount
           const rawDisc = currentOffersMap[update.sku].discount;
           offer.discount = {};
           if (rawDisc.discount_price !== undefined) {
-            offer.discount.price = rawDisc.discount_price;
+            offer.discount.discount_price = rawDisc.discount_price;
           } else if (rawDisc.price !== undefined) {
-            offer.discount.price = rawDisc.price;
+            offer.discount.discount_price = rawDisc.price;
           }
           if (rawDisc.start_date) {
             offer.discount.start_date = rawDisc.start_date;

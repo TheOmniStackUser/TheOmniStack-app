@@ -126,7 +126,7 @@ export async function syncProductsForCompany(companyId: string, integrationId?: 
 
       // Bulk Load existing data
       const existingMappings = await db.select().from(productMappings).where(and(eq(productMappings.companyId, companyId), eq(productMappings.integrationId, integration.id)))
-      const existingProducts = await db.select({ id: products.id, sku: products.sku }).from(products).where(eq(products.companyId, companyId))
+      const existingProducts = await db.select({ id: products.id, sku: products.sku, reducedPrice: products.reducedPrice, price: products.price }).from(products).where(eq(products.companyId, companyId))
 
       const mappedSkus = new Set(existingMappings.map(m => m.marketplaceSku))
       const centralProductMap = new Map(existingProducts.map(p => [p.sku, p]))
@@ -208,7 +208,7 @@ export async function syncProductsForCompany(companyId: string, integrationId?: 
 /**
  * Pushes inventory and price updates from OmniStack to the mapped marketplaces.
  */
-export async function pushUpdatesToMarketplaces(companyId: string, updates: { sku: string, stock?: number, price?: number }[], job?: Job<any>, targetIntegrationId?: string) {
+export async function pushUpdatesToMarketplaces(companyId: string, updates: { sku: string, stock?: number, price?: number, reducedPrice?: number }[], job?: Job<any>, targetIntegrationId?: string) {
   console.log(`[ProductSync] Pushing updates for ${updates.length} products for company ${companyId}...`)
   
   if (updates.length === 0) return { totalUpdatesSent: 0, activeMarketplaces: [] }
@@ -217,11 +217,11 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
 
   // Find all mappings for these SKUs
   // First find central products
-  const centralProducts: { id: string, sku: string }[] = []
+  const centralProducts: { id: string, sku: string, price?: string | null }[] = []
   for (let i = 0; i < skus.length; i += 1000) {
     const chunkSkus = skus.slice(i, i + 1000)
     const chunkProducts = await db
-      .select({ id: products.id, sku: products.sku })
+      .select({ id: products.id, sku: products.sku, reducedPrice: products.reducedPrice, price: products.price })
       .from(products)
       .where(
         and(
@@ -277,7 +277,7 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
   console.log("[Debug] Found active integrations:", activeIntegrations.map(i => i.id))
 
   // Group mappings by integrationId
-  const updatesByIntegration: Record<string, { sku: string, marketplaceProductId?: string, stock?: number, price?: number }[]> = {}
+  const updatesByIntegration: Record<string, { sku: string, marketplaceProductId?: string, stock?: number, price?: number, reducedPrice?: number }[]> = {}
 
   for (const mapping of mappings) {
     console.log("[Debug] Checking mapping:", mapping.id, mapping.integrationId, mapping.marketplaceSku)
@@ -324,19 +324,38 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
         modifiedPrice += parseFloat(mapping.priceModifierValue?.toString() || '0')
       } else if (mapping.priceModifierType === 'percentage') {
         const percent = parseFloat(mapping.priceModifierValue?.toString() || '0')
-        modifiedPrice = modifiedPrice * (1 + (percent / 100))
+        modifiedPrice = modifiedPrice * (1 + percent / 100)
       }
     }
 
-    if (canSyncPrice && mapping.syncPrice && updateDef.price !== undefined) {
-      mUpdate.price = modifiedPrice
+    let modifiedReducedPrice = updateDef.reducedPrice
+    if (modifiedReducedPrice !== undefined) {
+      if (mapping.priceModifierType === 'fixed') {
+        modifiedReducedPrice += parseFloat(mapping.priceModifierValue?.toString() || '0')
+      } else if (mapping.priceModifierType === 'percentage') {
+        const percent = parseFloat(mapping.priceModifierValue?.toString() || '0')
+        modifiedReducedPrice = modifiedReducedPrice * (1 + percent / 100)
+      }
     }
 
-    if (modifiedPrice !== undefined) {
-      (mUpdate as any).fallbackPrice = modifiedPrice
+    if (canSyncPrice && mapping.syncPrice) {
+      if (updateDef.price !== undefined) {
+        mUpdate.price = modifiedPrice
+      }
+      if (updateDef.reducedPrice !== undefined) {
+        mUpdate.reducedPrice = modifiedReducedPrice
+        // Ensure price is also sent if reducedPrice is sent, fallback to central DB price
+        if (mUpdate.price === undefined && centralProduct.price) {
+          mUpdate.price = parseFloat(centralProduct.price)
+        }
+      }
     }
 
-    if (mUpdate.stock !== undefined || mUpdate.price !== undefined) {
+    if (modifiedPrice !== undefined || modifiedReducedPrice !== undefined) {
+      (mUpdate as any).fallbackPrice = modifiedPrice || parseFloat(centralProduct.price || '0')
+    }
+
+    if (mUpdate.stock !== undefined || mUpdate.price !== undefined || mUpdate.reducedPrice !== undefined) {
       updatesByIntegration[intId].push(mUpdate)
     }
   }
@@ -395,7 +414,8 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
     const logPayload = mpUpdates.map((u: any) => ({
       sku: u.sku,
       ...(u.stock !== undefined ? { stock: u.stock } : {}),
-      ...(u.price !== undefined ? { price: u.price } : {})
+      ...(u.price !== undefined ? { price: u.price } : {}),
+      ...(u.reducedPrice !== undefined ? { reducedPrice: u.reducedPrice } : {})
     }))
 
     // Create sync log

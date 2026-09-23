@@ -1167,13 +1167,14 @@ export async function bulkUpdateCustomsData(productIds: string[], hsCode: string
 }
 
 
-export async function bulkUpdateStockAndPrice(productIds: string[], newStock?: number, newPrice?: number) {
+export async function bulkUpdateStockAndPrice(productIds: string[], newStock?: number, newPrice?: number, newReducedPrice?: number) {
   const auth = await requireAuth()
   if (productIds.length === 0) return { success: true }
 
-  const updates: Partial<{ currentStock: string; price: string; updatedAt: Date }> = { updatedAt: new Date() }
+  const updates: Partial<{ currentStock: string; price: string; reducedPrice: string | null; updatedAt: Date }> = { updatedAt: new Date() }
   let safeStock: number | undefined
   let safePrice: number | undefined
+  let safeReducedPrice: number | undefined
 
   if (newStock !== undefined) {
     safeStock = Math.max(0, newStock)
@@ -1183,6 +1184,16 @@ export async function bulkUpdateStockAndPrice(productIds: string[], newStock?: n
   if (newPrice !== undefined) {
     safePrice = Math.max(0, newPrice)
     updates.price = safePrice.toString()
+  }
+  
+  if (newReducedPrice !== undefined) {
+    if (newReducedPrice === 0 || newReducedPrice === null) {
+      updates.reducedPrice = null
+      safeReducedPrice = 0
+    } else {
+      safeReducedPrice = Math.max(0, newReducedPrice)
+      updates.reducedPrice = safeReducedPrice.toString()
+    }
   }
 
   if (Object.keys(updates).length === 1) {
@@ -1211,7 +1222,8 @@ export async function bulkUpdateStockAndPrice(productIds: string[], newStock?: n
         const syncPayload = selectedProducts.map(p => ({
           sku: p.sku,
           stock: safeStock,
-          price: safePrice
+          price: safePrice,
+          reducedPrice: safeReducedPrice === 0 ? undefined : safeReducedPrice // 0 means remove sale price
         }))
         await pushUpdatesToMarketplaces(auth.activeCompanyId, syncPayload)
       } catch (error) {

@@ -669,7 +669,7 @@ export class AmazonAdapter implements MarketplaceAdapter {
 
   async updateListings(
     companyId: string, 
-    updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number }[]
+    updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number; reducedPrice?: number; fallbackPrice?: number }[]
   ): Promise<void> {
     if (!updates || updates.length === 0) return
 
@@ -691,18 +691,26 @@ export class AmazonAdapter implements MarketplaceAdapter {
           })
         }
         
-        if (update.price !== undefined) {
+        if (update.price !== undefined || update.reducedPrice !== undefined) {
+          const offerValue: any = {
+            currency: "EUR",
+            our_price: [{
+              schedule: [{
+                value_with_tax: update.price !== undefined ? update.price : update.fallbackPrice
+              }]
+            }]
+          }
+          if (update.reducedPrice) {
+            offerValue.discounted_price = [{
+              schedule: [{
+                value_with_tax: update.reducedPrice
+              }]
+            }]
+          }
           patches.push({
             op: "replace",
             path: "/attributes/purchasable_offer",
-            value: [{
-              currency: "EUR",
-              our_price: [{
-                schedule: [{
-                  value_with_tax: update.price
-                }]
-              }]
-            }]
+            value: [offerValue]
           })
         }
 

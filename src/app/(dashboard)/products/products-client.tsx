@@ -237,6 +237,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
   const [showBulkEditModal, setShowBulkEditModal] = useState(false)
   const [bulkStock, setBulkStock] = useState('')
   const [bulkPrice, setBulkPrice] = useState('')
+  const [bulkReducedPrice, setBulkReducedPrice] = useState('')
   const [isBulkEditing, setIsBulkEditing] = useState(false)
 
   const handleBulkEditSubmit = async () => {
@@ -246,22 +247,28 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
       
       const newStock = bulkStock.trim() !== '' ? Math.max(0, parseInt(bulkStock)) : undefined
       let newPrice: number | undefined
+      let newReducedPrice: number | undefined
       if (bulkPrice.trim() !== '') {
         const parsed = parseFloat(bulkPrice.replace(',', '.'))
         if (!isNaN(parsed)) newPrice = Math.max(0, parsed)
       }
+      if (bulkReducedPrice.trim() !== '') {
+        const parsed = parseFloat(bulkReducedPrice.replace(',', '.'))
+        if (!isNaN(parsed)) newReducedPrice = Math.max(0, parsed)
+      }
 
-      if (newStock === undefined && newPrice === undefined) {
+      if (newStock === undefined && newPrice === undefined && newReducedPrice === undefined) {
         showToast('Keine Änderungen eingegeben', 'info')
         setIsBulkEditing(false)
         return
       }
 
-      await bulkUpdateStockAndPrice(Array.from(selectedProductIds), newStock, newPrice)
+      await bulkUpdateStockAndPrice(Array.from(selectedProductIds), newStock, newPrice, newReducedPrice)
       setSelectedProductIds(new Set())
       setShowBulkEditModal(false)
       setBulkStock('')
       setBulkPrice('')
+      setBulkReducedPrice('')
       showToast('Bestand/Preis erfolgreich für ausgewählte Produkte aktualisiert', 'success')
       router.refresh()
     } catch (e) {
@@ -930,6 +937,18 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 placeholder:text-slate-500" 
                   />
                 </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700">Neuer Aktions-Preis (Brutto in €)</label>
+                  <input 
+                    type="text" 
+                    value={bulkReducedPrice} 
+                    onChange={e => setBulkReducedPrice(e.target.value)} 
+                    placeholder="z.B. 14.90 (0 zum Löschen)" 
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 placeholder:text-slate-500" 
+                  />
+                </div>
+
               </div>
             </div>
             

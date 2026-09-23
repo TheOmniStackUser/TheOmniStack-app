@@ -1034,7 +1034,7 @@ export class OttoAdapter implements MarketplaceAdapter {
    */
   async updateListings(
     companyId: string, 
-    updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number }[]
+    updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number; reducedPrice?: number; fallbackPrice?: number }[]
   ): Promise<void> {
     if (!updates || updates.length === 0) return
 
@@ -1073,13 +1073,24 @@ export class OttoAdapter implements MarketplaceAdapter {
       // But patching prices for existing active products can be complex.
       // We will assume a basic structure. If it fails, the user needs
       // to adjust mapping or use the Otto UI.
-      const priceUpdates = updates.filter(u => u.price !== undefined).map(u => ({
-        sku: u.sku,
-        standardPrice: {
-          amount: u.price,
-          currency: 'EUR'
+      const priceUpdates = updates.filter(u => u.price !== undefined || u.reducedPrice !== undefined).map(u => {
+        const payload: any = {
+          sku: u.sku,
+          standardPrice: {
+            amount: u.price !== undefined ? u.price : u.fallbackPrice,
+            currency: 'EUR'
+          }
         }
-      }))
+        if (u.reducedPrice) {
+          payload.sale = {
+            salePrice: {
+              amount: u.reducedPrice,
+              currency: 'EUR'
+            }
+          }
+        }
+        return payload
+      })
 
       if (priceUpdates.length > 0) {
         const chunkSize = 150
