@@ -18,13 +18,7 @@ export function OttoIntegrationForm({
 }) {
   const [state, action, pending] = useActionState(saveOttoIntegrationAction, undefined)
   const [environment, setEnvironment] = useState(initialEnvironment)
-  
 
-  ; path=/; max-age=3600; SameSite=Lax`
-
-    // Open in same tab so cookies are preserved
-    window.location.href = inviteLink.trim()
-  }
 
   return (
     <form action={action} className="space-y-6 max-w-xl">
