@@ -675,72 +675,74 @@ ${feedXml}`)
     if (!updates || updates.length === 0) return
 
     try {
-      const inventoryUpdates = updates.filter(u => u.stock !== undefined)
-      const priceUpdates = updates.filter(u => u.price !== undefined || u.reducedPrice !== undefined)
+      const accessToken = await this.getAccessToken()
 
-      if (inventoryUpdates.length > 0) {
-        let msgId = 1
-        const inventoryMessages = inventoryUpdates.map(u => `
-  <Message>
-    <MessageID>${msgId++}</MessageID>
-    <OperationType>Update</OperationType>
-    <Inventory>
-      <SKU>${this.escapeXml(u.sku)}</SKU>
-      <Quantity>${u.stock}</Quantity>
-    </Inventory>
-  </Message>`).join('')
+      for (const u of updates) {
+        const patches: any[] = []
 
-        const inventoryXml = `<?xml version="1.0" encoding="utf-8"?>
-<AmazonEnvelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="amzn-envelope.xsd">
-  <Header>
-    <DocumentVersion>1.01</DocumentVersion>
-    <MerchantIdentifier>${this.config.sellerId}</MerchantIdentifier>
-  </Header>
-  <MessageType>Inventory</MessageType>
-  ${inventoryMessages}
-</AmazonEnvelope>`
+        if (u.stock !== undefined) {
+          patches.push({
+            op: 'replace',
+            path: '/attributes/fulfillment_availability',
+            value: [
+              {
+                fulfillment_channel_code: 'DEFAULT',
+                quantity: u.stock
+              }
+            ]
+          })
+        }
 
-        await this.submitXmlFeed('POST_INVENTORY_AVAILABILITY_DATA', inventoryXml)
-      }
-
-      if (priceUpdates.length > 0) {
-        let msgId = 1
-        const priceMessages = priceUpdates.map(u => {
+        if (u.price !== undefined || u.reducedPrice !== undefined) {
           const standardPrice = u.price !== undefined ? u.price : (u.fallbackPrice || 0)
-          let saleBlock = ''
+          const priceSchedule: any = { value_with_tax: standardPrice }
+          
+          const ourPrice: any = { schedule: [priceSchedule] }
+          
+          // Amazon PATCH does not natively support "sale prices" via simple schedule in purchasable_offer in the same way,
+          // but if reducedPrice is present, we can just set the main price to reducedPrice for now to ensure it updates.
+          // For a true sale, you need to use the promotional API or specific price attributes. 
+          // Here we just update the main price to the reduced price if it exists.
           if (u.reducedPrice !== undefined && u.reducedPrice > 0) {
-            const startStr = (u.saleStartDate ? u.saleStartDate : new Date()).toISOString()
-            const endStr = (u.saleEndDate ? u.saleEndDate : new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000)).toISOString()
-            saleBlock = `
-      <Sale>
-        <StartDate>${startStr}</StartDate>
-        <EndDate>${endStr}</EndDate>
-        <SalePrice currency="EUR">${u.reducedPrice}</SalePrice>
-      </Sale>`
+             ourPrice.schedule[0].value_with_tax = u.reducedPrice
           }
 
-          return `
-  <Message>
-    <MessageID>${msgId++}</MessageID>
-    <OperationType>Update</OperationType>
-    <Price>
-      <SKU>${this.escapeXml(u.sku)}</SKU>
-      <StandardPrice currency="EUR">${standardPrice}</StandardPrice>${saleBlock}
-    </Price>
-  </Message>`
-        }).join('')
+          patches.push({
+            op: 'replace',
+            path: '/attributes/purchasable_offer',
+            value: [
+              {
+                marketplace_id: this.marketplaceId,
+                currency: 'EUR',
+                our_price: [ourPrice]
+              }
+            ]
+          })
+        }
 
-        const priceXml = `<?xml version="1.0" encoding="utf-8"?>
-<AmazonEnvelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="amzn-envelope.xsd">
-  <Header>
-    <DocumentVersion>1.01</DocumentVersion>
-    <MerchantIdentifier>${this.config.sellerId}</MerchantIdentifier>
-  </Header>
-  <MessageType>Price</MessageType>
-  ${priceMessages}
-</AmazonEnvelope>`
+        if (patches.length > 0) {
+          const payload = {
+            productType: 'PRODUCT',
+            patches
+          }
 
-        await this.submitXmlFeed('POST_PRODUCT_PRICING_DATA', priceXml)
+          const res = await fetch(`${this.baseUrl}/listings/2021-08-01/items/${this.config.sellerId}/${u.sku}?marketplaceIds=${this.marketplaceId}&issueLocale=de_DE`, {
+            method: 'PATCH',
+            headers: {
+              'x-amz-access-token': accessToken,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify(payload)
+          })
+
+          if (!res.ok) {
+            const errText = await res.text()
+            console.error(`[AmazonAdapter] Failed to PATCH SKU ${u.sku}: ${res.status} ${errText}`)
+            // We throw the error so the sync worker logs it as failed for this marketplace
+            throw new Error(`Amazon API Fehler für SKU ${u.sku}: ${res.status} - ${errText}`)
+          }
+        }
       }
 
     } catch (error) {
