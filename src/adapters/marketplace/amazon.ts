@@ -736,11 +736,27 @@ ${feedXml}`)
             body: JSON.stringify(payload)
           })
 
+          const responseText = await res.text()
+
           if (!res.ok) {
-            const errText = await res.text()
-            console.error(`[AmazonAdapter] Failed to PATCH SKU ${u.sku}: ${res.status} ${errText}`)
-            // We throw the error so the sync worker logs it as failed for this marketplace
-            throw new Error(`Amazon API Fehler für SKU ${u.sku}: ${res.status} - ${errText}`)
+            console.error(`[AmazonAdapter] Failed to PATCH SKU ${u.sku}: ${res.status} ${responseText}`)
+            throw new Error(`Amazon API Fehler für SKU ${u.sku}: ${res.status} - ${responseText}`)
+          }
+
+          try {
+            const data = JSON.parse(responseText)
+            const errors = (data.issues || []).filter((i: any) => i.severity === 'ERROR')
+            if (errors.length > 0) {
+              console.error(`[AmazonAdapter] Amazon accepted request but returned errors for SKU ${u.sku}:`, JSON.stringify(errors))
+              throw new Error(`Amazon API Fehler (Issues) für SKU ${u.sku}: ${errors.map((e: any) => e.message).join(', ')}`)
+            } else {
+              console.log(`[AmazonAdapter] Successfully patched SKU ${u.sku}. Status: ${data.status}`)
+            }
+          } catch (e: any) {
+             if (e.message.includes('Amazon API Fehler (Issues)')) {
+                 throw e;
+             }
+             // Ignore JSON parse error if body is empty or not JSON
           }
         }
       }

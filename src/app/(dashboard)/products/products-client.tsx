@@ -826,7 +826,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                     const errors = result.failedMarketplaces.map((f: any) => `${f.name}: ${f.error}`).join(' | ')
                     showToast(`Sync mit Fehlern beendet: ${errors}`, 'error')
                   } else {
-                    showToast(`Sync für ${result.totalUpdatesSent} Updates erfolgreich gestartet!`, 'success');
+                    showToast(`Sync für ${selectedProductIds.size} Produkte erfolgreich an Marktplätze übermittelt!`, 'success');
                   }
                   setSelectedProductIds(new Set());
                 } catch (error) {
