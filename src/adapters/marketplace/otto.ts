@@ -42,7 +42,7 @@ export class OttoAdapter implements MarketplaceAdapter {
    * Exchanges the Client ID and Secret for a short-lived Access Token
    */
   private async getAccessToken(): Promise<string> {
-    const cacheKey = `${this.config.clientId}-${(this.config.metadata as any)?.installationId || 'no-install'}-${(this.config.metadata as any)?.connectionType || 'service_partner'}`;
+    const cacheKey = `${this.config.clientId}-${this.config.installationId || 'no-install'}-${this.config.connectionType || 'service_partner'}`;
 
     const cached = tokenCache.get(cacheKey);
     // Buffer of 10 seconds
@@ -63,7 +63,7 @@ export class OttoAdapter implements MarketplaceAdapter {
   }
 
   private async _fetchAccessToken(cacheKey: string): Promise<string> {
-    const isPrivate = (this.config.metadata as any)?.connectionType === 'private'
+    const isPrivate = this.config.connectionType === 'private'
     const tokenClientId = this.config.clientId
     const tokenClientSecret = this.config.clientSecret
 
@@ -100,7 +100,7 @@ export class OttoAdapter implements MarketplaceAdapter {
          }
          // If fallback worked, they misconfigured connectionType. We adjust it in memory for this session
          console.warn(`[OttoAdapter] Fallback succeeded. Adjusting connectionType for this session.`)
-         if (this.config.metadata) { (this.config.metadata as any).connectionType = isPrivate ? 'service_partner' : 'private'; }
+         this.config.connectionType = isPrivate ? 'service_partner' : 'private';
       } else {
          throw new Error(`[OttoAdapter] Failed to fetch access token: ${response.status} ${errText}`)
       }
@@ -111,7 +111,7 @@ export class OttoAdapter implements MarketplaceAdapter {
     const devExpiresIn = data.expires_in || 300 // default 5 mins
 
     // If this is a Private App, the developer token is all we need
-    if ((this.config.metadata as any)?.connectionType === 'private') {
+    if (this.config.connectionType === 'private') {
       console.log(`[OttoAdapter] Using Private App flow. Dev Token is fully authorized.`)
       tokenCache.set(cacheKey, {
         token: developerToken,
@@ -121,10 +121,10 @@ export class OttoAdapter implements MarketplaceAdapter {
     }
 
     // If we have installation details, exchange developer token for installation access token
-    if ((this.config.metadata as any)?.installationId && (this.config.metadata as any)?.appId) {
-      console.log(`[OttoAdapter] Exchanging developer token for installation access token (appId: ${(this.config.metadata as any)?.appId}, installationId: ${(this.config.metadata as any)?.installationId})...`)
+    if (this.config.installationId && this.config.appId) {
+      console.log(`[OttoAdapter] Exchanging developer token for installation access token (appId: ${this.config.appId}, installationId: ${this.config.installationId})...`)
       
-      const installTokenUrl = `${this.baseUrl}/v1/apps/${(this.config.metadata as any)?.appId}/installations/${(this.config.metadata as any)?.installationId}/accessToken`
+      const installTokenUrl = `${this.baseUrl}/v1/apps/${this.config.appId}/installations/${this.config.installationId}/accessToken`
       const installResponse = await fetch(installTokenUrl, {
         method: 'POST',
         headers: {
