@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
-  const environment = searchParams.get('environment') || 'sandbox'
+  const environment = searchParams.get('environment') || 'production'
   const companyId = searchParams.get('companyId') || request.cookies.get('otto_oauth_company_id')?.value
 
   if (!companyId) {

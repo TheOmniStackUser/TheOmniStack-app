@@ -46,7 +46,7 @@ export function OttoIntegrationForm({
         </div>
 
         <a
-          href={`/api/auth/otto?environment=${environment}&companyId=${companyId}`}
+          href="https://portal.otto.market/apps/theomnistackapp/versions/1"
           className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors shadow-sm"
           onClick={() => {
             document.cookie = `otto_oauth_company_id=${companyId}; path=/; max-age=3600; SameSite=Lax`;
