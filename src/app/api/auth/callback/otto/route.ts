@@ -220,6 +220,7 @@ export async function GET(request: NextRequest) {
         clientId: appClientId,
         clientSecret: appClientSecret,
         metadata,
+        isActive: true,
         accessToken: userAccessToken,
         refreshToken: tokenData.refresh_token,
         updatedAt: new Date()
