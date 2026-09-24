@@ -193,7 +193,8 @@ export function LogsClient({ initialLogs }: LogsClientProps) {
                       <tr>
                         <th className="px-4 py-3 font-semibold">SKU</th>
                         <th className="px-4 py-3 font-semibold">Bestand</th>
-                        <th className="px-4 py-3 font-semibold">Preis</th>
+                        <th className="px-4 py-3 font-semibold">Normaler Preis</th>
+                        <th className="px-4 py-3 font-semibold">Aktionspreis</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -216,7 +217,23 @@ export function LogsClient({ initialLogs }: LogsClientProps) {
                                   {Number(item.price).toFixed(2)} €
                                 </span>
                               ) : (
-                                <span className="text-slate-400 italic">Nicht gesynct</span>
+                                <span className="text-slate-400 italic">-</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-slate-600">
+                              {item.reducedPrice !== undefined && item.reducedPrice > 0 ? (
+                                <div>
+                                  <span className="bg-rose-50 text-rose-700 px-2 py-1 rounded font-medium border border-rose-100">
+                                    {Number(item.reducedPrice).toFixed(2)} €
+                                  </span>
+                                  {(item.saleStartDate || item.saleEndDate) && (
+                                    <div className="text-[10px] text-slate-500 mt-1.5 whitespace-nowrap">
+                                      {item.saleStartDate ? format(new Date(item.saleStartDate), 'dd.MM.yy') : '∞'} - {item.saleEndDate ? format(new Date(item.saleEndDate), 'dd.MM.yy') : '∞'}
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-slate-400 italic">-</span>
                               )}
                             </td>
                           </tr>

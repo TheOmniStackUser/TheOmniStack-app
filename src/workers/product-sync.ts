@@ -432,7 +432,9 @@ let modifiedSaleStartDate = updateDef.saleStartDate !== undefined ? (updateDef.s
       sku: u.sku,
       ...(u.stock !== undefined ? { stock: u.stock } : {}),
       ...(u.price !== undefined ? { price: u.price } : {}),
-      ...(u.reducedPrice !== undefined ? { reducedPrice: u.reducedPrice } : {})
+      ...(u.reducedPrice !== undefined ? { reducedPrice: u.reducedPrice } : {}),
+      ...(u.saleStartDate !== undefined ? { saleStartDate: u.saleStartDate } : {}),
+      ...(u.saleEndDate !== undefined ? { saleEndDate: u.saleEndDate } : {})
     }))
 
     // Create sync log
