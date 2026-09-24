@@ -126,7 +126,7 @@ export async function GET(request: NextRequest) {
           'b979c7bd-7e50-4b0e-bae2-d41d5fd2c1d7', 
           '69eb5ed304bb0234c14c27b5'
         ]
-      : ['ee1fc586-b339-47fb-80a7-22e239d575cd', 'fb5f4e1a-5a8f-4eb3-89b1-237f359d4709', '6a0c0a71102c6f4203615ea3', '69eb5ed304bb0234c14c27b5']
+      : [process.env.OTTO_APP_ID || '40c96391-5c99-4823-ace9-95e22df735bc', 'ee1fc586-b339-47fb-80a7-22e239d575cd', 'fb5f4e1a-5a8f-4eb3-89b1-237f359d4709', '6a0c0a71102c6f4203615ea3', '69eb5ed304bb0234c14c27b5']
 
     let installationId = ''
     let finalAppId = ''
