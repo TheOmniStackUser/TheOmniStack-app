@@ -281,12 +281,20 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
 
   for (const mapping of mappings) {
     console.log("[Debug] Checking mapping:", mapping.id, mapping.integrationId, mapping.marketplaceSku)
-    const intId = mapping.integrationId
-    if (!intId) continue // skip if mapping has no integrationId
+    
+    let intId = mapping.integrationId
+    let integration = intId ? activeIntegrations.find(i => i.id === intId) : undefined
 
-    const integration = activeIntegrations.find(i => i.id === intId)
+    // Fallback: If no integrationId is set (e.g. from legacy CSV imports), find the active integration by marketplace type
     if (!integration) {
-      console.log("[Debug] Integration not found in active list:", intId)
+      integration = activeIntegrations.find(i => i.type === mapping.marketplace)
+      if (integration) {
+        intId = integration.id
+      }
+    }
+
+    if (!integration || !intId) {
+      console.log("[Debug] Integration not found in active list or by fallback type for mapping:", mapping.id)
       continue
     }
 
