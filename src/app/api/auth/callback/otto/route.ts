@@ -80,8 +80,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Could not identify company for this OAuth callback. Please try connecting again from the integrations page.' }, { status: 400 })
     }
 
-    let appClientId = process.env.OTTO_APP_CLIENT_ID || '7dad7649-bdee-4593-8a65-c74f28693507'
-    let appClientSecret = process.env.OTTO_APP_CLIENT_SECRET || '9d8f8b8f-6ee7-4f78-b844-15332634b760'
+    let appClientId = process.env.OTTO_APP_CLIENT_ID || 'b93fd38d-4098-49a0-af5d-d57ed1162043'
+    let appClientSecret = process.env.OTTO_APP_CLIENT_SECRET || '3f481506-f051-4b0a-8538-e8b6a21692d8'
     
     // Override with Sandbox credentials if in sandbox environment
     if (environment === 'sandbox') {

@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.theomnistack.de'
   const redirectUri = `${appUrl}/api/auth/callback/otto`
 
-  let appClientId = process.env.OTTO_APP_CLIENT_ID || '7dad7649-bdee-4593-8a65-c74f28693507'
+  let appClientId = process.env.OTTO_APP_CLIENT_ID || 'b93fd38d-4098-49a0-af5d-d57ed1162043'
   if (environment === 'sandbox') {
     appClientId = process.env.OTTO_SANDBOX_APP_CLIENT_ID || '0bf6d71a-ed4b-4fb7-a7a1-445878d75912'
   }

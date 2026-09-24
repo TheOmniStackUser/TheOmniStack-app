@@ -18,14 +18,9 @@ export function OttoIntegrationForm({
 }) {
   const [state, action, pending] = useActionState(saveOttoIntegrationAction, undefined)
   const [environment, setEnvironment] = useState(initialEnvironment)
-  const [inviteLink, setInviteLink] = useState('')
+  
 
-  const handleConnectOtto = () => {
-    if (!inviteLink.trim()) return
-
-    // Store company ID in cookie BEFORE navigating away.
-    // SameSite=Lax means the cookie IS sent on GET-redirects back to our domain.
-    document.cookie = `otto_oauth_company_id=${companyId}; path=/; max-age=3600; SameSite=Lax`
+  ; path=/; max-age=3600; SameSite=Lax`
 
     // Open in same tab so cookies are preserved
     window.location.href = inviteLink.trim()
@@ -46,52 +41,27 @@ export function OttoIntegrationForm({
 
       <input type="hidden" name="connectionType" value="service_partner" />
 
-      {/* SERVICE PARTNER: Invitation link → sets cookie first */}
+      
+      {/* SERVICE PARTNER: Public App OAuth Flow */}
       <div className="p-5 bg-blue-50 border border-blue-200 rounded-xl space-y-4">
-          <div>
-            <p className="font-semibold text-blue-900 mb-1">Verbindung via TheOmniStack App</p>
-            <p className="text-sm text-blue-800 leading-relaxed">
-              Füge den Einladungslink ein, den du im OTTO Developer Portal generiert hast, und klicke dann auf den Button.
-              Öffne den Link <strong>nicht</strong> direkt – nur über diesen Button wird die Verbindung korrekt erkannt.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <label htmlFor="inviteLink" className="block text-sm font-semibold text-blue-900">
-              OTTO Einladungslink
-            </label>
-            <input
-              type="url"
-              id="inviteLink"
-              value={inviteLink}
-              onChange={(e) => setInviteLink(e.target.value)}
-              className="w-full px-4 py-2 bg-white border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm text-slate-900 placeholder:text-slate-400"
-              placeholder="https://portal.otto.market/apps/..."
-            />
-          </div>
-
-          <button
-            type="button"
-            onClick={handleConnectOtto}
-            disabled={!inviteLink.trim()}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-semibold rounded-xl transition-colors shadow-sm"
-          >
-            <ExternalLink className="w-4 h-4" />
-            1. Schritt: Jetzt mit OTTO verbinden (App installieren)
-          </button>
-          
-          <div className="pt-4 border-t border-blue-200">
-            <p className="text-sm text-blue-800 leading-relaxed mb-2">
-              <strong>WICHTIG:</strong> Nachdem du bei OTTO auf "Installieren" geklickt hast und hierher zurückgeleitet wurdest, klicke auf diesen Button, um den Autorisierungs-Token abzurufen:
-            </p>
-            <a
-              href={`/api/auth/otto?environment=${environment}&companyId=${companyId}`}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-colors shadow-sm"
-            >
-              2. Schritt: Autorisierung abschließen (Token abrufen)
-            </a>
-          </div>
+        <div>
+          <p className="font-semibold text-blue-900 mb-1">Mit OTTO verbinden</p>
+          <p className="text-sm text-blue-800 leading-relaxed">
+            Klicke auf den Button, um TheOmniStack mit deinem OTTO-Händlerkonto zu verbinden.
+          </p>
         </div>
+
+        <a
+          href={`/api/auth/otto?environment=${environment}&companyId=${companyId}`}
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors shadow-sm"
+          onClick={() => {
+            document.cookie = `otto_oauth_company_id=${companyId}; path=/; max-age=3600; SameSite=Lax`;
+          }}
+        >
+          <ExternalLink className="w-4 h-4" />
+          Jetzt mit OTTO verbinden
+        </a>
+      </div>
 
       {/* RETURN ADDRESS */}
       <div>
