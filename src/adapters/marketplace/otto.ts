@@ -1104,14 +1104,13 @@ export class OttoAdapter implements MarketplaceAdapter {
               'Accept': 'application/json',
               'X-Request-Timestamp': new Date().toISOString()
             },
-            body: JSON.stringify({ variationPrices: chunk })
+            body: JSON.stringify(chunk)
           })
 
           if (!pRes.ok) {
             const errText = await pRes.text()
             console.error(`[OttoAdapter] Update prices failed: ${errText}`)
-            console.error(`[OttoAdapter] Otto API Fehler beim Preisabgleich: ${pRes.status} - ${errText}`);
-            // We don't throw here so that stock updates (which already succeeded) are not rolled back in the user's mind.
+            throw new Error(`Otto API Fehler beim Preisabgleich: ${pRes.status} - ${errText}`)
           }
         }
       }
