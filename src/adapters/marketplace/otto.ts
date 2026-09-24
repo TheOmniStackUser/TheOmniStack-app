@@ -1081,7 +1081,7 @@ export class OttoAdapter implements MarketplaceAdapter {
             currency: 'EUR'
           }
         }
-        if (u.reducedPrice) {
+        if (u.reducedPrice && u.reducedPrice > 0) {
           payload.sale = {
             salePrice: {
               amount: u.reducedPrice,
@@ -1098,15 +1098,16 @@ export class OttoAdapter implements MarketplaceAdapter {
         const chunkSize = 150
         for (let i = 0; i < priceUpdates.length; i += chunkSize) {
           const chunk = priceUpdates.slice(i, i + chunkSize)
-          console.log(`[OttoAdapter] Updating ${chunk.length} prices via POST /v3/products...`)
-          const pRes = await fetch(`${this.baseUrl}/v3/products`, {
+          console.log(`[OttoAdapter] Updating ${chunk.length} prices via POST /v5/products/prices...`)
+          const pRes = await fetch(`${this.baseUrl}/v5/products/prices`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${accessToken}`,
               'Content-Type': 'application/json',
-              'Accept': 'application/json'
+              'Accept': 'application/json',
+              'X-Request-Timestamp': new Date().toISOString()
             },
-            body: JSON.stringify(chunk)
+            body: JSON.stringify({ variationPrices: chunk })
           })
 
           if (!pRes.ok) {
