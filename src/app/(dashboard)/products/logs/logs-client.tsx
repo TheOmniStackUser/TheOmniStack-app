@@ -14,11 +14,19 @@ export function LogsClient({ initialLogs }: LogsClientProps) {
   const [search, setSearch] = useState('')
   const [selectedLog, setSelectedLog] = useState<ProductSyncLog | null>(null)
 
+  const [selectedMarketplace, setSelectedMarketplace] = useState<string>('')
+
+  // Get unique marketplaces
+  const marketplaces = Array.from(new Set(logs.map(log => log.marketplace))).sort()
+
   const filteredLogs = logs.filter(log => {
     const s = search.toLowerCase()
-    return log.marketplace.toLowerCase().includes(s) || 
-           (log.errorMessage || '').toLowerCase().includes(s) ||
-           (log.id).includes(s)
+    const matchesSearch = log.marketplace.toLowerCase().includes(s) || 
+                          (log.errorMessage || '').toLowerCase().includes(s) ||
+                          (log.id).includes(s)
+    const matchesMarketplace = selectedMarketplace === '' || log.marketplace === selectedMarketplace
+    
+    return matchesSearch && matchesMarketplace
   })
 
   return (
@@ -35,8 +43,30 @@ export function LogsClient({ initialLogs }: LogsClientProps) {
               className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all text-slate-900 placeholder:text-slate-500"
             />
           </div>
-          <div className="text-sm font-medium text-slate-500 bg-white px-3 py-1.5 rounded-lg border border-slate-200">
-            {filteredLogs.length} Einträge (Letzte 30 Tage)
+          
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+            <select
+              value={selectedMarketplace}
+              onChange={(e) => setSelectedMarketplace(e.target.value)}
+              className="w-full sm:w-auto px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all text-slate-700"
+            >
+              <option value="">Alle Marktplätze</option>
+              {marketplaces.map(m => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+            
+            <div className="relative group flex items-center justify-center sm:justify-start text-sm font-medium text-slate-600 bg-white px-4 py-2 rounded-xl border border-slate-200 cursor-help w-full sm:w-auto">
+              <span>{filteredLogs.length} Einträge</span>
+              <div className="ml-2 bg-slate-100 p-1 rounded-full text-slate-400 group-hover:bg-cyan-50 group-hover:text-cyan-500 transition-colors">
+                <Info className="w-3.5 h-3.5" />
+              </div>
+              
+              <div className="absolute right-0 sm:-right-2 top-full mt-2 w-64 p-3 bg-slate-800 text-slate-50 text-xs leading-relaxed rounded-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10 shadow-lg shadow-slate-200/50">
+                <div className="absolute -top-1 right-8 w-2 h-2 bg-slate-800 rotate-45"></div>
+                Aus Performance- und Speichergründen werden die Sync-Logs automatisch nach 30 Tagen aus der Datenbank gelöscht.
+              </div>
+            </div>
           </div>
         </div>
 
