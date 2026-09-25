@@ -695,28 +695,30 @@ ${feedXml}`)
 
         if (u.price !== undefined || u.reducedPrice !== undefined) {
           const standardPrice = u.price !== undefined ? u.price : (u.fallbackPrice || 0)
-          const priceSchedule: any = { value_with_tax: standardPrice }
           
-          const ourPrice: any = { schedule: [priceSchedule] }
-          
-          // Amazon PATCH does not natively support "sale prices" via simple schedule in purchasable_offer in the same way,
-          // but if reducedPrice is present, we can just set the main price to reducedPrice for now to ensure it updates.
-          // For a true sale, you need to use the promotional API or specific price attributes. 
-          // Here we just update the main price to the reduced price if it exists.
+          const purchasableOffer: any = {
+            marketplace_id: this.marketplaceId,
+            audience: 'ALL',
+            currency: 'EUR',
+            our_price: [{ schedule: [{ value_with_tax: standardPrice }] }]
+          }
+
           if (u.reducedPrice !== undefined && u.reducedPrice > 0) {
-             ourPrice.schedule[0].value_with_tax = u.reducedPrice
+            purchasableOffer.discounted_price = [{
+              schedule: [
+                {
+                  value_with_tax: u.reducedPrice,
+                  start_at: u.saleStartDate ? new Date(u.saleStartDate).toISOString() : new Date().toISOString(),
+                  end_at: u.saleEndDate ? new Date(u.saleEndDate).toISOString() : new Date(Date.now() + 30*24*60*60*1000).toISOString()
+                }
+              ]
+            }]
           }
 
           patches.push({
             op: 'replace',
             path: '/attributes/purchasable_offer',
-            value: [
-              {
-                marketplace_id: this.marketplaceId,
-                currency: 'EUR',
-                our_price: [ourPrice]
-              }
-            ]
+            value: [purchasableOffer]
           })
         }
 
