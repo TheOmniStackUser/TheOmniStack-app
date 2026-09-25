@@ -30,12 +30,12 @@ export async function GET(request: Request) {
       clientId: integration.clientId!,
       clientSecret: integration.clientSecret!,
       refreshToken: integration.refreshToken!,
-      sellerId: meta.sellerId
+      sellerId: integration.sellerId!
     });
 
     const token = await (adapter as any).getAccessToken();
 
-    const res = await fetch(`https://sellingpartnerapi-eu.amazon.com/listings/2021-08-01/items/${meta.sellerId}/${sku}?marketplaceIds=A1PA6795UKMFR9&issueLocale=de_DE`, {
+    const res = await fetch(`https://sellingpartnerapi-eu.amazon.com/listings/2021-08-01/items/${integration.sellerId}/${sku}?marketplaceIds=A1PA6795UKMFR9&issueLocale=de_DE`, {
       headers: {
         'x-amz-access-token': token,
         'Accept': 'application/json'
