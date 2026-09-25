@@ -1071,10 +1071,15 @@ export class OttoAdapter implements MarketplaceAdapter {
       // We will assume a basic structure. If it fails, the user needs
       // to adjust mapping or use the Otto UI.
       const priceUpdates = updates.filter(u => u.price !== undefined || u.reducedPrice !== undefined).map(u => {
+        const standardAmount = u.price !== undefined ? u.price : u.fallbackPrice
         const payload: any = {
           sku: u.sku,
           standardPrice: {
-            amount: u.price !== undefined ? u.price : u.fallbackPrice,
+            amount: standardAmount,
+            currency: 'EUR'
+          },
+          msrp: {
+            amount: standardAmount,
             currency: 'EUR'
           }
         }
