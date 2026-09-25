@@ -30,7 +30,6 @@ export async function GET(request: Request) {
       clientId: integration.clientId!,
       clientSecret: integration.clientSecret!,
       refreshToken: integration.refreshToken!,
-      region: 'eu',
       sellerId: meta.sellerId
     });
 
