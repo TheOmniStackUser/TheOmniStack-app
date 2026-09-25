@@ -1,16 +1,15 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db/client';
 import { marketplaceIntegrations } from '@/db/schema/integrations';
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { AmazonAdapter } from '@/adapters/marketplace/amazon';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const sku = searchParams.get('sku');
-  const companyId = searchParams.get('companyId');
 
-  if (!sku || !companyId) {
-    return NextResponse.json({ error: 'Missing sku or companyId' }, { status: 400 });
+  if (!sku) {
+    return NextResponse.json({ error: 'Missing sku' }, { status: 400 });
   }
 
   try {
@@ -18,11 +17,7 @@ export async function GET(request: Request) {
       .select()
       .from(marketplaceIntegrations)
       .where(
-        and(
-          eq(marketplaceIntegrations.companyId, companyId),
-          eq(marketplaceIntegrations.type, 'amazon'),
-          eq(marketplaceIntegrations.isActive, true)
-        )
+        eq(marketplaceIntegrations.type, 'amazon')
       )
       .limit(1);
 
