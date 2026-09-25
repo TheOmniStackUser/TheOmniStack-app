@@ -43,7 +43,11 @@ export async function GET(request: Request) {
     });
 
     const data = await res.json();
-    return NextResponse.json(data);
+    return NextResponse.json({
+      sellerId: integration.sellerId,
+      status: res.status,
+      data
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
