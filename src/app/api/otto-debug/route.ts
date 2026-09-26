@@ -22,7 +22,9 @@ export async function GET(request: Request) {
       clientId: integration.clientId!,
       clientSecret: integration.clientSecret!,
       environment: 'production',
-      connectionType: 'service_partner'
+      connectionType: (integration.metadata as any)?.connectionType || 'service_partner',
+      installationId: (integration.metadata as any)?.installationId,
+      appId: (integration.metadata as any)?.appId
     });
 
     const token = await (adapter as any).getAccessToken();
