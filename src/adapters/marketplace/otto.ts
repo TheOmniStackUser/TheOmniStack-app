@@ -1031,7 +1031,7 @@ export class OttoAdapter implements MarketplaceAdapter {
    */
   async updateListings(
     companyId: string, 
-    updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number; reducedPrice?: number; fallbackPrice?: number; saleStartDate?: Date | null; saleEndDate?: Date | null; }[]
+    updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number; reducedPrice?: number; msrp?: number; fallbackPrice?: number; saleStartDate?: Date | null; saleEndDate?: Date | null; }[]
   ): Promise<void> {
     if (!updates || updates.length === 0) return
 
@@ -1078,10 +1078,7 @@ export class OttoAdapter implements MarketplaceAdapter {
             amount: standardAmount,
             currency: 'EUR'
           },
-          msrp: {
-            amount: standardAmount,
-            currency: 'EUR'
-          }
+          msrp: (u.msrp !== undefined) ? { amount: u.msrp, currency: 'EUR' } : undefined
         }
         if (u.reducedPrice && u.reducedPrice > 0) {
           payload.sale = {
@@ -1123,7 +1120,7 @@ export class OttoAdapter implements MarketplaceAdapter {
       // UVP (MSRP) Workaround:
       // Otto ignores msrp in /v5/products/prices for the strikethrough price on the live website.
       // We must fetch the product, inject msrp into the product structure, and POST it back.
-      const uvpUpdates = updates.filter(u => u.price !== undefined);
+      const uvpUpdates = updates.filter(u => u.msrp !== undefined);
       if (uvpUpdates.length > 0) {
         console.log(`[OttoAdapter] Running UVP workaround for ${uvpUpdates.length} products...`)
         const chunkSize = 5; // Process 5 concurrently to avoid rate limits
@@ -1147,10 +1144,10 @@ export class OttoAdapter implements MarketplaceAdapter {
                 const currentMsrp = product.pricing?.msrp?.amount;
                 
                 // If the MSRP is already correct, do not push a full update
-                if (currentMsrp === u.price) return;
+                if (currentMsrp === u.msrp) return;
                 
                 if (!product.pricing) product.pricing = {};
-                product.pricing.msrp = { amount: u.price, currency: 'EUR' };
+                product.pricing.msrp = { amount: u.msrp, currency: 'EUR' };
                 
                 // Ensure no empty msrp amount
                 if (product.pricing.msrp && product.pricing.msrp.amount === undefined) {
@@ -1167,7 +1164,7 @@ export class OttoAdapter implements MarketplaceAdapter {
                 if (!postRes.ok) {
                    console.error(`[OttoAdapter] Failed to update UVP for ${u.sku}: ${await postRes.text()}`);
                 } else {
-                   console.log(`[OttoAdapter] Successfully pushed UVP update for ${u.sku} (${currentMsrp} -> ${u.price})`);
+                   console.log(`[OttoAdapter] Successfully pushed UVP update for ${u.sku} (${currentMsrp} -> ${u.msrp}`);
                 }
              } catch (err) {
                 console.error(`[OttoAdapter] Error in UVP workaround for ${u.sku}:`, err);

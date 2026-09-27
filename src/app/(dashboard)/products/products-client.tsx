@@ -873,18 +873,29 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
 
             <button
               onClick={async () => {
+                
                 const { triggerMarketplaceSyncForProducts } = await import('@/app/actions/products');
-                showToast('Sync wird gestartet...', 'info');
+                showToast('Sync wird gestartet, bitte warten...', 'info');
                 try {
-                  const result = await triggerMarketplaceSyncForProducts(Array.from(selectedProductIds));
-                  if (result.failedMarketplaces && result.failedMarketplaces.length > 0) {
-                    const errors = result.failedMarketplaces.map((f: any) => `${f.name}: ${f.error}`).join(' | ')
-                    showToast(`Sync mit Fehlern beendet: ${errors}`, 'error')
+                  const productIds = Array.from(selectedProductIds);
+                  const chunkSize = 20;
+                  const failed = [];
+                  for (let i = 0; i < productIds.length; i += chunkSize) {
+                    const chunk = productIds.slice(i, i + chunkSize);
+                    const result = await triggerMarketplaceSyncForProducts(chunk);
+                    if (result.failedMarketplaces && result.failedMarketplaces.length > 0) {
+                      failed.push(...result.failedMarketplaces);
+                    }
+                  }
+                  
+                  if (failed.length > 0) {
+                    showToast(`Sync mit Fehlern beendet. Bitte Logs prüfen.`, 'error')
                   } else {
-                    showToast(`Sync für ${selectedProductIds.size} Produkte erfolgreich an Marktplätze übermittelt!`, 'success');
+                    showToast(`Sync für ${selectedProductIds.size} Produkte erfolgreich!`, 'success');
                   }
                   setSelectedProductIds(new Set());
                 } catch (error) {
+
                   showToast('Fehler beim Sync', 'error');
                 }
               }}

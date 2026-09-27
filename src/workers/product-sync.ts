@@ -277,7 +277,7 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
   console.log("[Debug] Found active integrations:", activeIntegrations.map(i => i.id))
 
   // Group mappings by integrationId
-  const updatesByIntegration: Record<string, { sku: string, marketplaceProductId?: string, stock?: number, price?: number, reducedPrice?: number }[]> = {}
+  const updatesByIntegration: Record<string, { sku: string, marketplaceProductId?: string, stock?: number, price?: number, reducedPrice?: number, msrp?: number }[]> = {}
 
   for (const mapping of mappings) {
     console.log("[Debug] Checking mapping:", mapping.id, mapping.integrationId, mapping.marketplaceSku)
@@ -327,7 +327,7 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
     }
 
     // MSRP -> Standard Price (Marketplace price)
-    let modifiedPrice = updateDef.msrp !== undefined ? updateDef.msrp : (centralProduct.msrp ? parseFloat(centralProduct.msrp) : undefined)
+    let modifiedPrice = updateDef.price !== undefined ? updateDef.price : (centralProduct.price ? parseFloat(centralProduct.price) : undefined)
     if (modifiedPrice !== undefined) {
       if (mapping.priceModifierType === 'fixed') {
         modifiedPrice += parseFloat(mapping.priceModifierValue?.toString() || '0')
@@ -343,7 +343,8 @@ let modifiedSaleStartDate = updateDef.saleStartDate !== undefined ? (updateDef.s
     if (modifiedSaleStartDate) mUpdate.saleStartDate = modifiedSaleStartDate;
     if (modifiedSaleEndDate) mUpdate.saleEndDate = modifiedSaleEndDate;
     // Price -> Sales Price (Marketplace reducedPrice)
-    let modifiedReducedPrice = updateDef.price !== undefined ? updateDef.price : (centralProduct.price ? parseFloat(centralProduct.price) : undefined)
+    let modifiedReducedPrice = updateDef.reducedPrice !== undefined ? updateDef.reducedPrice : (centralProduct.reducedPrice ? parseFloat(centralProduct.reducedPrice) : undefined)
+    let modifiedMsrp = updateDef.msrp !== undefined ? updateDef.msrp : (centralProduct.msrp ? parseFloat(centralProduct.msrp) : undefined)
     if (modifiedReducedPrice !== undefined && modifiedReducedPrice > 0) {
       if (mapping.priceModifierType === 'fixed') {
         modifiedReducedPrice += parseFloat(mapping.priceModifierValue?.toString() || '0')
@@ -365,14 +366,18 @@ let modifiedSaleStartDate = updateDef.saleStartDate !== undefined ? (updateDef.s
         if (mUpdate.price === undefined && modifiedPrice !== undefined) {
           mUpdate.price = modifiedPrice
         }
+        if (mUpdate.msrp === undefined && modifiedMsrp !== undefined) {
+          mUpdate.msrp = modifiedMsrp
+        }
       }
     }
 
-    if (updateDef.msrp !== undefined || updateDef.price !== undefined) {
+    if (modifiedMsrp !== undefined) mUpdate.msrp = modifiedMsrp
+    if (updateDef.msrp !== undefined || updateDef.price !== undefined || updateDef.reducedPrice !== undefined) {
       (mUpdate as any).fallbackPrice = modifiedPrice || 0
     }
 
-    if (mUpdate.stock !== undefined || mUpdate.price !== undefined || mUpdate.reducedPrice !== undefined) {
+    if (mUpdate.stock !== undefined || mUpdate.price !== undefined || mUpdate.reducedPrice !== undefined || mUpdate.msrp !== undefined) {
       updatesByIntegration[intId].push(mUpdate)
     }
   }
