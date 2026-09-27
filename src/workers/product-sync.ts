@@ -217,7 +217,7 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
 
   // Find all mappings for these SKUs
   // First find central products
-  const centralProducts: { id: string, sku: string, price?: string | null, msrp?: string | null, saleStartDate?: Date | null, saleEndDate?: Date | null }[] = []
+  const centralProducts: { id: string, sku: string, price?: string | null, reducedPrice?: string | null, msrp?: string | null, saleStartDate?: Date | null, saleEndDate?: Date | null }[] = []
   for (let i = 0; i < skus.length; i += 1000) {
     const chunkSkus = skus.slice(i, i + 1000)
     const chunkProducts = await db
