@@ -1227,7 +1227,17 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">Neuer Standard-Preis (Brutto in €)</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-semibold text-slate-700">Neuer Standard-Preis (Brutto in €)</label>
+                    <button 
+                      type="button" 
+                      onClick={() => { if(bulkMsrp) setBulkPrice(bulkMsrp); }} 
+                      className="text-xs text-cyan-600 hover:text-cyan-700 font-medium px-2 py-1 bg-cyan-50 hover:bg-cyan-100 rounded-md transition-colors"
+                      title="Kopiert den Wert aus dem UVP-Feld"
+                    >
+                      UVP übernehmen
+                    </button>
+                  </div>
                   <input 
                     type="text" 
                     value={bulkPrice} 
