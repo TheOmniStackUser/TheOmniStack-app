@@ -60,7 +60,7 @@ function StockEditor({ product }: { product: Product }) {
         title="Bestand bearbeiten"
       >
         <div className={`w-2 h-2 rounded-full ${Number(product.currentStock) > 0 ? 'bg-emerald-400' : 'bg-rose-400'}`} />
-        <span className="font-semibold text-slate-700 border-b border-slate-300 border-dashed">{product.currentStock}</span>
+        <span className="font-semibold text-slate-700 border-b border-slate-300 border-dashed whitespace-nowrap">{product.currentStock}</span>
         {isSaving ? (
           <Loader2 className="w-3 h-3 animate-spin text-slate-400" />
         ) : (
@@ -143,7 +143,7 @@ function PriceEditor({ product }: { product: Product }) {
         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsEditing(true); }}
         title="Standard Preis bearbeiten"
       >
-        <span className="font-semibold text-slate-700 border-b border-slate-300 border-dashed">{Number(product.price || 0).toFixed(2)} €</span>
+        <span className="font-semibold text-slate-700 border-b border-slate-300 border-dashed whitespace-nowrap">{Number(product.price || 0).toFixed(2)} €</span>
         {isSaving ? (
           <Loader2 className="w-3 h-3 animate-spin text-slate-400" />
         ) : (
@@ -213,7 +213,7 @@ function MsrpEditor({ product }: { product: Product }) {
         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsEditing(true); }}
         title="Preis bearbeiten"
       >
-        <span className="font-semibold text-slate-700 border-b border-slate-300 border-dashed">{Number(product.msrp || 0).toFixed(2)} €</span>
+        <span className="font-semibold text-slate-700 border-b border-slate-300 border-dashed whitespace-nowrap">{Number(product.msrp || 0).toFixed(2)} €</span>
         {isSaving ? (
           <Loader2 className="w-3 h-3 animate-spin text-slate-400" />
         ) : (
@@ -310,7 +310,7 @@ function ReducedPriceEditor({ product }: { product: Product }) {
         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsEditing(true); }}
         title="Aktionspreis bearbeiten"
       >
-        <span className="font-semibold text-rose-600 border-b border-rose-200 border-dashed">{product.reducedPrice ? Number(product.reducedPrice).toFixed(2) + ' €' : '-'}</span>
+        <span className="font-semibold text-rose-600 border-b border-rose-200 border-dashed whitespace-nowrap">{product.reducedPrice ? Number(product.reducedPrice).toFixed(2) + ' €' : '-'}</span>
         {isSaving ? (
           <Loader2 className="w-3 h-3 animate-spin text-slate-400" />
         ) : (
@@ -415,7 +415,7 @@ function ReducedPriceDatesEditor({ product }: { product: Product }) {
         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsEditing(true); }}
         title="Aktionszeitraum bearbeiten"
       >
-        <span className="text-xs font-medium text-slate-500 border-b border-slate-300 border-dashed">{displayString()}</span>
+        <span className="text-xs font-medium text-slate-500 border-b border-slate-300 border-dashed whitespace-nowrap">{displayString()}</span>
         {isSaving ? (
           <Loader2 className="w-3 h-3 animate-spin text-slate-400" />
         ) : (
