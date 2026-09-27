@@ -239,7 +239,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             </div>
             <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-700">Zentraler Preis (€)</label>
+                <label className="text-sm font-semibold text-slate-700">Standard Preis (€)</label>
                 <input type="number" name="price" step="0.01" defaultValue={Number(product.price)} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 placeholder:text-slate-500" />
               </div>
               <div className="space-y-2">
@@ -250,6 +250,20 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                 <label className="text-sm font-semibold text-slate-700">Einkaufspreis (€)</label>
                 <input type="number" name="purchasePrice" step="0.01" defaultValue={product.purchasePrice ? Number(product.purchasePrice) : ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 placeholder:text-slate-500" />
               </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700">Aktionspreis (€)</label>
+                <input type="number" name="reducedPrice" step="0.01" defaultValue={product.reducedPrice ? Number(product.reducedPrice) : ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 placeholder:text-slate-500" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700">Aktion Startdatum</label>
+                <input type="datetime-local" name="saleStartDate" defaultValue={product.saleStartDate ? new Date(product.saleStartDate.getTime() - product.saleStartDate.getTimezoneOffset() * 60000).toISOString().slice(0,16) : ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 placeholder:text-slate-500" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700">Aktion Enddatum</label>
+                <input type="datetime-local" name="saleEndDate" defaultValue={product.saleEndDate ? new Date(product.saleEndDate.getTime() - product.saleEndDate.getTimezoneOffset() * 60000).toISOString().slice(0,16) : ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 placeholder:text-slate-500" />
+              </div>
+
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700">Lagerbestand</label>
                 <input type="number" min="0" name="currentStock" defaultValue={Number(product.currentStock)} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all font-bold text-lg text-slate-900 placeholder:text-slate-500" />

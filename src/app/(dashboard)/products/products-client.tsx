@@ -76,8 +76,7 @@ function StockEditor({ product }: { product: Product }) {
         autoFocus
         type="number"
         min="0"
-        value={value}
-        onChange={e => setValue(e.target.value)}
+        value={value} onChange={e => setValue(e.target.value)}
         onKeyDown={handleKeyDown}
         disabled={isSaving}
         className="w-20 px-2 py-1 text-sm border border-cyan-400 focus:ring-2 focus:ring-cyan-500/50 outline-none rounded font-semibold text-slate-900 bg-white"
@@ -106,7 +105,65 @@ function StockEditor({ product }: { product: Product }) {
   )
 }
 
+
 function PriceEditor({ product }: { product: Product }) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [value, setValue] = useState(product.price ? Number(product.price).toFixed(2) : '0.00')
+  const [isSaving, setIsSaving] = useState(false)
+  const router = useRouter()
+
+  const handleSave = async () => {
+    let numericValue = Number(value.replace(',', '.'))
+    if (numericValue < 0) { numericValue = 0; setValue('0.00') }
+    if (String(numericValue) === product.reducedPrice || isNaN(numericValue)) {
+      setIsEditing(false); setValue(product.price ? Number(product.price).toFixed(2) : '0.00'); return
+    }
+    setIsSaving(true)
+    try {
+      const { bulkUpdateStockAndPrice } = await import('@/app/actions/products')
+      await bulkUpdateStockAndPrice([product.id], undefined, undefined, numericValue)
+      setIsEditing(false)
+      router.refresh()
+    } catch (e) {
+      console.error(e)
+      alert("Fehler beim Speichern des Preises")
+      setValue(product.price ? Number(product.price).toFixed(2) : '0.00')
+    } finally { setIsSaving(false) }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleSave()
+    if (e.key === 'Escape') { setValue(product.price ? Number(product.price).toFixed(2) : '0.00'); setIsEditing(false) }
+  }
+
+  if (!isEditing) {
+    return (
+      <div 
+        className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-1.5 -ml-1.5 rounded-md transition-colors group w-fit"
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsEditing(true); }}
+        title="Standard Preis bearbeiten"
+      >
+        <span className="font-semibold text-slate-700 border-b border-slate-300 border-dashed">{Number(product.price || 0).toFixed(2)} €</span>
+        {isSaving ? (
+          <Loader2 className="w-3 h-3 animate-spin text-slate-400" />
+        ) : (
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+      <input autoFocus type="number" step="0.01" min="0" value={value} onChange={e => setValue(e.target.value)} onKeyDown={handleKeyDown} disabled={isSaving} className="w-24 px-2 py-1 text-sm border border-cyan-400 focus:ring-2 focus:ring-cyan-500/50 outline-none rounded font-semibold text-slate-900 bg-white" />
+      <button onClick={handleSave} disabled={isSaving} className="p-1.5 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></button>
+      <button onClick={() => { setValue(product.price ? Number(product.price).toFixed(2) : '0.00'); setIsEditing(false); }} disabled={isSaving} className="p-1.5 rounded bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors"><X className="w-3.5 h-3.5" /></button>
+    </div>
+  )
+}
+
+
+function MsrpEditor({ product }: { product: Product }) {
   const [isEditing, setIsEditing] = useState(false)
   const [value, setValue] = useState(product.msrp ? Number(product.msrp).toFixed(2) : '0.00')
   const [isSaving, setIsSaving] = useState(false)
@@ -173,8 +230,7 @@ function PriceEditor({ product }: { product: Product }) {
         type="number"
         step="0.01"
         min="0"
-        value={value}
-        onChange={e => setValue(e.target.value)}
+        value={value} onChange={e => setValue(e.target.value)}
         onKeyDown={handleKeyDown}
         disabled={isSaving}
         className="w-24 px-2 py-1 text-sm border border-cyan-400 focus:ring-2 focus:ring-cyan-500/50 outline-none rounded font-semibold text-slate-900 bg-white"
@@ -206,7 +262,7 @@ function PriceEditor({ product }: { product: Product }) {
 
 function ReducedPriceEditor({ product }: { product: Product }) {
   const [isEditing, setIsEditing] = useState(false)
-  const [value, setValue] = useState(product.price ? Number(product.price).toFixed(2) : '')
+  const [value, setValue] = useState(product.reducedPrice ? Number(product.reducedPrice).toFixed(2) : '')
   const [isSaving, setIsSaving] = useState(false)
   const router = useRouter()
 
@@ -218,22 +274,22 @@ function ReducedPriceEditor({ product }: { product: Product }) {
       setValue('')
     }
 
-    if (String(numericValue) === product.price || isNaN(numericValue)) {
+    if (String(numericValue) === product.reducedPrice || isNaN(numericValue)) {
       setIsEditing(false)
-      setValue(product.price ? Number(product.price).toFixed(2) : '')
+      setValue(product.reducedPrice ? Number(product.reducedPrice).toFixed(2) : '')
       return
     }
     
     setIsSaving(true)
     try {
       const { bulkUpdateStockAndPrice } = await import('@/app/actions/products')
-      await bulkUpdateStockAndPrice([product.id], undefined, numericValue)
+      await bulkUpdateStockAndPrice([product.id], undefined, undefined, numericValue)
       setIsEditing(false)
       router.refresh()
     } catch (e) {
       console.error(e)
       alert("Fehler beim Speichern des Aktionspreises")
-      setValue(product.price ? Number(product.price).toFixed(2) : '')
+      setValue(product.reducedPrice ? Number(product.reducedPrice).toFixed(2) : '')
     } finally {
       setIsSaving(false)
     }
@@ -242,7 +298,7 @@ function ReducedPriceEditor({ product }: { product: Product }) {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') handleSave()
     if (e.key === 'Escape') {
-      setValue(product.price ? Number(product.price).toFixed(2) : '')
+      setValue(product.reducedPrice ? Number(product.reducedPrice).toFixed(2) : '')
       setIsEditing(false)
     }
   }
@@ -254,7 +310,7 @@ function ReducedPriceEditor({ product }: { product: Product }) {
         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsEditing(true); }}
         title="Aktionspreis bearbeiten"
       >
-        <span className="font-semibold text-rose-600 border-b border-rose-200 border-dashed">{product.price ? Number(product.price).toFixed(2) + ' €' : '-'}</span>
+        <span className="font-semibold text-rose-600 border-b border-rose-200 border-dashed">{product.reducedPrice ? Number(product.reducedPrice).toFixed(2) + ' €' : '-'}</span>
         {isSaving ? (
           <Loader2 className="w-3 h-3 animate-spin text-slate-400" />
         ) : (
@@ -271,8 +327,7 @@ function ReducedPriceEditor({ product }: { product: Product }) {
         type="number"
         step="0.01"
         min="0"
-        value={value}
-        onChange={e => setValue(e.target.value)}
+        value={value} onChange={e => setValue(e.target.value)}
         onKeyDown={handleKeyDown}
         disabled={isSaving}
         placeholder="0.00"
@@ -291,7 +346,7 @@ function ReducedPriceEditor({ product }: { product: Product }) {
         )}
       </button>
       <button
-        onClick={() => { setValue(product.price ? Number(product.price).toFixed(2) : ''); setIsEditing(false); }}
+        onClick={() => { setValue(product.reducedPrice ? Number(product.reducedPrice).toFixed(2) : ''); setIsEditing(false); }}
         disabled={isSaving}
         className="p-1.5 rounded bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors disabled:opacity-50"
         title="Abbrechen"
@@ -871,8 +926,9 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
               <Th column="sku">SKU</Th>
               <Th column="title">Titel</Th>
               <Th column="currentStock">Bestand</Th>
-              <Th column="price">Normaler Preis</Th>
-              <Th column="reducedPrice">Aktions-Preis</Th>
+              <Th column="msrp">UVP</Th>
+              <Th column="price">Standard Preis</Th>
+              <Th column="reducedPrice">Reduzierter Preis</Th>
               <Th column="saleStartDate">Aktionszeitraum</Th>
               <Th column="updatedAt">Letzte Änderung</Th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Aktion</th>
@@ -951,6 +1007,9 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                       </td>
                       <td className="px-6 py-4">
                         <StockEditor product={product} />
+                      </td>
+                      <td className="px-6 py-4">
+                        <MsrpEditor product={product} />
                       </td>
                       <td className="px-6 py-4">
                         <PriceEditor product={product} />
