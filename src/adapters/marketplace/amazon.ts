@@ -704,12 +704,17 @@ ${feedXml}`)
           }
 
           if (u.reducedPrice !== undefined && u.reducedPrice > 0) {
+            const formatDate = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, 'Z')
+            let start = u.saleStartDate ? new Date(u.saleStartDate) : new Date()
+            if (start < new Date()) start = new Date()
+            let end = u.saleEndDate ? new Date(u.saleEndDate) : new Date(Date.now() + 30*24*60*60*1000)
+            
             purchasableOffer.discounted_price = [{
               schedule: [
                 {
                   value_with_tax: u.reducedPrice,
-                  start_at: u.saleStartDate ? new Date(u.saleStartDate).toISOString() : new Date().toISOString(),
-                  end_at: u.saleEndDate ? new Date(u.saleEndDate).toISOString() : new Date(Date.now() + 30*24*60*60*1000).toISOString()
+                  start_at: formatDate(start),
+                  end_at: formatDate(end)
                 }
               ]
             }]
