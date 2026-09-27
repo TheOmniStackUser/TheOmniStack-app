@@ -18,33 +18,37 @@ export async function GET(request: Request) {
     let foundData = null;
 
     for (const integration of integrations) {
-      const adapter = new OttoAdapter({
-        clientId: integration.clientId!,
-        clientSecret: integration.clientSecret!,
-        environment: 'production',
-        connectionType: (integration.metadata as any)?.connectionType || 'service_partner',
-        installationId: (integration.metadata as any)?.installationId,
-        appId: (integration.metadata as any)?.appId
-      });
+      try {
+        const adapter = new OttoAdapter({
+          clientId: integration.clientId!,
+          clientSecret: integration.clientSecret!,
+          environment: 'production',
+          connectionType: (integration.metadata as any)?.connectionType || 'service_partner',
+          installationId: (integration.metadata as any)?.installationId,
+          appId: (integration.metadata as any)?.appId
+        });
 
-      const token = await (adapter as any).getAccessToken();
+        const token = await (adapter as any).getAccessToken();
 
-      const url = sku ? `https://api.otto.market/v5/products?sku=${sku}` : `https://api.otto.market/v5/products?limit=1`;
-      const res = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json'
+        const url = sku ? `https://api.otto.market/v5/products?sku=${sku}` : `https://api.otto.market/v5/products?limit=1`;
+        const res = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
+          }
+        });
+
+        if (res.ok) {
+          const dataStr = await res.text();
+          const data = JSON.parse(dataStr || '{}');
+          if (data.productVariations && data.productVariations.length > 0) {
+            foundData = { status: res.status, data };
+            break;
+          }
         }
-      });
-
-      if (res.ok) {
-        const dataStr = await res.text();
-        const data = JSON.parse(dataStr || '{}');
-        if (data.productVariations && data.productVariations.length > 0) {
-          foundData = { status: res.status, data };
-          break;
-        }
+      } catch (e) {
+        console.error("Skipping integration due to error:", e);
       }
     }
 
