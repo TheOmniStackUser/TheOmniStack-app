@@ -1082,7 +1082,7 @@ export class OttoAdapter implements MarketplaceAdapter {
         }
         if (u.reducedPrice && u.reducedPrice > 0) {
           // Format date without milliseconds as required by Otto API v5: yyyy-MM-dd'T'HH:mm:ssZ
-          const formatDate = (d) => d.toISOString().replace(/\.\d{3}Z$/, 'Z')
+          const formatDate = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, 'Z')
           
           let start = u.saleStartDate ? new Date(u.saleStartDate) : new Date()
           // Ensure start date is not in the past!
