@@ -1081,11 +1081,9 @@ export class OttoAdapter implements MarketplaceAdapter {
           msrp: (u.msrp !== undefined) ? { amount: u.msrp, currency: 'EUR' } : undefined
         }
         if (u.reducedPrice && u.reducedPrice > 0) {
-          payload.sale = {
-            salePrice: {
-              amount: u.reducedPrice,
-              currency: 'EUR'
-            },
+          payload.promotionalPrice = {
+            amount: u.reducedPrice,
+            currency: 'EUR',
             startDate: u.saleStartDate ? u.saleStartDate.toISOString() : new Date().toISOString(),
             endDate: u.saleEndDate ? u.saleEndDate.toISOString() : new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000).toISOString()
           }
