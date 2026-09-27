@@ -1120,6 +1120,62 @@ export class OttoAdapter implements MarketplaceAdapter {
         }
       }
 
+      // UVP (MSRP) Workaround:
+      // Otto ignores msrp in /v5/products/prices for the strikethrough price on the live website.
+      // We must fetch the product, inject msrp into the product structure, and POST it back.
+      const uvpUpdates = updates.filter(u => u.price !== undefined);
+      if (uvpUpdates.length > 0) {
+        console.log(`[OttoAdapter] Running UVP workaround for ${uvpUpdates.length} products...`)
+        const chunkSize = 5; // Process 5 concurrently to avoid rate limits
+        for (let i = 0; i < uvpUpdates.length; i += chunkSize) {
+          const chunk = uvpUpdates.slice(i, i + chunkSize);
+          await Promise.all(chunk.map(async (u) => {
+             try {
+                // GET existing product
+                const getRes = await fetch(`${this.baseUrl}/v5/products?sku=${encodeURIComponent(u.sku)}`, {
+                  method: 'GET',
+                  headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' }
+                });
+                
+                if (!getRes.ok) return;
+                
+                const dataStr = await getRes.text();
+                const data = JSON.parse(dataStr || '{}');
+                if (!data || !data.productVariations || data.productVariations.length === 0) return;
+                
+                const product = data.productVariations[0];
+                const currentMsrp = product.pricing?.msrp?.amount;
+                
+                // If the MSRP is already correct, do not push a full update
+                if (currentMsrp === u.price) return;
+                
+                if (!product.pricing) product.pricing = {};
+                product.pricing.msrp = { amount: u.price, currency: 'EUR' };
+                
+                // Ensure no empty msrp amount
+                if (product.pricing.msrp && product.pricing.msrp.amount === undefined) {
+                   delete product.pricing.msrp;
+                }
+                
+                // POST modified product back
+                const postRes = await fetch(`${this.baseUrl}/v5/products`, {
+                  method: 'POST',
+                  headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+                  body: JSON.stringify([product])
+                });
+                
+                if (!postRes.ok) {
+                   console.error(`[OttoAdapter] Failed to update UVP for ${u.sku}: ${await postRes.text()}`);
+                } else {
+                   console.log(`[OttoAdapter] Successfully pushed UVP update for ${u.sku} (${currentMsrp} -> ${u.price})`);
+                }
+             } catch (err) {
+                console.error(`[OttoAdapter] Error in UVP workaround for ${u.sku}:`, err);
+             }
+          }));
+        }
+      }
+
       console.log(`[OttoAdapter] Listings successfully updated.`)
     } catch (error) {
       console.error(`[OttoAdapter] Error updating listings:`, error)
