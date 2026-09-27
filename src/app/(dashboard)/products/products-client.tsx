@@ -491,6 +491,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
   
   const [showBulkEditModal, setShowBulkEditModal] = useState(false)
   const [bulkStock, setBulkStock] = useState('')
+  const [bulkMsrp, setBulkMsrp] = useState('')
   const [bulkPrice, setBulkPrice] = useState('')
   const [bulkReducedPrice, setBulkReducedPrice] = useState('')
   const [bulkSaleStartDate, setBulkSaleStartDate] = useState('')
@@ -507,6 +508,11 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
       const newStock = bulkStock.trim() !== '' ? Math.max(0, parseInt(bulkStock)) : undefined
       let newPrice: number | undefined
       let newReducedPrice: number | undefined
+      let parsedMsrp = undefined;
+      if (bulkMsrp.trim() !== '') {
+        const parsed = parseFloat(bulkMsrp.replace(',', '.'))
+        if (!isNaN(parsed)) parsedMsrp = Math.max(0, parsed)
+      }
       if (bulkPrice.trim() !== '') {
         const parsed = parseFloat(bulkPrice.replace(',', '.'))
         if (!isNaN(parsed)) newPrice = Math.max(0, parsed)
@@ -516,18 +522,17 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
         if (!isNaN(parsed)) newReducedPrice = Math.max(0, parsed)
       }
 
-      if (newStock === undefined && newPrice === undefined && newReducedPrice === undefined && newSaleStartDate === undefined && newSaleEndDate === undefined) {
+      if (newStock === undefined && parsedMsrp === undefined && newPrice === undefined && newReducedPrice === undefined && newSaleStartDate === undefined && newSaleEndDate === undefined) {
         showToast('Keine Änderungen eingegeben', 'info')
         setIsBulkEditing(false)
         return
       }
 
-      // newPrice comes from bulkPrice (which is "Normaler Preis" / UVP -> newMsrp)
-      // newReducedPrice comes from bulkReducedPrice (which is "Aktions-Preis" -> newPrice)
-      await bulkUpdateStockAndPrice(Array.from(selectedProductIds), newStock, newReducedPrice, undefined, newPrice, newSaleStartDate, newSaleEndDate)
+      await bulkUpdateStockAndPrice(Array.from(selectedProductIds), newStock, newPrice, newReducedPrice, parsedMsrp, newSaleStartDate, newSaleEndDate)
       setSelectedProductIds(new Set())
       setShowBulkEditModal(false)
       setBulkStock('')
+      setBulkMsrp('')
       setBulkPrice('')
       setBulkReducedPrice('')
       showToast('Bestand/Preis erfolgreich für ausgewählte Produkte aktualisiert', 'success')
@@ -1212,7 +1217,17 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">Neuer Preis (Brutto in €)</label>
+                  <label className="text-sm font-semibold text-slate-700">Neue UVP (Brutto in €)</label>
+                  <input 
+                    type="text" 
+                    value={bulkMsrp} 
+                    onChange={e => setBulkMsrp(e.target.value)} 
+                    placeholder="z.B. 24.90" 
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 placeholder:text-slate-500" 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700">Neuer Standard-Preis (Brutto in €)</label>
                   <input 
                     type="text" 
                     value={bulkPrice} 
