@@ -1117,7 +1117,7 @@ export class OttoAdapter implements MarketplaceAdapter {
               'Accept': 'application/json',
               'X-Request-Timestamp': new Date().toISOString()
             },
-            body: JSON.stringify(chunk)
+            body: JSON.stringify({ variationPrices: chunk })
           })
 
           if (!pRes.ok) {
