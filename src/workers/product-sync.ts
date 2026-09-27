@@ -208,7 +208,7 @@ export async function syncProductsForCompany(companyId: string, integrationId?: 
 /**
  * Pushes inventory and price updates from OmniStack to the mapped marketplaces.
  */
-export async function pushUpdatesToMarketplaces(companyId: string, updates: { sku: string, stock?: number, price?: number, msrp?: number, saleStartDate?: Date | null, saleEndDate?: Date | null }[], job?: Job<any>, targetIntegrationId?: string) {
+export async function pushUpdatesToMarketplaces(companyId: string, updates: { sku: string, stock?: number, price?: number, reducedPrice?: number, msrp?: number, saleStartDate?: Date | null, saleEndDate?: Date | null }[], job?: Job<any>, targetIntegrationId?: string) {
   console.log(`[ProductSync] Pushing updates for ${updates.length} products for company ${companyId}...`)
   
   if (updates.length === 0) return { totalUpdatesSent: 0, activeMarketplaces: [] }
@@ -356,11 +356,12 @@ let modifiedSaleStartDate = updateDef.saleStartDate !== undefined ? (updateDef.s
         modifiedReducedPrice = 0 // 0 means remove sale price
     }
 
+    
     if (canSyncPrice && mapping.syncPrice) {
-      if (updateDef.msrp !== undefined) {
+      if (updateDef.price !== undefined) {
         mUpdate.price = modifiedPrice
       }
-      if (updateDef.price !== undefined) {
+      if (updateDef.reducedPrice !== undefined) {
         mUpdate.reducedPrice = modifiedReducedPrice
         // Ensure price is also sent if reducedPrice is sent
         if (mUpdate.price === undefined && modifiedPrice !== undefined) {
@@ -371,6 +372,7 @@ let modifiedSaleStartDate = updateDef.saleStartDate !== undefined ? (updateDef.s
         }
       }
     }
+
 
     if (modifiedMsrp !== undefined) mUpdate.msrp = modifiedMsrp
     if (updateDef.msrp !== undefined || updateDef.price !== undefined || updateDef.reducedPrice !== undefined) {
