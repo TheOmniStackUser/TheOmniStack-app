@@ -693,6 +693,18 @@ ${feedXml}`)
           })
         }
 
+        if (u.msrp !== undefined) {
+          patches.push({
+            op: 'replace',
+            path: '/attributes/list_price',
+            value: [{
+              marketplace_id: this.marketplaceId,
+              value_with_tax: u.msrp,
+              currency: 'EUR'
+            }]
+          })
+        }
+
         if (u.price !== undefined || u.reducedPrice !== undefined) {
           const standardPrice = u.price !== undefined ? u.price : (u.fallbackPrice || 0)
           
