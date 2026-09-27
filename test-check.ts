@@ -6,7 +6,7 @@ async function main() {
   const ints = await db.query.marketplaceIntegrations.findMany({
     where: (integrations, { eq }) => eq(integrations.companyId, '3c8718d2-8738-4239-9481-56b6b16b85fb')
   });
-  console.log(ints.map(i => `${i.type} (${i.metadata?.customName || 'no name'}): active=${i.isActive}, id=${i.id}`));
+  console.log(ints.map(i => `${i.type} (${(i.metadata as any)?.customName || 'no name'}): active=${i.isActive}, id=${i.id}`));
   process.exit(0);
 }
 main();
