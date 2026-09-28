@@ -384,7 +384,7 @@ let modifiedSaleStartDate = updateDef.saleStartDate !== undefined ? (updateDef.s
       (mUpdate as any).fallbackPrice = modifiedPrice || 0
     }
 
-    if (mUpdate.stock !== undefined || mUpdate.price !== undefined || mUpdate.reducedPrice !== undefined || mUpdate.msrp !== undefined) {
+    if (mUpdate.stock !== undefined || mUpdate.price !== undefined || mUpdate.reducedPrice !== undefined || mUpdate.msrp !== undefined || mUpdate.gpsrDetails !== undefined) {
       updatesByIntegration[intId].push(mUpdate)
     }
   }
