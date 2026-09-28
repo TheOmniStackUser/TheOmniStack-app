@@ -143,7 +143,7 @@ export interface MarketplaceAdapter {
    */
   updateListings?(
     companyId: string, 
-    updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number; reducedPrice?: number; fallbackPrice?: number; saleStartDate?: Date | null; saleEndDate?: Date | null; }[]
+    updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number; reducedPrice?: number; fallbackPrice?: number; msrp?: number; saleStartDate?: Date | null; saleEndDate?: Date | null; gpsrDetails?: any; }[]
   ): Promise<void>
 
   /**

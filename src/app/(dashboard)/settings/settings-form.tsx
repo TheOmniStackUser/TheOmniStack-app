@@ -30,6 +30,67 @@ export function SettingsForm({ company }: { company: Company }) {
 
   return (
     <form id="settings-profile-form" action={action} className="space-y-8 pb-12">
+      {/* --- Section: GPSR --- */}
+      <CollapsibleSection
+        title="EU-Verantwortlicher (Produktsicherheit / GPSR)"
+        subtitle="Verantwortliche Person oder Unternehmen in der EU gemäß Produktsicherheitsverordnung (GPSR)."
+        headerClassName="p-6 flex items-center justify-between cursor-pointer hover:bg-gray-50/50 bg-gray-50/50 transition-colors select-none"
+        defaultOpen={false}
+      >
+        <div className="p-6 space-y-6">
+          <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl flex items-start gap-3">
+            <svg className="w-5 h-5 text-blue-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p className="text-xs text-blue-700 leading-relaxed">
+              Diese Daten dienen als Standard für alle Produkte, bei denen kein eigener Verantwortlicher hinterlegt ist.
+            </p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Name / Firma</label>
+              <input name="gpsr_name" type="text" defaultValue={company.gpsrDetails?.name || ''} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-slate-900 placeholder:text-slate-500" />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Straße & Hausnummer</label>
+              <input name="gpsr_street" type="text" defaultValue={company.gpsrDetails?.street || ''} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-slate-900 placeholder:text-slate-500" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">PLZ</label>
+              <input name="gpsr_zip" type="text" defaultValue={company.gpsrDetails?.zip || ''} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-slate-900 placeholder:text-slate-500" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Stadt</label>
+              <input name="gpsr_city" type="text" defaultValue={company.gpsrDetails?.city || ''} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-slate-900 placeholder:text-slate-500" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Land</label>
+              <input name="gpsr_country" type="text" defaultValue={company.gpsrDetails?.country || ''} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-slate-900 placeholder:text-slate-500" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">E-Mail</label>
+              <input name="gpsr_email" type="email" defaultValue={company.gpsrDetails?.email || ''} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-slate-900 placeholder:text-slate-500" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Telefon</label>
+              <input name="gpsr_phone" type="text" defaultValue={company.gpsrDetails?.phone || ''} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-slate-900 placeholder:text-slate-500" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">URL</label>
+              <input name="gpsr_url" type="text" defaultValue={company.gpsrDetails?.url || ''} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-slate-900 placeholder:text-slate-500" />
+            </div>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row items-center gap-4 pt-4 border-t border-gray-100 mt-6">
+            <button type="submit" disabled={isPending} className="px-6 py-2.5 rounded-xl font-bold text-white text-sm shadow-md transition-all bg-blue-600 hover:bg-blue-700 hover:shadow-blue-500/20 disabled:bg-gray-400 disabled:cursor-not-allowed">
+              {isPending ? 'Speichert...' : 'Änderungen speichern'}
+            </button>
+            {state?.message && <div className={`text-xs font-medium px-3 py-1.5 rounded-lg ${state.success ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>{state.message}</div>}
+          </div>
+        </div>
+      </CollapsibleSection>
+
       {/* --- Section: Stammdaten --- */}
       <CollapsibleSection
         title="Allgemeine Informationen"

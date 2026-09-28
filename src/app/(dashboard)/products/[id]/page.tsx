@@ -113,7 +113,17 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       storageLocation: (formData.get('storageLocation') as string) || null,
       hsCode: (formData.get('hsCode') as string) || null,
       countryOfOrigin: ((formData.get('countryOfOrigin') as string) || 'DE').toUpperCase(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
+      gpsrDetails: (formData.has('gpsr_name') || formData.has('gpsr_street') || formData.has('gpsr_zip') || formData.has('gpsr_city') || formData.has('gpsr_country') || formData.has('gpsr_email') || formData.has('gpsr_phone') || formData.has('gpsr_url')) ? {
+        name: formData.get('gpsr_name') as string || undefined,
+        street: formData.get('gpsr_street') as string || undefined,
+        zip: formData.get('gpsr_zip') as string || undefined,
+        city: formData.get('gpsr_city') as string || undefined,
+        country: formData.get('gpsr_country') as string || undefined,
+        email: formData.get('gpsr_email') as string || undefined,
+        phone: formData.get('gpsr_phone') as string || undefined,
+        url: formData.get('gpsr_url') as string || undefined
+      } : undefined
     }).where(
       and(
         eq(products.id, product.id),

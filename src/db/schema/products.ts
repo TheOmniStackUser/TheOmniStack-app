@@ -55,6 +55,19 @@ export const products = pgTable('products', {
   hsCode: text('hs_code'),
   countryOfOrigin: text('country_of_origin').default('DE'),
   
+  // GPSR Contact (Override global company GPSR details)
+  gpsrDetails: jsonb('gpsr_details').$type<{
+    name?: string;
+    street?: string;
+    zip?: string;
+    city?: string;
+    country?: string;
+    email?: string;
+    phone?: string;
+    url?: string;
+  }>(),
+
+  
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({

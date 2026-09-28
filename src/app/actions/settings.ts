@@ -123,6 +123,33 @@ export async function saveCompanySettingsAction(prevState: any, formData: FormDa
       updateData.internationalLanguage = formData.get('internationalLanguage') as string || 'en'
     }
 
+
+    const gpsrName = formData.get('gpsr_name') as string
+    const gpsrStreet = formData.get('gpsr_street') as string
+    const gpsrZip = formData.get('gpsr_zip') as string
+    const gpsrCity = formData.get('gpsr_city') as string
+    const gpsrCountry = formData.get('gpsr_country') as string
+    const gpsrEmail = formData.get('gpsr_email') as string
+    const gpsrPhone = formData.get('gpsr_phone') as string
+    const gpsrUrl = formData.get('gpsr_url') as string
+
+    if (
+      formData.has('gpsr_name') || formData.has('gpsr_street') || formData.has('gpsr_zip') ||
+      formData.has('gpsr_city') || formData.has('gpsr_country') || formData.has('gpsr_email') ||
+      formData.has('gpsr_phone') || formData.has('gpsr_url')
+    ) {
+      updateData.gpsrDetails = {
+        name: gpsrName || undefined,
+        street: gpsrStreet || undefined,
+        zip: gpsrZip || undefined,
+        city: gpsrCity || undefined,
+        country: gpsrCountry || undefined,
+        email: gpsrEmail || undefined,
+        phone: gpsrPhone || undefined,
+        url: gpsrUrl || undefined,
+      }
+    }
+
     await db
       .update(companies)
       .set(updateData)

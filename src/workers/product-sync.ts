@@ -217,11 +217,11 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
 
   // Find all mappings for these SKUs
   // First find central products
-  const centralProducts: { id: string, sku: string, price?: string | null, reducedPrice?: string | null, msrp?: string | null, saleStartDate?: Date | null, saleEndDate?: Date | null }[] = []
+  const centralProducts: { id: string, sku: string, price?: string | null, reducedPrice?: string | null, msrp?: string | null, saleStartDate?: Date | null, saleEndDate?: Date | null, gpsrDetails?: any }[] = []
   for (let i = 0; i < skus.length; i += 1000) {
     const chunkSkus = skus.slice(i, i + 1000)
     const chunkProducts = await db
-      .select({ id: products.id, sku: products.sku, reducedPrice: products.reducedPrice, price: products.price, msrp: products.msrp, saleStartDate: products.saleStartDate, saleEndDate: products.saleEndDate })
+      .select({ id: products.id, sku: products.sku, reducedPrice: products.reducedPrice, price: products.price, msrp: products.msrp, saleStartDate: products.saleStartDate, saleEndDate: products.saleEndDate, gpsrDetails: products.gpsrDetails })
       .from(products)
       .where(
         and(
@@ -231,6 +231,10 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
       )
     centralProducts.push(...chunkProducts)
   }
+
+  const [company] = await db.select({ gpsrDetails: companies.gpsrDetails }).from(companies).where(eq(companies.id, companyId)).limit(1)
+  const defaultGpsr = company?.gpsrDetails || null
+
 
   if (centralProducts.length === 0) {
     console.log("[Debug] No central products found for SKUs:", skus.length, "Company:", companyId)
@@ -316,7 +320,8 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
 
     const mUpdate: any = {
       sku: mapping.marketplaceSku,
-      marketplaceProductId: mapping.marketplaceProductId || undefined
+      marketplaceProductId: mapping.marketplaceProductId || undefined,
+      gpsrDetails: centralProduct.gpsrDetails || defaultGpsr
     }
 
     const canSyncStock = productSyncSettings ? productSyncSettings.syncStock !== false : true

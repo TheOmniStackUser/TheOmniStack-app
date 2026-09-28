@@ -1031,7 +1031,7 @@ export class OttoAdapter implements MarketplaceAdapter {
    */
   async updateListings(
     companyId: string, 
-    updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number; reducedPrice?: number; msrp?: number; fallbackPrice?: number; saleStartDate?: Date | null; saleEndDate?: Date | null; }[]
+    updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number; reducedPrice?: number; msrp?: number; fallbackPrice?: number; saleStartDate?: Date | null; saleEndDate?: Date | null; gpsrDetails?: any; }[]
   ): Promise<void> {
     if (!updates || updates.length === 0) return
 
@@ -1128,15 +1128,14 @@ export class OttoAdapter implements MarketplaceAdapter {
         }
       }
 
-      // UVP (MSRP) Workaround:
-      // Otto ignores msrp in /v5/products/prices for the strikethrough price on the live website.
-      // We must fetch the product, inject msrp into the product structure, and POST it back.
-      const uvpUpdates = updates.filter(u => u.msrp !== undefined);
-      if (uvpUpdates.length > 0) {
-        console.log(`[OttoAdapter] Running UVP workaround for ${uvpUpdates.length} products...`)
+      // UVP (MSRP) Workaround & GPSR:
+      // Otto requires full product POSTs for MSRP and GPSR updates.
+      const productDataUpdates = updates.filter(u => u.msrp !== undefined || (u.gpsrDetails && u.gpsrDetails.name));
+      if (productDataUpdates.length > 0) {
+        console.log(`[OttoAdapter] Running full product update for ${productDataUpdates.length} products...`)
         const chunkSize = 5; // Process 5 concurrently to avoid rate limits
-        for (let i = 0; i < uvpUpdates.length; i += chunkSize) {
-          const chunk = uvpUpdates.slice(i, i + chunkSize);
+        for (let i = 0; i < productDataUpdates.length; i += chunkSize) {
+          const chunk = productDataUpdates.slice(i, i + chunkSize);
           await Promise.all(chunk.map(async (u) => {
              try {
                 // GET existing product
@@ -1153,16 +1152,36 @@ export class OttoAdapter implements MarketplaceAdapter {
                 
                 const product = data.productVariations[0];
                 const currentMsrp = product.pricing?.msrp?.amount;
+                // If the MSRP is already correct AND we have no GPSR details to add, do not push a full update
+                if (u.msrp !== undefined && currentMsrp === u.msrp && !u.gpsrDetails) return;
                 
-                // If the MSRP is already correct, do not push a full update
-                if (currentMsrp === u.msrp) return;
-                
-                if (!product.pricing) product.pricing = {};
-                product.pricing.msrp = { amount: u.msrp, currency: 'EUR' };
+                if (u.msrp !== undefined) {
+                  if (!product.pricing) product.pricing = {};
+                  product.pricing.msrp = { amount: u.msrp, currency: 'EUR' };
+                }
                 
                 // Ensure no empty msrp amount
                 if (product.pricing.msrp && product.pricing.msrp.amount === undefined) {
                    delete product.pricing.msrp;
+                }
+                
+                // Inject GPSR / Product Safety Compliance if provided
+                if (u.gpsrDetails && u.gpsrDetails.name && u.gpsrDetails.email) {
+                  if (!product.compliance) product.compliance = {};
+                  if (!product.compliance.productSafety) product.compliance.productSafety = { addresses: [] };
+                  
+                  product.compliance.productSafety.addresses = [
+                    {
+                      name: u.gpsrDetails.name,
+                      address: [u.gpsrDetails.street, u.gpsrDetails.zip, u.gpsrDetails.city].filter(Boolean).join(', '),
+                      regionCode: u.gpsrDetails.country || 'DE',
+                      email: u.gpsrDetails.email,
+                      url: u.gpsrDetails.url || undefined,
+                      phone: u.gpsrDetails.phone || undefined,
+                      roles: ["DISTRIBUTOR"],
+                      components: []
+                    }
+                  ];
                 }
                 
                 // POST modified product back

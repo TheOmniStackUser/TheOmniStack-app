@@ -128,6 +128,19 @@ export const companies = pgTable('companies', {
   featuresReturnsEnabled: boolean('features_returns_enabled').notNull().default(false),
   featuresProductsEnabled: boolean('features_products_enabled').notNull().default(false),
 
+  // GPSR (General Product Safety Regulation) Default Contact
+  gpsrDetails: jsonb('gpsr_details').$type<{
+    name?: string;
+    street?: string;
+    zip?: string;
+    city?: string;
+    country?: string;
+    email?: string;
+    phone?: string;
+    url?: string;
+  }>(),
+
+
   // Cancellation
   canceledAt: timestamp('canceled_at', { withTimezone: true }),
   cancelEffectiveDate: timestamp('cancel_effective_date', { withTimezone: true }),
