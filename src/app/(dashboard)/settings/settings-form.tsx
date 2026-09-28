@@ -433,6 +433,46 @@ export function SettingsForm({ company }: { company: Company }) {
             </p>
           </div>
           
+          <div className="flex justify-end -mt-2">
+            <button
+              type="button"
+              onClick={() => {
+                const form = document.getElementById('settings-profile-form') as HTMLFormElement
+                if (!form) return
+                
+                const legalName = form.querySelector('[name="legalName"]') as HTMLInputElement
+                const street = form.querySelector('[name="street"]') as HTMLInputElement
+                const zip = form.querySelector('[name="zip"]') as HTMLInputElement
+                const city = form.querySelector('[name="city"]') as HTMLInputElement
+                const country = form.querySelector('[name="country"]') as HTMLSelectElement
+                const email = form.querySelector('[name="email"]') as HTMLInputElement
+                const phone = form.querySelector('[name="phone"]') as HTMLInputElement
+                const website = form.querySelector('[name="website"]') as HTMLInputElement
+
+                const gName = form.querySelector('[name="gpsr_name"]') as HTMLInputElement
+                const gStreet = form.querySelector('[name="gpsr_street"]') as HTMLInputElement
+                const gZip = form.querySelector('[name="gpsr_zip"]') as HTMLInputElement
+                const gCity = form.querySelector('[name="gpsr_city"]') as HTMLInputElement
+                const gCountry = form.querySelector('[name="gpsr_country"]') as HTMLInputElement
+                const gEmail = form.querySelector('[name="gpsr_email"]') as HTMLInputElement
+                const gPhone = form.querySelector('[name="gpsr_phone"]') as HTMLInputElement
+                const gUrl = form.querySelector('[name="gpsr_url"]') as HTMLInputElement
+
+                if (gName && legalName) gName.value = legalName.value
+                if (gStreet && street) gStreet.value = street.value
+                if (gZip && zip) gZip.value = zip.value
+                if (gCity && city) gCity.value = city.value
+                if (gCountry && country) gCountry.value = country.value
+                if (gEmail && email) gEmail.value = email.value
+                if (gPhone && phone) gPhone.value = phone.value
+                if (gUrl && website) gUrl.value = website.value
+              }}
+              className="text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-4 py-2 rounded-lg transition-colors border border-slate-200"
+            >
+              Daten aus Profil übernehmen
+            </button>
+          </div>
+          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2 md:col-span-2">
               <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Name / Firma</label>
