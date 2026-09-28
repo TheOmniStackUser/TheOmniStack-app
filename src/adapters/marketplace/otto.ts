@@ -1070,67 +1070,14 @@ export class OttoAdapter implements MarketplaceAdapter {
       // But patching prices for existing active products can be complex.
       // We will assume a basic structure. If it fails, the user needs
       // to adjust mapping or use the Otto UI.
-      const priceUpdates = updates.filter(u => u.price !== undefined || u.reducedPrice !== undefined).map(u => {
-        const standardAmount = u.price !== undefined ? u.price : u.fallbackPrice
-        const payload: any = {
-          sku: u.sku,
-          standardPrice: {
-            amount: standardAmount,
-            currency: 'EUR'
-          },
-          msrp: (u.msrp !== undefined) ? { amount: u.msrp, currency: 'EUR' } : undefined
-        }
-        if (u.reducedPrice && u.reducedPrice > 0) {
-          // Format date without milliseconds as required by Otto API v5: yyyy-MM-dd'T'HH:mm:ssZ
-          const formatDate = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, 'Z')
-          
-          let start = u.saleStartDate ? new Date(u.saleStartDate) : new Date()
-          // Ensure start date is not in the past!
-          if (start < new Date()) {
-            start = new Date()
-          }
-
-          let end = u.saleEndDate ? new Date(u.saleEndDate) : new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000)
-          
-          payload.sale = {
-            salePrice: {
-              amount: u.reducedPrice,
-              currency: 'EUR'
-            },
-            startDate: formatDate(start),
-            endDate: formatDate(end)
-          }
-        }
-        return payload
-      })
-
-      if (priceUpdates.length > 0) {
-        const chunkSize = 150
-        for (let i = 0; i < priceUpdates.length; i += chunkSize) {
-          const chunk = priceUpdates.slice(i, i + chunkSize)
-          console.log(`[OttoAdapter] Updating ${chunk.length} prices via POST /v5/products/prices...`)
-          const pRes = await fetch(`${this.baseUrl}/v5/products/prices`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'X-Request-Timestamp': new Date().toISOString()
-            },
-            body: JSON.stringify(chunk)
-          })
-
-          if (!pRes.ok) {
-            const errText = await pRes.text()
-            console.error(`[OttoAdapter] Update prices failed: ${errText}`)
-            throw new Error(`Otto API Fehler beim Preisabgleich: ${pRes.status} - ${errText}`)
-          }
-        }
-      }
-
-      // UVP (MSRP) Workaround & GPSR:
-      // Otto requires full product POSTs for MSRP and GPSR updates.
-      const productDataUpdates = updates.filter(u => u.msrp !== undefined || (u.gpsrDetails && u.gpsrDetails.name));
+      // 2. Full Product Updates (MSRP, Sale Price, Standard Price, GPSR)
+      // Otto requires full product POSTs for these fields to update reliably.
+      const productDataUpdates = updates.filter(u => 
+        u.msrp !== undefined || 
+        u.price !== undefined || 
+        u.reducedPrice !== undefined || 
+        (u.gpsrDetails && u.gpsrDetails.name)
+      );
       if (productDataUpdates.length > 0) {
         console.log(`[OttoAdapter] Running full product update for ${productDataUpdates.length} products...`)
         const chunkSize = 5; // Process 5 concurrently to avoid rate limits
@@ -1152,21 +1099,48 @@ export class OttoAdapter implements MarketplaceAdapter {
                 
                 const product = data.productVariations[0];
                 const currentMsrp = product.pricing?.msrp?.amount;
-                // If the MSRP is already correct AND we have no GPSR details to add, do not push a full update
-                if (u.msrp !== undefined && currentMsrp === u.msrp && !u.gpsrDetails) return;
+                let hasChanges = false;
                 
-                if (u.msrp !== undefined) {
+                if (u.msrp !== undefined && currentMsrp !== u.msrp) {
                   if (!product.pricing) product.pricing = {};
                   product.pricing.msrp = { amount: u.msrp, currency: 'EUR' };
+                  hasChanges = true;
                 }
                 
                 // Ensure no empty msrp amount
-                if (product.pricing.msrp && product.pricing.msrp.amount === undefined) {
+                if (product.pricing?.msrp && product.pricing.msrp.amount === undefined) {
                    delete product.pricing.msrp;
+                }
+
+                // Handle Standard Price
+                const standardAmount = u.price !== undefined ? u.price : u.fallbackPrice;
+                if (standardAmount !== undefined && product.pricing?.standardPrice?.amount !== standardAmount) {
+                  if (!product.pricing) product.pricing = {};
+                  product.pricing.standardPrice = { amount: standardAmount, currency: 'EUR' };
+                  hasChanges = true;
+                }
+                
+                // Handle Reduced Price
+                if (u.reducedPrice !== undefined) {
+                  if (u.reducedPrice > 0 && (standardAmount === undefined || u.reducedPrice < standardAmount || (!standardAmount && product.pricing?.standardPrice?.amount && u.reducedPrice < product.pricing.standardPrice.amount))) {
+                     if (!product.pricing) product.pricing = {};
+                     product.pricing.sale = {
+                       salePrice: { amount: u.reducedPrice, currency: 'EUR' },
+                       startDate: u.saleStartDate ? new Date(u.saleStartDate).toISOString() : new Date().toISOString(),
+                       endDate: u.saleEndDate ? new Date(u.saleEndDate).toISOString() : new Date(Date.now() + 1000 * 60 * 60 * 24 * 365 * 10).toISOString()
+                     };
+                     hasChanges = true;
+                  } else {
+                     if (product.pricing && product.pricing.sale) {
+                       delete product.pricing.sale;
+                       hasChanges = true;
+                     }
+                  }
                 }
                 
                 // Inject GPSR / Product Safety Compliance if provided
                 if (u.gpsrDetails && u.gpsrDetails.name && u.gpsrDetails.email) {
+                  hasChanges = true;
                   if (!product.compliance) product.compliance = {};
                   if (!product.compliance.productSafety) product.compliance.productSafety = { addresses: [] };
                   
@@ -1182,6 +1156,12 @@ export class OttoAdapter implements MarketplaceAdapter {
                       components: []
                     }
                   ];
+                }
+                
+                if (!hasChanges) {
+                  // Only skip if we are SURE nothing changed and we weren't just pushing GPSR for the first time
+                  if (u.gpsrDetails) hasChanges = true;
+                  else return;
                 }
                 
                 // POST modified product back
