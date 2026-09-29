@@ -1121,9 +1121,11 @@ export class OttoAdapter implements MarketplaceAdapter {
                 }
                 
                 // Handle Reduced Price
+                console.log("u.reducedPrice:", u.reducedPrice, "u.price:", u.price, "standardAmount:", standardAmount);
                 if (u.reducedPrice !== undefined) {
                   if (u.reducedPrice > 0 && (standardAmount === undefined || u.reducedPrice < standardAmount || (!standardAmount && product.pricing?.standardPrice?.amount && u.reducedPrice < product.pricing.standardPrice.amount))) {
                      if (!product.pricing) product.pricing = {};
+                     console.log("Setting sale price for", u.sku, "to", u.reducedPrice);
                      product.pricing.sale = {
                        salePrice: { amount: u.reducedPrice, currency: 'EUR' },
                        startDate: u.saleStartDate ? new Date(u.saleStartDate).toISOString() : new Date().toISOString(),
@@ -1148,7 +1150,7 @@ export class OttoAdapter implements MarketplaceAdapter {
                     {
                       name: u.gpsrDetails.name,
                       address: [u.gpsrDetails.street, u.gpsrDetails.zip, u.gpsrDetails.city].filter(Boolean).join(', '),
-                      regionCode: u.gpsrDetails.country || 'DE',
+                      regionCode: (u.gpsrDetails.country && u.gpsrDetails.country.toLowerCase() === 'deutschland') ? 'DE' : (u.gpsrDetails.country && u.gpsrDetails.country.toLowerCase() === 'österreich' ? 'AT' : 'DE'),
                       email: u.gpsrDetails.email,
                       url: u.gpsrDetails.url || undefined,
                       phone: u.gpsrDetails.phone || undefined,
