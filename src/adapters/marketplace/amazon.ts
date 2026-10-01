@@ -97,8 +97,11 @@ export class AmazonAdapter implements MarketplaceAdapter {
       createdAfter.setDate(createdAfter.getDate() - 14)
       const createdAfterStr = createdAfter.toISOString()
       
+      // All major EU marketplace IDs
+      const euMarketplaceIds = 'A1PA6795UKMFR9,A1805IZSGTT6HS,A13V1IB3VIYZZH,APJ6JZADPVGVX,A1RKKUPIHCS9HS,A1F83G8C2ARO7P,A1C3SOZRARQ6R3,AMEN7PMS3EDWL,A2NODRKZP88ZB9'
+      
       // Get Unshipped, PartiallyShipped, and Shipped MFN orders
-      const mfnOrdersUrl = `${this.baseUrl}/orders/v0/orders?MarketplaceIds=${this.marketplaceId}&FulfillmentChannels=MFN&OrderStatuses=Unshipped,PartiallyShipped,Shipped&CreatedAfter=${encodeURIComponent(createdAfterStr)}&dataElements=buyerInfo,shippingAddress`
+      const mfnOrdersUrl = `${this.baseUrl}/orders/v0/orders?MarketplaceIds=${euMarketplaceIds}&FulfillmentChannels=MFN&OrderStatuses=Unshipped,PartiallyShipped,Shipped&CreatedAfter=${encodeURIComponent(createdAfterStr)}&dataElements=buyerInfo,shippingAddress`
       const mfnResponse = await fetch(mfnOrdersUrl, {
       method: 'GET',
       cache: 'no-store',
@@ -120,7 +123,7 @@ export class AmazonAdapter implements MarketplaceAdapter {
       if (this.config.importFba) {
         console.log(`[AmazonAdapter] Fetching FBA (AFN) orders...`)
         // FBA orders are shipped by Amazon, so they are in Shipped state
-        const afnOrdersUrl = `${this.baseUrl}/orders/v0/orders?MarketplaceIds=${this.marketplaceId}&FulfillmentChannels=AFN&OrderStatuses=Shipped&CreatedAfter=${encodeURIComponent(createdAfterStr)}&dataElements=buyerInfo,shippingAddress`
+        const afnOrdersUrl = `${this.baseUrl}/orders/v0/orders?MarketplaceIds=${euMarketplaceIds}&FulfillmentChannels=AFN&OrderStatuses=Shipped&CreatedAfter=${encodeURIComponent(createdAfterStr)}&dataElements=buyerInfo,shippingAddress`
         const afnResponse = await fetch(afnOrdersUrl, {
           method: 'GET',
           cache: 'no-store',
