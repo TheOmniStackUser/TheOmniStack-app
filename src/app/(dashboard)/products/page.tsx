@@ -26,7 +26,7 @@ export default async function ProductsPage() {
       .where(
         eq(products.companyId, auth.activeCompanyId)
       )
-      .orderBy(products.createdAt)
+      .orderBy(products.createdAt, products.id)
 
     // Fetch all mappings to include their SKUs and EANs in the client search
 

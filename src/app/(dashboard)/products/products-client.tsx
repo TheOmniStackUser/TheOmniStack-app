@@ -714,6 +714,10 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
 
       if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1
       if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1
+      
+      // Secondary sort by ID to ensure stable order when values are equal
+      if (a.id < b.id) return -1
+      if (a.id > b.id) return 1
       return 0
     })
 
