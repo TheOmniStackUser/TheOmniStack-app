@@ -1080,6 +1080,10 @@ export class OttoAdapter implements MarketplaceAdapter {
       );
       if (productDataUpdates.length > 0) {
         console.log(`[OttoAdapter] Running full product update for ${productDataUpdates.length} products...`)
+        
+        // Step 1: Fetch all products sequentially or in small chunks
+        const modifiedProducts: any[] = [];
+        
         const chunkSize = 5; // Process 5 concurrently to avoid rate limits
         for (let i = 0; i < productDataUpdates.length; i += chunkSize) {
           const chunk = productDataUpdates.slice(i, i + chunkSize);
@@ -1107,12 +1111,10 @@ export class OttoAdapter implements MarketplaceAdapter {
                   hasChanges = true;
                 }
                 
-                // Ensure no empty msrp amount
                 if (product.pricing?.msrp && product.pricing.msrp.amount === undefined) {
                    delete product.pricing.msrp;
                 }
 
-                // Handle Standard Price
                 const standardAmount = u.price !== undefined ? u.price : u.fallbackPrice;
                 if (standardAmount !== undefined && product.pricing?.standardPrice?.amount !== standardAmount) {
                   if (!product.pricing) product.pricing = {};
@@ -1120,12 +1122,9 @@ export class OttoAdapter implements MarketplaceAdapter {
                   hasChanges = true;
                 }
                 
-                // Handle Reduced Price
-                console.log("u.reducedPrice:", u.reducedPrice, "u.price:", u.price, "standardAmount:", standardAmount);
                 if (u.reducedPrice !== undefined) {
                   if (u.reducedPrice > 0 && (standardAmount === undefined || u.reducedPrice < standardAmount || (!standardAmount && product.pricing?.standardPrice?.amount && u.reducedPrice < product.pricing.standardPrice.amount))) {
                      if (!product.pricing) product.pricing = {};
-                     console.log("Setting sale price for", u.sku, "to", u.reducedPrice);
                      product.pricing.sale = {
                        salePrice: { amount: u.reducedPrice, currency: 'EUR' },
                        startDate: u.saleStartDate ? new Date(u.saleStartDate).toISOString() : new Date().toISOString(),
@@ -1142,7 +1141,12 @@ export class OttoAdapter implements MarketplaceAdapter {
                 
                 // Inject GPSR / Product Safety Compliance if provided
                 if (u.gpsrDetails && u.gpsrDetails.name && u.gpsrDetails.email) {
-                  hasChanges = true;
+                  const newName = u.gpsrDetails.name;
+                  const currentName = product.compliance?.productSafety?.addresses?.[0]?.name;
+                  if (newName !== currentName) {
+                    hasChanges = true;
+                  }
+                  
                   if (!product.compliance) product.compliance = {};
                   if (!product.compliance.productSafety) product.compliance.productSafety = { addresses: [] };
                   
@@ -1161,28 +1165,48 @@ export class OttoAdapter implements MarketplaceAdapter {
                 }
                 
                 if (!hasChanges) {
-                  // Only skip if we are SURE nothing changed and we weren't just pushing GPSR for the first time
-                  if (u.gpsrDetails) hasChanges = true;
+                  if (u.gpsrDetails) hasChanges = true; // Fallback to push anyway if GPSR is in update
                   else return;
                 }
                 
-                // POST modified product back
-                const postRes = await fetch(`${this.baseUrl}/v5/products`, {
-                  method: 'POST',
-                  headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-                  body: JSON.stringify([product])
-                });
-                
-                if (!postRes.ok) {
-                   console.error(`[OttoAdapter] Failed to update UVP for ${u.sku}: ${await postRes.text()}`);
-                } else {
-                   console.log(`[OttoAdapter] Successfully pushed UVP update for ${u.sku} (${currentMsrp} -> ${u.msrp}`);
-                }
+                modifiedProducts.push(product);
              } catch (err) {
-                console.error(`[OttoAdapter] Error in UVP workaround for ${u.sku}:`, err);
+                console.error(`[OttoAdapter] Error fetching/modifying product ${u.sku}:`, err);
              }
           }));
         }
+        
+        // Step 2: Group by productReference and POST grouped variations
+        const groupedByRef: Record<string, any[]> = {};
+        for (const p of modifiedProducts) {
+          const ref = p.productReference || 'unreferenced';
+          if (!groupedByRef[ref]) groupedByRef[ref] = [];
+          groupedByRef[ref].push(p);
+        }
+        
+        for (const [ref, variations] of Object.entries(groupedByRef)) {
+           console.log(`[OttoAdapter] POSTing ${variations.length} variations for product family ${ref}...`);
+           try {
+               const postRes = await fetch(`${this.baseUrl}/v5/products`, {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                  },
+                  body: JSON.stringify(variations)
+               });
+                
+               if (!postRes.ok) {
+                  const errText = await postRes.text();
+                  console.error(`[OttoAdapter] Failed to update product family ${ref}: ${errText}`);
+               } else {
+                  console.log(`[OttoAdapter] Successfully updated product family ${ref}`);
+               }
+           } catch (err) {
+               console.error(`[OttoAdapter] Error posting product family ${ref}:`, err);
+           }
+               }
       }
 
       console.log(`[OttoAdapter] Listings successfully updated.`)
