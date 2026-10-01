@@ -1891,7 +1891,7 @@ export async function persistOrders(
           totalAmount: String(order.totalAmount),
           taxAmount: String(finalTaxAmount.toFixed(2)),
           totalWeight: order.totalWeight ? String(order.totalWeight) : null,
-          status: order.fulfillmentType === 'FBA' ? 'shipped' : 'pending',
+          status: order.fulfillmentType === 'FBA' || (order.rawPayload as any)?.rawOrder?.OrderStatus === 'Shipped' ? 'shipped' : 'pending',
           rawPayload: order.rawPayload,
           customerNumber,
           deliveryNoteNumber,

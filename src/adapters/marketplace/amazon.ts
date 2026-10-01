@@ -97,8 +97,8 @@ export class AmazonAdapter implements MarketplaceAdapter {
       createdAfter.setDate(createdAfter.getDate() - 14)
       const createdAfterStr = createdAfter.toISOString()
       
-      // Get Unshipped MFN orders
-      const mfnOrdersUrl = `${this.baseUrl}/orders/v0/orders?MarketplaceIds=${this.marketplaceId}&FulfillmentChannels=MFN&OrderStatuses=Unshipped&CreatedAfter=${encodeURIComponent(createdAfterStr)}&dataElements=buyerInfo,shippingAddress`
+      // Get Unshipped, PartiallyShipped, and Shipped MFN orders
+      const mfnOrdersUrl = `${this.baseUrl}/orders/v0/orders?MarketplaceIds=${this.marketplaceId}&FulfillmentChannels=MFN&OrderStatuses=Unshipped,PartiallyShipped,Shipped&CreatedAfter=${encodeURIComponent(createdAfterStr)}&dataElements=buyerInfo,shippingAddress`
       const mfnResponse = await fetch(mfnOrdersUrl, {
       method: 'GET',
       cache: 'no-store',
