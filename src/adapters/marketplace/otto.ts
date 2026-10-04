@@ -1127,8 +1127,8 @@ export class OttoAdapter implements MarketplaceAdapter {
                      if (!product.pricing) product.pricing = {};
                      product.pricing.sale = {
                        salePrice: { amount: u.reducedPrice, currency: 'EUR' },
-                       startDate: u.saleStartDate ? new Date(u.saleStartDate).toISOString() : new Date().toISOString(),
-                       endDate: (u.saleEndDate && new Date(u.saleEndDate).getTime() > Date.now()) ? new Date(u.saleEndDate).toISOString() : new Date(Date.now() + 1000 * 60 * 60 * 24 * 365 * 10).toISOString()
+                       startDate: u.saleStartDate ? new Date(u.saleStartDate).toISOString().split('.')[0] + 'Z' : new Date().toISOString().split('.')[0] + 'Z',
+                       endDate: (u.saleEndDate && new Date(u.saleEndDate).getTime() > Date.now()) ? new Date(u.saleEndDate).toISOString().split('.')[0] + 'Z' : new Date(Date.now() + 1000 * 60 * 60 * 24 * 365 * 10).toISOString().split('.')[0] + 'Z'
                      };
                      hasChanges = true;
                   } else {
