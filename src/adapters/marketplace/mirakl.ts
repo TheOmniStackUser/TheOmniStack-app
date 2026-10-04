@@ -1768,7 +1768,7 @@ export class MiraklAdapter implements MarketplaceAdapter {
             offer.discount = {
               discount_price: update.reducedPrice,
               start_date: update.saleStartDate ? update.saleStartDate.toISOString() : new Date().toISOString(),
-              end_date: update.saleEndDate ? update.saleEndDate.toISOString() : new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000).toISOString()
+              end_date: (update.saleEndDate && new Date(update.saleEndDate).getTime() > Date.now()) ? update.saleEndDate.toISOString() : new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000).toISOString()
             }
           } else {
             // Remove discount (Mirakl allows removing by passing empty strings)

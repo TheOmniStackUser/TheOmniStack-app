@@ -274,7 +274,7 @@ function ReducedPriceEditor({ product }: { product: Product }) {
       setValue('')
     }
 
-    if (String(numericValue) === product.reducedPrice || isNaN(numericValue)) {
+    if (isNaN(numericValue)) {
       setIsEditing(false)
       setValue(product.reducedPrice ? Number(product.reducedPrice).toFixed(2) : '')
       return

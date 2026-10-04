@@ -722,7 +722,7 @@ ${feedXml}`)
             const formatDate = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, 'Z')
             let start = u.saleStartDate ? new Date(u.saleStartDate) : new Date()
             if (start < new Date()) start = new Date()
-            let end = u.saleEndDate ? new Date(u.saleEndDate) : new Date(Date.now() + 30*24*60*60*1000)
+            let end = (u.saleEndDate && new Date(u.saleEndDate).getTime() > Date.now()) ? new Date(u.saleEndDate) : new Date(Date.now() + 30*24*60*60*1000)
             
             purchasableOffer.discounted_price = [{
               schedule: [
