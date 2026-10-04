@@ -530,7 +530,6 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
       }
 
       await bulkUpdateStockAndPrice(Array.from(selectedProductIds), newStock, newPrice, newReducedPrice, parsedMsrp, newSaleStartDate, newSaleEndDate)
-      setSelectedProductIds(new Set())
       setShowBulkEditModal(false)
       setBulkStock('')
       setBulkMsrp('')
@@ -551,7 +550,6 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
     try {
       const { bulkUpdateCustomsData } = await import('@/app/actions/products')
       await bulkUpdateCustomsData(Array.from(selectedProductIds), bulkHsCode, bulkOrigin)
-      setSelectedProductIds(new Set())
       setShowBulkCustomsModal(false)
       setBulkHsCode('')
       setBulkOrigin('DE')
@@ -821,7 +819,6 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                     const { bulkToggleProductSync } = await import('@/app/actions/products');
                     await bulkToggleProductSync(Array.from(selectedProductIds), 'stock', true);
                     showToast('Bestand-Sync aktiviert', 'success');
-                    setSelectedProductIds(new Set());
                   }}
                   className="px-3 py-1 text-xs font-bold rounded-md bg-white text-emerald-600 hover:bg-emerald-50 border border-slate-200 shadow-sm transition-colors whitespace-nowrap"
                 >
@@ -832,7 +829,6 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                     const { bulkToggleProductSync } = await import('@/app/actions/products');
                     await bulkToggleProductSync(Array.from(selectedProductIds), 'stock', false);
                     showToast('Bestand-Sync deaktiviert', 'success');
-                    setSelectedProductIds(new Set());
                   }}
                   className="px-3 py-1 text-xs font-bold rounded-md bg-white text-slate-600 hover:bg-rose-50 hover:text-rose-600 border border-slate-200 shadow-sm transition-colors whitespace-nowrap"
                 >
@@ -847,7 +843,6 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                     const { bulkToggleProductSync } = await import('@/app/actions/products');
                     await bulkToggleProductSync(Array.from(selectedProductIds), 'price', true);
                     showToast('Preis-Sync aktiviert', 'success');
-                    setSelectedProductIds(new Set());
                   }}
                   className="px-3 py-1 text-xs font-bold rounded-md bg-white text-emerald-600 hover:bg-emerald-50 border border-slate-200 shadow-sm transition-colors whitespace-nowrap"
                 >
@@ -858,7 +853,6 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                     const { bulkToggleProductSync } = await import('@/app/actions/products');
                     await bulkToggleProductSync(Array.from(selectedProductIds), 'price', false);
                     showToast('Preis-Sync deaktiviert', 'success');
-                    setSelectedProductIds(new Set());
                   }}
                   className="px-3 py-1 text-xs font-bold rounded-md bg-white text-slate-600 hover:bg-rose-50 hover:text-rose-600 border border-slate-200 shadow-sm transition-colors whitespace-nowrap"
                 >
@@ -913,7 +907,6 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                   } else {
                     showToast(`Sync für ${selectedProductIds.size} Produkte erfolgreich!`, 'success');
                   }
-                  setSelectedProductIds(new Set());
                 } catch (error) {
 
                   showToast('Fehler beim Sync', 'error');
