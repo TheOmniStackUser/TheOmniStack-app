@@ -107,7 +107,26 @@ export class AmazonAdapter implements MarketplaceAdapter {
       }
       
       const euMarketplaceIdsArray = ['A1PA6795UKMFR9','A1805IZSGTT6HS','A13V1IB3VIYZZH','APJ6JZADPVGVX','A1RKKUPIHCS9HS','A1F83G8C2ARO7P','A1C3SOZRARQ6R3','AMEN7PMS3EDWL','A2NODRKZP88ZB9'];
-      const marketplaceIdsQuery = euMarketplaceIdsArray.map(id => `MarketplaceIds=${id}`).join('&');
+      
+      let activeMarketplaces = euMarketplaceIdsArray;
+      try {
+        const pRes = await fetch(`${this.baseUrl}/sellers/v1/marketplaceParticipations`, {
+          headers: { 'x-amz-access-token': baseAccessToken, 'Accept': 'application/json' }
+        });
+        if (pRes.ok) {
+          const pData = await pRes.json();
+          const pIds = (pData.payload || []).map((p: any) => p.marketplace?.id);
+          if (pIds.length > 0) {
+            activeMarketplaces = euMarketplaceIdsArray.filter(id => pIds.includes(id));
+            if (activeMarketplaces.length === 0) activeMarketplaces = euMarketplaceIdsArray; // Fallback
+          }
+        } else {
+          console.error('[AmazonAdapter] Failed to fetch participations, falling back to all EU:', await pRes.text());
+        }
+      } catch (err) {
+         console.error('[AmazonAdapter] Error fetching participations:', err);
+      }
+      console.log(`[AmazonAdapter] Active marketplaces: ${activeMarketplaces.join(',')}`);
       
       let rawOrders: any[] = [];
       
@@ -121,7 +140,7 @@ export class AmazonAdapter implements MarketplaceAdapter {
           });
           if (!response.ok) {
             const err = await response.text();
-            console.error(`Amazon Orders API Error: ${err}`);
+            console.error(`Amazon Orders API Error for URL ${url}: ${err}`);
             break;
           }
           const data = await response.json();
@@ -138,13 +157,14 @@ export class AmazonAdapter implements MarketplaceAdapter {
 
       const dateParams = `CreatedAfter=${encodeURIComponent(createdAfterStr)}${createdBeforeStr ? '&CreatedBefore=' + encodeURIComponent(createdBeforeStr) : ''}`;
       
-      // Get MFN orders
-      await fetchWithPagination(`${this.baseUrl}/orders/v0/orders?${marketplaceIdsQuery}&FulfillmentChannels=MFN&OrderStatuses=Unshipped,PartiallyShipped,Shipped&${dateParams}&dataElements=buyerInfo,shippingAddress`);
-      
-      if (this.config.importFba) {
-        console.log(`[AmazonAdapter] Fetching FBA (AFN) orders...`)
-        // FBA orders
-        await fetchWithPagination(`${this.baseUrl}/orders/v0/orders?${marketplaceIdsQuery}&FulfillmentChannels=AFN&OrderStatuses=Shipped&${dateParams}&dataElements=buyerInfo,shippingAddress`);
+      for (const mpId of activeMarketplaces) {
+        console.log(`[AmazonAdapter] Fetching MFN orders for marketplace ${mpId}...`);
+        await fetchWithPagination(`${this.baseUrl}/orders/v0/orders?MarketplaceIds=${mpId}&FulfillmentChannels=MFN&OrderStatuses=Unshipped,PartiallyShipped,Shipped&${dateParams}&dataElements=buyerInfo,shippingAddress`);
+        
+        if (this.config.importFba) {
+          console.log(`[AmazonAdapter] Fetching FBA orders for marketplace ${mpId}...`);
+          await fetchWithPagination(`${this.baseUrl}/orders/v0/orders?MarketplaceIds=${mpId}&FulfillmentChannels=AFN&OrderStatuses=Shipped&${dateParams}&dataElements=buyerInfo,shippingAddress`);
+        }
       }
       
       const normalizedOrders: NormalizedOrder[] = []
