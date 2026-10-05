@@ -137,13 +137,13 @@ export class AmazonAdapter implements MarketplaceAdapter {
 
       const dateParams = `CreatedAfter=${encodeURIComponent(createdAfterStr)}${createdBeforeStr ? '&CreatedBefore=' + encodeURIComponent(createdBeforeStr) : ''}`;
       
-      // Get MFN orders (including Pending)
-      await fetchWithPagination(`${this.baseUrl}/orders/v0/orders?MarketplaceIds=${euMarketplaceIds}&FulfillmentChannels=MFN&OrderStatuses=PendingAvailability,Pending,Unshipped,PartiallyShipped,Shipped&${dateParams}&dataElements=buyerInfo,shippingAddress`);
+      // Get MFN orders
+      await fetchWithPagination(`${this.baseUrl}/orders/v0/orders?MarketplaceIds=${euMarketplaceIds}&FulfillmentChannels=MFN&OrderStatuses=Unshipped,PartiallyShipped,Shipped&${dateParams}&dataElements=buyerInfo,shippingAddress`);
       
       if (this.config.importFba) {
         console.log(`[AmazonAdapter] Fetching FBA (AFN) orders...`)
         // FBA orders
-        await fetchWithPagination(`${this.baseUrl}/orders/v0/orders?MarketplaceIds=${euMarketplaceIds}&FulfillmentChannels=AFN&OrderStatuses=Pending,Unshipped,Shipped&${dateParams}&dataElements=buyerInfo,shippingAddress`);
+        await fetchWithPagination(`${this.baseUrl}/orders/v0/orders?MarketplaceIds=${euMarketplaceIds}&FulfillmentChannels=AFN&OrderStatuses=Shipped&${dateParams}&dataElements=buyerInfo,shippingAddress`);
       }
       
       const normalizedOrders: NormalizedOrder[] = []
