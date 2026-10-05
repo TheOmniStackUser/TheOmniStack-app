@@ -84,64 +84,66 @@ export class AmazonAdapter implements MarketplaceAdapter {
     return data.restrictedDataToken
   }
 
-  async fetchUnshippedOrders(_companyId: string): Promise<NormalizedOrder[]> {
+  async fetchUnshippedOrders(_companyId: string, options?: { fromDate?: string, toDate?: string }): Promise<NormalizedOrder[]> {
     try {
       console.log(`[AmazonAdapter] Fetching access token...`)
       const baseAccessToken = await this.getAccessToken()
       const rdtToken = await this.getRestrictedDataToken(baseAccessToken, 'GET', '/orders/v0/orders', ['buyerInfo', 'shippingAddress'])
 
-      console.log(`[AmazonAdapter] Fetching MFN orders...`)
+      console.log(`[AmazonAdapter] Fetching orders...`)
       
-      // SP-API requires CreatedAfter or LastUpdatedAfter. We fetch the last 14 days.
-      const createdAfter = new Date()
-      createdAfter.setDate(createdAfter.getDate() - 14)
-      const createdAfterStr = createdAfter.toISOString()
+      let createdAfterStr = '';
+      if (options?.fromDate) {
+        createdAfterStr = new Date(options.fromDate).toISOString();
+      } else {
+        const createdAfter = new Date();
+        createdAfter.setDate(createdAfter.getDate() - 14);
+        createdAfterStr = createdAfter.toISOString();
+      }
       
-      // All major EU marketplace IDs
+      let createdBeforeStr = '';
+      if (options?.toDate) {
+        createdBeforeStr = new Date(options.toDate).toISOString();
+      }
+      
       const euMarketplaceIds = 'A1PA6795UKMFR9,A1805IZSGTT6HS,A13V1IB3VIYZZH,APJ6JZADPVGVX,A1RKKUPIHCS9HS,A1F83G8C2ARO7P,A1C3SOZRARQ6R3,AMEN7PMS3EDWL,A2NODRKZP88ZB9'
       
-      // Get Unshipped, PartiallyShipped, and Shipped MFN orders
-      const mfnOrdersUrl = `${this.baseUrl}/orders/v0/orders?MarketplaceIds=${euMarketplaceIds}&FulfillmentChannels=MFN&OrderStatuses=Unshipped,PartiallyShipped,Shipped&CreatedAfter=${encodeURIComponent(createdAfterStr)}&dataElements=buyerInfo,shippingAddress`
-      const mfnResponse = await fetch(mfnOrdersUrl, {
-      method: 'GET',
-      cache: 'no-store',
-      headers: {
-          'x-amz-access-token': rdtToken,
-          'Accept': 'application/json'
+      let rawOrders: any[] = [];
+      
+      const fetchWithPagination = async (url: string) => {
+        let currentUrl = url;
+        while (true) {
+          const response = await fetch(currentUrl, {
+            method: 'GET',
+            cache: 'no-store',
+            headers: { 'x-amz-access-token': rdtToken, 'Accept': 'application/json' }
+          });
+          if (!response.ok) {
+            const err = await response.text();
+            console.error(`Amazon Orders API Error: ${err}`);
+            break;
+          }
+          const data = await response.json();
+          const orders = data.payload?.Orders || [];
+          rawOrders = [...rawOrders, ...orders];
+          
+          if (data.payload?.NextToken) {
+            currentUrl = `${this.baseUrl}/orders/v0/orders?NextToken=${encodeURIComponent(data.payload.NextToken)}`;
+          } else {
+            break;
+          }
         }
-      })
+      };
 
-      if (!mfnResponse.ok) {
-        const err = await mfnResponse.text()
-        console.error(`Amazon MFN Orders API Error: ${err}`)
-        throw new Error(`Amazon Orders API Error: ${err}`)
-      }
-
-      const mfnData = await mfnResponse.json()
-      let rawOrders = mfnData.payload?.Orders || []
+      const dateParams = `CreatedAfter=${encodeURIComponent(createdAfterStr)}${createdBeforeStr ? '&CreatedBefore=' + encodeURIComponent(createdBeforeStr) : ''}`;
+      
+      // Get MFN orders (including Pending)
+      await fetchWithPagination(`${this.baseUrl}/orders/v0/orders?MarketplaceIds=${euMarketplaceIds}&FulfillmentChannels=MFN&OrderStatuses=PendingAvailability,Pending,Unshipped,PartiallyShipped,Shipped&${dateParams}&dataElements=buyerInfo,shippingAddress`);
       
       if (this.config.importFba) {
         console.log(`[AmazonAdapter] Fetching FBA (AFN) orders...`)
-        // FBA orders are shipped by Amazon, so they are in Shipped state
-        const afnOrdersUrl = `${this.baseUrl}/orders/v0/orders?MarketplaceIds=${euMarketplaceIds}&FulfillmentChannels=AFN&OrderStatuses=Shipped&CreatedAfter=${encodeURIComponent(createdAfterStr)}&dataElements=buyerInfo,shippingAddress`
-        const afnResponse = await fetch(afnOrdersUrl, {
-          method: 'GET',
-          cache: 'no-store',
-          headers: {
-            'x-amz-access-token': rdtToken,
-            'Accept': 'application/json'
-          }
-        })
-
-        if (!afnResponse.ok) {
-          const err = await afnResponse.text()
-          console.error(`Amazon AFN Orders API Error: ${err}`)
-          throw new Error(`Amazon AFN Orders API Error: ${err}`)
-        }
-
-        const afnData = await afnResponse.json()
-        const afnOrders = afnData.payload?.Orders || []
-        rawOrders = [...rawOrders, ...afnOrders]
+        // FBA orders
+        await fetchWithPagination(`${this.baseUrl}/orders/v0/orders?MarketplaceIds=${euMarketplaceIds}&FulfillmentChannels=AFN&OrderStatuses=Pending,Unshipped,Shipped&${dateParams}&dataElements=buyerInfo,shippingAddress`);
       }
       
       const normalizedOrders: NormalizedOrder[] = []

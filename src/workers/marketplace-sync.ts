@@ -1762,6 +1762,26 @@ export async function persistOrders(
 
       // Pre-cache/download delivery note for existing orders
       await generateOrDownloadDeliveryNote(existingOrder.id, companyId, adapter)
+      
+      // Update Amazon Pending orders once they get real shipping data
+      if (existingOrder.marketplace === 'amazon' && (!existingOrder.shippingName || existingOrder.shippingName === 'Amazon Kunde') && order.shippingAddress.name && order.shippingAddress.name !== 'Amazon Kunde') {
+         console.log(`[Worker] Updating Amazon Pending Order ${order.marketplaceOrderId} with real PII data`);
+         await db.update(orders)
+           .set({
+              buyerName: order.buyer.name,
+              buyerEmail: order.buyer.email,
+              shippingName: order.shippingAddress.name,
+              shippingCompany: order.shippingAddress.company,
+              shippingAddressAddition: order.shippingAddress.addressAddition,
+              shippingStreet: order.shippingAddress.street,
+              shippingCity: order.shippingAddress.city,
+              shippingZip: order.shippingAddress.zip,
+              shippingCountry: order.shippingAddress.country,
+              status: 'pending' // stays pending so they see it to process
+           })
+           .where(eq(orders.id, existingOrder.id));
+         affected++;
+      }
 
       // Note: Invoices are only created or downloaded on shipping confirmation.
       // So we do not generate any invoices here for existing orders.
