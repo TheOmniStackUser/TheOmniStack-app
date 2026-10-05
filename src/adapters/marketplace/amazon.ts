@@ -106,7 +106,8 @@ export class AmazonAdapter implements MarketplaceAdapter {
         createdBeforeStr = new Date(options.toDate).toISOString();
       }
       
-      const euMarketplaceIds = 'A1PA6795UKMFR9,A1805IZSGTT6HS,A13V1IB3VIYZZH,APJ6JZADPVGVX,A1RKKUPIHCS9HS,A1F83G8C2ARO7P,A1C3SOZRARQ6R3,AMEN7PMS3EDWL,A2NODRKZP88ZB9'
+      const euMarketplaceIdsArray = ['A1PA6795UKMFR9','A1805IZSGTT6HS','A13V1IB3VIYZZH','APJ6JZADPVGVX','A1RKKUPIHCS9HS','A1F83G8C2ARO7P','A1C3SOZRARQ6R3','AMEN7PMS3EDWL','A2NODRKZP88ZB9'];
+      const marketplaceIdsQuery = euMarketplaceIdsArray.map(id => `MarketplaceIds=${id}`).join('&');
       
       let rawOrders: any[] = [];
       
@@ -138,12 +139,12 @@ export class AmazonAdapter implements MarketplaceAdapter {
       const dateParams = `CreatedAfter=${encodeURIComponent(createdAfterStr)}${createdBeforeStr ? '&CreatedBefore=' + encodeURIComponent(createdBeforeStr) : ''}`;
       
       // Get MFN orders
-      await fetchWithPagination(`${this.baseUrl}/orders/v0/orders?MarketplaceIds=${euMarketplaceIds}&FulfillmentChannels=MFN&OrderStatuses=Unshipped,PartiallyShipped,Shipped&${dateParams}&dataElements=buyerInfo,shippingAddress`);
+      await fetchWithPagination(`${this.baseUrl}/orders/v0/orders?${marketplaceIdsQuery}&FulfillmentChannels=MFN&OrderStatuses=Unshipped,PartiallyShipped,Shipped&${dateParams}&dataElements=buyerInfo,shippingAddress`);
       
       if (this.config.importFba) {
         console.log(`[AmazonAdapter] Fetching FBA (AFN) orders...`)
         // FBA orders
-        await fetchWithPagination(`${this.baseUrl}/orders/v0/orders?MarketplaceIds=${euMarketplaceIds}&FulfillmentChannels=AFN&OrderStatuses=Shipped&${dateParams}&dataElements=buyerInfo,shippingAddress`);
+        await fetchWithPagination(`${this.baseUrl}/orders/v0/orders?${marketplaceIdsQuery}&FulfillmentChannels=AFN&OrderStatuses=Shipped&${dateParams}&dataElements=buyerInfo,shippingAddress`);
       }
       
       const normalizedOrders: NormalizedOrder[] = []
