@@ -145,6 +145,8 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
           searchConditions.push(ilike(orders.buyerName, `%${term}%`), ilike(orders.buyerCompany, `%${term}%`))
         } else if (searchField === 'sku') {
           searchConditions.push(ilike(sql`${orders.rawPayload}::text`, `%${term}%`))
+        } else if (searchField === 'ean') {
+          searchConditions.push(ilike(sql`${orders.rawPayload}::text`, `%${term}%`))
         } else if (searchField === 'tracking') {
           searchConditions.push(ilike(orders.trackingNumber, `%${term}%`))
         } else {
