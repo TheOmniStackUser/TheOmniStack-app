@@ -804,6 +804,7 @@ export function OrdersTable({
   const pathname = usePathname()
   // Draft Filters (The state while typing/selecting)
   const [draftSearch, setDraftSearch] = useState(urlParams.search || '')
+  const [draftSearchField, setDraftSearchField] = useState(urlParams.searchField || 'all')
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -932,6 +933,7 @@ export function OrdersTable({
   const pushParams = (updates: Record<string, string|undefined>) => {
     const params = new URLSearchParams()
     if (draftSearch) params.set('search', draftSearch)
+    if (draftSearchField !== 'all') params.set('searchField', draftSearchField)
     if (draftMarketplace !== 'all') params.set('marketplace', draftMarketplace)
     if (draftStatus !== 'all') params.set('status', draftStatus)
     if (draftShippingStatus !== 'all') params.set('shippingStatus', draftShippingStatus)
@@ -1858,6 +1860,19 @@ const filteredOrders = orders;
         {/* Row 1: Search */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 w-full">
           <div className="flex flex-col sm:flex-row gap-4 items-center w-full lg:max-w-2xl">
+            <select
+              value={draftSearchField}
+              onChange={(e) => {
+                setDraftSearchField(e.target.value)
+              }}
+              className="hidden sm:block px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm text-slate-900 font-medium transition-all min-w-[140px]"
+            >
+              <option value="all">Überall suchen</option>
+              <option value="sku">Nur SKU / EAN</option>
+              <option value="order_id">Bestellnummer</option>
+              <option value="buyer">Kundenname</option>
+              <option value="tracking">Sendungsnummer</option>
+            </select>
             <div className="relative flex-1 w-full">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

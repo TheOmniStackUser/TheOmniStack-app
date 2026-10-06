@@ -22,6 +22,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   const page = parseInt(params.page as string || '1', 10)
   const pageSize = parseInt(params.pageSize as string || '25', 10)
   const search = (params.search as string) || ''
+  const searchField = (params.searchField as string) || 'all'
   const marketplace = (params.marketplace as string) || 'all'
   const status = (params.status as string) || 'all'
   const shippingStatus = (params.shippingStatus as string) || 'all'
@@ -137,16 +138,27 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     
     if (terms.length > 0) {
       const allTermConditions = terms.map(term => {
-        const searchConditions: any[] = [
-          ilike(orders.marketplaceOrderId, `%${term}%`),
-          ilike(orders.buyerName, `%${term}%`),
-          ilike(orders.buyerCompany, `%${term}%`),
-          ilike(orders.shippingName, `%${term}%`),
-          ilike(orders.shippingCompany, `%${term}%`),
-          ilike(orders.trackingNumber, `%${term}%`),
-          ilike(orders.deliveryNoteNumber, `%${term}%`),
-          ilike(sql`${orders.rawPayload}::text`, `%${term}%`)
-        ]
+        let searchConditions: any[] = []
+        if (searchField === 'order_id') {
+          searchConditions.push(ilike(orders.marketplaceOrderId, `%${term}%`))
+        } else if (searchField === 'buyer') {
+          searchConditions.push(ilike(orders.buyerName, `%${term}%`), ilike(orders.buyerCompany, `%${term}%`))
+        } else if (searchField === 'sku') {
+          searchConditions.push(ilike(sql`${orders.rawPayload}::text`, `%${term}%`))
+        } else if (searchField === 'tracking') {
+          searchConditions.push(ilike(orders.trackingNumber, `%${term}%`))
+        } else {
+          searchConditions.push(
+            ilike(orders.marketplaceOrderId, `%${term}%`),
+            ilike(orders.buyerName, `%${term}%`),
+            ilike(orders.buyerCompany, `%${term}%`),
+            ilike(orders.shippingName, `%${term}%`),
+            ilike(orders.shippingCompany, `%${term}%`),
+            ilike(orders.trackingNumber, `%${term}%`),
+            ilike(orders.deliveryNoteNumber, `%${term}%`),
+            ilike(sql`${orders.rawPayload}::text`, `%${term}%`)
+          )
+        }
         
         // Support searching for refunded states via text input
         if (term.includes('erstattet') && refunds) {
@@ -475,7 +487,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         currentPage={page}
         pageSize={pageSize}
         urlParams={{
-          search, marketplace, status, shippingStatus, country, sortField, sortDirection
+          search, searchField, marketplace, status, shippingStatus, country, sortField, sortDirection
         }}
         hermesDefaultParcelClass={defaultParcelClass} 
         customMiraklIntegrations={customMiraklIntegrations}
