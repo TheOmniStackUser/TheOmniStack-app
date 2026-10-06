@@ -133,27 +133,35 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
 
   if (search) {
     const searchLower = search.toLowerCase()
-    const searchConditions: any[] = [
-      ilike(orders.marketplaceOrderId, `%${search}%`),
-      ilike(orders.buyerName, `%${search}%`),
-      ilike(orders.buyerCompany, `%${search}%`),
-      ilike(orders.shippingName, `%${search}%`),
-      ilike(orders.shippingCompany, `%${search}%`),
-      ilike(orders.trackingNumber, `%${search}%`),
-      ilike(orders.deliveryNoteNumber, `%${search}%`),
-      ilike(sql`${orders.rawPayload}::text`, `%${search}%`)
-    ]
+    const terms = searchLower.split(/\s+/).filter(Boolean)
     
-    // Support searching for refunded states via text input
-    if (searchLower.includes('erstattet') && refunds) {
-      if (searchLower === 'teilerstattet' || searchLower.includes('teil')) {
-        if (refunds.partiallyRefundedIds.length > 0) searchConditions.push(inArray(orders.id, refunds.partiallyRefundedIds))
-      } else {
-        if (refunds.fullyRefundedIds.length > 0) searchConditions.push(inArray(orders.id, refunds.fullyRefundedIds))
-      }
+    if (terms.length > 0) {
+      const allTermConditions = terms.map(term => {
+        const searchConditions: any[] = [
+          ilike(orders.marketplaceOrderId, `%${term}%`),
+          ilike(orders.buyerName, `%${term}%`),
+          ilike(orders.buyerCompany, `%${term}%`),
+          ilike(orders.shippingName, `%${term}%`),
+          ilike(orders.shippingCompany, `%${term}%`),
+          ilike(orders.trackingNumber, `%${term}%`),
+          ilike(orders.deliveryNoteNumber, `%${term}%`),
+          ilike(sql`${orders.rawPayload}::text`, `%${term}%`)
+        ]
+        
+        // Support searching for refunded states via text input
+        if (term.includes('erstattet') && refunds) {
+          if (term === 'teilerstattet' || term.includes('teil')) {
+            if (refunds.partiallyRefundedIds.length > 0) searchConditions.push(inArray(orders.id, refunds.partiallyRefundedIds))
+          } else {
+            if (refunds.fullyRefundedIds.length > 0) searchConditions.push(inArray(orders.id, refunds.fullyRefundedIds))
+          }
+        }
+        
+        return or(...searchConditions)!
+      })
+      
+      whereConditions.push(and(...allTermConditions)!)
     }
-
-    whereConditions.push(or(...searchConditions)!)
   }
 
   if (status !== 'all') {
