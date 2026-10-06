@@ -6,7 +6,7 @@ import { orders, orderItems } from '@/db/schema/orders'
 import { invoices, invoiceLogs } from '@/db/schema/invoices'
 import { returnsLog } from '@/db/schema/returns'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
-import { eq, desc, asc, and, ne, inArray, or, ilike, sql, notInArray } from 'drizzle-orm'
+import { eq, desc, asc, and, ne, inArray, or, ilike, sql, notInArray, exists } from 'drizzle-orm'
 import { OrdersTable } from './orders-table'
 import { ManualImport } from './manual-import'
 import type { HermesConfig } from '@/app/(dashboard)/integrations/hermes-form'
@@ -144,9 +144,36 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         } else if (searchField === 'buyer') {
           searchConditions.push(ilike(orders.buyerName, `%${term}%`), ilike(orders.buyerCompany, `%${term}%`))
         } else if (searchField === 'sku') {
-          searchConditions.push(ilike(sql`${orders.rawPayload}::text`, `%${term}%`))
+          searchConditions.push(
+            exists(
+              db.select({ id: orderItems.id })
+                .from(orderItems)
+                .where(
+                  and(
+                    eq(orderItems.orderId, orders.id),
+                    ilike(orderItems.sku, `%${term}%`)
+                  )
+                )
+            )
+          )
         } else if (searchField === 'ean') {
-          searchConditions.push(ilike(sql`${orders.rawPayload}::text`, `%${term}%`))
+          searchConditions.push(
+            or(
+              exists(
+                db.select({ id: orderItems.id })
+                  .from(orderItems)
+                  .where(
+                    and(
+                      eq(orderItems.orderId, orders.id),
+                      ilike(orderItems.sku, `%${term}%`)
+                    )
+                  )
+              ),
+              ilike(sql`${orders.rawPayload}::text`, `%"ean":"%${term}%"%`),
+              ilike(sql`${orders.rawPayload}::text`, `%"barcode":"%${term}%"%`),
+              ilike(sql`${orders.rawPayload}::text`, `%"EAN":"%${term}%"%`)
+            )!
+          )
         } else if (searchField === 'tracking') {
           searchConditions.push(ilike(orders.trackingNumber, `%${term}%`))
         } else {
