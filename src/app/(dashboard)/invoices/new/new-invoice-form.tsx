@@ -14,6 +14,8 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
   const [isPreviewing, setIsPreviewing] = useState(false)
   const [isLoadingSettings, setIsLoadingSettings] = useState(true)
   const [draftName, setDraftName] = useState('')
+
+
   const [drafts, setDrafts] = useState<any[]>([])
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null)
   const [currentDraftName, setCurrentDraftName] = useState('')
@@ -35,6 +37,8 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
   const customerIdParam = searchParams.get('customerId')
   const draftIdParam = searchParams.get('draftId')
   const [clonedFromInvoiceId, setClonedFromInvoiceId] = useState<string | null>(null)
+
+  
 
   const [customer, setCustomer] = useState({
     id: undefined as string | undefined,
@@ -98,6 +102,44 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
   const standardRate = availableVatRates[0] ?? 19
 
   const [items, setItems] = useState([{ sku: '', title: '', quantity: 1, unitPrice: 0 as number | string, taxRate: standardRate }])
+
+// Auto-save form data to prevent data loss
+  useEffect(() => {
+    if (typeof window === 'undefined' || editIdParam || cloneId || draftIdParam) return;
+    const saveState = () => {
+      const stateToSave = {
+        customer,
+        items,
+        settings,
+        customText,
+        internalNote,
+        draftName,
+      };
+      sessionStorage.setItem('billing_app_invoice_backup', JSON.stringify(stateToSave));
+    };
+    const timeoutId = setTimeout(saveState, 500);
+    return () => clearTimeout(timeoutId);
+  }, [customer, items, settings, customText, internalNote, draftName, editIdParam, cloneId, draftIdParam]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !editIdParam && !cloneId && !draftIdParam) {
+      const backup = sessionStorage.getItem('billing_app_invoice_backup');
+      if (backup) {
+        try {
+          const parsed = JSON.parse(backup);
+          if (parsed.customer && parsed.customer.name !== undefined) setCustomer(parsed.customer);
+          if (parsed.items && parsed.items.length) setItems(parsed.items);
+          if (parsed.settings) setSettings(parsed.settings);
+          if (parsed.customText !== undefined) setCustomText(parsed.customText);
+          if (parsed.internalNote !== undefined) setInternalNote(parsed.internalNote);
+          if (parsed.draftName !== undefined) setDraftName(parsed.draftName);
+        } catch (e) {
+          console.error('Failed to restore backup', e);
+        }
+      }
+    }
+  }, [editIdParam, cloneId, draftIdParam]);
+
 
   const [formats, setFormats] = useState({
     standardPdf: true,
@@ -596,6 +638,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
       if (result?.error) {
         setNotification({ message: `Fehler: ${result.error}`, type: 'error' })
       } else {
+        sessionStorage.removeItem('billing_app_invoice_backup')
         if (status === 'draft') {
           if (result.draftId) {
             setCurrentDraftId(result.draftId)
@@ -715,7 +758,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
           <div className="flex-1">
             <p className="font-bold text-sm leading-tight">{notification.message}</p>
           </div>
-          <button onClick={() => setNotification(null)} className="p-1 hover:bg-slate-50 rounded-lg transition-colors text-slate-400">
+          <button type="button" onClick={() => setNotification(null)} className="p-1 hover:bg-slate-50 rounded-lg transition-colors text-slate-400">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
@@ -778,7 +821,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
             <div className="absolute right-0 mt-2 w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 z-[100] overflow-hidden">
               <div className="p-4 bg-slate-50 border-b border-slate-200 font-bold text-slate-700 flex justify-between items-center">
                 <span>Gespeicherte Entwürfe</span>
-                <button onClick={() => setShowDraftsList(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+                <button type="button" onClick={() => setShowDraftsList(false)} className="text-slate-400 hover:text-slate-600">✕</button>
               </div>
               <div className="max-h-96 overflow-y-auto">
                 {drafts.length === 0 ? (
@@ -796,7 +839,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                       </div>
                       <div className="flex items-center gap-4 ml-4">
                         <div className="text-xs font-bold text-slate-400">{parseFloat(d.totalAmount).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</div>
-                        <button onClick={(e) => handleDeleteDraft(e, d.id)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" title="Löschen"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                        <button type="button" onClick={(e) => handleDeleteDraft(e, d.id)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" title="Löschen"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
                       </div>
                     </div>
                   ))
@@ -1378,8 +1421,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
             </div>
             <div className="flex items-center gap-4">
               {customerFormMode === 'search' && (
-                <button
-                  onClick={() => {
+                <button type="button" onClick={() => {
                     setCustomerFormData({ name: '', email: '', customerNumber: '', street: '', zip: '', city: '', country: 'DE', vatId: '' })
                     setCustomerFormMode('create')
                   }}
@@ -1389,7 +1431,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   Neuen Kunden anlegen
                 </button>
               )}
-              <button onClick={() => {
+              <button type="button" onClick={() => {
                 if (customerFormMode !== 'search') setCustomerFormMode('search')
                 else setShowCustomerSearch(false)
               }} className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-400 hover:text-slate-600">
@@ -1433,9 +1475,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                 <div className="max-h-[400px] overflow-y-auto pr-2 space-y-2 custom-scrollbar">
                   {customerResults.length > 0 ? (
                     customerResults.map(c => (
-                      <button 
-                        key={c.id} 
-                        onClick={() => selectCustomer(c)}
+                      <button type="button" key={c.id} onClick={() => selectCustomer(c)}
                         className="w-full p-5 text-left hover:bg-blue-50 border border-slate-100 rounded-2xl transition-all flex justify-between items-center group hover:border-blue-200 hover:shadow-md"
                       >
                         <div>
@@ -1472,9 +1512,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
                   ) : searchQuery.length < 2 && !isSearchingCustomers && customerResults.length > 0 ? (
                     // Show initial results even for short query
                     customerResults.map(c => (
-                      <button 
-                        key={c.id} 
-                        onClick={() => selectCustomer(c)}
+                      <button type="button" key={c.id} onClick={() => selectCustomer(c)}
                         className="w-full p-5 text-left hover:bg-blue-50 border border-slate-100 rounded-2xl transition-all flex justify-between items-center group hover:border-blue-200 hover:shadow-md"
                       >
                         <div>
@@ -1571,8 +1609,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
               <h2 className="text-xl font-black text-slate-900 tracking-tight">USt-IdNr. Validierung</h2>
               <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">Statusprüfung & Dokumentation</p>
             </div>
-            <button 
-              onClick={() => setShowVatModal(false)}
+            <button type="button" onClick={() => setShowVatModal(false)}
               className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white hover:shadow-md transition-all text-slate-400 hover:text-slate-900"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -1736,8 +1773,7 @@ export function NewInvoiceForm({ documentType = 'invoice' }: { documentType?: 'i
           </div>
           
           <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end shrink-0">
-            <button 
-              onClick={() => setShowVatModal(false)}
+            <button type="button" onClick={() => setShowVatModal(false)}
               className="px-6 py-3 bg-white text-slate-700 font-bold rounded-xl border border-slate-200 hover:bg-slate-50 transition-all text-sm"
             >
               Fenster schließen
