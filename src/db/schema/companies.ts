@@ -129,7 +129,9 @@ export const companies = pgTable('companies', {
   featuresProductsEnabled: boolean('features_products_enabled').notNull().default(false),
 
   // Integrations settings
-  lexofficeApiKey: text('lexoffice_api_key'),
+  lexofficeApiKey: text('lexoffice_api_key'), // Used as access token for OAuth
+  lexofficeRefreshToken: text('lexoffice_refresh_token'),
+  lexofficeExpiresAt: timestamp('lexoffice_expires_at', { withTimezone: true }),
   lexofficeAutoExport: boolean('lexoffice_auto_export').notNull().default(false),
 
 

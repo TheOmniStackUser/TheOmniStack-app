@@ -12,11 +12,10 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { lexofficeApiKey, lexofficeAutoExport } = body
+    const { lexofficeAutoExport } = body
 
     await db.update(companies)
       .set({
-        lexofficeApiKey: lexofficeApiKey || null,
         lexofficeAutoExport: lexofficeAutoExport === true,
         updatedAt: new Date(),
       })

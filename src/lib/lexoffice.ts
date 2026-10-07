@@ -14,8 +14,66 @@ export interface LexofficeVoucherResponse {
   version: number;
 }
 
+export async function getValidLexofficeToken(companyRecord: Company) {
+  let accessToken = companyRecord.lexofficeApiKey
+  
+  if (!accessToken) {
+    throw new Error(`Lexoffice not configured for company: ${companyRecord.id}`)
+  }
+
+  // Check if token is expired (or expires in the next 5 minutes)
+  const isOAuth = !!companyRecord.lexofficeRefreshToken
+  const expiresAt = companyRecord.lexofficeExpiresAt
+  
+  if (isOAuth && expiresAt && expiresAt.getTime() - 5 * 60000 < Date.now()) {
+    // Need to refresh
+    const clientId = process.env.LEXOFFICE_CLIENT_ID
+    const clientSecret = process.env.LEXOFFICE_CLIENT_SECRET
+    
+    if (!clientId || !clientSecret) {
+      throw new Error('LEXOFFICE_CLIENT_ID or LEXOFFICE_CLIENT_SECRET not configured')
+    }
+
+    const tokenParams = new URLSearchParams()
+    tokenParams.append('grant_type', 'refresh_token')
+    tokenParams.append('refresh_token', companyRecord.lexofficeRefreshToken!)
+    
+    const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
+
+    const tokenRes = await fetch('https://app.lexoffice.de/auth/oauth2/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Basic ${basicAuth}`,
+        'Accept': 'application/json'
+      },
+      body: tokenParams.toString()
+    })
+
+    if (!tokenRes.ok) {
+      const err = await tokenRes.text()
+      throw new Error(`Failed to refresh Lexoffice token: ${err}`)
+    }
+
+    const tokenData = await tokenRes.json()
+    const { access_token, refresh_token, expires_in } = tokenData
+    const newExpiresAt = new Date(Date.now() + (expires_in * 1000))
+
+    await db.update(companies).set({
+      lexofficeApiKey: access_token,
+      lexofficeRefreshToken: refresh_token,
+      lexofficeExpiresAt: newExpiresAt,
+      updatedAt: new Date()
+    }).where(eq(companies.id, companyRecord.id))
+
+    accessToken = access_token
+  }
+
+  return accessToken
+}
+
 export async function exportInvoiceToLexoffice(invoiceId: string, companyId: string) {
-  // 1. Fetch the company to get the API key
+  // 1. Fetch the company
   const companyRecord = await db.query.companies.findFirst({
     where: eq(companies.id, companyId),
   })
@@ -24,10 +82,7 @@ export async function exportInvoiceToLexoffice(invoiceId: string, companyId: str
     throw new Error(`Company not found: ${companyId}`)
   }
 
-  const apiKey = companyRecord.lexofficeApiKey
-  if (!apiKey) {
-    throw new Error(`Lexoffice API key not configured for company: ${companyId}`)
-  }
+  const apiKey = await getValidLexofficeToken(companyRecord)
 
   // 2. Fetch the invoice and items
   const invoiceRecord = await db.query.invoices.findFirst({
