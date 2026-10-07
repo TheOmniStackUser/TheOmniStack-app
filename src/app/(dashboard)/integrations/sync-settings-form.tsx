@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useActionState, useState, useEffect } from 'react'
 import { saveSyncSettingsAction } from '@/app/actions/integrations'
 import { HelpCircle, Clock, CheckCircle } from 'lucide-react'
 
@@ -25,6 +25,10 @@ export function SyncSettingsForm({ company, activeMarketplaces }: SyncSettingsFo
   const [selectedMarketplaces, setSelectedMarketplaces] = useState<string[]>(
     company.fetchOrdersMarketplaces || []
   )
+
+  useEffect(() => {
+    setSelectedMarketplaces(company.fetchOrdersMarketplaces || [])
+  }, [company.fetchOrdersMarketplaces])
 
   const handleToggleMarketplace = (value: string) => {
     setSelectedMarketplaces((prev) =>
