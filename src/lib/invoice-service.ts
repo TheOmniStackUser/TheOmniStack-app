@@ -485,11 +485,33 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
     }
   }
 
+  let result;
   if (txContext) {
-    return await runDbAction(txContext)
+    result = await runDbAction(txContext)
   } else {
-    return await db.transaction(async (tx) => await runDbAction(tx))
+    result = await db.transaction(async (tx) => await runDbAction(tx))
   }
+
+  // Trigger Lexoffice auto-export if enabled
+  if (
+    result &&
+    result.invoiceId &&
+    company.lexofficeAutoExport &&
+    company.lexofficeApiKey &&
+    status === 'issued' &&
+    documentType === 'invoice'
+  ) {
+    import('@/lib/lexoffice').then(({ exportInvoiceToLexoffice }) => {
+      // Delay slightly to ensure transaction is committed if txContext was used
+      setTimeout(() => {
+        exportInvoiceToLexoffice(result.invoiceId!, companyId).catch(err => {
+          console.error(`[Lexoffice Auto-Export] Failed for invoice ${result.invoiceId}:`, err)
+        })
+      }, 2000)
+    }).catch(console.error)
+  }
+
+  return result
 }
 
 export function extractPaymentInfo(order: any) {

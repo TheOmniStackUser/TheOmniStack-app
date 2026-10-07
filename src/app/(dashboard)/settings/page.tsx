@@ -9,6 +9,7 @@ import { MarketplaceAutomation } from './marketplace-automation'
 import { TwoFactorSettings } from './two-factor-settings'
 import { SmtpSettings } from './smtp-settings'
 import { DunningSettings } from './dunning-settings'
+import { LexofficeSettings } from './lexoffice-settings'
 import { vatSettings } from '@/db/schema/vat-settings'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { users } from '@/db/schema/auth'
@@ -88,6 +89,8 @@ export default async function SettingsPage(props: {
       <TwoFactorSettings initialEnabled={user?.twoFactorEnabled ?? false} />
 
       {!isCraftVariant && <MarketplaceAutomation integrations={integrations} />}
+
+      <LexofficeSettings company={company} />
 
       <SmtpSettings company={company} />
 

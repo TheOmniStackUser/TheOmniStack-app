@@ -128,6 +128,11 @@ export const companies = pgTable('companies', {
   featuresReturnsEnabled: boolean('features_returns_enabled').notNull().default(false),
   featuresProductsEnabled: boolean('features_products_enabled').notNull().default(false),
 
+  // Integrations settings
+  lexofficeApiKey: text('lexoffice_api_key'),
+  lexofficeAutoExport: boolean('lexoffice_auto_export').notNull().default(false),
+
+
   // GPSR (General Product Safety Regulation) Default Contact
   gpsrDetails: jsonb('gpsr_details').$type<{
     name?: string;
