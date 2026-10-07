@@ -1,5 +1,5 @@
 import { db } from '@/db/client'
-import { companies } from '@/db/schema/companies'
+import { companies, Company } from '@/db/schema/companies'
 import { invoices, invoiceItems, Invoice, InvoiceItem } from '@/db/schema/invoices'
 import { eq } from 'drizzle-orm'
 import { getDocumentUrl } from '@/lib/storage'
