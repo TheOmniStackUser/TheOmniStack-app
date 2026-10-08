@@ -182,7 +182,7 @@ export class AmazonAdapter implements MarketplaceAdapter {
         })
 
         if (!itemsResponse.ok) {
-          console.warn(`[AmazonAdapter] Could not fetch items for order ${rawOrder.AmazonOrderId}`)
+          const errText = await itemsResponse.text(); console.warn(`[AmazonAdapter] Could not fetch items for order ${rawOrder.AmazonOrderId}: ${itemsResponse.status} ${errText}`);
           continue
         }
 
@@ -297,8 +297,9 @@ export class AmazonAdapter implements MarketplaceAdapter {
         return `
         <Message>
           <MessageID>${idx + 1}</MessageID>
-          <PaymentAdjustment>
+          <OrderAdjustment>
             <AmazonOrderID>${marketplaceOrderId}</AmazonOrderID>
+            <ActionType>Refund</ActionType>
             <AdjustedItem>
               ${identifierXml}
               <AdjustmentReason>CustomerReturn</AdjustmentReason>
@@ -310,7 +311,7 @@ export class AmazonAdapter implements MarketplaceAdapter {
               </ItemPriceAdjustments>
               <Quantity>${item.quantity}</Quantity>
             </AdjustedItem>
-          </PaymentAdjustment>
+          </OrderAdjustment>
         </Message>`
       }).join('\n')
 
