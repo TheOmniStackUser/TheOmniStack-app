@@ -359,7 +359,10 @@ export function createMarketplaceSyncWorker() {
               toDate: job.data.toDate
             })
           } else if (marketplace === 'amazon') {
-            rawOrders = await adapter.fetchUnshippedOrders(companyId)
+            rawOrders = await adapter.fetchUnshippedOrders(companyId, {
+              fromDate: job.data.fromDate,
+              toDate: job.data.toDate
+            })
           } else if (marketplace === 'shopify') {
             rawOrders = await adapter.fetchUnshippedOrders(companyId, {
               fromDate: job.data.fromDate,

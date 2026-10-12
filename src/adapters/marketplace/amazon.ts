@@ -1,5 +1,8 @@
 import * as zlib from 'zlib'
 import type { MarketplaceAdapter, NormalizedOrder } from './base'
+import { db } from '@/db/client'
+import { orders } from '@/db/schema/orders'
+import { eq, and } from 'drizzle-orm'
 
 type AmazonAdapterConfig = {
   sellerId: string
@@ -84,7 +87,9 @@ export class AmazonAdapter implements MarketplaceAdapter {
     return data.restrictedDataToken
   }
 
-  async fetchUnshippedOrders(_companyId: string, options?: { fromDate?: string, toDate?: string }): Promise<NormalizedOrder[]> {
+  async fetchUnshippedOrders(companyId: string, options?: { fromDate?: string, toDate?: string }): Promise<NormalizedOrder[]> {
+    const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
     try {
       console.log(`[AmazonAdapter] Fetching access token...`)
       const baseAccessToken = await this.getAccessToken()
@@ -133,14 +138,27 @@ export class AmazonAdapter implements MarketplaceAdapter {
       const fetchWithPagination = async (url: string) => {
         let currentUrl = url;
         while (true) {
-          const response = await fetch(currentUrl, {
-            method: 'GET',
-            cache: 'no-store',
-            headers: { 'x-amz-access-token': rdtToken, 'Accept': 'application/json' }
-          });
-          if (!response.ok) {
-            const err = await response.text();
-            console.error(`Amazon Orders API Error for URL ${url}: ${err}`);
+          let response: Response | undefined;
+          let attempts = 0;
+          while (attempts < 5) {
+            attempts++;
+            response = await fetch(currentUrl, {
+              method: 'GET',
+              cache: 'no-store',
+              headers: { 'x-amz-access-token': rdtToken, 'Accept': 'application/json' }
+            });
+            if (response.status === 429) {
+              const waitMs = attempts * 3000;
+              console.warn(`[AmazonAdapter] Rate limit 429 on orders endpoint, retrying in ${waitMs}ms (attempt ${attempts}/5)...`);
+              await sleep(waitMs);
+              continue;
+            }
+            break;
+          }
+
+          if (!response || !response.ok) {
+            const err = await response?.text();
+            console.error(`Amazon Orders API Error for URL ${currentUrl}: ${err}`);
             break;
           }
           const data = await response.json();
@@ -149,6 +167,7 @@ export class AmazonAdapter implements MarketplaceAdapter {
           
           if (data.payload?.NextToken) {
             currentUrl = `${this.baseUrl}/orders/v0/orders?NextToken=${encodeURIComponent(data.payload.NextToken)}`;
+            await sleep(1500); // Respect SP-API rate limits on token pagination
           } else {
             break;
           }
@@ -156,40 +175,76 @@ export class AmazonAdapter implements MarketplaceAdapter {
       };
 
       const dateParams = `CreatedAfter=${encodeURIComponent(createdAfterStr)}${createdBeforeStr ? '&CreatedBefore=' + encodeURIComponent(createdBeforeStr) : ''}`;
+      const combinedMpIds = activeMarketplaces.join(',');
       
-      for (const mpId of activeMarketplaces) {
-        console.log(`[AmazonAdapter] Fetching MFN orders for marketplace ${mpId}...`);
-        await fetchWithPagination(`${this.baseUrl}/orders/v0/orders?MarketplaceIds=${mpId}&FulfillmentChannels=MFN&OrderStatuses=Unshipped,PartiallyShipped,Shipped&${dateParams}&dataElements=buyerInfo,shippingAddress`);
-        
-        if (this.config.importFba) {
-          console.log(`[AmazonAdapter] Fetching FBA orders for marketplace ${mpId}...`);
-          await fetchWithPagination(`${this.baseUrl}/orders/v0/orders?MarketplaceIds=${mpId}&FulfillmentChannels=AFN&OrderStatuses=Shipped&${dateParams}&dataElements=buyerInfo,shippingAddress`);
-        }
+      console.log(`[AmazonAdapter] Fetching MFN orders for marketplaces: ${combinedMpIds}...`);
+      await fetchWithPagination(`${this.baseUrl}/orders/v0/orders?MarketplaceIds=${combinedMpIds}&FulfillmentChannels=MFN&OrderStatuses=Unshipped,PartiallyShipped,Shipped&${dateParams}&dataElements=buyerInfo,shippingAddress`);
+      
+      if (this.config.importFba) {
+        await sleep(1500);
+        console.log(`[AmazonAdapter] Fetching FBA orders for marketplaces: ${combinedMpIds}...`);
+        await fetchWithPagination(`${this.baseUrl}/orders/v0/orders?MarketplaceIds=${combinedMpIds}&FulfillmentChannels=AFN&OrderStatuses=Shipped&${dateParams}&dataElements=buyerInfo,shippingAddress`);
       }
       
+      // Query database for orders already imported to avoid redundant orderItems calls
+      let existingSet = new Set<string>();
+      if (companyId) {
+        try {
+          const existingOrders = await db.select({ marketplaceOrderId: orders.marketplaceOrderId })
+            .from(orders)
+            .where(and(eq(orders.companyId, companyId), eq(orders.marketplace, 'amazon')));
+          existingSet = new Set(existingOrders.map(o => o.marketplaceOrderId));
+        } catch (dbErr) {
+          console.warn('[AmazonAdapter] Could not pre-query existing orders:', dbErr);
+        }
+      }
+
       const normalizedOrders: NormalizedOrder[] = []
 
       for (const rawOrder of rawOrders) {
-        console.log(`[AmazonAdapter] Fetching items for order ${rawOrder.AmazonOrderId}...`)
-        const itemsUrl = `${this.baseUrl}/orders/v0/orders/${rawOrder.AmazonOrderId}/orderItems`
-        const itemsResponse = await fetch(itemsUrl, {
-      method: 'GET',
-      cache: 'no-store',
-      headers: {
-            'x-amz-access-token': baseAccessToken,
-            'Accept': 'application/json'
-          }
-        })
+        // If order is already in our DB, persistOrders will skip re-inserting it.
+        // Skipping orderItems fetch saves quota and prevents 429 throttling!
+        if (existingSet.has(rawOrder.AmazonOrderId)) {
+          normalizedOrders.push(this.normalizeOrder(rawOrder, []));
+          continue;
+        }
 
-        if (!itemsResponse.ok) {
-          const errText = await itemsResponse.text(); console.warn(`[AmazonAdapter] Could not fetch items for order ${rawOrder.AmazonOrderId}: ${itemsResponse.status} ${errText}`);
-          continue
+        console.log(`[AmazonAdapter] Fetching items for new order ${rawOrder.AmazonOrderId}...`)
+        const itemsUrl = `${this.baseUrl}/orders/v0/orders/${rawOrder.AmazonOrderId}/orderItems`
+        
+        let itemsResponse: Response | undefined;
+        let attempts = 0;
+        while (attempts < 4) {
+          attempts++;
+          itemsResponse = await fetch(itemsUrl, {
+            method: 'GET',
+            cache: 'no-store',
+            headers: {
+              'x-amz-access-token': baseAccessToken,
+              'Accept': 'application/json'
+            }
+          });
+
+          if (itemsResponse.status === 429) {
+            const waitMs = attempts * 2500;
+            console.warn(`[AmazonAdapter] Rate limit 429 on orderItems for ${rawOrder.AmazonOrderId}, retrying in ${waitMs}ms (attempt ${attempts}/4)...`);
+            await sleep(waitMs);
+            continue;
+          }
+          break;
+        }
+
+        if (!itemsResponse || !itemsResponse.ok) {
+          const errText = await itemsResponse?.text();
+          console.warn(`[AmazonAdapter] Could not fetch items for order ${rawOrder.AmazonOrderId}: ${itemsResponse?.status} ${errText}`);
+          continue;
         }
 
         const itemsData = await itemsResponse.json()
         const rawItems = itemsData.payload?.OrderItems || []
         
         normalizedOrders.push(this.normalizeOrder(rawOrder, rawItems))
+        await sleep(500); // 500ms delay between item requests
       }
 
       return normalizedOrders
