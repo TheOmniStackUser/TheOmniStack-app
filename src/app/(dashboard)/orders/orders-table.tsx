@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, Fragment, ReactNode, useEffect, useMemo, useTransition, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
 import { Package, Truck, CheckCircle2, Store, Clock, XCircle, RefreshCw, Copy, Check } from 'lucide-react'
@@ -474,6 +475,7 @@ export function OrdersTable({
 
   // Dropdown actions states & helpers
   const [openMenuOrderId, setOpenMenuOrderId] = useState<string | null>(null)
+  const [menuPosition, setMenuPosition] = useState<{ top?: number; bottom?: number; left: number } | null>(null)
 
   // Build and sort marketplace categories
   const groupedMarketplaces = (() => {
@@ -549,15 +551,50 @@ export function OrdersTable({
       if (!target.closest('#progress-dropdown-container')) {
         setIsProgressDropdownOpen(false)
       }
-      setOpenMenuOrderId(null)
+      if (!target.closest('.order-row-menu-btn') && !target.closest('.order-row-menu-dropdown')) {
+        setOpenMenuOrderId(null)
+        setMenuPosition(null)
+      }
     }
     window.addEventListener('click', handleClose)
     return () => window.removeEventListener('click', handleClose)
   }, [])
 
-  const toggleMenu = (orderId: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    setOpenMenuOrderId(prev => prev === orderId ? null : orderId)
+  useEffect(() => {
+    const handleScrollOrResize = () => {
+      setOpenMenuOrderId(null)
+      setMenuPosition(null)
+    }
+    window.addEventListener('scroll', handleScrollOrResize, { passive: true, capture: true })
+    window.addEventListener('resize', handleScrollOrResize)
+    return () => {
+      window.removeEventListener('scroll', handleScrollOrResize, { capture: true })
+      window.removeEventListener('resize', handleScrollOrResize)
+    }
+  }, [])
+
+  const toggleMenu = (orderId: string, buttonElement: HTMLButtonElement) => {
+    if (openMenuOrderId === orderId) {
+      setOpenMenuOrderId(null)
+      setMenuPosition(null)
+    } else {
+      const rect = buttonElement.getBoundingClientRect()
+      const spaceBelow = window.innerHeight - rect.bottom
+      const estimatedMenuHeight = 420
+
+      if (spaceBelow < estimatedMenuHeight && rect.top > spaceBelow) {
+        setMenuPosition({
+          bottom: Math.max(8, window.innerHeight - rect.top + 6),
+          left: Math.max(8, Math.min(window.innerWidth - 296, rect.right - 288)),
+        })
+      } else {
+        setMenuPosition({
+          top: Math.max(8, rect.bottom + 6),
+          left: Math.max(8, Math.min(window.innerWidth - 296, rect.right - 288)),
+        })
+      }
+      setOpenMenuOrderId(orderId)
+    }
   }
 
   const handleSingleOrderHermes = (order: OrderWithItems) => {
@@ -2352,8 +2389,11 @@ const filteredOrders = orders;
                         <div className="flex items-center justify-end gap-2 relative">
                           {/* Menu Toggle Button */}
                           <button
-                            onClick={(e) => toggleMenu(order.id, e)}
-                            className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1.5 rounded-lg transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleMenu(order.id, e.currentTarget)
+                            }}
+                            className="order-row-menu-btn text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1.5 rounded-lg transition-colors"
                             title="Aktionen"
                           >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2374,13 +2414,27 @@ const filteredOrders = orders;
                             </svg>
                           </button>
 
-                          {/* Dropdown Menu */}
-                          {openMenuOrderId === order.id && (
-                            <div className="absolute right-0 top-full mt-1.5 w-72 bg-white border border-slate-200 rounded-xl shadow-2xl z-[100] flex flex-col py-1 animate-in fade-in slide-in-from-top-2 duration-150">
+                          {/* Dropdown Menu Portal */}
+                          {openMenuOrderId === order.id && menuPosition && typeof document !== 'undefined' && createPortal(
+                            <div
+                              className={`order-row-menu-dropdown fixed w-72 max-h-[calc(100vh-32px)] overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-2xl z-[9999] flex flex-col py-1 animate-in fade-in duration-150 ${
+                                menuPosition.bottom !== undefined ? 'slide-in-from-bottom-2' : 'slide-in-from-top-2'
+                              }`}
+                              style={{
+                                top: menuPosition.top !== undefined ? `${menuPosition.top}px` : undefined,
+                                bottom: menuPosition.bottom !== undefined ? `${menuPosition.bottom}px` : undefined,
+                                left: `${menuPosition.left}px`,
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               {/* 1. Lieferschein öffnen */}
                               <button
                                 type="button"
-                                onClick={() => window.open(`/api/orders/${order.id}/delivery-note`, '_blank')}
+                                onClick={() => {
+                                  setOpenMenuOrderId(null)
+                                  setMenuPosition(null)
+                                  window.open(`/api/orders/${order.id}/delivery-note`, '_blank')
+                                }}
                                 className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors whitespace-nowrap"
                               >
                                 <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
@@ -2391,7 +2445,11 @@ const filteredOrders = orders;
                               {order.invoiceId ? (
                                 <button
                                   type="button"
-                                  onClick={() => handleOpenInvoice(order.invoiceId!)}
+                                  onClick={() => {
+                                    setOpenMenuOrderId(null)
+                                    setMenuPosition(null)
+                                    handleOpenInvoice(order.invoiceId!)
+                                  }}
                                   disabled={loadingInvoiceId === order.invoiceId}
                                   className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-blue-700 hover:bg-blue-50/50 transition-colors disabled:opacity-50 whitespace-nowrap"
                                 >
@@ -2409,7 +2467,11 @@ const filteredOrders = orders;
                               {!order.invoiceId ? (
                                 <button
                                   type="button"
-                                  onClick={() => handleSingleOrderInvoice(order.id)}
+                                  onClick={() => {
+                                    setOpenMenuOrderId(null)
+                                    setMenuPosition(null)
+                                    handleSingleOrderInvoice(order.id)
+                                  }}
                                   disabled={isGeneratingInvoices}
                                   className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50 whitespace-nowrap"
                                 >
@@ -2429,7 +2491,11 @@ const filteredOrders = orders;
                               {dhlConfig ? (
                                 <button
                                   type="button"
-                                  onClick={() => handleSingleOrderDhl(order)}
+                                  onClick={() => {
+                                    setOpenMenuOrderId(null)
+                                    setMenuPosition(null)
+                                    handleSingleOrderDhl(order)
+                                  }}
                                   className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors whitespace-nowrap"
                                 >
                                   <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
@@ -2446,7 +2512,11 @@ const filteredOrders = orders;
                               {order.marketplace === 'otto' && (
                                 <button
                                   type="button"
-                                  onClick={() => setShowOttoRefundModal(order)}
+                                  onClick={() => {
+                                    setOpenMenuOrderId(null)
+                                    setMenuPosition(null)
+                                    setShowOttoRefundModal(order)
+                                  }}
                                   className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors whitespace-nowrap"
                                 >
                                   <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -2456,7 +2526,11 @@ const filteredOrders = orders;
                               {formatMarketplaceName(order.marketplace, order.shippingCountry).toLowerCase().includes('decathlon') && (
                                 <button
                                   type="button"
-                                  onClick={() => setShowDecathlonRefundModal(order)}
+                                  onClick={() => {
+                                    setOpenMenuOrderId(null)
+                                    setMenuPosition(null)
+                                    setShowDecathlonRefundModal(order)
+                                  }}
                                   className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors whitespace-nowrap"
                                 >
                                   <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -2465,7 +2539,11 @@ const filteredOrders = orders;
                               )}
                               <button
                                 type="button"
-                                onClick={() => handleSingleOrderHermes(order)}
+                                onClick={() => {
+                                  setOpenMenuOrderId(null)
+                                  setMenuPosition(null)
+                                  handleSingleOrderHermes(order)
+                                }}
                                 className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors whitespace-nowrap"
                               >
                                 <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
@@ -2474,7 +2552,11 @@ const filteredOrders = orders;
 
                               <button
                                 type="button"
-                                onClick={() => handleOpenRefundItems(order)}
+                                onClick={() => {
+                                  setOpenMenuOrderId(null)
+                                  setMenuPosition(null)
+                                  handleOpenRefundItems(order)
+                                }}
                                 className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors whitespace-nowrap"
                               >
                                 <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -2486,6 +2568,8 @@ const filteredOrders = orders;
                                 <button
                                   type="button"
                                   onClick={() => {
+                                    setOpenMenuOrderId(null)
+                                    setMenuPosition(null)
                                     setShowManualShipModal(order)
                                     setManualTrackingNumber(order.trackingNumber || '')
                                   }}
@@ -2507,7 +2591,11 @@ const filteredOrders = orders;
                               {order.status === 'pending' ? (
                                 <button
                                   type="button"
-                                  onClick={() => handleStatusUpdate(order.id, 'later_shipment')}
+                                  onClick={() => {
+                                    setOpenMenuOrderId(null)
+                                    setMenuPosition(null)
+                                    handleStatusUpdate(order.id, 'later_shipment')
+                                  }}
                                   disabled={isUpdatingStatus === order.id}
                                   className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-purple-700 hover:bg-purple-50 transition-colors disabled:opacity-50 whitespace-nowrap"
                                 >
@@ -2517,7 +2605,11 @@ const filteredOrders = orders;
                               ) : order.status === 'later_shipment' ? (
                                 <button
                                   type="button"
-                                  onClick={() => handleStatusUpdate(order.id, 'pending')}
+                                  onClick={() => {
+                                    setOpenMenuOrderId(null)
+                                    setMenuPosition(null)
+                                    handleStatusUpdate(order.id, 'pending')
+                                  }}
                                   disabled={isUpdatingStatus === order.id}
                                   className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-yellow-700 hover:bg-yellow-50 transition-colors disabled:opacity-50 whitespace-nowrap"
                                 >
@@ -2536,13 +2628,18 @@ const filteredOrders = orders;
                               {/* 8. Bestellung löschen */}
                               <button
                                 type="button"
-                                onClick={() => handleDelete(order.id)}
+                                onClick={() => {
+                                  setOpenMenuOrderId(null)
+                                  setMenuPosition(null)
+                                  handleDelete(order.id)
+                                }}
                                 className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 transition-colors whitespace-nowrap"
                               >
                                 <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                 Bestellung löschen
                               </button>
-                            </div>
+                            </div>,
+                            document.body
                           )}
                         </div>
                       </td>
