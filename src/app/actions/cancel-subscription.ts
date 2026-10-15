@@ -182,7 +182,7 @@ export async function undoCancelSubscriptionAction() {
 
     if (shopifyIntegration) {
       const metadata = (shopifyIntegration.metadata as any) || {}
-      if (metadata.isShopifyBilled) {
+      if (metadata.isShopifyBilled || metadata.shopifySubscriptionStatus) {
         // They need to approve a new charge before we can reactivate!
         return { redirectTo: '/api/billing/shopify/check' }
       }

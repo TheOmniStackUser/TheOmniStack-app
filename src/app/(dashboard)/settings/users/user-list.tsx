@@ -17,6 +17,41 @@ interface Member {
   inviteToken?: string | null
 }
 
+const PRICING_TIERS = [
+  { upTo: 141, pricePerOrder: 0.07, label: 'Bis 141', unitPrice: 'Mindestgebühr', maxPrice: '9,90 €' },
+  { upTo: 250, pricePerOrder: 0.07, label: '142 bis 250', unitPrice: '0,07 €', maxPrice: 'bis 17,50 €' },
+  { upTo: 500, pricePerOrder: 0.05, label: 'Bis 500', unitPrice: '0,05 €', maxPrice: 'bis 25,00 €' },
+  { upTo: 1000, pricePerOrder: 0.04, label: 'Bis 1.000', unitPrice: '0,04 €', maxPrice: 'bis 40,00 €' },
+  { upTo: 2000, pricePerOrder: 0.035, label: 'Bis 2.000', unitPrice: '0,035 €', maxPrice: 'bis 70,00 €' },
+  { upTo: 5000, pricePerOrder: 0.02, label: 'Bis 5.000', unitPrice: '0,02 €', maxPrice: 'bis 100,00 €' },
+  { upTo: 10000, pricePerOrder: 0.015, label: 'Bis 10.000', unitPrice: '0,015 €', maxPrice: 'bis 150,00 €' },
+  { upTo: 25000, pricePerOrder: 0.009, label: 'Bis 25.000', unitPrice: '0,009 €', maxPrice: 'bis 225,00 €' },
+  { upTo: 50000, pricePerOrder: 0.008, label: 'Bis 50.000', unitPrice: '0,008 €', maxPrice: 'bis 400,00 €' },
+  { upTo: 100000, pricePerOrder: 0.006, label: 'Bis 100.000', unitPrice: '0,006 €', maxPrice: 'bis 600,00 €' },
+  { upTo: 200000, pricePerOrder: 0.005, label: 'Bis 200.000', unitPrice: '0,005 €', maxPrice: 'bis 1.000,00 €' },
+  { upTo: Infinity, pricePerOrder: 0.0045, label: 'Ab 200.000', unitPrice: '0,0045 €', maxPrice: 'individuell' },
+]
+
+function getCurrentPricing(orderCount: number) {
+  if (orderCount <= 141) {
+    return {
+      tierLabel: 'Bis 141 Bestellungen',
+      unitPrice: 'Mindestgebühr (inklusive)',
+      currentTotalFormatted: '9,90 €',
+      isMinPrice: true,
+    }
+  }
+  const tier = PRICING_TIERS.find(t => orderCount <= t.upTo) || PRICING_TIERS[PRICING_TIERS.length - 1]
+  const total = orderCount * tier.pricePerOrder
+  const formatted = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(total)
+  return {
+    tierLabel: tier.label,
+    unitPrice: `${tier.unitPrice} / Stk.`,
+    currentTotalFormatted: formatted,
+    isMinPrice: false,
+  }
+}
+
 export function UserList({ 
   initialMembers, 
   currentUserRole,
@@ -51,6 +86,7 @@ export function UserList({
   
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
   const [isUndoingCancel, setIsUndoingCancel] = useState(false)
+  const [showPricingTiers, setShowPricingTiers] = useState(false)
 
   const currentUser = initialMembers.find((m) => m.id === currentUserId)
   
@@ -533,78 +569,163 @@ export function UserList({
       )}
 
       {/* Subscription Management (Owner & Admin Only) */}
-      {(currentUserRole === 'owner' || currentUserRole === 'admin') && (
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 mt-8">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-3 rounded-xl bg-slate-50 text-slate-600">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-slate-900">Abonnement & Paket</h3>
-              <p className="text-sm text-slate-500">Verwalte dein aktuelles TheOmniStack Paket.</p>
-            </div>
-          </div>
-          
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex justify-between items-center">
-            <div>
-              <p className="font-bold text-slate-900">Aktuelles Paket</p>
-              {subscriptionDetails?.canceledAt ? (
-                <>
-                  <p className="text-sm text-red-600 font-medium mt-0.5">Gekündigt</p>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Dein Abonnement läuft am {subscriptionDetails.cancelEffectiveDate ? new Date(subscriptionDetails.cancelEffectiveDate).toLocaleDateString('de-DE') : 'unbekannt'} ab.
-                  </p>
-                </>
-              ) : subscriptionDetails?.trialExpiresAt && new Date(subscriptionDetails.trialExpiresAt) > new Date() ? (
-                <>
-                  <p className="text-sm text-blue-600 font-medium mt-0.5">Testphase</p>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Deine Testphase läuft am {new Date(subscriptionDetails.trialExpiresAt).toLocaleDateString('de-DE')} ab.
-                    Danach beginnt die reguläre monatliche Abrechnung.
-                  </p>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Testzeitraum: {new Date(subscriptionDetails.currentPeriodStart).toLocaleDateString('de-DE')} – {new Date(subscriptionDetails.currentPeriodEnd).toLocaleDateString('de-DE')}
-                  </p>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Bisherige {subscriptionDetails.isProfifaktura ? 'Rechnungen' : 'Bestellungen'} im Testzeitraum: <strong className="text-slate-700">{subscriptionDetails.currentUsage}</strong>
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="text-sm text-emerald-600 font-medium mt-0.5">Aktiv (Monatliche Abrechnung)</p>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Nächste Abrechnung am: {subscriptionDetails?.nextBillingDate ? new Date(subscriptionDetails.nextBillingDate).toLocaleDateString('de-DE') : '-'}
-                  </p>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Aktueller Abrechnungszeitraum: {subscriptionDetails?.currentPeriodStart ? new Date(subscriptionDetails.currentPeriodStart).toLocaleDateString('de-DE') : '-'} – {subscriptionDetails?.currentPeriodEnd ? new Date(subscriptionDetails.currentPeriodEnd).toLocaleDateString('de-DE') : '-'}
-                  </p>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Bisherige {subscriptionDetails?.isProfifaktura ? 'Rechnungen' : 'Bestellungen'} in diesem Zeitraum: <strong className="text-slate-700">{subscriptionDetails?.currentUsage || 0}</strong>
-                  </p>
-                </>
-              )}
-            </div>
-            {subscriptionDetails?.canceledAt ? (
+      {(currentUserRole === 'owner' || currentUserRole === 'admin') && (() => {
+        const pricingInfo = getCurrentPricing(subscriptionDetails?.currentUsage || 0)
+        return (
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5 mt-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-blue-50 text-blue-600 shrink-0">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-lg font-bold text-slate-900">Abonnement & Paket</h3>
+                    {isShopifyUser && (
+                      <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        Shopify Billing
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-slate-500">Verwalte dein aktuelles TheOmniStack Paket und deine Konditionen.</p>
+                </div>
+              </div>
+
               <button
-                onClick={handleUndoCancel}
-                disabled={isUndoingCancel}
-                className="px-4 py-2 bg-blue-600 border border-transparent text-white font-bold rounded-lg hover:bg-blue-700 transition-all shadow-sm cursor-pointer disabled:opacity-50"
+                type="button"
+                onClick={() => setShowPricingTiers(!showPricingTiers)}
+                className="text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3.5 py-2 rounded-xl border border-blue-200 transition-all cursor-pointer flex items-center gap-1.5 self-start sm:self-auto"
               >
-                {isUndoingCancel ? 'Wird aufgehoben...' : 'Kündigung aufheben'}
+                <svg className={`w-3.5 h-3.5 transition-transform ${showPricingTiers ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                </svg>
+                {showPricingTiers ? 'Preistabelle ausblenden' : 'Alle Preisstufen anzeigen'}
               </button>
-            ) : (
-              <button
-                onClick={() => setIsCancelModalOpen(true)}
-                className="px-4 py-2 bg-white border border-slate-300 text-slate-700 font-bold rounded-lg hover:bg-slate-50 hover:text-red-600 transition-all shadow-sm cursor-pointer"
-              >
-                Paket kündigen
-              </button>
+            </div>
+            
+            <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-5">
+              <div className="space-y-2">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <p className="font-bold text-slate-900 text-base">TheOmniStack Basis (Flexibles Mengenmodell)</p>
+                  {subscriptionDetails?.canceledAt ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-200">
+                      Gekündigt
+                    </span>
+                  ) : subscriptionDetails?.trialExpiresAt && new Date(subscriptionDetails.trialExpiresAt) > new Date() ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-700 border border-blue-200">
+                      14 Tage Testphase
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
+                      Aktiv (Monatliche Abrechnung)
+                    </span>
+                  )}
+                </div>
+
+                <div className="text-xs text-slate-600 space-y-1.5">
+                  <p>
+                    <strong>Konditionen:</strong> Mindestgebühr <strong className="text-slate-900">9,90 € / Monat</strong> (inklusive bis zu 141 Bestellungen/Monat), darüber gestaffelt ab 0,07 € bis 0,0045 € je Bestellung.
+                  </p>
+                  {subscriptionDetails?.canceledAt ? (
+                    <p className="text-red-600 font-semibold pt-1">
+                      Dein Abonnement läuft am {subscriptionDetails.cancelEffectiveDate ? new Date(subscriptionDetails.cancelEffectiveDate).toLocaleDateString('de-DE') : 'unbekannt'} ab.
+                    </p>
+                  ) : subscriptionDetails?.trialExpiresAt && new Date(subscriptionDetails.trialExpiresAt) > new Date() ? (
+                    <>
+                      <p className="text-slate-500">
+                        Testphase aktiv bis zum <strong>{new Date(subscriptionDetails.trialExpiresAt).toLocaleDateString('de-DE')}</strong>. Danach beginnt die reguläre monatliche Abrechnung.
+                      </p>
+                      <p className="text-slate-500">
+                        Bisherige {subscriptionDetails.isProfifaktura ? 'Rechnungen' : 'Bestellungen'} im Testzeitraum: <strong className="text-slate-900">{subscriptionDetails.currentUsage || 0}</strong>
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-slate-500">
+                        Abrechnungszeitraum: {subscriptionDetails?.currentPeriodStart ? new Date(subscriptionDetails.currentPeriodStart).toLocaleDateString('de-DE') : '-'} – {subscriptionDetails?.currentPeriodEnd ? new Date(subscriptionDetails.currentPeriodEnd).toLocaleDateString('de-DE') : '-'}
+                        {' · '}Nächste Abrechnung am: <strong className="text-slate-900">{subscriptionDetails?.nextBillingDate ? new Date(subscriptionDetails.nextBillingDate).toLocaleDateString('de-DE') : '-'}</strong>
+                      </p>
+                      <p className="text-slate-700">
+                        Bisherige {subscriptionDetails?.isProfifaktura ? 'Rechnungen' : 'Bestellungen'} in diesem Zeitraum: <strong className="text-slate-900">{subscriptionDetails?.currentUsage || 0}</strong>
+                        {' · '}Aktuelle Preisstufe: <span className="font-semibold text-blue-700">{pricingInfo.tierLabel}</span>
+                        {' · '}Voraussichtlicher Betrag: <strong className="text-slate-900">{pricingInfo.currentTotalFormatted} netto</strong>
+                      </p>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="shrink-0 flex items-center gap-3">
+                {subscriptionDetails?.canceledAt ? (
+                  <button
+                    onClick={handleUndoCancel}
+                    disabled={isUndoingCancel}
+                    className="px-5 py-2.5 bg-blue-600 border border-transparent text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-sm cursor-pointer disabled:opacity-50 text-sm"
+                  >
+                    {isUndoingCancel ? 'Wird aufgehoben...' : isShopifyUser ? 'Kündigung aufheben & über Shopify reaktivieren' : 'Kündigung aufheben'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setIsCancelModalOpen(true)}
+                    className="px-4 py-2.5 bg-white border border-slate-300 text-slate-700 font-bold rounded-xl hover:bg-slate-100 hover:text-red-600 transition-all shadow-sm cursor-pointer text-sm"
+                  >
+                    Paket kündigen
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Interactive Pricing Table Accordion */}
+            {showPricingTiers && (
+              <div className="border border-slate-200 rounded-xl overflow-hidden bg-white animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="bg-slate-50 px-5 py-3 border-b border-slate-200 flex justify-between items-center">
+                  <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Vollständige Mengenstaffel (Stromtarif-Prinzip)
+                  </h4>
+                  <span className="text-[11px] text-slate-500">Alle Preise netto zzgl. gesetzl. MwSt.</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50/50 text-slate-500 border-b border-slate-200">
+                        <th className="px-4 py-2.5 font-bold">Bestellungen / Monat</th>
+                        <th className="px-4 py-2.5 font-bold">Preis pro Stück (netto)</th>
+                        <th className="px-4 py-2.5 font-bold">Monatspreis (netto)</th>
+                        <th className="px-4 py-2.5 font-bold text-right">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-slate-700">
+                      {PRICING_TIERS.map((tier, idx) => {
+                        const usage = subscriptionDetails?.currentUsage || 0
+                        const isCurrent = usage <= tier.upTo && (idx === 0 || usage > PRICING_TIERS[idx - 1].upTo)
+                        return (
+                          <tr key={idx} className={isCurrent ? 'bg-blue-50/70 font-semibold text-blue-900' : 'hover:bg-slate-50/50'}>
+                            <td className="px-4 py-2.5 font-medium">{tier.label}</td>
+                            <td className="px-4 py-2.5">{tier.unitPrice}</td>
+                            <td className="px-4 py-2.5">{tier.maxPrice}</td>
+                            <td className="px-4 py-2.5 text-right">
+                              {isCurrent && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-600 text-white shadow-xs">
+                                  Deine aktuelle Stufe
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="bg-slate-50 px-5 py-3 border-t border-slate-200 text-[11px] text-slate-500">
+                  Die Einstufung und Abrechnung erfolgt automatisch zum Monatsende basierend auf Ihrem tatsächlichen monatlichen Volumen. Keine Einrichtungsgebühr, keine Vertragslaufzeit.
+                </div>
+              </div>
             )}
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       <CancelModal isOpen={isCancelModalOpen} onClose={() => setIsCancelModalOpen(false)} />
     </div>

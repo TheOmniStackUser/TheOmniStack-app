@@ -35,8 +35,8 @@ export async function GET(request: Request) {
 
     const metadata = (integration.metadata as any) || {}
 
-    // 1. Is this a new user from the Shopify App Store?
-    if (metadata.isShopifyBilled) {
+    // 1. Is this a user from Shopify or marked for Shopify billing?
+    if (metadata.isShopifyBilled || metadata.shopifySubscriptionId || metadata.shopifySubscriptionStatus) {
       // 2. Do they already have an active subscription?
       if (metadata.shopifySubscriptionStatus !== 'ACTIVE') {
         // They need to pay! Redirect to start billing flow.

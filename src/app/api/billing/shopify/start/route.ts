@@ -55,18 +55,28 @@ export async function GET(request: Request) {
     const mutationString = `
       mutation {
         appSubscriptionCreate(
-          name: "OmniStack Basic Plan"
+          name: "TheOmniStack Basis"
           returnUrl: "${callbackUrl}"
           trialDays: 14
           test: ${isTest}
-          lineItems: [{
-            plan: {
-              appRecurringPricingDetails: {
-                price: { amount: 9.90, currencyCode: EUR }
-                interval: EVERY_30_DAYS
+          lineItems: [
+            {
+              plan: {
+                appRecurringPricingDetails: {
+                  price: { amount: 9.90, currencyCode: USD }
+                  interval: EVERY_30_DAYS
+                }
+              }
+            },
+            {
+              plan: {
+                appUsagePricingDetails: {
+                  terms: "Inkl. 141 Bestellungen. Darüber flexible Mengenstaffel: 0,07 € bis 0,0045 € je Bestellung. Monatlich kündbar."
+                  cappedAmount: { amount: 1000.00, currencyCode: USD }
+                }
               }
             }
-          }]
+          ]
         ) {
           appSubscription {
             id
