@@ -5,6 +5,7 @@ import { companies } from '@/db/schema/companies'
 import { eq, and, desc } from 'drizzle-orm'
 import React from 'react'
 import { uploadDocument, buildInvoiceKey } from '@/lib/storage'
+import { resolveBillingAddress } from '@/lib/order-address'
 
 function getCalendarWeek(d: Date): number {
   const target = new Date(d.valueOf())
@@ -217,55 +218,16 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
   const { paymentMethod, isPaid } = extractPaymentInfo(order)
   const metadata = (order.rawPayload as any)?.manualMetadata || {}
 
-  let billingName = order.buyerName || order.shippingName || ''
-  let billingCompany = order.shippingCompany || ''
-  let billingAddressAddition = order.shippingAddressAddition || ''
-  let billingPhone = order.buyerPhone || ''
-  let billingStreet = order.shippingStreet || ''
-  let billingZip = order.shippingZip || ''
-  let billingCity = order.shippingCity || ''
-  let billingCountry = order.shippingCountry || 'DE'
+  const resolvedBilling = resolveBillingAddress(order)
 
-  const raw = order.rawPayload as any
-  if (raw) {
-    if (raw.manualBillingAddress) {
-      billingName = raw.manualBillingAddress.name || billingName
-      billingCompany = raw.manualBillingAddress.company || ''
-      billingAddressAddition = raw.manualBillingAddress.addressAddition || ''
-      billingPhone = raw.manualBillingAddress.phone || order.buyerPhone || ''
-      billingStreet = raw.manualBillingAddress.street || ''
-      billingZip = raw.manualBillingAddress.zip || ''
-      billingCity = raw.manualBillingAddress.city || ''
-      billingCountry = raw.manualBillingAddress.country || 'DE'
-    } else if (raw.invoiceAddress) {
-      billingCompany = raw.invoiceAddress.companyName || raw.invoiceAddress.company || ''
-      billingAddressAddition = raw.invoiceAddress.addition || ''
-      billingStreet = `${raw.invoiceAddress.street || ''} ${raw.invoiceAddress.houseNumber || ''}`.trim()
-      billingZip = raw.invoiceAddress.zipCode || ''
-      billingCity = raw.invoiceAddress.city || ''
-      billingCountry = raw.invoiceAddress.countryCode || 'DE'
-    } else if (raw.customer?.billing_address) {
-      const addr = raw.customer.billing_address
-      billingCompany = addr.company || ''
-      billingAddressAddition = addr.additional_info || ''
-      billingStreet = `${addr.street_1 || ''} ${addr.street_2 || ''}`.trim()
-      billingZip = addr.zip_code || ''
-      billingCity = addr.city || ''
-      billingCountry = addr.country_iso_code || addr.country || 'DE'
-    } else if (raw.billing_street) {
-      billingCompany = raw.billing_company || ''
-      billingAddressAddition = raw.billing_address_addition || ''
-      billingStreet = raw.billing_street || ''
-      billingZip = raw.billing_zip_code || ''
-      billingCity = raw.billing_city || ''
-      billingCountry = raw.billing_country_code || 'DE'
-    }
-  } else if ((order.marketplace === 'manual' || order.marketplace === 'etsy') && order.shippingStreet) {
-    billingStreet = order.shippingStreet
-    billingZip = order.shippingZip || ''
-    billingCity = order.shippingCity || ''
-    billingCountry = order.shippingCountry || 'DE'
-  }
+  let billingName = resolvedBilling?.name || order.buyerName || order.shippingName || ''
+  let billingCompany = resolvedBilling?.company || ''
+  let billingAddressAddition = resolvedBilling?.addressAddition || ''
+  let billingPhone = resolvedBilling?.phone || order.buyerPhone || ''
+  let billingStreet = resolvedBilling?.street || order.shippingStreet || ''
+  let billingZip = resolvedBilling?.zip || order.shippingZip || ''
+  let billingCity = resolvedBilling?.city || order.shippingCity || ''
+  let billingCountry = resolvedBilling?.country || order.shippingCountry || 'DE'
 
   let pdfBuffer;
   if (documentType === 'delivery_note') {

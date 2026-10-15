@@ -99,6 +99,8 @@ export async function updateOrderStatusAction(orderId: string, status: any) {
   }
 }
 
+import { resolveBillingAddress } from '@/lib/order-address'
+
 export async function updateOrderAddressAction(
   orderId: string,
   address: {
@@ -116,6 +118,34 @@ export async function updateOrderAddressAction(
   try {
     const auth = await requireAuth()
 
+    const [order] = await db
+      .select()
+      .from(orders)
+      .where(
+        and(
+          eq(orders.id, orderId),
+          eq(orders.companyId, auth.activeCompanyId)
+        )
+      )
+      .limit(1)
+
+    if (!order) {
+      return { error: 'Bestellung nicht gefunden.' }
+    }
+
+    const currentRaw = (order.rawPayload as any) || {}
+    let updatedRaw = { ...currentRaw }
+
+    // If no manual billing address is explicitly stored yet, preserve the order's existing
+    // billing address BEFORE changing the shipping address, so that the billing address
+    // remains completely unchanged!
+    if (!currentRaw.manualBillingAddress) {
+      const existingBilling = resolveBillingAddress(order)
+      if (existingBilling) {
+        updatedRaw.manualBillingAddress = existingBilling
+      }
+    }
+
     await db
       .update(orders)
       .set({
@@ -126,8 +156,9 @@ export async function updateOrderAddressAction(
         shippingZip: address.shippingZip,
         shippingCity: address.shippingCity,
         shippingCountry: address.shippingCountry,
-        buyerPhone: address.buyerPhone,
-        buyerEmail: address.buyerEmail,
+        shippingPhone: address.buyerPhone || (order as any).shippingPhone,
+        buyerEmail: order.buyerEmail || address.buyerEmail,
+        rawPayload: updatedRaw,
         updatedAt: new Date()
       })
       .where(
@@ -136,6 +167,14 @@ export async function updateOrderAddressAction(
           eq(orders.companyId, auth.activeCompanyId)
         )
       )
+
+    // Invalidate cached delivery note so subsequent opens regenerate it with the new delivery address
+    try {
+      const { deleteDocument, buildDeliveryNoteKey } = await import('@/lib/storage')
+      await deleteDocument(buildDeliveryNoteKey(auth.activeCompanyId, orderId))
+    } catch {
+      // Non-fatal
+    }
 
     revalidatePath('/orders')
     return { success: true, message: 'Lieferadresse wurde erfolgreich aktualisiert.' }
@@ -533,7 +572,8 @@ export async function updateOrderBillingAddressAction(
         street: address.street,
         zip: address.zip,
         city: address.city,
-        country: address.country
+        country: address.country,
+        email: address.buyerEmail
       }
     }
 

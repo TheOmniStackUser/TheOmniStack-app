@@ -13,6 +13,7 @@ import type { Invoice, InvoiceLog } from '@/db/schema/invoices'
 import type { DhlConfig } from '@/app/(dashboard)/integrations/dhl-form'
 import { OttoRefundModal } from '@/components/orders/OttoRefundModal'
 import { DecathlonRefundModal } from '@/components/orders/DecathlonRefundModal'
+import { resolveBillingAddress } from '@/lib/order-address'
 
 export type OrderWithItems = Order & { items: OrderItem[], returns?: any[], invoice?: (Invoice & { logs?: InvoiceLog[] }) | null }
 
@@ -682,14 +683,14 @@ export function OrdersTable({
   const startEditingBillingAddress = (order: OrderWithItems) => {
     const addr = getBillingAddress(order)
     setEditingBillingAddressId(order.id)
-    setEditBillingName(order.buyerName || order.shippingName || '')
+    setEditBillingName(addr?.name || order.buyerName || order.shippingName || '')
     setEditBillingCompany(addr?.company || '')
     setEditBillingAddressAddition(addr?.addressAddition || '')
     setEditBillingStreet(addr?.street || '')
     setEditBillingZip(addr?.zip || '')
     setEditBillingCity(addr?.city || '')
     setEditBillingCountry(addr?.country || 'DE')
-    setEditBillingEmail(order.buyerEmail || '')
+    setEditBillingEmail(addr?.email || order.buyerEmail || '')
     setEditBillingPhone(addr?.phone || '')
   }
 
@@ -741,7 +742,7 @@ export function OrdersTable({
     setEditCity(order.shippingCity || '')
     setEditCountry(order.shippingCountry || 'DE')
     setEditEmail(order.buyerEmail || '')
-    setEditPhone((order as any).buyerPhone || '')
+    setEditPhone((order as any).shippingPhone || (order as any).buyerPhone || '')
   }
 
   const handleSaveAddress = async (orderId: string) => {
@@ -1265,87 +1266,7 @@ const filteredOrders = orders;
   }
 
   const getBillingAddress = (order: OrderWithItems) => {
-    // 1. If we have a linked invoice, use its recipient details as the billing address
-    if (order.invoice) {
-      return {
-        street: order.invoice.recipientStreet || '',
-        zip: order.invoice.recipientZip || '',
-        city: order.invoice.recipientCity || '',
-        country: order.invoice.recipientCountry || '',
-        company: (order.invoice as any).recipientCompany || '',
-        addressAddition: '',
-        phone: (order as any).buyerPhone || ''
-      }
-    }
-
-    const raw = order.rawPayload as any
-    if (raw) {
-      if (raw.manualBillingAddress) {
-        return {
-          street: raw.manualBillingAddress.street || '',
-          zip: raw.manualBillingAddress.zip || '',
-          city: raw.manualBillingAddress.city || '',
-          country: raw.manualBillingAddress.country || 'DE',
-          company: raw.manualBillingAddress.company || '',
-          addressAddition: raw.manualBillingAddress.addressAddition || '',
-          phone: raw.manualBillingAddress.phone || (order as any).buyerPhone || ''
-        }
-      }
-      // 2. Otto Structure
-      if (raw.invoiceAddress) {
-        return {
-          street: `${raw.invoiceAddress.street || ''} ${raw.invoiceAddress.houseNumber || ''}`.trim(),
-          zip: raw.invoiceAddress.zipCode || '',
-          city: raw.invoiceAddress.city || '',
-          country: raw.invoiceAddress.countryCode || '',
-          company: raw.invoiceAddress.companyName || raw.invoiceAddress.company || '',
-          addressAddition: raw.invoiceAddress.addition || '',
-          phone: (order as any).buyerPhone || ''
-        }
-      }
-
-      // 3. Mirakl Structure
-      if (raw.customer?.billing_address) {
-        const addr = raw.customer.billing_address
-        return {
-          street: `${addr.street_1 || ''} ${addr.street_2 || ''}`.trim(),
-          zip: addr.zip_code || '',
-          city: addr.city || '',
-          country: addr.country_iso_code || addr.country || '',
-          company: addr.company || '',
-          addressAddition: addr.additional_info || '',
-          phone: (order as any).buyerPhone || ''
-        }
-      }
-
-      // 4. About You Structure
-      if (raw.billing_street) {
-        return {
-          street: raw.billing_street || '',
-          zip: raw.billing_zip_code || '',
-          city: raw.billing_city || '',
-          country: raw.billing_country_code || '',
-          company: raw.billing_company || '',
-          addressAddition: raw.billing_address_addition || '',
-          phone: (order as any).buyerPhone || ''
-        }
-      }
-    }
-
-    // 5. General Fallback (use shipping address if no invoice is linked yet and no other format matched)
-    if (order.shippingStreet) {
-      return {
-        street: order.shippingStreet,
-        zip: order.shippingZip || '',
-        city: order.shippingCity || '',
-        country: order.shippingCountry || '',
-        company: (order as any).shippingCompany || '',
-        addressAddition: (order as any).shippingAddressAddition || '',
-        phone: (order as any).buyerPhone || ''
-      }
-    }
-
-    return null
+    return resolveBillingAddress(order)
   }
 
   const handleGenerateLabels = async () => {
@@ -3047,18 +2968,20 @@ const filteredOrders = orders;
                                         </button>
                                       </div>
                                       <div className="mt-1 text-gray-600 bg-white p-3 rounded-md border border-gray-200">
-                                        {order.buyerName || order.buyerEmail}<br/>
                                         {(() => {
                                           const addr = getBillingAddress(order)
                                           if (!addr) return <span>Keine Rechnungsadresse hinterlegt</span>
+                                          const billingName = addr.name || order.buyerName || order.buyerEmail
+                                          const billingEmail = addr.email || order.buyerEmail
                                           return (
                                             <>
+                                              {billingName && <>{billingName}<br/></>}
                                               {addr.company && <>{addr.company}<br/></>}
                                               {addr.addressAddition && <>{addr.addressAddition}<br/></>}
                                               {addr.street}<br/>
                                               {addr.zip} {addr.city}<br/>
                                               {formatCountry(addr.country)}
-                                              {order.buyerEmail && order.buyerName && <><br/>{order.buyerEmail}</>}
+                                              {billingEmail && billingName !== billingEmail && <><br/>{billingEmail}</>}
                                               {addr.phone && <><br/>{addr.phone}</>}
                                             </>
                                           )
@@ -3199,7 +3122,7 @@ const filteredOrders = orders;
                                       {order.shippingZip} {order.shippingCity}<br/>
                                       {formatCountry(order.shippingCountry)}
                                       {order.buyerEmail && <><br/>{order.buyerEmail}</>}
-                                      {(order as any).buyerPhone && <><br/>{(order as any).buyerPhone}</>}
+                                      {((order as any).shippingPhone || (order as any).buyerPhone) && <><br/>{(order as any).shippingPhone || (order as any).buyerPhone}</>}
                                     </div>
                                   </div>
                                 )}
@@ -3553,7 +3476,7 @@ const filteredOrders = orders;
                             <div>{order.shippingZip} {order.shippingCity}</div>
                             <div>{formatCountry(order.shippingCountry)}</div>
                             {order.buyerEmail && <div className="text-slate-500 mt-0.5">{order.buyerEmail}</div>}
-                            {(order as any).buyerPhone && <div className="text-slate-500">{(order as any).buyerPhone}</div>}
+                            {((order as any).shippingPhone || (order as any).buyerPhone) && <div className="text-slate-500">{(order as any).shippingPhone || (order as any).buyerPhone}</div>}
                           </div>
                         </div>
                       )}
@@ -4040,7 +3963,7 @@ const filteredOrders = orders;
                             <div>{order.shippingZip} {order.shippingCity}</div>
                             <div>{formatCountry(order.shippingCountry)}</div>
                             {order.buyerEmail && <div className="text-slate-500 mt-0.5">{order.buyerEmail}</div>}
-                            {(order as any).buyerPhone && <div className="text-slate-500">{(order as any).buyerPhone}</div>}
+                            {((order as any).shippingPhone || (order as any).buyerPhone) && <div className="text-slate-500">{(order as any).shippingPhone || (order as any).buyerPhone}</div>}
                           </div>
                         </div>
                       )}

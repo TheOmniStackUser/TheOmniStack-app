@@ -14,6 +14,7 @@ import type { DhlConfig } from '@/app/(dashboard)/integrations/dhl-form'
 import Link from 'next/link'
 
 import { ManufacturerCsvDialog } from './manufacturer-csv-dialog'
+import { resolveBillingAddress } from '@/lib/order-address'
 
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
   const auth = await requireAuth()
@@ -427,13 +428,14 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   // Optimize payload size for Client Component
   const optimizedOrders = allOrders.map(order => {
     const raw = order.rawPayload as any
+    const resolvedBilling = resolveBillingAddress(order)
     let strippedPayload = null
     if (raw) {
       strippedPayload = {
         orderNumber: raw.orderNumber,
         name: raw.name,
         financial_status: raw.financial_status,
-        manualBillingAddress: raw.manualBillingAddress,
+        manualBillingAddress: raw.manualBillingAddress || resolvedBilling,
         invoiceAddress: raw.invoiceAddress,
         customer: raw.customer ? { billing_address: raw.customer.billing_address } : undefined,
         billing_street: raw.billing_street,
@@ -441,6 +443,10 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         billing_city: raw.billing_city,
         billing_country_code: raw.billing_country_code,
         positionItems: raw.positionItems, // Required for OttoRefundModal
+      }
+    } else if (resolvedBilling) {
+      strippedPayload = {
+        manualBillingAddress: resolvedBilling
       }
     }
     return {
