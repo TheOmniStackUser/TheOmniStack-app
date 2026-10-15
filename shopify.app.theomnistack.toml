@@ -12,6 +12,10 @@ api_version = "2026-04"
   uri = "https://app.theomnistack.de/api/webhooks/shopify/gdpr"
   compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
 
+  [[webhooks.subscriptions]]
+  uri = "https://app.theomnistack.de/api/webhooks/shopify/events"
+  topics = [ "app/uninstalled" ]
+
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
 scopes = "read_orders,write_orders,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders,read_products,write_products,read_inventory,write_inventory,read_locations"

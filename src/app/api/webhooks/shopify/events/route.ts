@@ -34,6 +34,43 @@ export async function POST(request: Request) {
 
     console.log(`[Shopify Webhook] Received ${topic} from ${shopDomain}`)
 
+    // Handle app uninstallation immediately
+    if (topic === 'app/uninstalled') {
+      console.log(`[Shopify Webhook] Processing app/uninstalled for shop: ${shopDomain}`)
+      const matchingIntegrations = await db
+        .select()
+        .from(marketplaceIntegrations)
+        .where(
+          and(
+            eq(marketplaceIntegrations.type, 'shopify'),
+            eq(marketplaceIntegrations.environment, shopDomain)
+          )
+        )
+
+      for (const row of matchingIntegrations) {
+        const existingMeta = (row.metadata as any) || {}
+        await db
+          .update(marketplaceIntegrations)
+          .set({
+            isActive: false,
+            accessToken: null,
+            refreshToken: null,
+            expiresAt: null,
+            metadata: {
+              ...existingMeta,
+              uninstalledAt: new Date().toISOString(),
+              isShopifyBilled: false,
+              shopifySubscriptionStatus: 'CANCELLED',
+            },
+            updatedAt: new Date(),
+          })
+          .where(eq(marketplaceIntegrations.id, row.id))
+      }
+
+      console.log(`[Shopify Webhook] Successfully uninstalled and deactivated integration for shop: ${shopDomain}`)
+      return new NextResponse('OK', { status: 200 })
+    }
+
     // Find the company associated with this shop
     const [integration] = await db
       .select()

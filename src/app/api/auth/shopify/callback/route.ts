@@ -140,7 +140,7 @@ export async function GET(request: Request) {
         ? appUrl.replace('http', 'https') + '/api/webhooks/shopify/events'
         : `${appUrl}/api/webhooks/shopify/events`
 
-      const webhookTopics = ['orders/create', 'orders/updated', 'products/create', 'products/update']
+      const webhookTopics = ['orders/create', 'orders/updated', 'products/create', 'products/update', 'app/uninstalled']
       
       for (const topic of webhookTopics) {
         try {

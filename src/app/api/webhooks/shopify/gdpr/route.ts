@@ -48,9 +48,33 @@ export async function POST(request: Request) {
         // A customer requested to be forgotten. Delete their PII from your database.
         break
       
-      case 'shop/redact':
-        // A shop uninstalled your app or requested deletion. Delete all shop-related data.
+      case 'shop/redact': {
+        // A shop uninstalled your app or requested deletion. Delete/deactivate shop-related integration.
+        const shop = (data as any)?.shop_domain || shopDomain
+        if (shop) {
+          const { db } = await import('@/db/client')
+          const { marketplaceIntegrations } = await import('@/db/schema/integrations')
+          const { eq, and } = await import('drizzle-orm')
+
+          await db
+            .update(marketplaceIntegrations)
+            .set({
+              isActive: false,
+              accessToken: null,
+              refreshToken: null,
+              expiresAt: null,
+              updatedAt: new Date()
+            })
+            .where(
+              and(
+                eq(marketplaceIntegrations.type, 'shopify'),
+                eq(marketplaceIntegrations.environment, shop)
+              )
+            )
+          console.log(`[Shopify GDPR] Cleaned up integration for redacted shop: ${shop}`)
+        }
         break
+      }
       
       default:
         console.warn(`[Shopify Webhook] Unhandled GDPR topic: ${topic}`)
