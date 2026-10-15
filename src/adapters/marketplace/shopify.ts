@@ -655,30 +655,42 @@ export class ShopifyAdapter implements MarketplaceAdapter {
         const hasPriceUpdate = update.price !== undefined || update.reducedPrice !== undefined || update.msrp !== undefined || update.fallbackPrice !== undefined
 
         if (hasPriceUpdate) {
-          const standardPrice = update.price !== undefined ? update.price : update.fallbackPrice
-
-          let sellingPrice: number | undefined
-          let compareAtPrice: number | null = null
+          const standardPrice = (update.price !== undefined && update.price !== null) ? update.price : update.fallbackPrice
+          const reducedPrice = (update.reducedPrice !== undefined && update.reducedPrice !== null && update.reducedPrice > 0) ? update.reducedPrice : undefined
+          const msrp = (update.msrp !== undefined && update.msrp !== null && update.msrp > 0) ? update.msrp : undefined
 
           const now = new Date()
           const isSaleDateValid = (!update.saleStartDate || new Date(update.saleStartDate) <= now) &&
                                   (!update.saleEndDate || new Date(update.saleEndDate) >= now)
 
-          if (update.reducedPrice !== undefined && update.reducedPrice !== null && update.reducedPrice > 0 && isSaleDateValid) {
-            // Sale is active: price = reduced price, compare_at_price = standard price (or msrp if higher)
-            sellingPrice = update.reducedPrice
-            if (standardPrice !== undefined && standardPrice > update.reducedPrice) {
-              compareAtPrice = (update.msrp && update.msrp > standardPrice) ? update.msrp : standardPrice
-            } else if (update.msrp && update.msrp > update.reducedPrice) {
-              compareAtPrice = update.msrp
+          const isReducedPriceActive = reducedPrice !== undefined && isSaleDateValid
+
+          let sellingPrice: number | undefined
+          let compareAtPrice: number | null = null
+
+          if (isReducedPriceActive) {
+            // Case C & D: A reduced price is active -> customer pays reduced price
+            sellingPrice = reducedPrice
+
+            // Strikethrough / Compare-at price:
+            if (msrp !== undefined && msrp > reducedPrice) {
+              // Case D: UVP is available and higher than reduced price -> use UVP as compare-at price
+              compareAtPrice = msrp
+            } else if (standardPrice !== undefined && standardPrice > reducedPrice) {
+              // Case C: No UVP available (or UVP <= reduced price) -> use standard price as compare-at price
+              compareAtPrice = standardPrice
+            } else {
+              compareAtPrice = null
             }
           } else {
-            // No sale active (or discount removed)
+            // Case A & B: No reduced price active (or sale ended / removed) -> customer pays standard price
             sellingPrice = standardPrice
-            // If MSRP is higher than standard price, display it as compare-at price; otherwise clear compare-at price
-            if (update.msrp && standardPrice !== undefined && update.msrp > standardPrice) {
-              compareAtPrice = update.msrp
+
+            if (msrp !== undefined && standardPrice !== undefined && msrp > standardPrice) {
+              // Case B: UVP is higher than standard price -> display UVP as compare-at price
+              compareAtPrice = msrp
             } else {
+              // Case A: Only standard price (or UVP <= standard price) -> clear compare-at price
               compareAtPrice = null
             }
           }

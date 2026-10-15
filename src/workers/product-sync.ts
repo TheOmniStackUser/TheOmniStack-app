@@ -362,23 +362,24 @@ let modifiedSaleStartDate = updateDef.saleStartDate !== undefined ? (updateDef.s
     }
 
     
-    if (canSyncPrice && mapping.syncPrice) {
-      if (updateDef.price !== undefined || updateDef.reducedPrice !== undefined || updateDef.msrp !== undefined) {
-        if (modifiedPrice !== undefined) {
-          mUpdate.price = modifiedPrice
-        }
-        if (modifiedReducedPrice !== undefined) {
-          mUpdate.reducedPrice = modifiedReducedPrice
-        }
-        if (modifiedMsrp !== undefined) {
-          mUpdate.msrp = modifiedMsrp
-        }
+    const isPriceSyncAllowed = canSyncPrice && (
+      mapping.syncPrice ||
+      productSyncSettings?.syncPrice === true ||
+      updateDef.price !== undefined ||
+      updateDef.reducedPrice !== undefined ||
+      updateDef.msrp !== undefined
+    )
+
+    if (isPriceSyncAllowed) {
+      if (modifiedPrice !== undefined) {
+        mUpdate.price = modifiedPrice
       }
-    }
-
-
-    if (modifiedMsrp !== undefined) mUpdate.msrp = modifiedMsrp
-    if (updateDef.msrp !== undefined || updateDef.price !== undefined || updateDef.reducedPrice !== undefined) {
+      if (modifiedReducedPrice !== undefined) {
+        mUpdate.reducedPrice = modifiedReducedPrice
+      }
+      if (modifiedMsrp !== undefined) {
+        mUpdate.msrp = modifiedMsrp
+      }
       (mUpdate as any).fallbackPrice = modifiedPrice || 0
     }
 
