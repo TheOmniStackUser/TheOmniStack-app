@@ -292,8 +292,43 @@ export class ShopifyAdapter implements MarketplaceAdapter {
         return false
       }
 
-      // 6. Post Refund
-      const refundPayload = {
+      // 6. Calculate refund with Shopify to retrieve suggested monetary transactions
+      let transactions: any[] = []
+      try {
+        console.log(`[Shopify] Calculating refund for order ${marketplaceOrderId}...`)
+        const calcRes = await fetch(`${shopUrl}/admin/api/2024-01/orders/${marketplaceOrderId}/refunds/calculate.json`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            refund: {
+              shipping: { full_refund: false },
+              refund_line_items: refundLineItems
+            }
+          })
+        })
+
+        if (calcRes.ok) {
+          const calcData = await calcRes.json()
+          if (calcData.refund?.transactions && Array.isArray(calcData.refund.transactions)) {
+            transactions = calcData.refund.transactions.map((tx: any) => ({
+              parent_id: tx.parent_id || tx.id,
+              amount: tx.amount,
+              kind: 'refund',
+              gateway: tx.gateway,
+              currency: tx.currency || shopifyOrder.currency || 'EUR'
+            }))
+            console.log(`[Shopify] Calculated refund transactions:`, transactions)
+          }
+        } else {
+          const errText = await calcRes.text()
+          console.warn(`[Shopify] Calculate refund endpoint returned ${calcRes.status}: ${errText}`)
+        }
+      } catch (calcErr) {
+        console.error(`[Shopify] Error calculating refund:`, calcErr)
+      }
+
+      // 7. Post Refund
+      const refundPayload: any = {
         refund: {
           currency: shopifyOrder.currency || 'EUR',
           notify: true,
@@ -301,6 +336,10 @@ export class ShopifyAdapter implements MarketplaceAdapter {
           shipping: { full_refund: false },
           refund_line_items: refundLineItems
         }
+      }
+
+      if (transactions.length > 0) {
+        refundPayload.refund.transactions = transactions
       }
 
       console.log(`[Shopify] Sending refund request for order ${marketplaceOrderId}...`)
