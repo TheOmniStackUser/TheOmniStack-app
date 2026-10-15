@@ -77,8 +77,12 @@ export class ShopifyAdapter implements MarketplaceAdapter {
         const liTaxLines = li.tax_lines || []
         const taxRate = liTaxLines.length > 0 ? liTaxLines[0].rate : 0.19
 
+        const resolvedSku = (li.sku && String(li.sku).trim().length > 0)
+          ? String(li.sku).trim()
+          : (li.variant_id ? String(li.variant_id) : String(li.id))
+
         return {
-          sku: li.sku || li.id.toString(),
+          sku: resolvedSku,
           title: li.title || 'Shopify Item',
           quantity: li.quantity,
           unitPrice,

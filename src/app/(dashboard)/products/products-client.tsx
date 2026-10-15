@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import { Package, Search, ChevronUp, ChevronDown, ChevronRight, Scale, MapPin, Tag, FileText, Barcode, ExternalLink, Trash2, Building2, X, Loader2, Copy, MoreHorizontal, GitMerge, CheckCircle2 } from 'lucide-react'
 import { DeleteProductButton } from './delete-button'
@@ -8,11 +8,17 @@ import { useRouter } from 'next/navigation'
 
 type Product = any
 
-function StockEditor({ product }: { product: Product }) {
+function StockEditor({ product, onToast }: { product: Product; onToast?: (message: string, type: 'success' | 'error' | 'info') => void }) {
   const [isEditing, setIsEditing] = useState(false)
   const [value, setValue] = useState(product.currentStock || '0')
   const [isSaving, setIsSaving] = useState(false)
   const router = useRouter()
+
+  useEffect(() => {
+    if (!isEditing) {
+      setValue(product.currentStock || '0')
+    }
+  }, [product.currentStock, isEditing])
 
   const handleSave = async () => {
     let numericValue = Number(value)
@@ -34,10 +40,11 @@ function StockEditor({ product }: { product: Product }) {
       const { updateProductStockInline } = await import('@/app/actions/products')
       await updateProductStockInline(product.id, numericValue)
       setIsEditing(false)
+      onToast?.('Bestand erfolgreich aktualisiert', 'success')
       router.refresh()
     } catch (e) {
       console.error(e)
-      alert("Fehler beim Speichern des Bestands")
+      onToast?.('Fehler beim Speichern des Bestands', 'error')
       setValue(product.currentStock || '0')
     } finally {
       setIsSaving(false)
@@ -106,27 +113,36 @@ function StockEditor({ product }: { product: Product }) {
 }
 
 
-function PriceEditor({ product }: { product: Product }) {
+function PriceEditor({ product, onToast }: { product: Product; onToast?: (message: string, type: 'success' | 'error' | 'info') => void }) {
   const [isEditing, setIsEditing] = useState(false)
   const [value, setValue] = useState(product.price ? Number(product.price).toFixed(2) : '0.00')
   const [isSaving, setIsSaving] = useState(false)
   const router = useRouter()
 
+  useEffect(() => {
+    if (!isEditing) {
+      setValue(product.price ? Number(product.price).toFixed(2) : '0.00')
+    }
+  }, [product.price, isEditing])
+
   const handleSave = async () => {
     let numericValue = Number(value.replace(',', '.'))
     if (numericValue < 0) { numericValue = 0; setValue('0.00') }
-    if (String(numericValue) === product.reducedPrice || isNaN(numericValue)) {
-      setIsEditing(false); setValue(product.price ? Number(product.price).toFixed(2) : '0.00'); return
+    if (numericValue === Number(product.price || 0) || isNaN(numericValue)) {
+      setIsEditing(false)
+      setValue(product.price ? Number(product.price).toFixed(2) : '0.00')
+      return
     }
     setIsSaving(true)
     try {
       const { bulkUpdateStockAndPrice } = await import('@/app/actions/products')
-      await bulkUpdateStockAndPrice([product.id], undefined, undefined, numericValue)
+      await bulkUpdateStockAndPrice([product.id], undefined, numericValue)
       setIsEditing(false)
+      onToast?.('Standard-Preis erfolgreich aktualisiert', 'success')
       router.refresh()
     } catch (e) {
       console.error(e)
-      alert("Fehler beim Speichern des Preises")
+      onToast?.('Fehler beim Speichern des Preises', 'error')
       setValue(product.price ? Number(product.price).toFixed(2) : '0.00')
     } finally { setIsSaving(false) }
   }
@@ -163,11 +179,17 @@ function PriceEditor({ product }: { product: Product }) {
 }
 
 
-function MsrpEditor({ product }: { product: Product }) {
+function MsrpEditor({ product, onToast }: { product: Product; onToast?: (message: string, type: 'success' | 'error' | 'info') => void }) {
   const [isEditing, setIsEditing] = useState(false)
   const [value, setValue] = useState(product.msrp ? Number(product.msrp).toFixed(2) : '0.00')
   const [isSaving, setIsSaving] = useState(false)
   const router = useRouter()
+
+  useEffect(() => {
+    if (!isEditing) {
+      setValue(product.msrp ? Number(product.msrp).toFixed(2) : '0.00')
+    }
+  }, [product.msrp, isEditing])
 
   const handleSave = async () => {
     let numericValue = Number(value.replace(',', '.'))
@@ -188,10 +210,11 @@ function MsrpEditor({ product }: { product: Product }) {
       const { bulkUpdateStockAndPrice } = await import('@/app/actions/products')
       await bulkUpdateStockAndPrice([product.id], undefined, undefined, undefined, numericValue)
       setIsEditing(false)
+      onToast?.('UVP erfolgreich aktualisiert', 'success')
       router.refresh()
     } catch (e) {
       console.error(e)
-      alert("Fehler beim Speichern des Preises")
+      onToast?.('Fehler beim Speichern des UVP', 'error')
       setValue(product.msrp ? Number(product.msrp).toFixed(2) : '0.00')
     } finally {
       setIsSaving(false)
@@ -260,11 +283,17 @@ function MsrpEditor({ product }: { product: Product }) {
 }
 
 
-function ReducedPriceEditor({ product }: { product: Product }) {
+function ReducedPriceEditor({ product, onToast }: { product: Product; onToast?: (message: string, type: 'success' | 'error' | 'info') => void }) {
   const [isEditing, setIsEditing] = useState(false)
   const [value, setValue] = useState(product.reducedPrice ? Number(product.reducedPrice).toFixed(2) : '')
   const [isSaving, setIsSaving] = useState(false)
   const router = useRouter()
+
+  useEffect(() => {
+    if (!isEditing) {
+      setValue(product.reducedPrice ? Number(product.reducedPrice).toFixed(2) : '')
+    }
+  }, [product.reducedPrice, isEditing])
 
   const handleSave = async () => {
     let numericValue = value.trim() === '' ? 0 : Number(value.replace(',', '.'))
@@ -285,10 +314,11 @@ function ReducedPriceEditor({ product }: { product: Product }) {
       const { bulkUpdateStockAndPrice } = await import('@/app/actions/products')
       await bulkUpdateStockAndPrice([product.id], undefined, undefined, numericValue)
       setIsEditing(false)
+      onToast?.('Aktionspreis erfolgreich aktualisiert', 'success')
       router.refresh()
     } catch (e) {
       console.error(e)
-      alert("Fehler beim Speichern des Aktionspreises")
+      onToast?.('Fehler beim Speichern des Aktionspreises', 'error')
       setValue(product.reducedPrice ? Number(product.reducedPrice).toFixed(2) : '')
     } finally {
       setIsSaving(false)
@@ -358,7 +388,7 @@ function ReducedPriceEditor({ product }: { product: Product }) {
 }
 
 
-function ReducedPriceDatesEditor({ product }: { product: Product }) {
+function ReducedPriceDatesEditor({ product, onToast }: { product: Product; onToast?: (message: string, type: 'success' | 'error' | 'info') => void }) {
   const [isEditing, setIsEditing] = useState(false)
   
   const formatDateForInput = (date: any) => {
@@ -375,6 +405,13 @@ function ReducedPriceDatesEditor({ product }: { product: Product }) {
   const [isSaving, setIsSaving] = useState(false)
   const router = useRouter()
 
+  useEffect(() => {
+    if (!isEditing) {
+      setStartValue(formatDateForInput(product.saleStartDate))
+      setEndValue(formatDateForInput(product.saleEndDate))
+    }
+  }, [product.saleStartDate, product.saleEndDate, isEditing])
+
   const handleSave = async () => {
     setIsSaving(true)
     try {
@@ -383,10 +420,11 @@ function ReducedPriceDatesEditor({ product }: { product: Product }) {
       const eDate = endValue ? new Date(endValue) : null
       await bulkUpdateStockAndPrice([product.id], undefined, undefined, undefined, undefined, sDate, eDate)
       setIsEditing(false)
+      onToast?.('Aktionszeitraum erfolgreich aktualisiert', 'success')
       router.refresh()
     } catch (e) {
       console.error(e)
-      alert("Fehler beim Speichern der Aktionsdaten")
+      onToast?.('Fehler beim Speichern der Aktionsdaten', 'error')
     } finally {
       setIsSaving(false)
     }
@@ -1030,19 +1068,19 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                         )}
                       </td>
                       <td className="px-6 py-4">
-                        <StockEditor product={product} />
+                        <StockEditor product={product} onToast={showToast} />
                       </td>
                       <td className="px-6 py-4">
-                        <MsrpEditor product={product} />
+                        <MsrpEditor product={product} onToast={showToast} />
                       </td>
                       <td className="px-6 py-4">
-                        <PriceEditor product={product} />
+                        <PriceEditor product={product} onToast={showToast} />
                       </td>
                       <td className="px-6 py-4">
-                        <ReducedPriceEditor product={product} />
+                        <ReducedPriceEditor product={product} onToast={showToast} />
                       </td>
                       <td className="px-6 py-4">
-                        <ReducedPriceDatesEditor product={product} />
+                        <ReducedPriceDatesEditor product={product} onToast={showToast} />
                       </td>
                       <td className="px-6 py-4 text-slate-500 text-sm">
                         {new Date(product.updatedAt).toLocaleDateString('de-DE')}

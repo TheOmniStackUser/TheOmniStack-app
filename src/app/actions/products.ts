@@ -1255,6 +1255,7 @@ if (newSaleStartDate !== undefined) {
           sku: p.sku,
           stock: safeStock,
           price: safePrice,
+          reducedPrice: safeReducedPrice,
           msrp: safeMsrp,
           saleStartDate: newSaleStartDate,
           saleEndDate: newSaleEndDate

@@ -17,7 +17,7 @@ import { eq, and, desc, isNull, inArray, gte, sql, notInArray } from 'drizzle-or
 import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { invoices, invoiceItems, invoiceLogs } from '@/db/schema/invoices'
 import { returnsLog, returnedItems } from '@/db/schema/returns'
-import { products } from '@/db/schema/products'
+import { products, productMappings } from '@/db/schema/products'
 import { pushUpdatesToMarketplaces } from '@/workers/product-sync'
 import { buildInvoiceKey, buildDeliveryNoteKey, documentExists, uploadDocument } from '@/lib/storage'
 import { OttoAdapter } from '@/adapters/marketplace/otto'
@@ -1926,14 +1926,22 @@ export async function persistOrders(
           })
         )
         
-        // Deduct stock for each item
+        // Deduct stock for each item (matching direct SKU or via productMappings)
         for (const item of order.items) {
           if (!item.sku || item.sku === 'N/A' || item.sku === 'UNKNOWN') continue;
           
           await tx.execute(sql`
             UPDATE ${products}
             SET current_stock = GREATEST(0, current_stock - ${item.quantity})
-            WHERE company_id = ${companyId} AND sku = ${item.sku}
+            WHERE company_id = ${companyId}
+              AND (
+                sku = ${item.sku}
+                OR id IN (
+                  SELECT product_id FROM ${productMappings}
+                  WHERE company_id = ${companyId}
+                    AND (marketplace_sku = ${item.sku} OR marketplace_product_id = ${item.sku})
+                )
+              )
           `);
         }
       }
@@ -1956,7 +1964,16 @@ export async function persistOrders(
         const updatedProducts = await db
           .select({ sku: products.sku, currentStock: products.currentStock })
           .from(products)
-          .where(and(eq(products.companyId, companyId), inArray(products.sku, skus)))
+          .where(
+            and(
+              eq(products.companyId, companyId),
+              sql`(${inArray(products.sku, skus)} OR ${products.id} IN (
+                SELECT product_id FROM ${productMappings}
+                WHERE company_id = ${companyId}
+                  AND (marketplace_sku IN (${sql.join(skus.map(s => sql`${s}`), sql`, `)}) OR marketplace_product_id IN (${sql.join(skus.map(s => sql`${s}`), sql`, `)}))
+              ))`
+            )
+          )
 
         const stockUpdates = updatedProducts.map(p => ({
           sku: p.sku,
