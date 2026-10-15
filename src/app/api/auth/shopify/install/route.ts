@@ -22,8 +22,9 @@ export async function GET(request: Request) {
   const { getSession } = await import('@/lib/session')
   
   const payload = await getSession()
-  
-  if (payload?.userId && payload?.activeCompanyId) {
+  const isForce = searchParams.get('force') === 'true' || searchParams.get('reconnect') === 'true'
+
+  if (payload?.userId && payload?.activeCompanyId && !isForce) {
     const [existing] = await db
       .select()
       .from(marketplaceIntegrations)
@@ -37,9 +38,24 @@ export async function GET(request: Request) {
       )
       .limit(1)
 
-    // Only skip OAuth if already actively connected with a token for THIS company
-    if (existing) {
-      return NextResponse.redirect(new URL('/dashboard', process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'))
+    // Only skip OAuth if already actively connected with a WORKING token for THIS company
+    if (existing?.accessToken) {
+      let isTokenWorking = false
+      try {
+        const testRes = await fetch(`https://${shop}/admin/api/2024-01/shop.json`, {
+          headers: { 'X-Shopify-Access-Token': existing.accessToken },
+          cache: 'no-store'
+        })
+        if (testRes.ok) {
+          isTokenWorking = true
+        }
+      } catch (err) {
+        isTokenWorking = false
+      }
+
+      if (isTokenWorking) {
+        return NextResponse.redirect(new URL('/dashboard', process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'))
+      }
     }
   }
 

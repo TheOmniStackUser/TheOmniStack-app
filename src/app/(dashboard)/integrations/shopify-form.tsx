@@ -34,9 +34,17 @@ export function ShopifyIntegrationForm({ initialData }: { initialData?: any }) {
     return (
       <div className="space-y-4 max-w-md">
         <p className="text-sm text-gray-600">
-          TheOmniStack ist erfolgreich mit <strong>{initialData.environment}</strong> verknüpft.
+          TheOmniStack ist mit <strong>{initialData.environment}</strong> verknüpft.
         </p>
-        <DisconnectButton type="shopify" />
+        <div className="flex flex-wrap items-center gap-3">
+          <a
+            href={`/api/auth/shopify/install?shop=${encodeURIComponent(initialData.environment)}&reconnect=true&t=${Date.now()}`}
+            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-sm transition-all text-center inline-flex items-center gap-2 active:scale-95"
+          >
+            Verbindung erneuern
+          </a>
+          <DisconnectButton type="shopify" />
+        </div>
       </div>
     )
   }

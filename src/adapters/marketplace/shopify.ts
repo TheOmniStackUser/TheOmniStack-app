@@ -34,10 +34,10 @@ export class ShopifyAdapter implements MarketplaceAdapter {
 
     try {
       const accessToken = await this.getAccessToken(integration)
-      return this.fetchWithToken(shopUrl, accessToken, options)
+      return await this.fetchWithToken(shopUrl, accessToken, options)
     } catch (err) {
-      console.error(`[Shopify] Error getting access token:`, err)
-      return []
+      console.error(`[Shopify] Error fetching unshipped orders:`, err)
+      throw err
     }
   }
 
