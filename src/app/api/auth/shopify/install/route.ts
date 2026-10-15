@@ -15,43 +15,32 @@ export async function GET(request: Request) {
     return new NextResponse('Missing Shopify Client ID in environment variables', { status: 500 })
   }
 
-  // 1.5 Check if already installed
+  // 1.5 Check if already actively installed for the current logged-in company
   const { db } = await import('@/db/client')
   const { marketplaceIntegrations } = await import('@/db/schema/integrations')
-  const { eq, and } = await import('drizzle-orm')
+  const { eq, and, isNotNull } = await import('drizzle-orm')
   const { getSession } = await import('@/lib/session')
   
   const payload = await getSession()
   
-  let existing = null
-
-  if (payload?.activeCompanyId) {
-    const [found] = await db
+  if (payload?.userId && payload?.activeCompanyId) {
+    const [existing] = await db
       .select()
       .from(marketplaceIntegrations)
       .where(
         and(
           eq(marketplaceIntegrations.environment, shop),
-          eq(marketplaceIntegrations.companyId, payload.activeCompanyId)
+          eq(marketplaceIntegrations.companyId, payload.activeCompanyId),
+          eq(marketplaceIntegrations.isActive, true),
+          isNotNull(marketplaceIntegrations.accessToken)
         )
       )
       .limit(1)
-    existing = found
-  } else {
-    const [found] = await db
-      .select()
-      .from(marketplaceIntegrations)
-      .where(eq(marketplaceIntegrations.environment, shop))
-      .limit(1)
-    existing = found
-  }
 
-  // If already installed and user is logged in, redirect straight to dashboard
-  if (existing && payload?.userId) {
-    return NextResponse.redirect(new URL('/dashboard', process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'))
-  } else if (existing && !payload?.userId) {
-    // Already installed but user not logged in -> redirect to login with intent
-    return NextResponse.redirect(new URL(`/login?shop=${shop}`, process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'))
+    // Only skip OAuth if already actively connected with a token for THIS company
+    if (existing) {
+      return NextResponse.redirect(new URL('/dashboard', process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'))
+    }
   }
 
   // 2. Define required scopes for TheOmniStack
