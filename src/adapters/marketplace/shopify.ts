@@ -215,7 +215,7 @@ export class ShopifyAdapter implements MarketplaceAdapter {
 
   async refundOrder(
     marketplaceOrderId: string,
-    refundItems: { sku: string; quantity: number }[],
+    refundItems: { sku: string; quantity: number; title?: string }[],
     rawOrderPayload?: unknown
   ): Promise<boolean> {
     console.log(`[Shopify] Refunding order ${marketplaceOrderId}...`)
@@ -229,7 +229,7 @@ export class ShopifyAdapter implements MarketplaceAdapter {
 
       if (!orderRow) {
         console.warn(`[Shopify] Order ${marketplaceOrderId} not found in DB`)
-        return false
+        throw new Error(`Bestellung ${marketplaceOrderId} nicht in der Datenbank gefunden.`)
       }
 
       // 2. Fetch active Shopify integration
@@ -247,7 +247,7 @@ export class ShopifyAdapter implements MarketplaceAdapter {
 
       if (!integration || !integration.environment) {
         console.warn(`[Shopify] No active credentials found for company ${orderRow.companyId}`)
-        return false
+        throw new Error(`Keine aktive Shopify-Integration für dieses Unternehmen gefunden.`)
       }
 
       let shopUrl = integration.environment
@@ -282,15 +282,61 @@ export class ShopifyAdapter implements MarketplaceAdapter {
       }
 
       if (!shopifyOrder || !shopifyOrder.line_items) {
-        throw new Error(`No Shopify line items found for order ${marketplaceOrderId}`)
+        throw new Error(`Keine Shopify Line Items für Bestellung ${marketplaceOrderId} gefunden.`)
       }
 
-      // 5. Map SKU or Line Item ID to Shopify line_item IDs
+      // 5. Map SKU or Line Item ID or Variant ID to Shopify line_item IDs
       const refundLineItems: { line_item_id: number; quantity: number; restock_type: string }[] = []
       for (const item of refundItems) {
-        const matchingLineItem = shopifyOrder.line_items.find(
-          (li: any) => (li.sku && li.sku.toString().toLowerCase() === item.sku.toLowerCase()) || li.id.toString() === item.sku
-        )
+        const itemSkuTrimmed = (item.sku || '').trim().toLowerCase()
+        const itemTitleTrimmed = (item.title || '').trim().toLowerCase()
+
+        let matchingLineItem = shopifyOrder.line_items.find((li: any) => {
+          const skuMatch = li.sku && itemSkuTrimmed && li.sku.toString().trim().toLowerCase() === itemSkuTrimmed
+          const variantMatch = li.variant_id && item.sku && li.variant_id.toString().trim() === item.sku.trim()
+          const lineItemIdMatch = li.id && item.sku && li.id.toString().trim() === item.sku.trim()
+          const titleMatch = itemTitleTrimmed && (
+            (li.title && li.title.toString().trim().toLowerCase() === itemTitleTrimmed) ||
+            (li.name && li.name.toString().trim().toLowerCase() === itemTitleTrimmed)
+          )
+          return skuMatch || variantMatch || lineItemIdMatch || titleMatch
+        })
+
+        // Fallback: If not matched and item.sku exists, check productMappings in DB
+        if (!matchingLineItem && item.sku) {
+          try {
+            const { products, productMappings } = await import('@/db/schema/products')
+            const localProduct = await db.query.products.findFirst({
+              where: and(eq(products.sku, item.sku), eq(products.companyId, orderRow.companyId))
+            })
+            if (localProduct) {
+              const mappings = await db.query.productMappings.findMany({
+                where: and(
+                  eq(productMappings.productId, localProduct.id),
+                  eq(productMappings.marketplace, 'shopify')
+                )
+              })
+              for (const map of mappings) {
+                matchingLineItem = shopifyOrder.line_items.find((li: any) => {
+                  return (map.marketplaceSku && li.sku && li.sku.toString().trim().toLowerCase() === map.marketplaceSku.trim().toLowerCase()) ||
+                    (map.marketplaceSku && li.variant_id && li.variant_id.toString().trim() === map.marketplaceSku.trim()) ||
+                    (map.marketplaceProductId && li.variant_id && li.variant_id.toString().trim() === map.marketplaceProductId.trim()) ||
+                    (map.marketplaceProductId && li.product_id && li.product_id.toString().trim() === map.marketplaceProductId.trim())
+                })
+                if (matchingLineItem) break
+              }
+            }
+          } catch (e) {
+            console.warn(`[Shopify] Could not resolve line item via productMappings:`, e)
+          }
+        }
+
+        // Fallback: If single item order and single refund item, match directly
+        if (!matchingLineItem && shopifyOrder.line_items.length === 1 && refundItems.length === 1) {
+          console.log(`[Shopify] Single line item order fallback: matching line item ${shopifyOrder.line_items[0].id}`)
+          matchingLineItem = shopifyOrder.line_items[0]
+        }
+
         if (!matchingLineItem) {
           console.warn(`[Shopify] No matching line item found on Shopify for SKU ${item.sku}`)
           continue
@@ -304,7 +350,7 @@ export class ShopifyAdapter implements MarketplaceAdapter {
 
       if (refundLineItems.length === 0) {
         console.warn(`[Shopify] No valid line items to refund.`)
-        return false
+        throw new Error(`Keine passenden Artikel in der Shopify-Bestellung gefunden (SKU: ${refundItems.map(i => i.sku).join(', ')}).`)
       }
 
       // 6. Calculate refund with Shopify to retrieve suggested monetary transactions
@@ -404,6 +450,23 @@ export class ShopifyAdapter implements MarketplaceAdapter {
       if (!refundRes.ok) {
         const errText = await refundRes.text()
         console.error(`[Shopify] Refund request failed: ${refundRes.status} - ${errText}`)
+        // If it failed with transactions, retry once without transactions payload
+        if (transactions.length > 0) {
+          console.log(`[Shopify] Retrying refund without transactions payload...`)
+          delete refundPayload.refund.transactions
+          const retryRes = await fetch(`${shopUrl}/admin/api/2024-01/orders/${marketplaceOrderId}/refunds.json`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(refundPayload)
+          })
+          if (retryRes.ok) {
+            console.log(`[Shopify] Refund retry without transactions succeeded for order ${marketplaceOrderId}`)
+            return true
+          }
+          const retryErrText = await retryRes.text()
+          console.error(`[Shopify] Refund retry failed: ${retryRes.status} - ${retryErrText}`)
+          throw new Error(`Shopify API Fehler: ${retryErrText}`)
+        }
         throw new Error(`Shopify Refund API Error: ${errText}`)
       }
 
@@ -411,7 +474,7 @@ export class ShopifyAdapter implements MarketplaceAdapter {
       return true
     } catch (error) {
       console.error(`[Shopify] Error during refund:`, error)
-      return false
+      throw error
     }
   }
 

@@ -115,7 +115,7 @@ export interface MarketplaceAdapter {
    */
   refundOrder?(
     marketplaceOrderId: string,
-    refundItems: { sku: string; quantity: number }[],
+    refundItems: { sku: string; quantity: number; title?: string }[],
     rawOrderPayload?: unknown
   ): Promise<boolean>
 

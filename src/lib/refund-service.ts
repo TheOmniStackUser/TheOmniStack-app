@@ -15,6 +15,7 @@ export type RefundItemInput = {
   sku: string
   quantity: number
   restock?: boolean
+  title?: string
 }
 
 export async function executeRefund({
@@ -138,7 +139,8 @@ export async function executeRefund({
        resolvedItemsToRefund.push({
          sku: resolvedSku,
          quantity: refundItem.quantity,
-         restock: refundItem.restock
+         restock: refundItem.restock,
+         title: matchedOrderItem.title
        })
        resolvedConditions[resolvedSku.toLowerCase()] = originalCondition
     } else {
