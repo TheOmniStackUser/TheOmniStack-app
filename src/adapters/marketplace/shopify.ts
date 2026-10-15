@@ -2,6 +2,7 @@ import { MarketplaceAdapter, NormalizedOrder } from './base'
 import { db } from '@/db/client'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { orders } from '@/db/schema/orders'
+import { productMappings } from '@/db/schema/products'
 import { eq, and } from 'drizzle-orm'
 
 export class ShopifyAdapter implements MarketplaceAdapter {
@@ -504,7 +505,18 @@ export class ShopifyAdapter implements MarketplaceAdapter {
 
   async updateListings(
     companyId: string, 
-    updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number }[]
+    updates: { 
+      sku: string; 
+      marketplaceProductId?: string; 
+      stock?: number; 
+      price?: number; 
+      reducedPrice?: number; 
+      msrp?: number; 
+      fallbackPrice?: number; 
+      saleStartDate?: Date | null; 
+      saleEndDate?: Date | null; 
+      gpsrDetails?: any; 
+    }[]
   ): Promise<void> {
     if (!updates || updates.length === 0) return
 
@@ -537,74 +549,159 @@ export class ShopifyAdapter implements MarketplaceAdapter {
         'Content-Type': 'application/json',
       }
 
-      // We need location_id for inventory updates
-      const locRes = await fetch(`${shopUrl}/admin/api/2024-01/locations.json`, { headers })
+      // We only need location_id if at least one update includes stock
+      const hasStockUpdates = updates.some(u => u.stock !== undefined)
       let locationId = ''
-      if (locRes.ok) {
-        const locData = await locRes.json()
-        locationId = locData.locations?.[0]?.id?.toString() || ''
+      if (hasStockUpdates) {
+        const locRes = await fetch(`${shopUrl}/admin/api/2024-01/locations.json`, { headers })
+        if (locRes.ok) {
+          const locData = await locRes.json()
+          locationId = locData.locations?.[0]?.id?.toString() || ''
+        }
       }
 
       for (const update of updates) {
-        // Find variant ID if not provided, though we expect it in marketplaceProductId
         let variantId = update.marketplaceProductId
+
+        // Fallback: If variantId is not provided, look it up by SKU in productMappings
+        if (!variantId && update.sku) {
+          const [mapping] = await db
+            .select({ marketplaceProductId: productMappings.marketplaceProductId })
+            .from(productMappings)
+            .where(
+              and(
+                eq(productMappings.companyId, companyId),
+                eq(productMappings.marketplaceSku, update.sku),
+                eq(productMappings.marketplace, 'shopify')
+              )
+            )
+            .limit(1)
+          if (mapping?.marketplaceProductId) {
+            variantId = mapping.marketplaceProductId
+          }
+        }
+
+        if (!variantId) {
+          console.warn(`[Shopify] Skipping update for SKU ${update.sku}: No variant ID found`)
+          continue
+        }
+
         let inventoryItemId = ''
 
-        if (variantId) {
-          // Update Price
-          if (update.price !== undefined) {
-            const variantPayload = { variant: { id: variantId, price: update.price } }
-            await fetch(`${shopUrl}/admin/api/2024-01/variants/${variantId}.json`, {
+        // Check if price / compare-at price update is needed
+        const hasPriceUpdate = update.price !== undefined || update.reducedPrice !== undefined || update.msrp !== undefined || update.fallbackPrice !== undefined
+
+        if (hasPriceUpdate) {
+          const standardPrice = update.price !== undefined ? update.price : update.fallbackPrice
+
+          let sellingPrice: number | undefined
+          let compareAtPrice: number | null = null
+
+          const now = new Date()
+          const isSaleDateValid = (!update.saleStartDate || new Date(update.saleStartDate) <= now) &&
+                                  (!update.saleEndDate || new Date(update.saleEndDate) >= now)
+
+          if (update.reducedPrice !== undefined && update.reducedPrice !== null && update.reducedPrice > 0 && isSaleDateValid) {
+            // Sale is active: price = reduced price, compare_at_price = standard price (or msrp if higher)
+            sellingPrice = update.reducedPrice
+            if (standardPrice !== undefined && standardPrice > update.reducedPrice) {
+              compareAtPrice = (update.msrp && update.msrp > standardPrice) ? update.msrp : standardPrice
+            } else if (update.msrp && update.msrp > update.reducedPrice) {
+              compareAtPrice = update.msrp
+            }
+          } else {
+            // No sale active (or discount removed)
+            sellingPrice = standardPrice
+            // If MSRP is higher than standard price, display it as compare-at price; otherwise clear compare-at price
+            if (update.msrp && standardPrice !== undefined && update.msrp > standardPrice) {
+              compareAtPrice = update.msrp
+            } else {
+              compareAtPrice = null
+            }
+          }
+
+          if (sellingPrice !== undefined) {
+            const variantPayload: any = {
+              variant: {
+                id: variantId,
+                price: Number(sellingPrice).toFixed(2),
+                compare_at_price: compareAtPrice !== null ? Number(compareAtPrice).toFixed(2) : null
+              }
+            }
+
+            console.log(`[Shopify] Updating variant ${variantId} (SKU: ${update.sku}): price=${variantPayload.variant.price}, compare_at_price=${variantPayload.variant.compare_at_price}`)
+            const vPutRes = await fetch(`${shopUrl}/admin/api/2024-01/variants/${variantId}.json`, {
               method: 'PUT',
               headers,
               body: JSON.stringify(variantPayload)
             })
-          }
 
-          // If we need to update stock, we need the inventory_item_id
-          if (update.stock !== undefined && locationId) {
+            if (!vPutRes.ok) {
+              const errBody = await vPutRes.text()
+              console.error(`[Shopify] Variant ${variantId} price update failed: ${vPutRes.status} - ${errBody}`)
+              throw new Error(`Shopify API variant update error (${vPutRes.status}): ${errBody}`)
+            }
+
+            const putData = await vPutRes.json()
+            if (putData.variant?.inventory_item_id) {
+              inventoryItemId = putData.variant.inventory_item_id.toString()
+            }
+          }
+        }
+
+        // If we need to update stock, we need the inventory_item_id
+        if (update.stock !== undefined && locationId) {
+          if (!inventoryItemId) {
             const vRes = await fetch(`${shopUrl}/admin/api/2024-01/variants/${variantId}.json`, { headers })
             if (vRes.ok) {
               const vData = await vRes.json()
-              inventoryItemId = vData.variant?.inventory_item_id
+              inventoryItemId = vData.variant?.inventory_item_id?.toString() || ''
             }
+          }
 
-            if (inventoryItemId) {
-              const levelsRes = await fetch(`${shopUrl}/admin/api/2024-01/inventory_levels.json?inventory_item_ids=${inventoryItemId}`, { headers })
-              
-              if (levelsRes.ok) {
-                const levelsData = await levelsRes.json()
-                const levels = levelsData.inventory_levels || []
-                
-                if (levels.length > 0) {
-                  // Set the target stock on the first location, and 0 on all others to ensure total sum is exact
-                  for (let i = 0; i < levels.length; i++) {
-                    const level = levels[i]
-                    const stockToSet = i === 0 ? update.stock : 0
-                    
-                    const invPayload = {
-                      location_id: level.location_id,
-                      inventory_item_id: inventoryItemId,
-                      available: stockToSet
-                    }
-                    await fetch(`${shopUrl}/admin/api/2024-01/inventory_levels/set.json`, {
-                      method: 'POST',
-                      headers,
-                      body: JSON.stringify(invPayload)
-                    })
-                  }
-                } else if (locationId) {
-                  // Fallback if no inventory levels exist yet but we have a default location
+          if (inventoryItemId) {
+            const levelsRes = await fetch(`${shopUrl}/admin/api/2024-01/inventory_levels.json?inventory_item_ids=${inventoryItemId}`, { headers })
+
+            if (levelsRes.ok) {
+              const levelsData = await levelsRes.json()
+              const levels = levelsData.inventory_levels || []
+
+              if (levels.length > 0) {
+                // Set the target stock on the first location, and 0 on all others to ensure total sum is exact
+                for (let i = 0; i < levels.length; i++) {
+                  const level = levels[i]
+                  const stockToSet = i === 0 ? update.stock : 0
+
                   const invPayload = {
-                    location_id: locationId,
+                    location_id: level.location_id,
                     inventory_item_id: inventoryItemId,
-                    available: update.stock
+                    available: stockToSet
                   }
-                  await fetch(`${shopUrl}/admin/api/2024-01/inventory_levels/set.json`, {
+                  const setRes = await fetch(`${shopUrl}/admin/api/2024-01/inventory_levels/set.json`, {
                     method: 'POST',
                     headers,
                     body: JSON.stringify(invPayload)
                   })
+                  if (!setRes.ok) {
+                    const errText = await setRes.text()
+                    console.error(`[Shopify] Inventory level update failed for location ${level.location_id}: ${setRes.status} - ${errText}`)
+                  }
+                }
+              } else if (locationId) {
+                // Fallback if no inventory levels exist yet but we have a default location
+                const invPayload = {
+                  location_id: locationId,
+                  inventory_item_id: inventoryItemId,
+                  available: update.stock
+                }
+                const setRes = await fetch(`${shopUrl}/admin/api/2024-01/inventory_levels/set.json`, {
+                  method: 'POST',
+                  headers,
+                  body: JSON.stringify(invPayload)
+                })
+                if (!setRes.ok) {
+                  const errText = await setRes.text()
+                  console.error(`[Shopify] Fallback inventory level update failed: ${setRes.status} - ${errText}`)
                 }
               }
             }

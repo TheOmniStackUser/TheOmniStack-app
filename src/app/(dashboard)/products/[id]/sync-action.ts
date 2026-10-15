@@ -2,7 +2,16 @@
 
 import { requireAuth } from '@/lib/session'
 
-export async function triggerProductSync(productId: string, sku: string, currentStock: number, price: number) {
+export async function triggerProductSync(
+  productId: string, 
+  sku: string, 
+  currentStock: number, 
+  price: number,
+  reducedPrice?: number,
+  msrp?: number,
+  saleStartDate?: Date | null,
+  saleEndDate?: Date | null
+) {
   const auth = await requireAuth()
   
   const { pushUpdatesToMarketplaces } = await import('@/workers/product-sync')
@@ -11,7 +20,11 @@ export async function triggerProductSync(productId: string, sku: string, current
   const result = await pushUpdatesToMarketplaces(auth.activeCompanyId, [{
     sku,
     stock: Math.max(0, currentStock || 0),
-    price: price || 0
+    price: price || 0,
+    reducedPrice,
+    msrp,
+    saleStartDate,
+    saleEndDate
   }])
   
   return { success: true, ...result }

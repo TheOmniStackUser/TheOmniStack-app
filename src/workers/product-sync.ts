@@ -363,16 +363,14 @@ let modifiedSaleStartDate = updateDef.saleStartDate !== undefined ? (updateDef.s
 
     
     if (canSyncPrice && mapping.syncPrice) {
-      if (updateDef.price !== undefined) {
-        mUpdate.price = modifiedPrice
-      }
-      if (updateDef.reducedPrice !== undefined) {
-        mUpdate.reducedPrice = modifiedReducedPrice
-        // Ensure price is also sent if reducedPrice is sent
-        if (mUpdate.price === undefined && modifiedPrice !== undefined) {
+      if (updateDef.price !== undefined || updateDef.reducedPrice !== undefined || updateDef.msrp !== undefined) {
+        if (modifiedPrice !== undefined) {
           mUpdate.price = modifiedPrice
         }
-        if (mUpdate.msrp === undefined && modifiedMsrp !== undefined) {
+        if (modifiedReducedPrice !== undefined) {
+          mUpdate.reducedPrice = modifiedReducedPrice
+        }
+        if (modifiedMsrp !== undefined) {
           mUpdate.msrp = modifiedMsrp
         }
       }

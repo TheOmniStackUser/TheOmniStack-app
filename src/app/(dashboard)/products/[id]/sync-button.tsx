@@ -4,7 +4,25 @@ import { useState, useTransition } from 'react'
 import { RefreshCw, Loader2, CheckCircle2, AlertCircle, Info } from 'lucide-react'
 import { triggerProductSync } from './sync-action'
 
-export function SyncButton({ productId, sku, currentStock, price }: { productId: string, sku: string, currentStock: number, price: number }) {
+export function SyncButton({ 
+  productId, 
+  sku, 
+  currentStock, 
+  price,
+  reducedPrice,
+  msrp,
+  saleStartDate,
+  saleEndDate
+}: { 
+  productId: string, 
+  sku: string, 
+  currentStock: number, 
+  price: number,
+  reducedPrice?: number,
+  msrp?: number,
+  saleStartDate?: Date | null,
+  saleEndDate?: Date | null
+}) {
   const [isPending, startTransition] = useTransition()
   const [synced, setSynced] = useState(false)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
@@ -20,7 +38,7 @@ export function SyncButton({ productId, sku, currentStock, price }: { productId:
     showToast('Synchronisierung an Marktplätze gestartet...', 'info')
     startTransition(async () => {
       try {
-        const result = await triggerProductSync(productId, sku, currentStock, price)
+        const result = await triggerProductSync(productId, sku, currentStock, price, reducedPrice, msrp, saleStartDate, saleEndDate)
         if (result.failedMarketplaces && result.failedMarketplaces.length > 0) {
           const errors = result.failedMarketplaces.map((f: any) => `${f.name}: ${f.error}`).join(' | ')
           showToast(`Fehler bei: ${errors}`, 'error')

@@ -98,6 +98,13 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
     "use server"
     const auth = await requireAuth()
     
+    const reducedPriceRaw = (formData.get('reducedPrice') as string) || ''
+    const reducedPrice = reducedPriceRaw.trim() !== '' ? Math.max(0, parseFloat(reducedPriceRaw.replace(',', '.'))) : null
+    const saleStartDateRaw = (formData.get('saleStartDate') as string) || ''
+    const saleStartDate = saleStartDateRaw ? new Date(saleStartDateRaw) : null
+    const saleEndDateRaw = (formData.get('saleEndDate') as string) || ''
+    const saleEndDate = saleEndDateRaw ? new Date(saleEndDateRaw) : null
+
     await db.update(products).set({
       title: formData.get('title') as string,
       sku: formData.get('sku') as string,
@@ -106,6 +113,9 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       category: (formData.get('category') as string) || null,
       brand: (formData.get('brand') as string) || null,
       price: (formData.get('price') as string) || '0',
+      reducedPrice: reducedPrice !== null ? reducedPrice.toString() : null,
+      saleStartDate,
+      saleEndDate,
       purchasePrice: (formData.get('purchasePrice') as string) || null,
       msrp: (formData.get('msrp') as string) || null,
       currentStock: Math.max(0, parseInt((formData.get('currentStock') as string) || '0', 10)).toString(),
@@ -153,10 +163,17 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
     
     after(async () => {
       const { pushUpdatesToMarketplaces } = await import('@/workers/product-sync')
+      const msrpRaw = (formData.get('msrp') as string) || ''
+      const msrpVal = msrpRaw.trim() !== '' ? parseFloat(msrpRaw.replace(',', '.')) : undefined
+
       await pushUpdatesToMarketplaces(auth.activeCompanyId, [{
         sku: formData.get('sku') as string,
         stock: Math.max(0, parseInt((formData.get('currentStock') as string) || '0', 10)),
-        price: parseFloat((formData.get('price') as string) || '0')
+        price: parseFloat((formData.get('price') as string) || '0'),
+        reducedPrice: reducedPrice !== null ? reducedPrice : 0,
+        msrp: msrpVal,
+        saleStartDate,
+        saleEndDate
       }]).catch(e => {
         console.error('Failed to sync product updates:', e)
       })
@@ -183,7 +200,16 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
           <span className="px-4 py-2.5 bg-slate-50 text-slate-700 rounded-xl text-sm font-bold font-mono border border-slate-200 flex items-center justify-center">
             {product.sku}
           </span>
-          <SyncButton productId={product.id} sku={product.sku} currentStock={Number(product.currentStock || 0)} price={Number(product.price || 0)} />
+          <SyncButton 
+            productId={product.id} 
+            sku={product.sku} 
+            currentStock={Number(product.currentStock || 0)} 
+            price={Number(product.price || 0)}
+            reducedPrice={product.reducedPrice ? Number(product.reducedPrice) : undefined}
+            msrp={product.msrp ? Number(product.msrp) : undefined}
+            saleStartDate={product.saleStartDate}
+            saleEndDate={product.saleEndDate}
+          />
           <SubmitButton />
         </div>
       </header>
