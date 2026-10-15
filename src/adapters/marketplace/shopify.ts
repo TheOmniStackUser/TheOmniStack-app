@@ -256,36 +256,46 @@ export class ShopifyAdapter implements MarketplaceAdapter {
         'Content-Type': 'application/json',
       }
 
-      // 4. Fetch the order from Shopify to get full line_items metadata
-      let shopifyOrder = (rawOrderPayload as any)
-      if (!shopifyOrder || !shopifyOrder.line_items) {
-        console.log(`[Shopify] Fetching order details from Shopify API...`)
-        const getOrderRes = await fetch(`${shopUrl}/admin/api/2024-01/orders/${marketplaceOrderId}.json`, { headers })
-        if (!getOrderRes.ok) {
-          const errText = await getOrderRes.text()
-          throw new Error(`Failed to fetch order details from Shopify: ${getOrderRes.status} ${errText}`)
+      // 4. Fetch the latest order details from Shopify to get up-to-date line_items and financial status
+      console.log(`[Shopify] Fetching latest order details from Shopify API for ${marketplaceOrderId}...`)
+      let shopifyOrder: any = null
+      try {
+        const getOrderRes = await fetch(`${shopUrl}/admin/api/2024-01/orders/${marketplaceOrderId}.json`, {
+          headers,
+          cache: 'no-store'
+        })
+        if (getOrderRes.ok) {
+          const orderData = await getOrderRes.json()
+          shopifyOrder = orderData.order
         }
-        const orderData = await getOrderRes.json()
-        shopifyOrder = orderData.order
+      } catch (e) {
+        console.warn(`[Shopify] Could not fetch fresh order details from Shopify API:`, e)
+      }
+
+      if (!shopifyOrder || !shopifyOrder.line_items) {
+        shopifyOrder = rawOrderPayload as any
       }
 
       if (!shopifyOrder || !shopifyOrder.line_items) {
         throw new Error(`No Shopify line items found for order ${marketplaceOrderId}`)
       }
 
-      // 5. Map SKU to Shopify line_item IDs
-      const refundLineItems = refundItems.map(item => {
-        const matchingLineItem = shopifyOrder.line_items.find((li: any) => li.sku === item.sku || li.id.toString() === item.sku)
+      // 5. Map SKU or Line Item ID to Shopify line_item IDs
+      const refundLineItems: { line_item_id: number; quantity: number; restock_type: string }[] = []
+      for (const item of refundItems) {
+        const matchingLineItem = shopifyOrder.line_items.find(
+          (li: any) => (li.sku && li.sku.toString().toLowerCase() === item.sku.toLowerCase()) || li.id.toString() === item.sku
+        )
         if (!matchingLineItem) {
           console.warn(`[Shopify] No matching line item found on Shopify for SKU ${item.sku}`)
-          return null
+          continue
         }
-        return {
+        refundLineItems.push({
           line_item_id: matchingLineItem.id,
           quantity: item.quantity,
           restock_type: 'no_restock'
-        }
-      }).filter(Boolean)
+        })
+      }
 
       if (refundLineItems.length === 0) {
         console.warn(`[Shopify] No valid line items to refund.`)
@@ -327,7 +337,44 @@ export class ShopifyAdapter implements MarketplaceAdapter {
         console.error(`[Shopify] Error calculating refund:`, calcErr)
       }
 
-      // 7. Post Refund
+      // 7. Robust Fallback: If calculate.json did not return transactions, but the order is paid, lookup parent transaction
+      if (transactions.length === 0 && (shopifyOrder.financial_status === 'paid' || shopifyOrder.financial_status === 'partially_paid')) {
+        console.log(`[Shopify] Calculate returned no transactions for paid order ${marketplaceOrderId}. Attempting fallback via order transactions...`)
+        try {
+          const txRes = await fetch(`${shopUrl}/admin/api/2024-01/orders/${marketplaceOrderId}/transactions.json`, {
+            headers,
+            cache: 'no-store'
+          })
+          if (txRes.ok) {
+            const txData = await txRes.json()
+            const parentTx = (txData.transactions || []).find((t: any) => (t.kind === 'sale' || t.kind === 'capture') && t.status === 'success')
+            if (parentTx) {
+              let refundAmount = 0
+              for (const rli of refundLineItems) {
+                const li = shopifyOrder.line_items.find((item: any) => item.id === rli.line_item_id)
+                if (li) {
+                  const price = parseFloat(li.price || '0')
+                  refundAmount += price * rli.quantity
+                }
+              }
+              if (refundAmount > 0) {
+                transactions = [{
+                  parent_id: parentTx.id,
+                  amount: refundAmount.toFixed(2),
+                  kind: 'refund',
+                  gateway: parentTx.gateway,
+                  currency: parentTx.currency || shopifyOrder.currency || 'EUR'
+                }]
+                console.log(`[Shopify] Fallback created refund transaction:`, transactions)
+              }
+            }
+          }
+        } catch (fbErr) {
+          console.error(`[Shopify] Fallback transaction lookup failed:`, fbErr)
+        }
+      }
+
+      // 8. Post Refund
       const refundPayload: any = {
         refund: {
           currency: shopifyOrder.currency || 'EUR',
