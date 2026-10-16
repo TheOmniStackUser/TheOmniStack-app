@@ -48,7 +48,11 @@ export function createProductSyncWorker() {
           .select({
             sku: products.sku,
             currentStock: products.currentStock,
-            price: products.price, msrp: products.msrp
+            price: products.price,
+            msrp: products.msrp,
+            reducedPrice: products.reducedPrice,
+            saleStartDate: products.saleStartDate,
+            saleEndDate: products.saleEndDate
           })
           .from(products)
           .where(eq(products.companyId, companyId))
@@ -56,7 +60,11 @@ export function createProductSyncWorker() {
         const updates = allProducts.map(p => ({
           sku: p.sku,
           stock: p.currentStock !== null && p.currentStock !== undefined ? Number(p.currentStock) : undefined,
-          price: p.price !== null && p.price !== undefined ? Number(p.price) : undefined
+          price: p.price !== null && p.price !== undefined ? Number(p.price) : undefined,
+          msrp: p.msrp !== null && p.msrp !== undefined ? Number(p.msrp) : undefined,
+          reducedPrice: p.reducedPrice !== null && p.reducedPrice !== undefined ? Number(p.reducedPrice) : undefined,
+          saleStartDate: p.saleStartDate ? p.saleStartDate : undefined,
+          saleEndDate: p.saleEndDate ? p.saleEndDate : undefined
         }))
 
         await pushUpdatesToMarketplaces(companyId, updates, job)
@@ -362,13 +370,13 @@ let modifiedSaleStartDate = updateDef.saleStartDate !== undefined ? (updateDef.s
     }
 
     
-    const isPriceSyncAllowed = canSyncPrice && (
-      mapping.syncPrice ||
+    const isPriceSyncAllowed = mapping.syncPrice === true ||
       productSyncSettings?.syncPrice === true ||
-      updateDef.price !== undefined ||
-      updateDef.reducedPrice !== undefined ||
-      updateDef.msrp !== undefined
-    )
+      (mapping.syncPrice !== false && (
+        updateDef.price !== undefined ||
+        updateDef.reducedPrice !== undefined ||
+        updateDef.msrp !== undefined
+      ))
 
     if (isPriceSyncAllowed) {
       if (modifiedPrice !== undefined) {

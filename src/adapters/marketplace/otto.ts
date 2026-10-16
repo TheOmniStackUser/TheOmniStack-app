@@ -1015,7 +1015,7 @@ export class OttoAdapter implements MarketplaceAdapter {
           marketplaceProductId: sku,
           sku: sku,
           title: p.productTitle || p.title || p.productReference || sku,
-          price: p.pricing?.salePrice?.amount || p.salePrice?.amount || p.pricing?.standardPrice?.amount || p.standardPrice?.amount || p.price?.amount,
+          price: p.pricing?.sale?.salePrice?.amount || p.pricing?.salePrice?.amount || p.salePrice?.amount || p.pricing?.standardPrice?.amount || p.standardPrice?.amount || p.price?.amount,
           stock: stockMap.get(sku),
           rawPayload: p
         }
@@ -1066,147 +1066,140 @@ export class OttoAdapter implements MarketplaceAdapter {
         }
       }
 
-      // Price updates on Otto are typically done via POST /v3/products
-      // But patching prices for existing active products can be complex.
-      // We will assume a basic structure. If it fails, the user needs
-      // to adjust mapping or use the Otto UI.
-      // 2. Full Product Updates (MSRP, Sale Price, Standard Price, GPSR)
-      // Otto requires full product POSTs for these fields to update reliably.
-      const productDataUpdates = updates.filter(u => 
-        u.msrp !== undefined || 
+      // 2. Dedicated Pricing Updates (Standard Price, Sale Price, MSRP) via POST /v5/products/prices
+      const priceUpdates = updates.filter(u => 
         u.price !== undefined || 
         u.reducedPrice !== undefined || 
-        (u.gpsrDetails && u.gpsrDetails.name)
+        u.msrp !== undefined
       );
-      if (productDataUpdates.length > 0) {
-        console.log(`[OttoAdapter] Running full product update for ${productDataUpdates.length} products...`)
-        
-        // Step 1: Fetch all products sequentially or in small chunks
-        const modifiedProducts: any[] = [];
-        
-        const chunkSize = 5; // Process 5 concurrently to avoid rate limits
-        for (let i = 0; i < productDataUpdates.length; i += chunkSize) {
-          const chunk = productDataUpdates.slice(i, i + chunkSize);
-          await Promise.all(chunk.map(async (u) => {
-             try {
-                // GET existing product
-                const getRes = await fetch(`${this.baseUrl}/v5/products?sku=${encodeURIComponent(u.sku)}`, {
-                  method: 'GET',
-                  headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' }
-                });
-                
-                if (!getRes.ok) return;
-                
-                const dataStr = await getRes.text();
-                const data = JSON.parse(dataStr || '{}');
-                if (!data || !data.productVariations || data.productVariations.length === 0) return;
-                
-                const product = data.productVariations[0];
-                const currentMsrp = product.pricing?.msrp?.amount;
-                let hasChanges = false;
-                
-                if (u.msrp !== undefined && currentMsrp !== u.msrp) {
-                  if (!product.pricing) product.pricing = {};
-                  product.pricing.msrp = { amount: u.msrp, currency: 'EUR' };
-                  hasChanges = true;
-                }
-                
-                if (product.pricing?.msrp && product.pricing.msrp.amount === undefined) {
-                   delete product.pricing.msrp;
-                }
 
-                const standardAmount = u.price !== undefined ? u.price : u.fallbackPrice;
-                if (standardAmount !== undefined && product.pricing?.standardPrice?.amount !== standardAmount) {
-                  if (!product.pricing) product.pricing = {};
-                  product.pricing.standardPrice = { amount: standardAmount, currency: 'EUR' };
-                  hasChanges = true;
+      if (priceUpdates.length > 0) {
+        console.log(`[OttoAdapter] Updating prices for ${priceUpdates.length} products via POST /v5/products/prices...`)
+        const pricePayload = priceUpdates.map(u => {
+          const standardAmount = u.price !== undefined ? u.price : (u.fallbackPrice || 0)
+          
+          let sale: any = null
+          if (u.reducedPrice !== undefined && u.reducedPrice > 0 && (standardAmount === 0 || u.reducedPrice < standardAmount)) {
+            sale = {
+              salePrice: {
+                amount: u.reducedPrice,
+                currency: 'EUR'
+              },
+              startDate: u.saleStartDate ? new Date(u.saleStartDate).toISOString().split('.')[0] + 'Z' : new Date().toISOString().split('.')[0] + 'Z',
+              endDate: (u.saleEndDate && new Date(u.saleEndDate).getTime() > Date.now()) 
+                ? new Date(u.saleEndDate).toISOString().split('.')[0] + 'Z' 
+                : '2069-11-11T22:59:59Z'
+            }
+          }
+
+          const item: any = {
+            sku: u.sku,
+            standardPrice: {
+              amount: standardAmount,
+              currency: 'EUR'
+            },
+            sale
+          }
+
+          if (u.msrp !== undefined && u.msrp > 0) {
+            item.msrp = {
+              amount: u.msrp,
+              currency: 'EUR'
+            }
+          }
+
+          return item
+        })
+
+        const priceChunkSize = 200
+        for (let i = 0; i < pricePayload.length; i += priceChunkSize) {
+          const chunk = pricePayload.slice(i, i + priceChunkSize)
+          console.log(`[OttoAdapter] Sending batch of ${chunk.length} price updates to /v5/products/prices...`)
+          const pRes = await fetch(`${this.baseUrl}/v5/products/prices`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify(chunk)
+          })
+
+          if (!pRes.ok) {
+            const errText = await pRes.text()
+            console.error(`[OttoAdapter] Failed to update prices: ${pRes.status} - ${errText}`)
+            throw new Error(`Otto API Fehler beim Preisabgleich: ${pRes.status} - ${errText}`)
+          }
+          console.log(`[OttoAdapter] Successfully posted ${chunk.length} prices to Otto (status ${pRes.status})`)
+        }
+      }
+
+      // 3. Compliance / GPSR Updates via POST /v5/products (if specified)
+      const gpsrUpdates = updates.filter(u => u.gpsrDetails && u.gpsrDetails.name);
+      if (gpsrUpdates.length > 0) {
+        console.log(`[OttoAdapter] Running GPSR compliance update for ${gpsrUpdates.length} products...`)
+        const modifiedProducts: any[] = [];
+        const chunkSize = 5;
+        for (let i = 0; i < gpsrUpdates.length; i += chunkSize) {
+          const chunk = gpsrUpdates.slice(i, i + chunkSize);
+          await Promise.all(chunk.map(async (u) => {
+            try {
+              const getRes = await fetch(`${this.baseUrl}/v5/products?sku=${encodeURIComponent(u.sku)}`, {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' }
+              });
+              if (!getRes.ok) return;
+              const data = await getRes.json();
+              if (!data?.productVariations?.length) return;
+              const product = data.productVariations[0];
+
+              if (!product.compliance) product.compliance = {};
+              if (!product.compliance.productSafety) product.compliance.productSafety = { addresses: [] };
+              product.compliance.productSafety.addresses = [
+                {
+                  name: u.gpsrDetails.name,
+                  address: [u.gpsrDetails.street, u.gpsrDetails.zip, u.gpsrDetails.city].filter(Boolean).join(', '),
+                  regionCode: (u.gpsrDetails.country && u.gpsrDetails.country.toLowerCase() === 'deutschland') ? 'DE' : (u.gpsrDetails.country && u.gpsrDetails.country.toLowerCase() === 'österreich' ? 'AT' : 'DE'),
+                  email: u.gpsrDetails.email,
+                  url: u.gpsrDetails.url || undefined,
+                  phone: u.gpsrDetails.phone || undefined,
+                  roles: ["DISTRIBUTOR"],
+                  components: []
                 }
-                
-                if (u.reducedPrice !== undefined) {
-                  if (u.reducedPrice > 0 && (standardAmount === undefined || u.reducedPrice < standardAmount || (!standardAmount && product.pricing?.standardPrice?.amount && u.reducedPrice < product.pricing.standardPrice.amount))) {
-                     if (!product.pricing) product.pricing = {};
-                     product.pricing.sale = {
-                       salePrice: { amount: u.reducedPrice, currency: 'EUR' },
-                       startDate: u.saleStartDate ? new Date(u.saleStartDate).toISOString().split('.')[0] + 'Z' : new Date().toISOString().split('.')[0] + 'Z',
-                       endDate: (u.saleEndDate && new Date(u.saleEndDate).getTime() > Date.now()) ? new Date(u.saleEndDate).toISOString().split('.')[0] + 'Z' : new Date(Date.now() + 1000 * 60 * 60 * 24 * 365 * 10).toISOString().split('.')[0] + 'Z'
-                     };
-                     hasChanges = true;
-                  } else {
-                     if (product.pricing && product.pricing.sale) {
-                       delete product.pricing.sale;
-                       hasChanges = true;
-                     }
-                  }
-                }
-                
-                // Inject GPSR / Product Safety Compliance if provided
-                if (u.gpsrDetails && u.gpsrDetails.name && u.gpsrDetails.email) {
-                  const newName = u.gpsrDetails.name;
-                  const currentName = product.compliance?.productSafety?.addresses?.[0]?.name;
-                  if (newName !== currentName) {
-                    hasChanges = true;
-                  }
-                  
-                  if (!product.compliance) product.compliance = {};
-                  if (!product.compliance.productSafety) product.compliance.productSafety = { addresses: [] };
-                  
-                  product.compliance.productSafety.addresses = [
-                    {
-                      name: u.gpsrDetails.name,
-                      address: [u.gpsrDetails.street, u.gpsrDetails.zip, u.gpsrDetails.city].filter(Boolean).join(', '),
-                      regionCode: (u.gpsrDetails.country && u.gpsrDetails.country.toLowerCase() === 'deutschland') ? 'DE' : (u.gpsrDetails.country && u.gpsrDetails.country.toLowerCase() === 'österreich' ? 'AT' : 'DE'),
-                      email: u.gpsrDetails.email,
-                      url: u.gpsrDetails.url || undefined,
-                      phone: u.gpsrDetails.phone || undefined,
-                      roles: ["DISTRIBUTOR"],
-                      components: []
-                    }
-                  ];
-                }
-                
-                if (!hasChanges) {
-                  if (u.gpsrDetails) hasChanges = true; // Fallback to push anyway if GPSR is in update
-                  else return;
-                }
-                
-                modifiedProducts.push(product);
-             } catch (err) {
-                console.error(`[OttoAdapter] Error fetching/modifying product ${u.sku}:`, err);
-             }
+              ];
+              modifiedProducts.push(product);
+            } catch (err) {
+              console.error(`[OttoAdapter] Error updating GPSR for ${u.sku}:`, err);
+            }
           }));
         }
-        
-        // Step 2: Group by productReference and POST grouped variations
+
         const groupedByRef: Record<string, any[]> = {};
         for (const p of modifiedProducts) {
           const ref = p.productReference || 'unreferenced';
           if (!groupedByRef[ref]) groupedByRef[ref] = [];
           groupedByRef[ref].push(p);
         }
-        
+
         for (const [ref, variations] of Object.entries(groupedByRef)) {
-           console.log(`[OttoAdapter] POSTing ${variations.length} variations for product family ${ref}...`);
-           try {
-               const postRes = await fetch(`${this.baseUrl}/v5/products`, {
-                  method: 'POST',
-                  headers: {
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                  },
-                  body: JSON.stringify(variations)
-               });
-                
-               if (!postRes.ok) {
-                  const errText = await postRes.text();
-                  console.error(`[OttoAdapter] Failed to update product family ${ref}: ${errText}`);
-               } else {
-                  console.log(`[OttoAdapter] Successfully updated product family ${ref}`);
-               }
-           } catch (err) {
-               console.error(`[OttoAdapter] Error posting product family ${ref}:`, err);
-           }
-               }
+          try {
+            const postRes = await fetch(`${this.baseUrl}/v5/products`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+              },
+              body: JSON.stringify(variations)
+            });
+            if (!postRes.ok) {
+              const errText = await postRes.text();
+              console.error(`[OttoAdapter] Failed to update GPSR for product family ${ref}: ${errText}`);
+            }
+          } catch (err) {
+            console.error(`[OttoAdapter] Error posting GPSR for product family ${ref}:`, err);
+          }
+        }
       }
 
       console.log(`[OttoAdapter] Listings successfully updated.`)
