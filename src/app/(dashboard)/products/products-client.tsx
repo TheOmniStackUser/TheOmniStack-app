@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
-import { Package, Search, ChevronUp, ChevronDown, ChevronRight, Scale, MapPin, Tag, FileText, Barcode, ExternalLink, Trash2, Building2, X, Loader2, Copy, MoreHorizontal, GitMerge, CheckCircle2, RotateCcw } from 'lucide-react'
+import { Package, Search, ChevronUp, ChevronDown, ChevronRight, Scale, MapPin, Tag, FileText, Barcode, ExternalLink, Trash2, Building2, X, Loader2, Copy, MoreHorizontal, GitMerge, CheckCircle2, RotateCcw, Filter, Palette, Check } from 'lucide-react'
 import { DeleteProductButton } from './delete-button'
 import { useRouter } from 'next/navigation'
 
@@ -674,12 +674,379 @@ function SizeEditor({ product, onToast }: { product: Product; onToast?: (message
   )
 }
 
+const SIZE_ORDER: Record<string, number> = {
+  'XXS': 1, '2XS': 1,
+  'XS': 2,
+  'S': 3,
+  'M': 4,
+  'L': 5,
+  'XL': 6,
+  'XXL': 7, '2XL': 7,
+  'XXXL': 8, '3XL': 8,
+  'XXXXL': 9, '4XL': 9,
+  '5XL': 10,
+  '6XL': 11,
+  'ONESIZE': 99, 'ONE SIZE': 99, 'EINHEITSGRÖSSE': 99,
+}
+
+function compareSizes(a: string, b: string): number {
+  if (a === '__EMPTY__') return 1
+  if (b === '__EMPTY__') return -1
+
+  const normA = a.toUpperCase().replace(/\s+/g, '')
+  const normB = b.toUpperCase().replace(/\s+/g, '')
+  const rankA = SIZE_ORDER[normA]
+  const rankB = SIZE_ORDER[normB]
+  if (rankA !== undefined && rankB !== undefined) return rankA - rankB
+  if (rankA !== undefined) return -1
+  if (rankB !== undefined) return 1
+  
+  const numA = parseFloat(a.replace(',', '.'))
+  const numB = parseFloat(b.replace(',', '.'))
+  if (!isNaN(numA) && !isNaN(numB) && !isNaN(Number(a.trim())) && !isNaN(Number(b.trim()))) {
+    return numA - numB
+  }
+  
+  return a.localeCompare(b, 'de', { numeric: true, sensitivity: 'base' })
+}
+
+function getColorDot(colorName: string): string | null {
+  const c = colorName.toLowerCase().trim()
+  if (c === '__empty__') return null
+  if (c.includes('schwarz') || c.includes('black')) return '#18181b'
+  if (c.includes('weiß') || c.includes('weiss') || c.includes('white')) return '#f8fafc'
+  if (c.includes('hellgrau')) return '#cbd5e1'
+  if (c.includes('dunkelgrau')) return '#475569'
+  if (c.includes('grau') || c.includes('grey') || c.includes('gray')) return '#94a3b8'
+  if (c.includes('dunkelblau') || c.includes('navy')) return '#1e3a8a'
+  if (c.includes('hellblau')) return '#38bdf8'
+  if (c.includes('blau') || c.includes('blue')) return '#2563eb'
+  if (c.includes('bordeaux') || c.includes('weinrot')) return '#881337'
+  if (c.includes('rot') || c.includes('red')) return '#dc2626'
+  if (c.includes('dunkelgrün')) return '#14532d'
+  if (c.includes('hellgrün')) return '#4ade80'
+  if (c.includes('grün') || c.includes('green') || c.includes('olive')) return '#16a34a'
+  if (c.includes('gelb') || c.includes('yellow')) return '#eab308'
+  if (c.includes('braun') || c.includes('brown')) return '#78350f'
+  if (c.includes('orange')) return '#ea580c'
+  if (c.includes('rosa') || c.includes('pink')) return '#ec4899'
+  if (c.includes('lila') || c.includes('purple') || c.includes('violett')) return '#9333ea'
+  if (c.includes('beige')) return '#d4c5b9'
+  if (c.includes('khaki')) return '#87805e'
+  if (c.includes('gold')) return '#eab308'
+  if (c.includes('silber') || c.includes('silver')) return '#cbd5e1'
+  return null
+}
+
+function MultiSelectFacetFilter({
+  title,
+  icon,
+  items,
+  selected,
+  onChange,
+  placeholderSearch = 'Suchen...',
+  emptyLabel = 'Ohne Angabe',
+  isColor = false,
+  variant = 'toolbar',
+  isOpen,
+  onToggle,
+  onClose,
+}: {
+  title: string
+  icon?: React.ReactNode
+  items: { name: string; count: number }[]
+  selected: Set<string>
+  onChange: (next: Set<string>) => void
+  placeholderSearch?: string
+  emptyLabel?: string
+  isColor?: boolean
+  variant?: 'toolbar' | 'header'
+  isOpen: boolean
+  onToggle: () => void
+  onClose: () => void
+}) {
+  const [searchTerm, setSearchTerm] = useState('')
+
+  const filteredItems = useMemo(() => {
+    if (!searchTerm.trim()) return items
+    const q = searchTerm.toLowerCase().trim()
+    return items.filter(item => {
+      const label = item.name === '__EMPTY__' ? emptyLabel : item.name
+      return label.toLowerCase().includes(q)
+    })
+  }, [items, searchTerm, emptyLabel])
+
+  const toggleItem = (name: string) => {
+    const next = new Set(selected)
+    if (next.has(name)) {
+      next.delete(name)
+    } else {
+      next.add(name)
+    }
+    onChange(next)
+  }
+
+  const selectAll = () => {
+    const next = new Set(selected)
+    filteredItems.forEach(i => next.add(i.name))
+    onChange(next)
+  }
+
+  const clearSelection = () => {
+    if (searchTerm.trim()) {
+      const next = new Set(selected)
+      filteredItems.forEach(i => next.delete(i.name))
+      onChange(next)
+    } else {
+      onChange(new Set())
+    }
+  }
+
+  const selectedCount = selected.size
+
+  return (
+    <div className="relative inline-block text-left">
+      {variant === 'toolbar' ? (
+        <button
+          type="button"
+          onClick={onToggle}
+          className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-all shadow-sm ${
+            selectedCount > 0
+              ? 'bg-purple-50 text-purple-700 border-purple-300 hover:bg-purple-100 ring-2 ring-purple-500/20'
+              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+          }`}
+        >
+          {icon}
+          <span>{title}</span>
+          {selectedCount > 0 ? (
+            <span className="inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold bg-purple-600 text-white rounded-full min-w-[20px]">
+              {selectedCount}
+            </span>
+          ) : (
+            <span className="text-xs text-slate-400 font-normal">Alle</span>
+          )}
+          <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onToggle()
+          }}
+          className={`p-1 rounded-md transition-all relative ${
+            selectedCount > 0
+              ? 'text-purple-600 bg-purple-100 hover:bg-purple-200 ring-1 ring-purple-400/50'
+              : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200/60'
+          }`}
+          title={`Nach ${title} filtern (${selectedCount > 0 ? `${selectedCount} aktiv` : 'Alle'})`}
+        >
+          <Filter className="w-3.5 h-3.5" />
+          {selectedCount > 0 && (
+            <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-purple-600 text-white text-[9px] font-bold rounded-full flex items-center justify-center shadow-sm">
+              {selectedCount}
+            </span>
+          )}
+        </button>
+      )}
+
+      {isOpen && (
+        <>
+          <div 
+            className="fixed inset-0 z-40" 
+            onClick={(e) => {
+              e.stopPropagation()
+              onClose()
+            }} 
+          />
+          <div 
+            className={`absolute ${variant === 'header' ? 'left-0 mt-2' : 'left-0 sm:left-auto sm:right-0 mt-2'} w-72 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 p-3 text-left animate-in fade-in zoom-in-95 duration-150`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
+              <div className="flex items-center gap-1.5">
+                {icon}
+                <span className="text-xs font-bold text-slate-800">
+                  {title} filtern
+                </span>
+                {selectedCount > 0 && (
+                  <span className="text-[10px] font-bold text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded-full border border-purple-200">
+                    {selectedCount} ausgewählt
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Search Input */}
+            <div className="relative mb-2">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder={placeholderSearch}
+                className="w-full pl-8 pr-7 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-500 font-medium focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-400 bg-white"
+                autoFocus
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            {/* Quick Actions (Select All / Clear) */}
+            <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500 px-1 py-1 mb-1 border-b border-slate-100">
+              <button
+                type="button"
+                onClick={selectAll}
+                className="hover:text-purple-600 transition-colors cursor-pointer"
+              >
+                Alle auswählen
+              </button>
+              <button
+                type="button"
+                onClick={clearSelection}
+                className="hover:text-rose-600 transition-colors cursor-pointer"
+              >
+                Auswahl aufheben
+              </button>
+            </div>
+
+            {/* List */}
+            <div className="max-h-56 overflow-y-auto space-y-0.5 pr-1 divide-y divide-slate-50">
+              {filteredItems.length === 0 ? (
+                <div className="py-6 text-center text-xs text-slate-400 italic">
+                  Keine Einträge gefunden
+                </div>
+              ) : (
+                filteredItems.map(item => {
+                  const isChecked = selected.has(item.name)
+                  const isEmpty = item.name === '__EMPTY__'
+                  const label = isEmpty ? emptyLabel : item.name
+                  const dot = isColor ? getColorDot(item.name) : null
+
+                  return (
+                    <label
+                      key={item.name}
+                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer text-xs transition-colors select-none ${
+                        isChecked ? 'bg-purple-50/70 text-purple-900 font-semibold' : 'hover:bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0 pr-2">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleItem(item.name)}
+                          className="w-3.5 h-3.5 rounded border-slate-300 text-purple-600 focus:ring-purple-500 cursor-pointer shrink-0"
+                        />
+                        {isColor && (
+                          dot ? (
+                            <span
+                              className="w-2.5 h-2.5 rounded-full border border-slate-300 shrink-0"
+                              style={{ backgroundColor: dot }}
+                            />
+                          ) : (
+                            <span className="w-2.5 h-2.5 rounded-full border border-dashed border-slate-300 shrink-0" />
+                          )
+                        )}
+                        <span className={`truncate ${isEmpty ? 'italic text-slate-400' : ''}`}>
+                          {label}
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-full shrink-0 border border-slate-200">
+                        {item.count}
+                      </span>
+                    </label>
+                  )
+                })
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="pt-2 mt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+              <span className="text-slate-400 text-[11px]">
+                {items.length} {title} gefunden
+              </span>
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Fertig
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 export function ProductsClient({ initialProducts }: { initialProducts: Product[] }) {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
   const [searchField, setSearchField] = useState<'all' | 'sku' | 'title' | 'color' | 'size' | 'ean'>('all')
   const [syncFilter, setSyncFilter] = useState<'all' | 'stock_on' | 'stock_off' | 'price_on' | 'price_off'>('all')
   const [marketplaceFilter, setMarketplaceFilter] = useState<string>('all')
+
+  const [selectedColors, setSelectedColors] = useState<Set<string>>(new Set())
+  const [selectedSizes, setSelectedSizes] = useState<Set<string>>(new Set())
+  const [activeFacetFilter, setActiveFacetFilter] = useState<string | null>(null)
+
+  const availableColors = useMemo(() => {
+    const counts = new Map<string, number>()
+    let emptyCount = 0
+    initialProducts.forEach(p => {
+      const c = p.color?.trim()
+      if (c) {
+        counts.set(c, (counts.get(c) || 0) + 1)
+      } else {
+        emptyCount++
+      }
+    })
+    const list = Array.from(counts.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'de'))
+    
+    if (emptyCount > 0) {
+      list.push({ name: '__EMPTY__', count: emptyCount })
+    }
+    return list
+  }, [initialProducts])
+
+  const availableSizes = useMemo(() => {
+    const counts = new Map<string, number>()
+    let emptyCount = 0
+    initialProducts.forEach(p => {
+      const s = p.size?.trim()
+      if (s) {
+        counts.set(s, (counts.get(s) || 0) + 1)
+      } else {
+        emptyCount++
+      }
+    })
+    const list = Array.from(counts.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => compareSizes(a.name, b.name))
+    
+    if (emptyCount > 0) {
+      list.push({ name: '__EMPTY__', count: emptyCount })
+    }
+    return list
+  }, [initialProducts])
 
   const availableMarketplaces = useMemo(() => {
     const s = new Set<string>()
@@ -908,6 +1275,26 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
       result = result.filter(p => p.marketplaces && p.marketplaces.includes(marketplaceFilter))
     }
 
+    if (selectedColors.size > 0) {
+      result = result.filter(p => {
+        const c = p.color?.trim()
+        if (!c) {
+          return selectedColors.has('__EMPTY__')
+        }
+        return selectedColors.has(c)
+      })
+    }
+
+    if (selectedSizes.size > 0) {
+      result = result.filter(p => {
+        const s = p.size?.trim()
+        if (!s) {
+          return selectedSizes.has('__EMPTY__')
+        }
+        return selectedSizes.has(s)
+      })
+    }
+
     if (searchQuery.trim()) {
       const terms = searchQuery.toLowerCase().trim().split(/\s+/).filter(Boolean)
       result = result.filter(p => {
@@ -963,7 +1350,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
     })
 
     return result
-  }, [initialProducts, searchQuery, sortColumn, sortDirection, searchField, syncFilter, marketplaceFilter])
+  }, [initialProducts, searchQuery, sortColumn, sortDirection, searchField, syncFilter, marketplaceFilter, selectedColors, selectedSizes])
 
   const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
     sku: 140,
@@ -1089,7 +1476,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
     return sortDirection === 'asc' ? <ChevronUp className="w-3 h-3 text-cyan-600" /> : <ChevronDown className="w-3 h-3 text-cyan-600" />
   }
 
-  const Th = ({ children, column, className = "", resizable = true }: { children: React.ReactNode, column: string, className?: string, resizable?: boolean }) => {
+  const Th = ({ children, column, className = "", resizable = true, filterNode }: { children: React.ReactNode, column: string, className?: string, resizable?: boolean, filterNode?: React.ReactNode }) => {
     const width = columnWidths[column]
     const isResizing = activeResizingColumn === column
 
@@ -1102,6 +1489,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
         <div className={`flex items-center gap-1.5 ${className.includes('text-right') ? 'justify-end' : ''}`}>
           <span className="truncate">{children}</span>
           <SortIcon column={column} />
+          {filterNode}
         </div>
         {resizable && (
           <div
@@ -1121,11 +1509,11 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
   return (
     <div className="space-y-6">
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-        <div className="flex flex-col sm:flex-row gap-4 items-center w-full">
+        <div className="flex flex-wrap gap-3 items-center w-full">
           <select
             value={searchField}
             onChange={(e) => setSearchField(e.target.value as any)}
-            className="w-48 px-3 py-2 pr-8 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all text-slate-900 font-medium"
+            className="w-36 px-3 py-2 pr-8 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all text-slate-900 font-medium"
           >
             <option value="all">Alle Felder</option>
             <option value="sku">SKU</option>
@@ -1137,7 +1525,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
           <select
             value={syncFilter}
             onChange={(e) => setSyncFilter(e.target.value as any)}
-            className="w-48 px-3 py-2 pr-8 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all text-slate-900 font-medium"
+            className="w-40 px-3 py-2 pr-8 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all text-slate-900 font-medium"
           >
             <option value="all">Alle Sync-Stati</option>
             <option value="stock_on">Bestand Sync: AN</option>
@@ -1149,7 +1537,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
             <select
               value={marketplaceFilter}
               onChange={(e) => setMarketplaceFilter(e.target.value)}
-              className="w-48 px-3 py-2 pr-8 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all text-slate-900 font-medium"
+              className="w-40 px-3 py-2 pr-8 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all text-slate-900 font-medium"
             >
               <option value="all">Alle Marktplätze</option>
               {availableMarketplaces.map(m => (
@@ -1159,7 +1547,40 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
               ))}
             </select>
           )}
-          <div className="relative flex-1 flex gap-2">
+
+          {/* Color Facet Filter */}
+          <MultiSelectFacetFilter
+            title="Farbe"
+            icon={<Palette className="w-3.5 h-3.5 text-purple-600" />}
+            items={availableColors}
+            selected={selectedColors}
+            onChange={setSelectedColors}
+            placeholderSearch="Farbe suchen..."
+            emptyLabel="Ohne Farbe"
+            isColor={true}
+            variant="toolbar"
+            isOpen={activeFacetFilter === 'toolbar_color'}
+            onToggle={() => setActiveFacetFilter(activeFacetFilter === 'toolbar_color' ? null : 'toolbar_color')}
+            onClose={() => setActiveFacetFilter(null)}
+          />
+
+          {/* Size Facet Filter */}
+          <MultiSelectFacetFilter
+            title="Größe"
+            icon={<Tag className="w-3.5 h-3.5 text-cyan-600" />}
+            items={availableSizes}
+            selected={selectedSizes}
+            onChange={setSelectedSizes}
+            placeholderSearch="Größe suchen..."
+            emptyLabel="Ohne Größe"
+            isColor={false}
+            variant="toolbar"
+            isOpen={activeFacetFilter === 'toolbar_size'}
+            onToggle={() => setActiveFacetFilter(activeFacetFilter === 'toolbar_size' ? null : 'toolbar_size')}
+            onClose={() => setActiveFacetFilter(null)}
+          />
+
+          <div className="relative flex-1 min-w-[200px] flex gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input 
@@ -1179,7 +1600,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
               )}
             </div>
             <button 
-              className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm flex items-center gap-2"
+              className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm flex items-center gap-2 cursor-pointer"
               onClick={(e) => e.preventDefault()}
             >
               Suchen
@@ -1187,7 +1608,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
             {isColumnsCustomized && (
               <button
                 onClick={handleResetAllWidths}
-                className="px-3 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors flex items-center gap-1.5 shrink-0"
+                className="px-3 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer"
                 title="Alle Spaltenbreiten auf Standard zurücksetzen"
               >
                 <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
@@ -1196,6 +1617,91 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
             )}
           </div>
         </div>
+
+        {/* Active Filter Chips */}
+        {(selectedColors.size > 0 || selectedSizes.size > 0 || syncFilter !== 'all' || marketplaceFilter !== 'all' || searchQuery) && (
+          <div className="flex flex-wrap items-center gap-2 pt-3 mt-3 border-t border-slate-100 text-xs">
+            <span className="font-semibold text-slate-500 flex items-center gap-1">
+              <Filter className="w-3.5 h-3.5 text-slate-400" />
+              Aktive Filter:
+            </span>
+            {Array.from(selectedColors).map(color => (
+              <span key={color} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 font-semibold shadow-xs">
+                {getColorDot(color) && <span className="w-2 h-2 rounded-full border border-slate-300" style={{ backgroundColor: getColorDot(color)! }} />}
+                <span>Farbe: {color === '__EMPTY__' ? 'Ohne Farbe' : color}</span>
+                <button 
+                  type="button"
+                  onClick={() => {
+                    const next = new Set(selectedColors)
+                    next.delete(color)
+                    setSelectedColors(next)
+                  }} 
+                  className="hover:text-purple-900 ml-0.5 font-bold cursor-pointer"
+                  title="Diesen Filter entfernen"
+                >
+                  ✕
+                </button>
+              </span>
+            ))}
+            {Array.from(selectedSizes).map(size => (
+              <span key={size} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-50 text-cyan-700 border border-cyan-200 font-semibold shadow-xs">
+                <span>Größe: {size === '__EMPTY__' ? 'Ohne Größe' : size}</span>
+                <button 
+                  type="button"
+                  onClick={() => {
+                    const next = new Set(selectedSizes)
+                    next.delete(size)
+                    setSelectedSizes(next)
+                  }} 
+                  className="hover:text-cyan-900 ml-0.5 font-bold cursor-pointer"
+                  title="Diesen Filter entfernen"
+                >
+                  ✕
+                </button>
+              </span>
+            ))}
+            {syncFilter !== 'all' && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 border border-slate-200 font-semibold">
+                <span>Sync: {syncFilter}</span>
+                <button 
+                  type="button"
+                  onClick={() => setSyncFilter('all')} 
+                  className="hover:text-slate-900 ml-0.5 font-bold cursor-pointer"
+                >
+                  ✕
+                </button>
+              </span>
+            )}
+            {marketplaceFilter !== 'all' && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 border border-slate-200 font-semibold">
+                <span>Marktplatz: {marketplaceFilter}</span>
+                <button 
+                  type="button"
+                  onClick={() => setMarketplaceFilter('all')} 
+                  className="hover:text-slate-900 ml-0.5 font-bold cursor-pointer"
+                >
+                  ✕
+                </button>
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedColors(new Set())
+                setSelectedSizes(new Set())
+                setSyncFilter('all')
+                setMarketplaceFilter('all')
+                setSearchQuery('')
+              }}
+              className="text-xs text-rose-600 hover:text-rose-700 font-semibold underline underline-offset-2 ml-1 cursor-pointer"
+            >
+              Alle Filter zurücksetzen
+            </button>
+            <span className="text-slate-400 text-xs ml-auto font-medium">
+              {filteredAndSortedProducts.length} von {initialProducts.length} Produkten
+            </span>
+          </div>
+        )}
         
         {selectedProductIds.size > 0 && (
           <div className="flex flex-wrap items-center gap-3 animate-in fade-in slide-in-from-top-2 pt-4 mt-4 border-t border-slate-100">
@@ -1325,8 +1831,8 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
         )}
       </div>
 
-      <div className={`bg-white rounded-xl shadow-sm border border-slate-200 ${openMenuId ? '' : 'overflow-hidden'}`}>
-        <div className={openMenuId ? '' : 'overflow-x-auto'}>
+      <div className={`bg-white rounded-xl shadow-sm border border-slate-200 ${(openMenuId || activeFacetFilter) ? '' : 'overflow-hidden'}`}>
+        <div className={(openMenuId || activeFacetFilter) ? '' : 'overflow-x-auto'}>
           <table 
             style={{ minWidth: '100%', width: `${totalTableWidth}px` }}
             className="text-left border-collapse table-fixed"
@@ -1364,8 +1870,48 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                 <th className="w-10 px-4"></th>
                 <Th column="sku">SKU</Th>
                 <Th column="title">Titel</Th>
-                <Th column="color">Farbe</Th>
-                <Th column="size">Größe</Th>
+                <Th 
+                  column="color"
+                  filterNode={
+                    <MultiSelectFacetFilter
+                      title="Farbe"
+                      icon={<Palette className="w-3.5 h-3.5 text-purple-600" />}
+                      items={availableColors}
+                      selected={selectedColors}
+                      onChange={setSelectedColors}
+                      placeholderSearch="Farbe suchen..."
+                      emptyLabel="Ohne Farbe"
+                      isColor={true}
+                      variant="header"
+                      isOpen={activeFacetFilter === 'header_color'}
+                      onToggle={() => setActiveFacetFilter(activeFacetFilter === 'header_color' ? null : 'header_color')}
+                      onClose={() => setActiveFacetFilter(null)}
+                    />
+                  }
+                >
+                  Farbe
+                </Th>
+                <Th 
+                  column="size"
+                  filterNode={
+                    <MultiSelectFacetFilter
+                      title="Größe"
+                      icon={<Tag className="w-3.5 h-3.5 text-cyan-600" />}
+                      items={availableSizes}
+                      selected={selectedSizes}
+                      onChange={setSelectedSizes}
+                      placeholderSearch="Größe suchen..."
+                      emptyLabel="Ohne Größe"
+                      isColor={false}
+                      variant="header"
+                      isOpen={activeFacetFilter === 'header_size'}
+                      onToggle={() => setActiveFacetFilter(activeFacetFilter === 'header_size' ? null : 'header_size')}
+                      onClose={() => setActiveFacetFilter(null)}
+                    />
+                  }
+                >
+                  Größe
+                </Th>
                 <Th column="currentStock">Bestand</Th>
                 <Th column="msrp">UVP</Th>
                 <Th column="price">Standard Preis</Th>
