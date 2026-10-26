@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
-import { Package, Search, ChevronUp, ChevronDown, ChevronRight, Scale, MapPin, Tag, FileText, Barcode, ExternalLink, Trash2, Building2, X, Loader2, Copy, MoreHorizontal, GitMerge, CheckCircle2 } from 'lucide-react'
+import { Package, Search, ChevronUp, ChevronDown, ChevronRight, Scale, MapPin, Tag, FileText, Barcode, ExternalLink, Trash2, Building2, X, Loader2, Copy, MoreHorizontal, GitMerge, CheckCircle2, RotateCcw } from 'lucide-react'
 import { DeleteProductButton } from './delete-button'
 import { useRouter } from 'next/navigation'
 
@@ -760,22 +760,154 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
     return result
   }, [initialProducts, searchQuery, sortColumn, sortDirection, searchField, syncFilter, marketplaceFilter])
 
+  const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
+    sku: 140,
+    title: 280,
+    currentStock: 110,
+    msrp: 100,
+    price: 130,
+    reducedPrice: 140,
+    saleStartDate: 150,
+    updatedAt: 130,
+    actions: 160,
+  }
+
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(DEFAULT_COLUMN_WIDTHS)
+  const [activeResizingColumn, setActiveResizingColumn] = useState<string | null>(null)
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('theomnistack_product_col_widths')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (typeof parsed === 'object' && parsed !== null) {
+          setColumnWidths(prev => ({ ...prev, ...parsed }))
+        }
+      }
+    } catch (e) {
+      console.error(e)
+    }
+  }, [])
+
+  const handleResizeStart = (e: React.MouseEvent, column: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setActiveResizingColumn(column)
+
+    const startX = e.clientX
+    const startWidth = columnWidths[column] || DEFAULT_COLUMN_WIDTHS[column] || 140
+
+    const minWidths: Record<string, number> = {
+      sku: 90,
+      title: 140,
+      currentStock: 80,
+      msrp: 75,
+      price: 85,
+      reducedPrice: 100,
+      saleStartDate: 110,
+      updatedAt: 95,
+      actions: 120,
+    }
+    const minW = minWidths[column] || 70
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      moveEvent.preventDefault()
+      const diff = moveEvent.clientX - startX
+      const newW = Math.max(minW, startWidth + diff)
+      setColumnWidths(prev => ({
+        ...prev,
+        [column]: newW,
+      }))
+    }
+
+    const onMouseUp = () => {
+      setActiveResizingColumn(null)
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      try {
+        setColumnWidths(latest => {
+          localStorage.setItem('theomnistack_product_col_widths', JSON.stringify(latest))
+          return latest
+        })
+      } catch (err) {
+        console.error(err)
+      }
+    }
+
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+  }
+
+  const handleResetWidth = (e: React.MouseEvent, column: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const def = DEFAULT_COLUMN_WIDTHS[column]
+    if (def) {
+      setColumnWidths(prev => {
+        const next = { ...prev, [column]: def }
+        try {
+          localStorage.setItem('theomnistack_product_col_widths', JSON.stringify(next))
+        } catch (err) {}
+        return next
+      })
+    }
+  }
+
+  const handleResetAllWidths = () => {
+    setColumnWidths(DEFAULT_COLUMN_WIDTHS)
+    try {
+      localStorage.removeItem('theomnistack_product_col_widths')
+    } catch (err) {}
+    showToast('Spaltenbreiten zurückgesetzt', 'info')
+  }
+
+  const isColumnsCustomized = useMemo(() => {
+    return Object.keys(DEFAULT_COLUMN_WIDTHS).some(
+      key => columnWidths[key] && Math.abs(columnWidths[key] - DEFAULT_COLUMN_WIDTHS[key]) > 2
+    )
+  }, [columnWidths])
+
+  const totalTableWidth = useMemo(() => {
+    return 48 + 40 + Object.values(columnWidths).reduce((a, b) => a + b, 0)
+  }, [columnWidths])
+
   const SortIcon = ({ column }: { column: string }) => {
     if (sortColumn !== column) return <ChevronUp className="w-3 h-3 opacity-20" />
     return sortDirection === 'asc' ? <ChevronUp className="w-3 h-3 text-cyan-600" /> : <ChevronDown className="w-3 h-3 text-cyan-600" />
   }
 
-  const Th = ({ children, column, className = "" }: { children: React.ReactNode, column: string, className?: string }) => (
-    <th 
-      className={`px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100/50 transition-colors select-none ${className}`}
-      onClick={() => toggleSort(column)}
-    >
-      <div className={`flex items-center gap-1.5 ${className.includes('text-right') ? 'justify-end' : ''}`}>
-        {children}
-        <SortIcon column={column} />
-      </div>
-    </th>
-  )
+  const Th = ({ children, column, className = "", resizable = true }: { children: React.ReactNode, column: string, className?: string, resizable?: boolean }) => {
+    const width = columnWidths[column]
+    const isResizing = activeResizingColumn === column
+
+    return (
+      <th 
+        style={width ? { width: `${width}px`, minWidth: `${width}px` } : undefined}
+        className={`relative px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100/50 transition-colors select-none group/th ${className}`}
+        onClick={() => toggleSort(column)}
+      >
+        <div className={`flex items-center gap-1.5 ${className.includes('text-right') ? 'justify-end' : ''}`}>
+          <span className="truncate">{children}</span>
+          <SortIcon column={column} />
+        </div>
+        {resizable && (
+          <div
+            className={`absolute right-0 top-0 bottom-0 w-3 cursor-col-resize z-20 flex items-center justify-center hover:bg-cyan-500/20 transition-colors ${isResizing ? 'bg-cyan-500/30' : ''}`}
+            onMouseDown={(e) => handleResizeStart(e, column)}
+            onDoubleClick={(e) => handleResetWidth(e, column)}
+            onClick={(e) => e.stopPropagation()}
+            title="Spaltenbreite anpassen (ziehen) • Doppelklick zum Zurücksetzen"
+          >
+            <div className={`w-[2px] h-4 rounded-full transition-colors ${isResizing ? 'bg-cyan-500' : 'bg-slate-300/80 group-hover/th:bg-cyan-400'}`} />
+          </div>
+        )}
+      </th>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -841,6 +973,16 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
             >
               Suchen
             </button>
+            {isColumnsCustomized && (
+              <button
+                onClick={handleResetAllWidths}
+                className="px-3 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors flex items-center gap-1.5 shrink-0"
+                title="Alle Spaltenbreiten auf Standard zurücksetzen"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+                Spalten zurücksetzen
+              </button>
+            )}
           </div>
         </div>
         
@@ -968,38 +1110,68 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
 
       <div className={`bg-white rounded-xl shadow-sm border border-slate-200 ${openMenuId ? '' : 'overflow-hidden'}`}>
         <div className={openMenuId ? '' : 'overflow-x-auto'}>
-          <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-slate-50/50 border-b border-slate-100">
-              <th className="w-12 px-4 text-center">
-                <input
-                  type="checkbox"
-                  checked={selectedProductIds.size > 0 && selectedProductIds.size === filteredAndSortedProducts.length}
-                  ref={input => {
-                    if (input) {
-                      input.indeterminate = selectedProductIds.size > 0 && selectedProductIds.size < filteredAndSortedProducts.length
-                    }
-                  }}
-                  onChange={toggleSelectAll}
-                  className="w-4 h-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-600 focus:ring-offset-0 bg-white cursor-pointer"
-                />
-              </th>
-              <th className="w-10 px-4"></th>
-              <Th column="sku">SKU</Th>
-              <Th column="title">Titel</Th>
-              <Th column="currentStock">Bestand</Th>
-              <Th column="msrp">UVP</Th>
-              <Th column="price">Standard Preis</Th>
-              <Th column="reducedPrice">Reduzierter Preis</Th>
-              <Th column="saleStartDate">Aktionszeitraum</Th>
-              <Th column="updatedAt">Letzte Änderung</Th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Aktion</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {filteredAndSortedProducts.length === 0 ? (
-              <tr>
-                <td colSpan={8} className="px-6 py-12 text-center text-slate-500">
+          <table 
+            style={{ minWidth: '100%', width: `${totalTableWidth}px` }}
+            className="text-left border-collapse table-fixed"
+          >
+            <colgroup>
+              <col style={{ width: '48px' }} />
+              <col style={{ width: '40px' }} />
+              <col style={{ width: `${columnWidths.sku || 140}px` }} />
+              <col style={{ width: `${columnWidths.title || 280}px` }} />
+              <col style={{ width: `${columnWidths.currentStock || 110}px` }} />
+              <col style={{ width: `${columnWidths.msrp || 100}px` }} />
+              <col style={{ width: `${columnWidths.price || 130}px` }} />
+              <col style={{ width: `${columnWidths.reducedPrice || 140}px` }} />
+              <col style={{ width: `${columnWidths.saleStartDate || 150}px` }} />
+              <col style={{ width: `${columnWidths.updatedAt || 130}px` }} />
+              <col style={{ width: `${columnWidths.actions || 160}px` }} />
+            </colgroup>
+            <thead>
+              <tr className="bg-slate-50/50 border-b border-slate-100">
+                <th className="w-12 px-4 text-center">
+                  <input
+                    type="checkbox"
+                    checked={selectedProductIds.size > 0 && selectedProductIds.size === filteredAndSortedProducts.length}
+                    ref={input => {
+                      if (input) {
+                        input.indeterminate = selectedProductIds.size > 0 && selectedProductIds.size < filteredAndSortedProducts.length
+                      }
+                    }}
+                    onChange={toggleSelectAll}
+                    className="w-4 h-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-600 focus:ring-offset-0 bg-white cursor-pointer"
+                  />
+                </th>
+                <th className="w-10 px-4"></th>
+                <Th column="sku">SKU</Th>
+                <Th column="title">Titel</Th>
+                <Th column="currentStock">Bestand</Th>
+                <Th column="msrp">UVP</Th>
+                <Th column="price">Standard Preis</Th>
+                <Th column="reducedPrice">Reduzierter Preis</Th>
+                <Th column="saleStartDate">Aktionszeitraum</Th>
+                <Th column="updatedAt">Letzte Änderung</Th>
+                <th 
+                  style={{ width: `${columnWidths.actions || 160}px`, minWidth: `${columnWidths.actions || 160}px` }}
+                  className="relative px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right select-none group/th"
+                >
+                  <div
+                    className={`absolute left-0 top-0 bottom-0 w-3 cursor-col-resize z-20 flex items-center justify-center hover:bg-cyan-500/20 transition-colors ${activeResizingColumn === 'actions' ? 'bg-cyan-500/30' : ''}`}
+                    onMouseDown={(e) => handleResizeStart(e, 'actions')}
+                    onDoubleClick={(e) => handleResetWidth(e, 'actions')}
+                    onClick={(e) => e.stopPropagation()}
+                    title="Spaltenbreite anpassen (ziehen) • Doppelklick zum Zurücksetzen"
+                  >
+                    <div className={`w-[2px] h-4 rounded-full transition-colors ${activeResizingColumn === 'actions' ? 'bg-cyan-500' : 'bg-slate-300/80 group-hover/th:bg-cyan-400'}`} />
+                  </div>
+                  Aktion
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredAndSortedProducts.length === 0 ? (
+                <tr>
+                  <td colSpan={11} className="px-6 py-12 text-center text-slate-500">
                   <div className="flex flex-col items-center justify-center">
                     <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
                       <Package className="w-8 h-8 text-slate-300" />
@@ -1049,7 +1221,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="font-semibold text-slate-900 line-clamp-1">{product.title}</div>
+                        <div className={`font-semibold text-slate-900 transition-all ${isExpanded ? 'whitespace-normal break-words' : 'line-clamp-1'}`}>{product.title}</div>
                         {product.ean && (
                           <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-2 group/ean w-fit">
                             <span>EAN: {product.ean}</span>
@@ -1165,8 +1337,19 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                     </tr>
                     {isExpanded && (
                       <tr className="bg-slate-50/30 border-b border-slate-100">
-                        <td colSpan={8} className="p-0">
+                        <td colSpan={11} className="p-0">
                           <div className="px-14 py-6 animate-in slide-in-from-top-2 fade-in duration-200">
+                            {/* Prominently display full title when expanded */}
+                            <div className="mb-5 pb-4 border-b border-slate-200/80 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+                              <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                                <Package className="w-3.5 h-3.5 text-cyan-600" />
+                                Vollständiger Produkttitel
+                              </div>
+                              <h3 className="text-base font-bold text-slate-900 leading-snug break-words">
+                                {product.title}
+                              </h3>
+                            </div>
+
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                               <div className="space-y-4">
                                 <div>
