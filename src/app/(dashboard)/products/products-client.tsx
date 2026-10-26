@@ -496,10 +496,188 @@ function ReducedPriceDatesEditor({ product, onToast }: { product: Product; onToa
   )
 }
 
+function ColorEditor({ product, onToast }: { product: Product; onToast?: (message: string, type: 'success' | 'error' | 'info') => void }) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [value, setValue] = useState(product.color || '')
+  const [isSaving, setIsSaving] = useState(false)
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!isEditing) {
+      setValue(product.color || '')
+    }
+  }, [product.color, isEditing])
+
+  const handleSave = async () => {
+    const trimmed = value.trim()
+    if (trimmed === (product.color || '')) {
+      setIsEditing(false)
+      return
+    }
+    setIsSaving(true)
+    try {
+      const { updateProductVariantInfoInline } = await import('@/app/actions/products')
+      await updateProductVariantInfoInline(product.id, { color: trimmed })
+      setIsEditing(false)
+      onToast?.('Farbe erfolgreich aktualisiert', 'success')
+      router.refresh()
+    } catch (e) {
+      console.error(e)
+      onToast?.('Fehler beim Speichern der Farbe', 'error')
+      setValue(product.color || '')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleSave()
+    if (e.key === 'Escape') {
+      setValue(product.color || '')
+      setIsEditing(false)
+    }
+  }
+
+  if (!isEditing) {
+    return (
+      <div 
+        className="flex items-center gap-1.5 cursor-pointer hover:bg-slate-100 p-1.5 -ml-1.5 rounded-md transition-colors group w-fit max-w-full"
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsEditing(true); }}
+        title="Farbe bearbeiten"
+      >
+        {product.color ? (
+          <span className="text-xs font-semibold text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md truncate max-w-[120px]">
+            {product.color}
+          </span>
+        ) : (
+          <span className="text-xs text-slate-400 italic border-b border-slate-300 border-dashed">
+            -
+          </span>
+        )}
+        {isSaving ? (
+          <Loader2 className="w-3 h-3 animate-spin text-slate-400 shrink-0" />
+        ) : (
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+      <input
+        autoFocus
+        type="text"
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        onKeyDown={handleKeyDown}
+        disabled={isSaving}
+        placeholder="Farbe"
+        className="w-24 px-2 py-1 text-xs border border-cyan-400 focus:ring-2 focus:ring-cyan-500/50 outline-none rounded font-semibold text-slate-900 placeholder:text-slate-500 bg-white"
+      />
+      <button onClick={handleSave} disabled={isSaving} className="p-1 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors flex items-center justify-center shrink-0" title="Speichern">
+        {isSaving ? <Loader2 className="w-3 animate-spin" /> : <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>}
+      </button>
+      <button onClick={() => { setValue(product.color || ''); setIsEditing(false); }} disabled={isSaving} className="p-1 rounded bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors shrink-0" title="Abbrechen">
+        <X className="w-3 h-3" />
+      </button>
+    </div>
+  )
+}
+
+function SizeEditor({ product, onToast }: { product: Product; onToast?: (message: string, type: 'success' | 'error' | 'info') => void }) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [value, setValue] = useState(product.size || '')
+  const [isSaving, setIsSaving] = useState(false)
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!isEditing) {
+      setValue(product.size || '')
+    }
+  }, [product.size, isEditing])
+
+  const handleSave = async () => {
+    const trimmed = value.trim()
+    if (trimmed === (product.size || '')) {
+      setIsEditing(false)
+      return
+    }
+    setIsSaving(true)
+    try {
+      const { updateProductVariantInfoInline } = await import('@/app/actions/products')
+      await updateProductVariantInfoInline(product.id, { size: trimmed })
+      setIsEditing(false)
+      onToast?.('Größe erfolgreich aktualisiert', 'success')
+      router.refresh()
+    } catch (e) {
+      console.error(e)
+      onToast?.('Fehler beim Speichern der Größe', 'error')
+      setValue(product.size || '')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleSave()
+    if (e.key === 'Escape') {
+      setValue(product.size || '')
+      setIsEditing(false)
+    }
+  }
+
+  if (!isEditing) {
+    return (
+      <div 
+        className="flex items-center gap-1.5 cursor-pointer hover:bg-slate-100 p-1.5 -ml-1.5 rounded-md transition-colors group w-fit max-w-full"
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsEditing(true); }}
+        title="Größe bearbeiten"
+      >
+        {product.size ? (
+          <span className="font-mono text-xs font-bold text-slate-800 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
+            {product.size}
+          </span>
+        ) : (
+          <span className="text-xs text-slate-400 italic border-b border-slate-300 border-dashed">
+            -
+          </span>
+        )}
+        {isSaving ? (
+          <Loader2 className="w-3 h-3 animate-spin text-slate-400 shrink-0" />
+        ) : (
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+      <input
+        autoFocus
+        type="text"
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        onKeyDown={handleKeyDown}
+        disabled={isSaving}
+        placeholder="Größe"
+        className="w-16 px-2 py-1 text-xs border border-cyan-400 focus:ring-2 focus:ring-cyan-500/50 outline-none rounded font-semibold text-slate-900 placeholder:text-slate-500 bg-white"
+      />
+      <button onClick={handleSave} disabled={isSaving} className="p-1 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors flex items-center justify-center shrink-0" title="Speichern">
+        {isSaving ? <Loader2 className="w-3 animate-spin" /> : <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>}
+      </button>
+      <button onClick={() => { setValue(product.size || ''); setIsEditing(false); }} disabled={isSaving} className="p-1 rounded bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors shrink-0" title="Abbrechen">
+        <X className="w-3 h-3" />
+      </button>
+    </div>
+  )
+}
+
 export function ProductsClient({ initialProducts }: { initialProducts: Product[] }) {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
-  const [searchField, setSearchField] = useState<'all' | 'sku' | 'title' | 'ean'>('all')
+  const [searchField, setSearchField] = useState<'all' | 'sku' | 'title' | 'color' | 'size' | 'ean'>('all')
   const [syncFilter, setSyncFilter] = useState<'all' | 'stock_on' | 'stock_off' | 'price_on' | 'price_off'>('all')
   const [marketplaceFilter, setMarketplaceFilter] = useState<string>('all')
 
@@ -721,11 +899,19 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
           if (searchField === 'title') {
             return (p.title && p.title.toLowerCase().includes(term))
           }
+          if (searchField === 'color') {
+            return (p.color && p.color.toLowerCase().includes(term))
+          }
+          if (searchField === 'size') {
+            return (p.size && p.size.toLowerCase().includes(term))
+          }
           if (searchField === 'ean') {
             return (p.ean && p.ean.toLowerCase().includes(term)) || (p.mappingEans && p.mappingEans.toLowerCase().includes(term))
           }
           return (p.sku && p.sku.toLowerCase().includes(term)) || 
             (p.title && p.title.toLowerCase().includes(term)) || 
+            (p.color && p.color.toLowerCase().includes(term)) || 
+            (p.size && p.size.toLowerCase().includes(term)) || 
             (p.ean && p.ean.toLowerCase().includes(term)) ||
             (p.mappingSkus && p.mappingSkus.toLowerCase().includes(term)) ||
             (p.mappingEans && p.mappingEans.toLowerCase().includes(term))
@@ -762,7 +948,9 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
 
   const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
     sku: 140,
-    title: 280,
+    title: 250,
+    color: 110,
+    size: 90,
     currentStock: 110,
     msrp: 100,
     price: 130,
@@ -800,6 +988,8 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
     const minWidths: Record<string, number> = {
       sku: 90,
       title: 140,
+      color: 80,
+      size: 70,
       currentStock: 80,
       msrp: 75,
       price: 85,
@@ -921,6 +1111,8 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
             <option value="all">Alle Felder</option>
             <option value="sku">SKU</option>
             <option value="title">Titel</option>
+            <option value="color">Farbe</option>
+            <option value="size">Größe</option>
             <option value="ean">EAN</option>
           </select>
           <select
@@ -1118,7 +1310,9 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
               <col style={{ width: '48px' }} />
               <col style={{ width: '40px' }} />
               <col style={{ width: `${columnWidths.sku || 140}px` }} />
-              <col style={{ width: `${columnWidths.title || 280}px` }} />
+              <col style={{ width: `${columnWidths.title || 250}px` }} />
+              <col style={{ width: `${columnWidths.color || 110}px` }} />
+              <col style={{ width: `${columnWidths.size || 90}px` }} />
               <col style={{ width: `${columnWidths.currentStock || 110}px` }} />
               <col style={{ width: `${columnWidths.msrp || 100}px` }} />
               <col style={{ width: `${columnWidths.price || 130}px` }} />
@@ -1145,6 +1339,8 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                 <th className="w-10 px-4"></th>
                 <Th column="sku">SKU</Th>
                 <Th column="title">Titel</Th>
+                <Th column="color">Farbe</Th>
+                <Th column="size">Größe</Th>
                 <Th column="currentStock">Bestand</Th>
                 <Th column="msrp">UVP</Th>
                 <Th column="price">Standard Preis</Th>
@@ -1171,7 +1367,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
             <tbody className="divide-y divide-slate-100">
               {filteredAndSortedProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="px-6 py-12 text-center text-slate-500">
+                  <td colSpan={13} className="px-6 py-12 text-center text-slate-500">
                   <div className="flex flex-col items-center justify-center">
                     <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
                       <Package className="w-8 h-8 text-slate-300" />
@@ -1238,6 +1434,12 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                             </button>
                           </div>
                         )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <ColorEditor product={product} onToast={showToast} />
+                      </td>
+                      <td className="px-6 py-4">
+                        <SizeEditor product={product} onToast={showToast} />
                       </td>
                       <td className="px-6 py-4">
                         <StockEditor product={product} onToast={showToast} />
@@ -1337,7 +1539,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                     </tr>
                     {isExpanded && (
                       <tr className="bg-slate-50/30 border-b border-slate-100">
-                        <td colSpan={11} className="p-0">
+                        <td colSpan={13} className="p-0">
                           <div className="px-14 py-6 animate-in slide-in-from-top-2 fade-in duration-200">
                             {/* Prominently display full title when expanded */}
                             <div className="mb-5 pb-4 border-b border-slate-200/80 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
@@ -1365,6 +1567,14 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                                   <div className="flex justify-between items-center">
                                     <span className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5"><Barcode className="w-3.5 h-3.5"/> EAN</span>
                                     <span className="text-sm text-slate-900 font-mono">{product.ean || '-'}</span>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5"><Tag className="w-3.5 h-3.5"/> Farbe</span>
+                                    <span className="text-sm text-slate-900 font-medium">{product.color || '-'}</span>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5"><Tag className="w-3.5 h-3.5"/> Größe</span>
+                                    <span className="text-sm text-slate-900 font-mono font-bold">{product.size || '-'}</span>
                                   </div>
                                   <div className="flex justify-between items-center">
                                     <span className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5"/> Marke</span>

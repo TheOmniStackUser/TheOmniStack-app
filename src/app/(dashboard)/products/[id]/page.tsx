@@ -113,6 +113,8 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       description: (formData.get('description') as string) || null,
       category: (formData.get('category') as string) || null,
       brand: (formData.get('brand') as string) || null,
+      color: (formData.get('color') as string) || null,
+      size: (formData.get('size') as string) || null,
       price: (formData.get('price') as string) || '0',
       reducedPrice: reducedPrice !== null ? reducedPrice.toString() : null,
       saleStartDate,
@@ -250,6 +252,14 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-slate-700">Marke / Brand</label>
                   <input type="text" name="brand" defaultValue={product.brand || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 placeholder:text-slate-500" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700">Farbe</label>
+                  <input type="text" name="color" defaultValue={product.color || ''} placeholder="z.B. Schwarz, Hellgrau" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 placeholder:text-slate-500" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700">Größe</label>
+                  <input type="text" name="size" defaultValue={product.size || ''} placeholder="z.B. XL, 42, 110" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 placeholder:text-slate-500" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-slate-700">Zolltarifnr. (HS-Code)</label>

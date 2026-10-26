@@ -7,6 +7,7 @@ import { eq, and, inArray, ilike, or, ne } from 'drizzle-orm'
 import { products, productMappings, unmappedMarketplaceProducts } from '@/db/schema/products'
 import { revalidatePath, unstable_noStore } from 'next/cache'
 import { after } from 'next/server'
+import { extractSizeAndColor } from '@/lib/product-variant-parser'
 
 export type MarketplaceSyncSettings = {
   enabled: boolean
@@ -295,6 +296,12 @@ export async function bulkCreateProductsFromUnmapped(unmappedProductIds: string[
            if (!isNaN(parsed)) safeMsrp = String(parsed)
         }
 
+        const { color: extractedColor, size: extractedSize } = extractSizeAndColor(
+          unmapped.marketplaceSku,
+          unmapped.title,
+          unmapped.rawPayload
+        );
+
         newProductsToInsert.push({
           companyId: auth.activeCompanyId,
           sku: unmapped.marketplaceSku,
@@ -306,6 +313,8 @@ export async function bulkCreateProductsFromUnmapped(unmappedProductIds: string[
           msrp: safeMsrp,
           category: category || null,
           brand: brand || null,
+          color: extractedColor || null,
+          size: extractedSize || null,
         })
       }
     }
@@ -766,6 +775,41 @@ export async function updateProductPriceInline(productId: string, newPrice: numb
 
   const { revalidatePath } = await import('next/cache')
   revalidatePath('/products')
+
+  return { success: true }
+}
+
+export async function updateProductVariantInfoInline(
+  productId: string,
+  data: { color?: string | null; size?: string | null }
+) {
+  const auth = await requireAuth()
+
+  const [product] = await db
+    .select()
+    .from(products)
+    .where(and(eq(products.id, productId), eq(products.companyId, auth.activeCompanyId)))
+
+  if (!product) throw new Error('Product not found')
+
+  const updateData: { color?: string | null; size?: string | null; updatedAt: Date } = {
+    updatedAt: new Date(),
+  }
+  if (data.color !== undefined) {
+    updateData.color = data.color ? data.color.trim() : null
+  }
+  if (data.size !== undefined) {
+    updateData.size = data.size ? data.size.trim() : null
+  }
+
+  await db
+    .update(products)
+    .set(updateData)
+    .where(eq(products.id, productId))
+
+  const { revalidatePath } = await import('next/cache')
+  revalidatePath('/products')
+  revalidatePath(`/products/${productId}`)
 
   return { success: true }
 }

@@ -5,6 +5,7 @@ import { db } from '@/db/client'
 import { products, productMappings } from '@/db/schema/products'
 import { eq, sql, and } from 'drizzle-orm'
 import Papa from 'papaparse'
+import { extractSizeAndColor } from '@/lib/product-variant-parser'
 
 export async function exportProductsCsv() {
   const auth = await requireAuth()
@@ -29,6 +30,8 @@ export async function exportProductsCsv() {
     const baseRow: Record<string, string> = {
       SKU: p.sku,
       Titel: p.title,
+      Farbe: p.color || '',
+      'Größe': p.size || '',
       Beschreibung: p.description || '',
       EAN: p.ean || '',
       Bestand: p.currentStock?.toString() || '0',
@@ -107,12 +110,18 @@ export async function importProductsCsvAction(csvString: string) {
     const hsCode = row['HS-Code']?.trim() || null
     const countryOfOrigin = row['Ursprungsland']?.trim() || 'DE'
     
+    const parsedVariant = extractSizeAndColor(sku, title)
+    const color = (row['Farbe'] || row['Color'])?.trim() || parsedVariant.color || null
+    const size = (row['Größe'] || row['Groesse'] || row['Size'])?.trim() || parsedVariant.size || null
+    
     const [insertedProduct] = await db.insert(products).values({
       companyId: auth.activeCompanyId,
       sku,
       title,
       description,
       ean,
+      color,
+      size,
       currentStock,
       price,
       msrp,
@@ -129,6 +138,8 @@ export async function importProductsCsvAction(csvString: string) {
         title,
         description,
         ean,
+        color,
+        size,
         currentStock,
         price,
         msrp,
