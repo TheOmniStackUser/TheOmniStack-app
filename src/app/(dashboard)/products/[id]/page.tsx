@@ -5,6 +5,7 @@ import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { MappingSyncRules } from './mapping-sync-rules'
 import { AddMappingClient } from './add-mapping-client'
 import { DeleteMappingClient } from './delete-mapping-client'
+import { SetMainSkuClient, MainSkuBanner } from './set-main-sku-client'
 import { eq, and } from 'drizzle-orm'
 import { ProductFormClient, SubmitButton } from './product-form-client'
 import { InlineCopyButton } from './copy-button'
@@ -328,6 +329,10 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                 {mappings.length}
               </span>
             </div>
+
+            {mappings.length > 0 && (
+              <MainSkuBanner currentSku={product.sku} />
+            )}
             
             <div className="divide-y divide-slate-100">
               {mappings.length === 0 ? (
@@ -339,9 +344,17 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                   <div key={`${mapping.id}-${mapping.updatedAt ? new Date(mapping.updatedAt).getTime() : ''}`} className="p-5 hover:bg-slate-50/50 transition-colors">
                     <div className="flex justify-between items-start mb-3">
                       <div>
-                        <span className="uppercase text-xs font-bold tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
-                          {getMarketplaceName(mapping)}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="uppercase text-xs font-bold tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
+                            {getMarketplaceName(mapping)}
+                          </span>
+                          <SetMainSkuClient
+                            productId={product.id}
+                            marketplaceSku={mapping.marketplaceSku}
+                            marketplaceName={getMarketplaceName(mapping)}
+                            isMainSku={mapping.marketplaceSku === product.sku}
+                          />
+                        </div>
                         <div className="mt-1 flex flex-wrap items-center gap-2">
                           <p className="font-mono text-sm font-bold text-slate-700 group/msku flex items-center gap-1">
                             {mapping.marketplaceSku}

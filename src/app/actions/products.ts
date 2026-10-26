@@ -3,7 +3,7 @@
 import { requireAuth } from '@/lib/session'
 import { db } from '@/db/client'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
-import { eq, and, inArray, ilike, or } from 'drizzle-orm'
+import { eq, and, inArray, ilike, or, ne } from 'drizzle-orm'
 import { products, productMappings, unmappedMarketplaceProducts } from '@/db/schema/products'
 import { revalidatePath, unstable_noStore } from 'next/cache'
 import { after } from 'next/server'
@@ -1311,3 +1311,62 @@ export async function mergeProductsAction(masterId: string, sourceId: string) {
     return { success: false, error: err.message || "Unbekannter Fehler beim Zusammenfassen" }
   }
 }
+
+export async function setProductMainSku(productId: string, newSku: string) {
+  const auth = await requireAuth()
+  const companyId = auth.activeCompanyId
+  if (!companyId) throw new Error("Nicht autorisiert")
+
+  const cleanSku = newSku.trim()
+  if (!cleanSku) throw new Error("Ungültige SKU angegeben.")
+
+  try {
+    // 1. Check current product
+    const [product] = await db
+      .select({ id: products.id, sku: products.sku, title: products.title })
+      .from(products)
+      .where(and(eq(products.id, productId), eq(products.companyId, companyId)))
+      .limit(1)
+
+    if (!product) throw new Error("Produkt nicht gefunden.")
+    if (product.sku === cleanSku) {
+      return { success: true }
+    }
+
+    // 2. Check if another product already uses this SKU
+    const [existingWithSku] = await db
+      .select({ id: products.id, title: products.title })
+      .from(products)
+      .where(and(
+        eq(products.companyId, companyId),
+        eq(products.sku, cleanSku),
+        ne(products.id, productId)
+      ))
+      .limit(1)
+
+    if (existingWithSku) {
+      return {
+        success: false,
+        error: `Die SKU "${cleanSku}" wird bereits von einem anderen Produkt ("${existingWithSku.title || 'Ohne Titel'}") verwendet. Bitte fassen Sie die Produkte zusammen oder wählen Sie eine andere SKU.`
+      }
+    }
+
+    // 3. Update the main SKU
+    await db
+      .update(products)
+      .set({
+        sku: cleanSku,
+        updatedAt: new Date()
+      })
+      .where(and(eq(products.id, productId), eq(products.companyId, companyId)))
+
+    revalidatePath(`/products/${productId}`)
+    revalidatePath('/products')
+
+    return { success: true }
+  } catch (err: any) {
+    console.error("setProductMainSku error:", err)
+    return { success: false, error: err.message || "Fehler beim Aktualisieren der Haupt-SKU" }
+  }
+}
+
