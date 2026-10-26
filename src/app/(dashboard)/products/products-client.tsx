@@ -786,6 +786,25 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
     }, 3000)
   }
 
+  const productsToMerge = useMemo(() => {
+    if (selectedProductIds.size !== 2) return []
+    const ids = Array.from(selectedProductIds)
+    return ids.map(id => initialProducts.find(p => p.id === id)).filter(Boolean) as Product[]
+  }, [initialProducts, selectedProductIds])
+
+  const handleMerge = async (masterId: string, sourceId: string) => {
+    const { mergeProductsAction } = await import('@/app/actions/products')
+    const res = await mergeProductsAction(masterId, sourceId)
+    if (res.success) {
+      showToast('Produkte erfolgreich zusammengefasst!', 'success')
+      setSelectedProductIds(new Set())
+      setShowMergeModal(false)
+      router.refresh()
+    } else {
+      throw new Error(res.error || 'Fehler beim Zusammenfassen')
+    }
+  }
+
   const handleToggleSync = async (productId: string, field: 'stock' | 'price', value: boolean) => {
     try {
       const { toggleProductSync } = await import('@/app/actions/products')
@@ -1241,7 +1260,13 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
             </button>
             {selectedProductIds.size === 2 && (
               <button
-                onClick={() => setShowMergeModal(true)}
+                onClick={() => {
+                  if (productsToMerge.length !== 2) {
+                    showToast('Bitte wählen Sie genau 2 Produkte aus der Liste aus.', 'error')
+                    return
+                  }
+                  setShowMergeModal(true)
+                }}
                 className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-50 text-purple-600 hover:bg-purple-100 transition-colors text-sm font-semibold border border-purple-200"
               >
                 <GitMerge className="w-4 h-4" />
@@ -1836,6 +1861,14 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
         </div>
       )}
 
+      {/* Merge Products Modal */}
+      <MergeProductsModal
+        isOpen={showMergeModal}
+        onClose={() => setShowMergeModal(false)}
+        productsToMerge={productsToMerge}
+        onMerge={handleMerge}
+      />
+
       {/* Toast Notification */}
       {toast && (
         <div className={`fixed bottom-4 right-4 px-4 py-3 rounded-lg shadow-lg shadow-slate-200/50 flex items-center gap-3 animate-in slide-in-from-bottom-5 z-50 ${
@@ -1875,7 +1908,27 @@ function MergeProductsModal({
     }
   }, [isOpen, productsToMerge])
 
-  if (!isOpen || productsToMerge.length !== 2) return null
+  if (!isOpen) return null
+
+  if (productsToMerge.length !== 2) {
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
+        <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6 text-center">
+          <p className="text-slate-800 font-semibold mb-4">Es müssen genau 2 Produkte ausgewählt sein, um sie zusammenzufassen.</p>
+          <button onClick={onClose} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl">
+            Schließen
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const p1 = productsToMerge[0]
+  const p2 = productsToMerge[1]
+  const masterProduct = productsToMerge.find(p => p.id === masterId) || p1
+  const sourceProduct = productsToMerge.find(p => p.id !== masterId) || p2
+  const combinedStock = (Number(p1?.currentStock || 0) + Number(p2?.currentStock || 0))
 
   const handleConfirm = async () => {
     if (!masterId) return
@@ -1890,9 +1943,6 @@ function MergeProductsModal({
       setIsMerging(false)
     }
   }
-
-  const p1 = productsToMerge[0]
-  const p2 = productsToMerge[1]
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -1916,7 +1966,7 @@ function MergeProductsModal({
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto space-y-6">
+        <div className="p-6 overflow-y-auto space-y-5">
           {error && (
             <div className="p-4 bg-red-50 text-red-700 rounded-xl text-sm font-medium border border-red-100">
               {error}
@@ -1927,41 +1977,92 @@ function MergeProductsModal({
             <strong>Achtung:</strong> Alle Marktplatz-Verknüpfungen des zweiten Produkts werden auf das Hauptprodukt übertragen. Der Lagerbestand wird addiert. Das zweite Produkt wird gelöscht. Diese Aktion kann nicht rückgängig gemacht werden!
           </div>
 
-          <div className="space-y-4">
-            <label className="text-sm font-semibold text-slate-700">Welches Produkt soll das Hauptprodukt sein?</label>
+          <div className="space-y-3">
+            <label className="text-sm font-semibold text-slate-800">Welches Produkt soll das Hauptprodukt bleiben?</label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              
-              {[p1, p2].map(p => (
-                <div 
-                  key={p.id}
-                  onClick={() => setMasterId(p.id)}
-                  className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all ${masterId === p.id ? 'border-purple-500 bg-purple-50/50' : 'border-slate-200 hover:border-purple-200 bg-white'}`}
-                >
-                  {masterId === p.id && (
-                    <div className="absolute top-3 right-3 text-purple-600">
-                      <CheckCircle2 className="w-5 h-5" />
+              {[p1, p2].map(p => {
+                const isSelected = masterId === p.id
+                return (
+                  <div 
+                    key={p.id}
+                    onClick={() => setMasterId(p.id)}
+                    className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                      isSelected 
+                        ? 'border-purple-600 bg-purple-50/50 ring-2 ring-purple-600/20' 
+                        : 'border-slate-200 hover:border-purple-300 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <span className="font-mono text-xs font-bold text-purple-700 bg-purple-100/70 border border-purple-200 px-2 py-0.5 rounded-md">
+                        {p.sku}
+                      </span>
+                      {isSelected ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-purple-600" />
+                          Hauptprodukt
+                        </span>
+                      ) : (
+                        <span className="text-xs font-semibold text-slate-400">
+                          Wird integriert
+                        </span>
+                      )}
                     </div>
-                  )}
-                  <div className="text-xs font-bold text-slate-500 mb-1">{p.sku}</div>
-                  <div className="font-semibold text-slate-800 line-clamp-2 leading-tight mb-3 pr-6">{p.title}</div>
-                  
-                  <div className="space-y-2 text-sm text-slate-600">
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Bestand:</span>
-                      <span className="font-medium">{p.currentStock || 0}</span>
+                    <div className="font-semibold text-slate-900 text-sm line-clamp-2 leading-snug mb-3" title={p.title}>
+                      {p.title}
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">EAN:</span>
-                      <span className="font-medium">{p.ean || '-'}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Preis:</span>
-                      <span className="font-medium">{p.price ? `${p.price} €` : '-'}</span>
+                    
+                    <div className="space-y-1.5 text-xs text-slate-600 bg-slate-50/80 p-2.5 rounded-lg border border-slate-100">
+                      <div className="flex justify-between py-0.5">
+                        <span className="text-slate-500">Bestand:</span>
+                        <span className="font-bold text-slate-900">{p.currentStock || 0}</span>
+                      </div>
+                      <div className="flex justify-between py-0.5">
+                        <span className="text-slate-500">Farbe:</span>
+                        <span className="font-semibold text-slate-900">{p.color || '-'}</span>
+                      </div>
+                      <div className="flex justify-between py-0.5">
+                        <span className="text-slate-500">Größe:</span>
+                        <span className="font-semibold text-slate-900">{p.size || '-'}</span>
+                      </div>
+                      <div className="flex justify-between py-0.5">
+                        <span className="text-slate-500">EAN:</span>
+                        <span className="font-mono text-slate-900">{p.ean || '-'}</span>
+                      </div>
+                      <div className="flex justify-between py-0.5">
+                        <span className="text-slate-500">Preis:</span>
+                        <span className="font-semibold text-slate-900">{p.price ? `${p.price} €` : '-'}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
+            </div>
+          </div>
 
+          {/* Merge Result Summary Preview */}
+          <div className="p-4 rounded-xl bg-purple-50/60 border border-purple-100 text-xs text-purple-900 space-y-1">
+            <div className="font-bold text-purple-950 flex items-center gap-1.5 mb-1 text-sm">
+              <CheckCircle2 className="w-4 h-4 text-purple-600" />
+              Ergebnis nach dem Zusammenfassen
+            </div>
+            <div>
+              <strong>Haupt-SKU:</strong> <span className="font-mono">{masterProduct.sku}</span> ({masterProduct.title})
+            </div>
+            <div>
+              <strong>Kombinierter Lagerbestand:</strong> <span className="font-bold text-purple-700">{combinedStock}</span> Stück ({Number(masterProduct.currentStock || 0)} + {Number(sourceProduct.currentStock || 0)})
+            </div>
+            {(!masterProduct.color && sourceProduct.color) && (
+              <div>
+                <strong>Farbe geerbt:</strong> {sourceProduct.color}
+              </div>
+            )}
+            {(!masterProduct.size && sourceProduct.size) && (
+              <div>
+                <strong>Größe geerbt:</strong> {sourceProduct.size}
+              </div>
+            )}
+            <div>
+              <strong>Marktplatz-Mappings:</strong> Alle Listings von <span className="font-mono">{sourceProduct.sku}</span> werden auf <span className="font-mono">{masterProduct.sku}</span> umgeleitet.
             </div>
           </div>
         </div>
@@ -1970,7 +2071,8 @@ function MergeProductsModal({
         <div className="p-6 border-t border-slate-100 flex items-center justify-end gap-3 shrink-0 bg-slate-50">
           <button 
             onClick={onClose}
-            className="px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-200 bg-slate-100 rounded-xl transition-colors"
+            disabled={isMerging}
+            className="px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-200 bg-slate-100 rounded-xl transition-colors disabled:opacity-50"
           >
             Abbrechen
           </button>

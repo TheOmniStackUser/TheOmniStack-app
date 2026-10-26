@@ -1323,6 +1323,9 @@ export async function mergeProductsAction(masterId: string, sourceId: string) {
   if (!companyId) throw new Error("Unauthorized")
 
   try {
+    let finalMasterStock = 0
+    let masterSku = ''
+
     await db.transaction(async (tx) => {
       // 1. Fetch products
       const [master, source] = await Promise.all([
@@ -1332,21 +1335,74 @@ export async function mergeProductsAction(masterId: string, sourceId: string) {
 
       if (!master || !source) throw new Error("Produkte nicht gefunden")
 
+      masterSku = master.sku
+
       // 2. Re-assign mappings
       await tx.update(productMappings)
         .set({ productId: master.id })
         .where(and(eq(productMappings.productId, source.id), eq(productMappings.companyId, companyId)))
 
-      // 3. Update stock (sum them)
-      const newStock = Number(master.currentStock || 0) + Number(source.currentStock || 0)
+      // 3. Re-assign any variant children pointing to source
       await tx.update(products)
-        .set({ currentStock: newStock.toString() })
+        .set({ parentId: master.id })
+        .where(and(eq(products.parentId, source.id), eq(products.companyId, companyId)))
+
+      // 4. Update stock (sum them) and inherit missing attributes into master
+      const newStock = Number(master.currentStock || 0) + Number(source.currentStock || 0)
+      finalMasterStock = newStock
+
+      const masterUpdates: Record<string, any> = {
+        currentStock: newStock.toString(),
+        updatedAt: new Date(),
+      }
+
+      if (!master.color && source.color) masterUpdates.color = source.color
+      if (!master.size && source.size) masterUpdates.size = source.size
+      if (!master.ean && source.ean) masterUpdates.ean = source.ean
+      if (!master.hsCode && source.hsCode) masterUpdates.hsCode = source.hsCode
+      if (!master.countryOfOrigin && source.countryOfOrigin) masterUpdates.countryOfOrigin = source.countryOfOrigin
+      if (!master.weight && source.weight) masterUpdates.weight = source.weight
+      if (!master.storageLocation && source.storageLocation) masterUpdates.storageLocation = source.storageLocation
+      if (!master.description && source.description) masterUpdates.description = source.description
+      if (!master.brand && source.brand) masterUpdates.brand = source.brand
+      if (!master.category && source.category) masterUpdates.category = source.category
+      if (!master.price && source.price) masterUpdates.price = source.price
+      if (!master.purchasePrice && source.purchasePrice) masterUpdates.purchasePrice = source.purchasePrice
+      if (!master.msrp && source.msrp) masterUpdates.msrp = source.msrp
+      if (!master.reducedPrice && source.reducedPrice) {
+        masterUpdates.reducedPrice = source.reducedPrice
+        masterUpdates.saleStartDate = source.saleStartDate
+        masterUpdates.saleEndDate = source.saleEndDate
+      }
+
+      await tx.update(products)
+        .set(masterUpdates)
         .where(and(eq(products.id, master.id), eq(products.companyId, companyId)))
 
-      // 4. Delete source product
+      // 5. Delete source product
       await tx.delete(products)
         .where(and(eq(products.id, source.id), eq(products.companyId, companyId)))
     })
+
+    // Background sync to marketplaces if stock was updated
+    if (masterSku) {
+      try {
+        const { pushUpdatesToMarketplaces } = await import('@/workers/product-sync')
+        const { after } = await import('next/server')
+        after(async () => {
+          try {
+            await pushUpdatesToMarketplaces(companyId, [{
+              sku: masterSku,
+              stock: finalMasterStock,
+            }])
+          } catch (syncErr) {
+            console.error('[mergeProductsAction] Background sync failed:', syncErr)
+          }
+        })
+      } catch {
+        // after() might not be available in non-server-action context, ignore
+      }
+    }
     
     revalidatePath('/products')
     return { success: true }
