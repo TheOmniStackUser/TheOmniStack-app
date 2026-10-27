@@ -55,7 +55,24 @@ productWorker.on('failed', (job, err) => {
   console.log(`❌ [ProductSync] Job ${job?.id} failed:`, err.message)
 })
 
-process.on('SIGINT', async () => {
+process.on('uncaughtException', (err: any) => {
+  if (err?.message && (err.message.includes("Cannot read properties of null (reading 'write')") || err.code === 'CONNECTION_CLOSED')) {
+    console.warn('⚠️ [Worker Engine] Caught transient postgres driver socket disconnection safely:', err.message)
+    return
+  }
+  console.error('💥 [Worker Engine] Fatal Uncaught Exception:', err)
+  process.exit(1)
+})
+
+process.on('unhandledRejection', (reason: any, promise) => {
+  if (reason?.message && (reason.message.includes("Cannot read properties of null (reading 'write')") || reason.code === 'CONNECTION_CLOSED')) {
+    console.warn('⚠️ [Worker Engine] Caught unhandled database connection rejection safely:', reason.message)
+    return
+  }
+  console.error('⚠️ [Worker Engine] Unhandled Rejection at:', promise, 'reason:', reason)
+})
+
+const shutdown = async () => {
   console.log('Shutting down workers...')
   await Promise.all([
     marketplaceWorker.close(),
@@ -65,4 +82,7 @@ process.on('SIGINT', async () => {
     systemStatusWorker.close(),
   ])
   process.exit(0)
-})
+}
+
+process.on('SIGINT', shutdown)
+process.on('SIGTERM', shutdown)
