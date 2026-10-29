@@ -201,7 +201,12 @@ export async function loginAction(
           accessToken: pendingShopify.accessToken,
           isActive: true,
           updatedAt: new Date(),
-          metadata: { ...((existingIntegration.metadata as any) || {}), shop: pendingShopify.shopMetadata }
+          metadata: { 
+            ...((existingIntegration.metadata as any) || {}), 
+            shop: pendingShopify.shopMetadata,
+            isShopifyBilled: true,
+            shopifySubscriptionStatus: 'PENDING'
+          }
         })
         .where(eq(marketplaceIntegrations.id, existingIntegration.id))
     } else {
@@ -211,7 +216,11 @@ export async function loginAction(
         environment: pendingShopify.shop,
         accessToken: pendingShopify.accessToken,
         isActive: true,
-        metadata: { shop: pendingShopify.shopMetadata }
+        metadata: { 
+          shop: pendingShopify.shopMetadata,
+          isShopifyBilled: true,
+          shopifySubscriptionStatus: 'PENDING'
+        }
       })
     }
 
@@ -317,7 +326,12 @@ export async function verifyTwoFactorLoginAction(
           accessToken: pendingShopify.accessToken,
           isActive: true,
           updatedAt: new Date(),
-          metadata: { ...((existingIntegration.metadata as any) || {}), shop: pendingShopify.shopMetadata }
+          metadata: { 
+            ...((existingIntegration.metadata as any) || {}), 
+            shop: pendingShopify.shopMetadata,
+            isShopifyBilled: true,
+            shopifySubscriptionStatus: 'PENDING'
+          }
         })
         .where(eq(marketplaceIntegrations.id, existingIntegration.id))
     } else {
@@ -327,7 +341,11 @@ export async function verifyTwoFactorLoginAction(
         environment: pendingShopify.shop,
         accessToken: pendingShopify.accessToken,
         isActive: true,
-        metadata: { shop: pendingShopify.shopMetadata }
+        metadata: { 
+          shop: pendingShopify.shopMetadata,
+          isShopifyBilled: true,
+          shopifySubscriptionStatus: 'PENDING'
+        }
       })
     }
 
@@ -504,7 +522,7 @@ export async function completeRegistrationAction(
         environment: pendingShopify.shop,
         accessToken: pendingShopify.accessToken,
         isActive: true,
-        metadata: { shop: pendingShopify.shopMetadata, isShopifyBilled: true }
+        metadata: { shop: pendingShopify.shopMetadata, isShopifyBilled: true, shopifySubscriptionStatus: 'PENDING' }
       })
     }
 

@@ -11,7 +11,7 @@ import { UserList } from './user-list'
 export default async function UserManagementPage() {
   const auth = await requireAuth()
 
-  const [members, tokens, company, hasShopify] = await Promise.all([
+  const [members, tokens, company, shopifyIntegration] = await Promise.all([
     db
       .select({
         id: users.id,
@@ -44,16 +44,21 @@ export default async function UserManagementPage() {
       .limit(1)
       .then(res => res[0]),
     db
-      .select({ metadata: marketplaceIntegrations.metadata })
+      .select({ 
+        metadata: marketplaceIntegrations.metadata,
+        environment: marketplaceIntegrations.environment,
+        isActive: marketplaceIntegrations.isActive
+      })
       .from(marketplaceIntegrations)
       .where(
         and(
           eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
-          eq(marketplaceIntegrations.type, 'shopify')
+          eq(marketplaceIntegrations.type, 'shopify'),
+          eq(marketplaceIntegrations.isActive, true)
         )
       )
       .limit(1)
-      .then(res => (res[0]?.metadata as any)?.isShopifyBilled === true)
+      .then(res => res[0] || null)
   ])
 
   const enrichedMembers = members.map((m) => {
@@ -112,6 +117,11 @@ export default async function UserManagementPage() {
     currentUsage = value;
   }
 
+  const shopifyMeta = (shopifyIntegration?.metadata as any) || {}
+  const isShopifyBilled = shopifyMeta.isShopifyBilled === true
+  const shopifySubscriptionStatus = shopifyMeta.shopifySubscriptionStatus || null
+  const shopDomain = shopifyIntegration?.environment ? shopifyIntegration.environment.replace('https://', '').replace(/\/$/, '') : null
+
   const enhancedCompany = {
     ...company,
     isProfifaktura,
@@ -119,7 +129,10 @@ export default async function UserManagementPage() {
     currentPeriodStart,
     currentPeriodEnd,
     isTrialPeriod,
-    nextBillingDate: isTrialPeriod && company.trialExpiresAt ? company.trialExpiresAt : currentPeriodEnd
+    nextBillingDate: isTrialPeriod && company.trialExpiresAt ? company.trialExpiresAt : currentPeriodEnd,
+    isShopifyBilled,
+    shopifySubscriptionStatus,
+    shopDomain,
   }
 
   return (
@@ -136,7 +149,7 @@ export default async function UserManagementPage() {
         currentUserRole={auth.role} 
         currentUserId={auth.userId} 
         subscriptionDetails={enhancedCompany}
-        isShopifyUser={hasShopify}
+        isShopifyUser={isShopifyBilled}
       />
     </div>
   )

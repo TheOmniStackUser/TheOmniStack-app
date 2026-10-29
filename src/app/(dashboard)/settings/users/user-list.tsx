@@ -72,6 +72,9 @@ export function UserList({
     currentPeriodEnd: Date
     isTrialPeriod: boolean
     nextBillingDate: Date
+    isShopifyBilled?: boolean
+    shopifySubscriptionStatus?: string | null
+    shopDomain?: string | null
   }
   isShopifyUser?: boolean
 }) {
@@ -609,7 +612,15 @@ export function UserList({
               <div className="space-y-2">
                 <div className="flex items-center gap-3 flex-wrap">
                   <p className="font-bold text-slate-900 text-base">TheOmniStack Basis (Flexibles Mengenmodell)</p>
-                  {subscriptionDetails?.canceledAt ? (
+                  {isShopifyUser && subscriptionDetails?.shopifySubscriptionStatus === 'DECLINED' ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700 border border-amber-200">
+                      Zahlung abgelehnt
+                    </span>
+                  ) : isShopifyUser && subscriptionDetails?.shopifySubscriptionStatus === 'PENDING' ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700 border border-amber-200">
+                      Genehmigung ausstehend
+                    </span>
+                  ) : subscriptionDetails?.canceledAt || (isShopifyUser && subscriptionDetails?.shopifySubscriptionStatus === 'CANCELLED') ? (
                     <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-200">
                       Gekündigt
                     </span>
@@ -658,7 +669,14 @@ export function UserList({
               </div>
 
               <div className="shrink-0 flex items-center gap-3">
-                {subscriptionDetails?.canceledAt ? (
+                {isShopifyUser && subscriptionDetails?.shopifySubscriptionStatus !== 'ACTIVE' ? (
+                  <a
+                    href={`/api/billing/shopify/start${subscriptionDetails?.shopDomain ? `?shop=${encodeURIComponent(subscriptionDetails.shopDomain)}` : ''}`}
+                    className="px-5 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold rounded-xl transition-all shadow-sm cursor-pointer text-sm flex items-center gap-1.5"
+                  >
+                    Abonnement aktivieren
+                  </a>
+                ) : subscriptionDetails?.canceledAt ? (
                   <button
                     onClick={handleUndoCancel}
                     disabled={isUndoingCancel}

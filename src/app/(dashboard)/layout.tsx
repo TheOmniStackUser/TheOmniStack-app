@@ -48,26 +48,25 @@ export default async function DashboardLayout({
     redirect('/setup-2fa')
   }
 
-  // Mandatory Shopify Billing Check for App Store Customers
-  if (!isTestAccount) {
-    const { marketplaceIntegrations } = await import('@/db/schema/integrations')
-    const { and } = await import('drizzle-orm')
-    const [shopifyIntegration] = await db
-      .select({ metadata: marketplaceIntegrations.metadata })
-      .from(marketplaceIntegrations)
-      .where(
-        and(
-          eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
-          eq(marketplaceIntegrations.type, 'shopify')
-        )
+  // Mandatory Shopify Billing Check for App Store Customers (Enforced for all accounts including test accounts)
+  const { marketplaceIntegrations } = await import('@/db/schema/integrations')
+  const { and } = await import('drizzle-orm')
+  const [shopifyIntegration] = await db
+    .select({ metadata: marketplaceIntegrations.metadata })
+    .from(marketplaceIntegrations)
+    .where(
+      and(
+        eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
+        eq(marketplaceIntegrations.type, 'shopify'),
+        eq(marketplaceIntegrations.isActive, true)
       )
-      .limit(1)
-    
-    if (shopifyIntegration) {
-      const metadata = (shopifyIntegration.metadata as any) || {}
-      if (metadata.isShopifyBilled && metadata.shopifySubscriptionStatus !== 'ACTIVE') {
-        redirect('/api/billing/shopify/check')
-      }
+    )
+    .limit(1)
+  
+  if (shopifyIntegration) {
+    const metadata = (shopifyIntegration.metadata as any) || {}
+    if (metadata.isShopifyBilled && metadata.shopifySubscriptionStatus !== 'ACTIVE') {
+      redirect('/subscribe')
     }
   }
 

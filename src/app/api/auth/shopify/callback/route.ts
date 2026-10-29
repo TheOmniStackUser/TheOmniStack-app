@@ -118,7 +118,12 @@ export async function GET(request: Request) {
             expiresAt: expiresAt || null,
             isActive: true,
             updatedAt: new Date(),
-            metadata: { ...((existing.metadata as any) || {}), shop: shopMetadata }
+            metadata: { 
+              ...((existing.metadata as any) || {}), 
+              shop: shopMetadata,
+              isShopifyBilled: true,
+              shopifySubscriptionStatus: 'PENDING'
+            }
           })
           .where(eq(marketplaceIntegrations.id, existing.id))
       } else {
@@ -130,7 +135,11 @@ export async function GET(request: Request) {
           refreshToken: refreshToken || null,
           expiresAt: expiresAt || null,
           isActive: true,
-          metadata: { shop: shopMetadata }
+          metadata: { 
+            shop: shopMetadata,
+            isShopifyBilled: true,
+            shopifySubscriptionStatus: 'PENDING'
+          }
         })
       }
 
@@ -203,14 +212,9 @@ export async function GET(request: Request) {
         console.error('[Shopify OAuth] Failed to trigger initial sync:', e)
       }
 
-      // 6. Cleanup CSRF cookie and redirect to Shopify Admin (Shopify App Review Requirement)
+      // 6. Cleanup CSRF cookie and redirect through Billing Check (Shopify App Review Requirement 1.2.2)
       cookieStore.delete('shopify_oauth_nonce')
-      const clientId = process.env.SHOPIFY_CLIENT_ID
-      const redirectUrl = clientId 
-        ? `https://admin.shopify.com/store/${shop.replace('.myshopify.com', '')}/apps/${clientId}`
-        : `${(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000')}/integrations?success=shopify_connected`
-        
-      return NextResponse.redirect(redirectUrl)
+      return NextResponse.redirect(new URL(`/api/billing/shopify/check?shop=${shop}`, process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'))
     } else {
       // User is NOT logged in. Save pending install to secure cookie and redirect to registration.
       await setShopifyPendingInstall({

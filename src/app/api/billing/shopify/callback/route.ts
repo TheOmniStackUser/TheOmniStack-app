@@ -11,10 +11,6 @@ export async function GET(request: Request) {
     const chargeId = searchParams.get('charge_id')
     const returnUrl = searchParams.get('returnUrl') || '/dashboard'
 
-    if (!chargeId) {
-      return NextResponse.redirect(new URL('/dashboard?error=missing_charge_id', process.env.NEXT_PUBLIC_APP_URL))
-    }
-
     const [integration] = await db
       .select()
       .from(marketplaceIntegrations)
@@ -31,6 +27,23 @@ export async function GET(request: Request) {
     }
 
     const shop = integration.environment.replace('https://', '').replace(/\/$/, '')
+
+    if (!chargeId) {
+      // User cancelled before charge ID was provided
+      const metadata = (integration.metadata as any) || {}
+      await db
+        .update(marketplaceIntegrations)
+        .set({
+          metadata: {
+            ...metadata,
+            isShopifyBilled: true,
+            shopifySubscriptionStatus: 'DECLINED'
+          }
+        })
+        .where(eq(marketplaceIntegrations.id, integration.id))
+
+      return NextResponse.redirect(new URL(`/subscribe?error=declined&shop=${shop}`, process.env.NEXT_PUBLIC_APP_URL))
+    }
 
     // Verify the subscription status
     const query = `
@@ -64,6 +77,7 @@ export async function GET(request: Request) {
           .set({
             metadata: {
               ...metadata,
+              isShopifyBilled: true,
               shopifySubscriptionId: chargeId,
               shopifySubscriptionStatus: 'ACTIVE'
             }
@@ -81,15 +95,26 @@ export async function GET(request: Request) {
           .where(eq(companies.id, auth.activeCompanyId))
       })
       
-      // If returnUrl is /dashboard, we might want to redirect into the Shopify Admin iframe if it's embedded
-      // But since embedded = false, normal dashboard is fine.
       return NextResponse.redirect(new URL(returnUrl, process.env.NEXT_PUBLIC_APP_URL))
     } else {
       // The user declined the charge or it failed
-      return NextResponse.redirect(new URL('/dashboard?error=billing_declined', process.env.NEXT_PUBLIC_APP_URL))
+      const metadata = (integration.metadata as any) || {}
+      await db
+        .update(marketplaceIntegrations)
+        .set({
+          metadata: {
+            ...metadata,
+            isShopifyBilled: true,
+            shopifySubscriptionId: chargeId,
+            shopifySubscriptionStatus: 'DECLINED'
+          }
+        })
+        .where(eq(marketplaceIntegrations.id, integration.id))
+
+      return NextResponse.redirect(new URL(`/subscribe?error=declined&shop=${shop}`, process.env.NEXT_PUBLIC_APP_URL))
     }
   } catch (error) {
     console.error('[Shopify Billing Callback] Error:', error)
-    return NextResponse.redirect(new URL('/dashboard?error=internal_billing_error', process.env.NEXT_PUBLIC_APP_URL))
+    return NextResponse.redirect(new URL('/subscribe?error=internal_billing_error', process.env.NEXT_PUBLIC_APP_URL))
   }
 }
