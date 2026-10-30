@@ -9,6 +9,7 @@ export async function GET(request: Request) {
     const auth = await requireAuth()
     const { searchParams } = new URL(request.url)
     const chargeId = searchParams.get('charge_id')
+    const shopParams = searchParams.get('shop')
     const returnUrl = searchParams.get('returnUrl') || '/dashboard'
 
     const [integration] = await db
@@ -17,7 +18,8 @@ export async function GET(request: Request) {
       .where(
         and(
           eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
-          eq(marketplaceIntegrations.type, 'shopify')
+          eq(marketplaceIntegrations.type, 'shopify'),
+          shopParams ? eq(marketplaceIntegrations.environment, shopParams) : undefined
         )
       )
       .limit(1)

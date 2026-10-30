@@ -104,7 +104,8 @@ export async function GET(request: Request) {
         .where(
           and(
             eq(marketplaceIntegrations.companyId, companyId),
-            eq(marketplaceIntegrations.type, 'shopify')
+            eq(marketplaceIntegrations.type, 'shopify'),
+            eq(marketplaceIntegrations.environment, shop)
           )
         )
 
@@ -191,12 +192,14 @@ export async function GET(request: Request) {
           .where(
             and(
               eq(marketplaceIntegrations.companyId, companyId),
-              eq(marketplaceIntegrations.type, 'shopify')
+              eq(marketplaceIntegrations.type, 'shopify'),
+              eq(marketplaceIntegrations.environment, shop)
             )
           )
           .limit(1)
 
         if (insertedOrUpdated) {
+          const shopName = (shopMetadata as any)?.name ? `Shopify (${(shopMetadata as any).name})` : `Shopify (${shop})`
           await marketplaceSyncQueue.add(
             `sync-shopify`,
             {
@@ -204,13 +207,13 @@ export async function GET(request: Request) {
               marketplace: 'shopify',
               triggeredByUserId: null,
               integrationId: insertedOrUpdated.id,
-              marketplaceDisplayName: 'Shopify',
+              marketplaceDisplayName: shopName,
             },
             {
-              jobId: `sync-shopify-${companyId}-${Date.now()}`
+              jobId: `sync-shopify-${insertedOrUpdated.id}-${Date.now()}`
             }
           )
-          console.log(`[Shopify OAuth] Initial data sync triggered for company ${companyId}`)
+          console.log(`[Shopify OAuth] Initial data sync triggered for company ${companyId} (shop: ${shop})`)
         }
       } catch (e) {
         console.error('[Shopify OAuth] Failed to trigger initial sync:', e)

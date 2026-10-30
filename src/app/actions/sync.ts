@@ -48,7 +48,9 @@ export async function getActiveIntegrationsList() {
     } else if (integration.type === 'amazon') {
       label = 'Amazon'
     } else if (integration.type === 'shopify') {
-      label = 'Shopify'
+      const shopName = (integration.metadata as any)?.shop?.name || (integration.metadata as any)?.shop?.domain || 'Shopify'
+      label = activeIntegrations.filter(i => i.type === 'shopify').length > 1 ? `Shopify (${shopName})` : 'Shopify'
+      value = `shopify_${integration.id}`
     } else if (integration.type === 'etsy') {
       label = 'Etsy'
     }
@@ -134,6 +136,8 @@ export async function triggerManualSyncAction(data: { marketplace: string, fromD
           return !isDecathlon && !isSecretSales && !isDirect
         } else if (data.marketplace.startsWith('mirakl_custom_')) {
           return integration.id === data.marketplace.replace('mirakl_custom_', '')
+        } else if (data.marketplace.startsWith('shopify_')) {
+          return integration.id === data.marketplace.replace('shopify_', '')
         } else {
           return integration.type === data.marketplace
         }

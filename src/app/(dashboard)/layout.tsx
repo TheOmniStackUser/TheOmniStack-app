@@ -51,7 +51,7 @@ export default async function DashboardLayout({
   // Mandatory Shopify Billing Check for App Store Customers (Enforced for all accounts including test accounts)
   const { marketplaceIntegrations } = await import('@/db/schema/integrations')
   const { and } = await import('drizzle-orm')
-  const [shopifyIntegration] = await db
+  const shopifyIntegrations = await db
     .select({ metadata: marketplaceIntegrations.metadata })
     .from(marketplaceIntegrations)
     .where(
@@ -61,11 +61,11 @@ export default async function DashboardLayout({
         eq(marketplaceIntegrations.isActive, true)
       )
     )
-    .limit(1)
   
-  if (shopifyIntegration) {
-    const metadata = (shopifyIntegration.metadata as any) || {}
-    if (metadata.isShopifyBilled && metadata.shopifySubscriptionStatus !== 'ACTIVE') {
+  const shopifyBilled = shopifyIntegrations.filter((i) => (i.metadata as any)?.isShopifyBilled === true)
+  if (shopifyBilled.length > 0) {
+    const hasActiveSubscription = shopifyBilled.some((i) => (i.metadata as any)?.shopifySubscriptionStatus === 'ACTIVE')
+    if (!hasActiveSubscription) {
       redirect('/subscribe')
     }
   }

@@ -94,7 +94,10 @@ export async function POST(request: Request) {
       // Enqueue a sync job for this company
       // Using a somewhat debounced JobID (rounded to nearest 10 seconds) to avoid spam
       const timeBucket = Math.floor(Date.now() / 10000)
-      const jobId = `sync-shopify-webhook-${integration.companyId}-${timeBucket}`
+      const jobId = `sync-shopify-webhook-${integration.id}-${timeBucket}`
+      const shopDisplayName = (integration.metadata as any)?.shop?.name 
+        ? `Shopify (${(integration.metadata as any).shop.name})` 
+        : `Shopify (${shopDomain})`
 
       await marketplaceSyncQueue.add(
         `sync-shopify`,
@@ -103,7 +106,7 @@ export async function POST(request: Request) {
           marketplace: 'shopify',
           triggeredByUserId: null,
           integrationId: integration.id,
-          marketplaceDisplayName: 'Shopify',
+          marketplaceDisplayName: shopDisplayName,
         },
         {
           jobId, // This acts as a debounce within the 10-second window

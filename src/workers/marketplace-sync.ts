@@ -563,7 +563,7 @@ export function getAdapterForIntegration(
   }
   if (integration.type === 'shopify') {
     if (!integration.environment) return null
-    return new ShopifyAdapter()
+    return new ShopifyAdapter(integration)
   }
   if (integration.type === 'etsy') {
     if (!integration.clientId || !integration.clientSecret) return null

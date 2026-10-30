@@ -54,7 +54,10 @@ export default async function IntegrationsPage(props: {
       if (i.type === 'otto') label = 'Otto.de'
       else if (i.type === 'etsy') label = 'Etsy'
       else if (i.type === 'amazon') label = 'Amazon EU'
-      else if (i.type === 'shopify') label = 'Shopify'
+      else if (i.type === 'shopify') {
+        const shopName = (i.metadata as any)?.shop?.name || i.environment
+        label = shopName ? `Shopify (${shopName})` : 'Shopify'
+      }
       else if (i.type === 'aboutyou') label = 'About You'
       else if (i.type === 'kaufland') label = 'Kaufland'
       else if (i.type === 'ebay') label = 'eBay'
@@ -75,13 +78,18 @@ export default async function IntegrationsPage(props: {
     .map((i) => {
       const key = i.type === 'mirakl_custom'
         ? ((i.metadata as any)?.customName || '').toLowerCase()
+        : i.type === 'shopify'
+        ? `shopify_${i.id}`
         : i.type
 
       let label: string = i.type
       if (i.type === 'otto') label = 'Otto.de'
       else if (i.type === 'etsy') label = 'Etsy'
       else if (i.type === 'amazon') label = 'Amazon EU'
-      else if (i.type === 'shopify') label = 'Shopify'
+      else if (i.type === 'shopify') {
+        const shopName = (i.metadata as any)?.shop?.name || i.environment
+        label = shopName ? `Shopify (${shopName})` : 'Shopify'
+      }
       else if (i.type === 'aboutyou') label = 'About You'
       else if (i.type === 'kaufland') label = 'Kaufland'
       else if (i.type === 'ebay') label = 'eBay'
@@ -294,10 +302,12 @@ export default async function IntegrationsPage(props: {
                   <span className="text-green-800 font-black text-xs tracking-tighter">Shopify</span>
                 </div>
               }
-              badge={integrations.find((i: any) => i.type === 'shopify' && i.isActive)?.accessToken ? (
+              badge={integrations.filter((i: any) => i.type === 'shopify' && i.isActive && i.accessToken).length > 0 ? (
                 <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
                   <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                  Verbunden
+                  {integrations.filter((i: any) => i.type === 'shopify' && i.isActive && i.accessToken).length > 1
+                    ? `Verbunden (${integrations.filter((i: any) => i.type === 'shopify' && i.isActive && i.accessToken).length} Shops)`
+                    : 'Verbunden'}
                 </span>
               ) : (
                 <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
@@ -307,7 +317,7 @@ export default async function IntegrationsPage(props: {
             >
               <div className="p-6 bg-gray-50">
                 <ShopifyIntegrationForm
-                  initialData={integrations.find((i: any) => i.type === 'shopify' && i.isActive)}
+                  initialIntegrations={integrations.filter((i: any) => i.type === 'shopify' && i.isActive && i.accessToken)}
                 />
               </div>
             </CollapsibleSection>

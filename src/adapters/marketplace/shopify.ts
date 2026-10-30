@@ -7,20 +7,29 @@ import { eq, and } from 'drizzle-orm'
 
 export class ShopifyAdapter implements MarketplaceAdapter {
   readonly marketplace = 'shopify'
+  private integration?: typeof marketplaceIntegrations.$inferSelect
+
+  constructor(integration?: typeof marketplaceIntegrations.$inferSelect) {
+    this.integration = integration
+  }
 
   async fetchUnshippedOrders(companyId: string, options?: { fromDate?: string; toDate?: string }): Promise<NormalizedOrder[]> {
-    // 1. Get credentials
-    const [integration] = await db
-      .select()
-      .from(marketplaceIntegrations)
-      .where(
-        and(
-          eq(marketplaceIntegrations.companyId, companyId),
-          eq(marketplaceIntegrations.type, 'shopify'),
-          eq(marketplaceIntegrations.isActive, true)
+    // 1. Get credentials (use passed integration or lookup first active shopify integration)
+    let integration = this.integration
+    if (!integration) {
+      const [found] = await db
+        .select()
+        .from(marketplaceIntegrations)
+        .where(
+          and(
+            eq(marketplaceIntegrations.companyId, companyId),
+            eq(marketplaceIntegrations.type, 'shopify'),
+            eq(marketplaceIntegrations.isActive, true)
+          )
         )
-      )
-      .limit(1)
+        .limit(1)
+      integration = found
+    }
 
     if (!integration || !integration.environment) {
       console.warn(`[Shopify] No active credentials found for company ${companyId}`)
@@ -35,14 +44,14 @@ export class ShopifyAdapter implements MarketplaceAdapter {
 
     try {
       const accessToken = await this.getAccessToken(integration)
-      return await this.fetchWithToken(shopUrl, accessToken, options)
+      return await this.fetchWithToken(shopUrl, accessToken, options, integration.id)
     } catch (err) {
       console.error(`[Shopify] Error fetching unshipped orders:`, err)
       throw err
     }
   }
 
-  private async fetchWithToken(shopUrl: string, token: string, options?: any): Promise<NormalizedOrder[]> {
+  private async fetchWithToken(shopUrl: string, token: string, options?: any, integrationId?: string): Promise<NormalizedOrder[]> {
     const endpoint = `${shopUrl}/admin/api/2024-01/orders.json?status=any&limit=50`
     const res = await fetch(endpoint, {
       method: 'GET',
@@ -59,10 +68,10 @@ export class ShopifyAdapter implements MarketplaceAdapter {
     }
 
     const data = await res.json()
-    return this.mapOrders(data.orders || [])
+    return this.mapOrders(data.orders || [], shopUrl, integrationId)
   }
 
-  private mapOrders(orders: any[]): NormalizedOrder[] {
+  private mapOrders(orders: any[], shopUrl?: string, integrationId?: string): NormalizedOrder[] {
     return orders.map((order: any): NormalizedOrder => {
       // Shipping address
       const sa = order.shipping_address || order.billing_address || {}
@@ -115,9 +124,64 @@ export class ShopifyAdapter implements MarketplaceAdapter {
         totalAmount,
         taxAmount,
         totalWeight: totalWeightKg,
-        rawPayload: order, // Preserve raw Shopify payload
+        rawPayload: {
+          ...order,
+          _shopDomain: shopUrl ? shopUrl.replace(/^https?:\/\//, '').replace(/\/.*$/, '') : undefined,
+          _integrationId: integrationId,
+        },
       }
     })
+  }
+
+  private async getIntegrationForOrder(orderRow: typeof orders.$inferSelect): Promise<typeof marketplaceIntegrations.$inferSelect | null> {
+    if (this.integration) return this.integration
+
+    const rawPayload = (orderRow.rawPayload as any) || {}
+    const targetIntegrationId = rawPayload._integrationId
+    const targetShopDomain = rawPayload._shopDomain
+
+    if (targetIntegrationId) {
+      const [found] = await db
+        .select()
+        .from(marketplaceIntegrations)
+        .where(
+          and(
+            eq(marketplaceIntegrations.id, targetIntegrationId),
+            eq(marketplaceIntegrations.companyId, orderRow.companyId),
+            eq(marketplaceIntegrations.isActive, true)
+          )
+        )
+        .limit(1)
+      if (found) return found
+    }
+
+    if (targetShopDomain) {
+      const [found] = await db
+        .select()
+        .from(marketplaceIntegrations)
+        .where(
+          and(
+            eq(marketplaceIntegrations.environment, targetShopDomain),
+            eq(marketplaceIntegrations.companyId, orderRow.companyId),
+            eq(marketplaceIntegrations.isActive, true)
+          )
+        )
+        .limit(1)
+      if (found) return found
+    }
+
+    const [found] = await db
+      .select()
+      .from(marketplaceIntegrations)
+      .where(
+        and(
+          eq(marketplaceIntegrations.companyId, orderRow.companyId),
+          eq(marketplaceIntegrations.type, 'shopify'),
+          eq(marketplaceIntegrations.isActive, true)
+        )
+      )
+      .limit(1)
+    return found || null
   }
 
   async confirmShipment(
@@ -140,17 +204,7 @@ export class ShopifyAdapter implements MarketplaceAdapter {
        return
     }
 
-    const [integration] = await db
-      .select()
-      .from(marketplaceIntegrations)
-      .where(
-        and(
-          eq(marketplaceIntegrations.companyId, orderRow.companyId),
-          eq(marketplaceIntegrations.type, 'shopify'),
-          eq(marketplaceIntegrations.isActive, true)
-        )
-      )
-      .limit(1)
+    const integration = await this.getIntegrationForOrder(orderRow)
 
     if (!integration || !integration.environment) {
       console.warn(`[Shopify] No active credentials found for company ${orderRow.companyId}`)
@@ -233,17 +287,7 @@ export class ShopifyAdapter implements MarketplaceAdapter {
       }
 
       // 2. Fetch active Shopify integration
-      const [integration] = await db
-        .select()
-        .from(marketplaceIntegrations)
-        .where(
-          and(
-            eq(marketplaceIntegrations.companyId, orderRow.companyId),
-            eq(marketplaceIntegrations.type, 'shopify'),
-            eq(marketplaceIntegrations.isActive, true)
-          )
-        )
-        .limit(1)
+      const integration = await this.getIntegrationForOrder(orderRow)
 
       if (!integration || !integration.environment) {
         console.warn(`[Shopify] No active credentials found for company ${orderRow.companyId}`)
@@ -480,17 +524,21 @@ export class ShopifyAdapter implements MarketplaceAdapter {
 
   async fetchProducts(companyId: string): Promise<import('./base').MarketplaceProduct[]> {
     try {
-      const [integration] = await db
-        .select()
-        .from(marketplaceIntegrations)
-        .where(
-          and(
-            eq(marketplaceIntegrations.companyId, companyId),
-            eq(marketplaceIntegrations.type, 'shopify'),
-            eq(marketplaceIntegrations.isActive, true)
+      let integration = this.integration
+      if (!integration) {
+        const [found] = await db
+          .select()
+          .from(marketplaceIntegrations)
+          .where(
+            and(
+              eq(marketplaceIntegrations.companyId, companyId),
+              eq(marketplaceIntegrations.type, 'shopify'),
+              eq(marketplaceIntegrations.isActive, true)
+            )
           )
-        )
-        .limit(1)
+          .limit(1)
+        integration = found
+      }
 
       if (!integration || !integration.environment) {
         console.warn(`[Shopify] No active credentials found for company ${companyId}`)
@@ -584,17 +632,21 @@ export class ShopifyAdapter implements MarketplaceAdapter {
     if (!updates || updates.length === 0) return
 
     try {
-      const [integration] = await db
-        .select()
-        .from(marketplaceIntegrations)
-        .where(
-          and(
-            eq(marketplaceIntegrations.companyId, companyId),
-            eq(marketplaceIntegrations.type, 'shopify'),
-            eq(marketplaceIntegrations.isActive, true)
+      let integration = this.integration
+      if (!integration) {
+        const [found] = await db
+          .select()
+          .from(marketplaceIntegrations)
+          .where(
+            and(
+              eq(marketplaceIntegrations.companyId, companyId),
+              eq(marketplaceIntegrations.type, 'shopify'),
+              eq(marketplaceIntegrations.isActive, true)
+            )
           )
-        )
-        .limit(1)
+          .limit(1)
+        integration = found
+      }
 
       if (!integration || !integration.environment) {
         console.warn(`[Shopify] No active credentials found for company ${companyId}`)
