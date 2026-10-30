@@ -380,6 +380,70 @@ export async function saveDhlIntegrationAction(
   return { success: true, message: 'DHL Konfiguration wurde erfolgreich gespeichert!' }
 }
 
+export async function testDhlConnectionAction(credentials: {
+  username?: string
+  password?: string
+  apiKey?: string
+  environment?: 'production' | 'sandbox'
+}): Promise<{ success: boolean; message: string }> {
+  await requireAuth()
+
+  const username = (credentials.username || '').trim()
+  const password = (credentials.password || '').trim()
+  const apiKey = (credentials.apiKey || '').trim() || process.env.DHL_API_KEY || ''
+  const env = credentials.environment || 'production'
+
+  if (!username || !password) {
+    return { success: false, message: 'Bitte Benutzername und Passwort eingeben.' }
+  }
+
+  if (!apiKey) {
+    return { success: false, message: 'DHL API-Key fehlt (weder im Formular noch serverseitig hinterlegt).' }
+  }
+
+  const baseUrl = env === 'sandbox'
+    ? 'https://api-sandbox.dhl.com/parcel/de/shipping/v2'
+    : 'https://api-eu.dhl.com/parcel/de/shipping/v2'
+
+  const basicAuth = Buffer.from(`${username}:${password}`).toString('base64')
+
+  try {
+    const res = await fetch(`${baseUrl}/orders`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Basic ${basicAuth}`,
+        'dhl-api-key': apiKey,
+        'Accept': 'application/json',
+      },
+    })
+
+    if (res.status === 401 || res.status === 403) {
+      return {
+        success: false,
+        message: 'Authentifizierung fehlgeschlagen (401/403). Bitte überprüfe Benutzername, Passwort und API-Key.'
+      }
+    }
+
+    if (res.ok || res.status === 400 || res.status === 404 || res.status === 422) {
+      return {
+        success: true,
+        message: 'Verbindung zu DHL Geschäftskundenversand erfolgreich hergestellt!'
+      }
+    }
+
+    const text = await res.text()
+    return {
+      success: false,
+      message: `DHL Rückmeldung (${res.status}): ${text.slice(0, 150)}`
+    }
+  } catch (err: any) {
+    return {
+      success: false,
+      message: `Netzwerkfehler bei der Verbindung zu DHL: ${err?.message || 'Unbekannter Fehler'}`
+    }
+  }
+}
+
 const ShopifyIntegrationSchema = z.object({
   environment: z.string().url({ message: 'Bitte gib eine gültige Shop URL an (inkl. https://).' }).trim(),
   clientId: z.string().min(1, { message: 'Client ID ist erforderlich.' }).trim(),
