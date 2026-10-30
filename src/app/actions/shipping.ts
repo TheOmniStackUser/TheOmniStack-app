@@ -275,9 +275,61 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
   }
 }
 
+// Helper: normalize 2-letter to 3-letter ISO country codes
+const toIso3 = (code: string | null | undefined): string => {
+  const map: Record<string, string> = {
+    BD: "BGD", BE: "BEL", BF: "BFA", BG: "BGR", BA: "BIH", BB: "BRB", WF: "WLF", BL: "BLM", BM: "BMU",
+    BN: "BRN", BO: "BOL", BH: "BHR", BI: "BDI", BJ: "BEN", BT: "BTN", JM: "JAM", BV: "BVT", BW: "BWA",
+    WS: "WSM", BQ: "BES", BR: "BRA", BS: "BHS", JE: "JEY", BY: "BLR", BZ: "BLZ", RU: "RUS", RW: "RWA",
+    RS: "SRB", TL: "TLS", RE: "REU", TM: "TKM", TJ: "TJK", RO: "ROU", TK: "TKL", GW: "GNB", GU: "GUM",
+    GT: "GTM", GS: "SGS", GR: "GRC", GQ: "GNQ", GP: "GLP", JP: "JPN", GY: "GUY", GG: "GGY", GF: "GUF",
+    GE: "GEO", GD: "GRD", GB: "GBR", GA: "GAB", SV: "SLV", GN: "GIN", GM: "GMB", GL: "GRL", GI: "GIB",
+    GH: "GHA", OM: "OMN", TN: "TUN", JO: "JOR", HR: "HRV", HT: "HTI", HU: "HUN", HK: "HKG", HN: "HND",
+    HM: "HMD", VE: "VEN", PR: "PRI", PS: "PSE", PW: "PLW", PT: "PRT", SJ: "SJM", PY: "PRY", IQ: "IRQ",
+    PA: "PAN", PF: "PYF", PG: "PNG", PE: "PER", PK: "PAK", PH: "PHL", PN: "PCN", PL: "POL", PM: "SPM",
+    ZM: "ZMB", EH: "ESH", EE: "EST", EG: "EGY", ZA: "ZAF", EC: "ECU", IT: "ITA", VN: "VNM", SB: "SLB",
+    ET: "ETH", SO: "SOM", ZW: "ZWE", SA: "SAU", ES: "ESP", ER: "ERI", ME: "MNE", MD: "MDA", MG: "MDG",
+    MF: "MAF", MA: "MAR", MC: "MCO", UZ: "UZB", MM: "MMR", ML: "MLI", MO: "MAC", MN: "MNG", MH: "MHL",
+    MK: "MKD", MU: "MUS", MT: "MLT", MW: "MWI", MV: "MDV", MQ: "MTQ", MP: "MNP", MS: "MSR", MR: "MRT",
+    IM: "IMN", UG: "UGA", TZ: "TZA", MY: "MYS", MX: "MEX", IL: "ISR", FR: "FRA", IO: "IOT", SH: "SHN",
+    FI: "FIN", FJ: "FJI", FK: "FLK", FM: "FSM", FO: "FRO", NI: "NIC", NL: "NLD", NO: "NOR", NA: "NAM",
+    VU: "VUT", NC: "NCL", NE: "NER", NF: "NFK", NG: "NGA", NZ: "NZL", NP: "NPL", NR: "NRU", NU: "NIU",
+    CK: "COK", XK: "XKX", CI: "CIV", CH: "CHE", CO: "COL", CN: "CHN", CM: "CMR", CL: "CHL", CC: "CCK",
+    CA: "CAN", CG: "COG", CF: "CAF", CD: "COD", CZ: "CZE", CY: "CYP", CX: "CXR", CR: "CRI", CW: "CUW",
+    CV: "CPV", CU: "CUB", SZ: "SWZ", SY: "SYR", SX: "SXM", KG: "KGZ", KE: "KEN", SS: "SSD", SR: "SUR",
+    KI: "KIR", KH: "KHM", KN: "KNA", KM: "COM", ST: "STP", SK: "SVK", KR: "KOR", SI: "SVN", KP: "PRK",
+    KW: "KWT", SN: "SEN", SM: "SMR", SL: "SLE", SC: "SYC", KZ: "KAZ", KY: "CYM", SG: "SGP", SE: "SWE",
+    SD: "SDN", DO: "DOM", DM: "DMA", DJ: "DJI", DK: "DNK", VG: "VGB", DE: "DEU", YE: "YEM", DZ: "DZA",
+    US: "USA", UY: "URY", YT: "MYT", UM: "UMI", LB: "LBN", LC: "LCA", LA: "LAO", TV: "TUV", TW: "TWN",
+    TT: "TTO", TR: "TUR", LK: "LKA", LI: "LIE", LV: "LVA", TO: "TON", LT: "LTU", LU: "LUX", LR: "LBR",
+    LS: "LSO", TH: "THA", TF: "ATF", TG: "TGO", TD: "TCD", TC: "TCA", LY: "LBY", VA: "VAT", VC: "VCT",
+    AE: "ARE", AD: "AND", AG: "ATG", AF: "AFG", AI: "AIA", VI: "VIR", IS: "ISL", IR: "IRN", AM: "ARM",
+    AL: "ALB", AO: "AGO", AQ: "ATA", AS: "ASM", AR: "ARG", AU: "AUS", AT: "AUT", AW: "ABW", IN: "IND",
+    AX: "ALA", AZ: "AZE", IE: "IRL", ID: "IDN", UA: "UKR", QA: "QAT", MZ: "MOZ"
+  }
+  if (!code) return 'DEU'
+  const upper = code.toUpperCase()
+  return map[upper] ?? (upper.length === 3 ? upper : 'DEU')
+}
+
+// Helper: split "Musterstraße 12a" into street + house number
+const splitStreet = (full: string | null | undefined): { street: string; houseNo: string } => {
+  if (!full) return { street: '', houseNo: '.' }
+  // Try to find a number/complex part at the end (supports 12, 12a, 74/1, 10-12)
+  const match = full.match(/^(.+?)\s+([\d\-\/]+\s*[a-zA-Z]*)$/)
+  if (match) return { street: match[1].trim(), houseNo: match[2].trim().slice(0, 10) }
+  // Fallback: split by last space
+  const parts = full.trim().split(/\s+/)
+  if (parts.length > 1) {
+    const last = parts.pop()!
+    return { street: parts.join(' ').trim(), houseNo: last.slice(0, 10) }
+  }
+  return { street: full.trim(), houseNo: '.' }
+}
+
 export async function generateDhlLabelsAction(
   orderIds?: string[],
-  orderConfigMap?: Record<string, { productCode: string; weight: number }>
+  orderConfigMap?: Record<string, { productCode: string; weight: number; withReturnLabel?: boolean }>
 ) {
   const auth = await requireAuth()
 
@@ -390,77 +442,32 @@ export async function generateDhlLabelsAction(
 
     const basicAuth = Buffer.from(`${config.username}:${config.password}`).toString('base64')
 
-    // Helper: normalize 2-letter to 3-letter ISO country codes
-    const toIso3 = (code: string | null | undefined): string => {
-      const map: Record<string, string> = {
-        BD: "BGD", BE: "BEL", BF: "BFA", BG: "BGR", BA: "BIH", BB: "BRB", WF: "WLF", BL: "BLM", BM: "BMU",
-        BN: "BRN", BO: "BOL", BH: "BHR", BI: "BDI", BJ: "BEN", BT: "BTN", JM: "JAM", BV: "BVT", BW: "BWA",
-        WS: "WSM", BQ: "BES", BR: "BRA", BS: "BHS", JE: "JEY", BY: "BLR", BZ: "BLZ", RU: "RUS", RW: "RWA",
-        RS: "SRB", TL: "TLS", RE: "REU", TM: "TKM", TJ: "TJK", RO: "ROU", TK: "TKL", GW: "GNB", GU: "GUM",
-        GT: "GTM", GS: "SGS", GR: "GRC", GQ: "GNQ", GP: "GLP", JP: "JPN", GY: "GUY", GG: "GGY", GF: "GUF",
-        GE: "GEO", GD: "GRD", GB: "GBR", GA: "GAB", SV: "SLV", GN: "GIN", GM: "GMB", GL: "GRL", GI: "GIB",
-        GH: "GHA", OM: "OMN", TN: "TUN", JO: "JOR", HR: "HRV", HT: "HTI", HU: "HUN", HK: "HKG", HN: "HND",
-        HM: "HMD", VE: "VEN", PR: "PRI", PS: "PSE", PW: "PLW", PT: "PRT", SJ: "SJM", PY: "PRY", IQ: "IRQ",
-        PA: "PAN", PF: "PYF", PG: "PNG", PE: "PER", PK: "PAK", PH: "PHL", PN: "PCN", PL: "POL", PM: "SPM",
-        ZM: "ZMB", EH: "ESH", EE: "EST", EG: "EGY", ZA: "ZAF", EC: "ECU", IT: "ITA", VN: "VNM", SB: "SLB",
-        ET: "ETH", SO: "SOM", ZW: "ZWE", SA: "SAU", ES: "ESP", ER: "ERI", ME: "MNE", MD: "MDA", MG: "MDG",
-        MF: "MAF", MA: "MAR", MC: "MCO", UZ: "UZB", MM: "MMR", ML: "MLI", MO: "MAC", MN: "MNG", MH: "MHL",
-        MK: "MKD", MU: "MUS", MT: "MLT", MW: "MWI", MV: "MDV", MQ: "MTQ", MP: "MNP", MS: "MSR", MR: "MRT",
-        IM: "IMN", UG: "UGA", TZ: "TZA", MY: "MYS", MX: "MEX", IL: "ISR", FR: "FRA", IO: "IOT", SH: "SHN",
-        FI: "FIN", FJ: "FJI", FK: "FLK", FM: "FSM", FO: "FRO", NI: "NIC", NL: "NLD", NO: "NOR", NA: "NAM",
-        VU: "VUT", NC: "NCL", NE: "NER", NF: "NFK", NG: "NGA", NZ: "NZL", NP: "NPL", NR: "NRU", NU: "NIU",
-        CK: "COK", XK: "XKX", CI: "CIV", CH: "CHE", CO: "COL", CN: "CHN", CM: "CMR", CL: "CHL", CC: "CCK",
-        CA: "CAN", CG: "COG", CF: "CAF", CD: "COD", CZ: "CZE", CY: "CYP", CX: "CXR", CR: "CRI", CW: "CUW",
-        CV: "CPV", CU: "CUB", SZ: "SWZ", SY: "SYR", SX: "SXM", KG: "KGZ", KE: "KEN", SS: "SSD", SR: "SUR",
-        KI: "KIR", KH: "KHM", KN: "KNA", KM: "COM", ST: "STP", SK: "SVK", KR: "KOR", SI: "SVN", KP: "PRK",
-        KW: "KWT", SN: "SEN", SM: "SMR", SL: "SLE", SC: "SYC", KZ: "KAZ", KY: "CYM", SG: "SGP", SE: "SWE",
-        SD: "SDN", DO: "DOM", DM: "DMA", DJ: "DJI", DK: "DNK", VG: "VGB", DE: "DEU", YE: "YEM", DZ: "DZA",
-        US: "USA", UY: "URY", YT: "MYT", UM: "UMI", LB: "LBN", LC: "LCA", LA: "LAO", TV: "TUV", TW: "TWN",
-        TT: "TTO", TR: "TUR", LK: "LKA", LI: "LIE", LV: "LVA", TO: "TON", LT: "LTU", LU: "LUX", LR: "LBR",
-        LS: "LSO", TH: "THA", TF: "ATF", TG: "TGO", TD: "TCD", TC: "TCA", LY: "LBY", VA: "VAT", VC: "VCT",
-        AE: "ARE", AD: "AND", AG: "ATG", AF: "AFG", AI: "AIA", VI: "VIR", IS: "ISL", IR: "IRN", AM: "ARM",
-        AL: "ALB", AO: "AGO", AQ: "ATA", AS: "ASM", AR: "ARG", AU: "AUS", AT: "AUT", AW: "ABW", IN: "IND",
-        AX: "ALA", AZ: "AZE", IE: "IRL", ID: "IDN", UA: "UKR", QA: "QAT", MZ: "MOZ"
-      }
-      if (!code) return 'DEU'
-      const upper = code.toUpperCase()
-      return map[upper] ?? (upper.length === 3 ? upper : 'DEU')
-    }
-
-    // Helper: split "Musterstraße 12a" into street + house number
-    const splitStreet = (full: string | null | undefined): { street: string; houseNo: string } => {
-      if (!full) return { street: '', houseNo: '.' }
-      // Try to find a number/complex part at the end (supports 12, 12a, 74/1, 10-12)
-      const match = full.match(/^(.+?)\s+([\d\-\/]+\s*[a-zA-Z]*)$/)
-      if (match) return { street: match[1].trim(), houseNo: match[2].trim().slice(0, 10) }
-      // Fallback: split by last space
-      const parts = full.trim().split(/\s+/)
-      if (parts.length > 1) {
-        const last = parts.pop()!
-        return { street: parts.join(' ').trim(), houseNo: last.slice(0, 10) }
-      }
-      return { street: full.trim(), houseNo: '.' }
-    }
-
     interface ShippingTaskResult {
       success: boolean;
       orderId?: string;
       error?: string;
+      labels?: string[];
     }
 
     const tasks = pendingOrders.map(order => async (): Promise<ShippingTaskResult> => {
       try {
         const { street: consigneeStreet, houseNo: consigneeHouseNo } = splitStreet(order.shippingStreet)
 
-        const returnType = config.platformReturns?.[order.marketplace] ?? 'online'
-        const needsEnclosedReturn = returnType === 'enclosed_with_label' || returnType === 'enclosed_without_label'
-        
-        if (needsEnclosedReturn && !returnBillingNum) {
-          throw new Error('Retouren-Abrechnungsnummer fehlt. Bitte trage unter Integrationen -> DHL eine Retouren-Abrechnungsnummer ein, um Retourenlabels zu generieren.')
-        }
-        
         const orderConfig = orderConfigMap?.[order.id]
         const productCode = orderConfig?.productCode || domesticZone.productCode || 'V01PAK'
+        const initialProduct = config.products?.find(p => p.productCode === productCode)
+
+        // Determine if return label should be generated
+        const platformReturnSetting = config.platformReturns?.[order.marketplace]
+        let needsEnclosedReturn = false
+
+        if (orderConfig?.withReturnLabel !== undefined) {
+          needsEnclosedReturn = Boolean(orderConfig.withReturnLabel)
+        } else if (initialProduct?.returnType && initialProduct.returnType !== '' && initialProduct.returnType !== 'none') {
+          needsEnclosedReturn = true
+        } else if (platformReturnSetting === 'enclosed_with_label') {
+          needsEnclosedReturn = true
+        }
 
         // Resolve billing number for this product code
         let zone = config.zones?.find(z => z.productCode === productCode && z.billingNumber)
@@ -477,7 +484,6 @@ export async function generateDhlLabelsAction(
         if (billingNum.length !== 14) {
           throw new Error(`Die Abrechnungsnummer für das ausgewählte Produkt ${productCode} muss exakt 14 Zeichen haben, aktuell: ${billingNum.length} Zeichen.`)
         }
-        const resolvedReturnBillingNum = zone.returnBillingNumber?.replace(/\s/g, '')
 
         // Automatically correct productCode based on the procedure ID (Verfahrens-ID) in the billing number
         let resolvedProductCode = productCode
@@ -502,8 +508,50 @@ export async function generateDhlLabelsAction(
           resolvedProductCode = verfahrensMap[verfahrensId]
         }
 
-        if (needsEnclosedReturn && !resolvedReturnBillingNum) {
-          throw new Error(`Retouren-Abrechnungsnummer für Produkt ${resolvedProductCode} fehlt. Bitte trage unter Integrationen -> DHL eine Retouren-Abrechnungsnummer ein.`)
+        // Resolve return billing number if return label is requested
+        let resolvedReturnBillingNum: string | undefined = undefined
+        if (needsEnclosedReturn) {
+          // 1. Check current zone's return billing number
+          if (zone.returnBillingNumber && zone.returnBillingNumber.replace(/\s/g, '').length === 14) {
+            resolvedReturnBillingNum = zone.returnBillingNumber.replace(/\s/g, '')
+          }
+
+          // 2. If destination is DEU (national return):
+          const consigneeCountry = toIso3(order.shippingCountry)
+          if (!resolvedReturnBillingNum && consigneeCountry === 'DEU') {
+            const retZone = config.zones?.find(z => {
+              const num = (z.returnBillingNumber || (z.productCode === 'V07PAK' ? z.billingNumber : '')).replace(/\s/g, '')
+              return num.length === 14 && (num.slice(10, 12) === '07' || z.id === 'domestic')
+            })
+            if (retZone) {
+              const candidate = (retZone.returnBillingNumber || (retZone.productCode === 'V07PAK' ? retZone.billingNumber : '')).replace(/\s/g, '')
+              if (candidate.length === 14) resolvedReturnBillingNum = candidate
+            }
+            if (!resolvedReturnBillingNum && domesticZone.returnBillingNumber) {
+              const domRet = domesticZone.returnBillingNumber.replace(/\s/g, '')
+              if (domRet.length === 14) resolvedReturnBillingNum = domRet
+            }
+          }
+
+          // 3. If destination is international / EU:
+          if (!resolvedReturnBillingNum && consigneeCountry !== 'DEU') {
+            const intZone = config.zones?.find(z => {
+              const num = (z.returnBillingNumber || (['V53WPAK', 'V06PAK'].includes(z.productCode) ? z.billingNumber : '')).replace(/\s/g, '')
+              return num.length === 14 && (num.slice(10, 12) === '53' || z.id === 'eu' || z.id === 'international')
+            })
+            if (intZone) {
+              const candidate = (intZone.returnBillingNumber || intZone.billingNumber).replace(/\s/g, '')
+              if (candidate.length === 14) resolvedReturnBillingNum = candidate
+            }
+            if (!resolvedReturnBillingNum && domesticZone.returnBillingNumber) {
+              const domRet = domesticZone.returnBillingNumber.replace(/\s/g, '')
+              if (domRet.length === 14) resolvedReturnBillingNum = domRet
+            }
+          }
+
+          if (!resolvedReturnBillingNum) {
+            throw new Error(`Retouren-Abrechnungsnummer für Produkt ${resolvedProductCode} (${order.marketplace}) fehlt. Bitte trage unter Integrationen -> DHL eine Retouren-Abrechnungsnummer ein.`)
+          }
         }
 
         // Always false to keep return label separate from the outbound label
@@ -579,7 +627,7 @@ export async function generateDhlLabelsAction(
                 : (splitStreet(company.warehouseStreet || company.street || '').houseNo || '1'),
               postalCode: company.warehouseZip || company.zip || '53113',
               city: company.warehouseCity || company.city || 'Bonn',
-              country: (company.warehouseCountry || company.country) === 'DE' ? 'DEU' : ((company.warehouseCountry || company.country) || 'DEU'),
+              country: toIso3(company.warehouseCountry || company.country) || 'DEU',
             },
             consignee: {
               name1: (order.shippingCompany || order.shippingName || 'Empfänger').slice(0, 50),
@@ -832,12 +880,13 @@ export async function generateDhlLabelsAction(
 
         const orderLabels: string[] = []
         if (labelUrl) orderLabels.push(labelUrl)
-        if (returnType === 'enclosed_with_label' && returnLabelUrl) orderLabels.push(returnLabelUrl)
+        if (returnLabelUrl) orderLabels.push(returnLabelUrl)
 
         return {
           success: true,
           orderId: order.id,
-          error: confirmError
+          error: confirmError,
+          labels: orderLabels,
         }
       } catch (err: any) {
         const msg = err?.message ?? String(err)
@@ -851,12 +900,16 @@ export async function generateDhlLabelsAction(
     let successCount = 0
     const generatedIds: string[] = []
     const errors: string[] = []
+    const allLabels: string[] = []
 
     for (const res of results) {
       if (res.success) {
         successCount++
         if (res.orderId) {
           generatedIds.push(res.orderId)
+        }
+        if (res.labels && res.labels.length > 0) {
+          allLabels.push(...res.labels)
         }
       }
       if (res.error) {
@@ -879,6 +932,7 @@ export async function generateDhlLabelsAction(
         message: `${successCount} DHL-Versandetikett${successCount === 1 ? '' : 'en'} erstellt!`,
         warning: `Erfolgreich: ${successCount} DHL-Etikett(en) erstellt.\n\nFolgende Bestellungen konnten nicht versendet werden. Bitte die Lieferadresse prüfen:\n- ${errors.join('\n- ')}`,
         generatedIds,
+        labels: allLabels,
       }
     }
 
@@ -886,9 +940,245 @@ export async function generateDhlLabelsAction(
       success: true,
       message: `${successCount} DHL-Versandetikett${successCount === 1 ? '' : 'en'} erstellt!`,
       generatedIds,
+      labels: allLabels,
     }
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Fehler bei der DHL API Kommunikation.' }
+  }
+}
+
+export async function generateSingleDhlReturnLabelAction(orderId: string) {
+  const auth = await requireAuth()
+
+  try {
+    // 1. Load DHL config from DB
+    const [integration] = await db
+      .select()
+      .from(marketplaceIntegrations)
+      .where(
+        and(
+          eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
+          eq(marketplaceIntegrations.type, 'dhl'),
+          eq(marketplaceIntegrations.isActive, true)
+        )
+      )
+      .limit(1)
+
+    if (!integration?.metadata) {
+      return { error: 'DHL ist nicht konfiguriert. Bitte richte die DHL-Verbindung unter Integrationen ein.' }
+    }
+
+    const config = integration.metadata as DhlConfig
+
+    if (!config || !config.username || !config.password) {
+      return { error: 'DHL Zugangsdaten fehlen. Bitte überprüfe die DHL-Konfiguration unter Integrationen.' }
+    }
+
+    const apiKey = (config.apiKey || '').trim() || process.env.DHL_API_KEY
+    if (!apiKey) {
+      return { error: 'Systemfehler: DHL API Key fehlt. Bitte kontaktiere den Support.' }
+    }
+
+    // 2. Fetch order
+    const [order] = await db
+      .select()
+      .from(orders)
+      .where(
+        and(
+          eq(orders.id, orderId),
+          eq(orders.companyId, auth.activeCompanyId)
+        )
+      )
+      .limit(1)
+
+    if (!order) {
+      return { error: 'Bestellung konnte nicht gefunden werden.' }
+    }
+
+    if (!order.shippingStreet || !order.shippingZip || !order.shippingCity) {
+      return { error: 'Lieferadresse des Kunden ist unvollständig (Straße, PLZ oder Stadt fehlt).' }
+    }
+
+    // 3. Fetch company for warehouse/shipper address
+    const [company] = await db
+      .select()
+      .from(companies)
+      .where(eq(companies.id, auth.activeCompanyId))
+      .limit(1)
+
+    if (!company) {
+      return { error: 'Unternehmensdaten konnten nicht geladen werden.' }
+    }
+
+    const warehouseStreetFull = company.warehouseStreet || company.street
+    const warehouseZip = company.warehouseZip || company.zip
+    const warehouseCity = company.warehouseCity || company.city
+    const warehouseCountry = toIso3(company.warehouseCountry || company.country) || 'DEU'
+
+    if (!warehouseStreetFull || !warehouseZip || !warehouseCity) {
+      return { error: 'Keine Empfängeradresse/Lageradresse für Retouren in den Firmeneinstellungen hinterlegt.' }
+    }
+
+    const domesticZone = config.zones?.find(z => z.id === 'domestic' && z.billingNumber)
+      ?? config.zones?.find(z => z.billingNumber)
+    if (!domesticZone?.billingNumber) {
+      return { error: 'Keine DHL Abrechnungsnummer hinterlegt.' }
+    }
+
+    const isDomestic = toIso3(order.shippingCountry) === 'DEU'
+
+    // Reverse shipment: Customer is sender, merchant warehouse is recipient.
+    let productCode = isDomestic ? 'V01PAK' : 'V53WPAK'
+    let zone = config.zones?.find(z => z.productCode === productCode && z.billingNumber)
+    if (!zone && isDomestic) {
+      zone = domesticZone
+    } else if (!zone && !isDomestic) {
+      zone = config.zones?.find(z => (z.id === 'eu' || z.productCode === 'V53WPAK' || z.productCode === 'V06PAK') && z.billingNumber) || domesticZone
+    }
+
+    let billingNum = (zone?.billingNumber || domesticZone.billingNumber).replace(/\s/g, '')
+    if (billingNum.length !== 14) {
+      return { error: `Ungültige DHL Abrechnungsnummer (${billingNum}). Sie muss 14 Zeichen lang sein.` }
+    }
+
+    // Adjust product code based on procedure ID if necessary
+    const verfahrensId = billingNum.slice(10, 12)
+    if (verfahrensId === '01') productCode = 'V01PAK'
+    else if (verfahrensId === '53') productCode = isDomestic ? 'V01PAK' : 'V53WPAK'
+    else if (verfahrensId === '55') productCode = 'V55PAK'
+
+    const baseUrl = config.environment === 'sandbox'
+      ? 'https://api-sandbox.dhl.com/parcel/de/shipping/v2'
+      : 'https://api-eu.dhl.com/parcel/de/shipping/v2'
+
+    const basicAuth = Buffer.from(`${config.username}:${config.password}`).toString('base64')
+
+    const { street: customerStreet, houseNo: customerHouseNo } = splitStreet(order.shippingStreet)
+    const { street: warehouseStreet, houseNo: warehouseHouseNo } = splitStreet(warehouseStreetFull)
+
+    const weight = Number(order.totalWeight) > 0 ? Number(order.totalWeight) : (config.defaultWeight ?? 1)
+
+    const shipmentPayload: any = {
+      profile: 'STANDARD_GRUPPENPROFIL',
+      shipments: [{
+        product: productCode,
+        billingNumber: billingNum,
+        refNo: (() => {
+          const raw = `RET-${order.marketplaceOrderId ?? order.id.replace(/-/g, '')}`
+          if (raw.length >= 8 && raw.length <= 35) return raw
+          return raw.replace(/-/g, '').slice(0, 35).padEnd(8, '0')
+        })(),
+        // Shipper is customer
+        shipper: {
+          name1: (order.shippingCompany || order.shippingName || 'Kunde').slice(0, 50),
+          ...(order.shippingCompany && order.shippingName ? { name2: order.shippingName.slice(0, 50) } : {}),
+          ...(order.shippingAddressAddition ? { additionalAddressInformation1: order.shippingAddressAddition.slice(0, 50) } : {}),
+          addressStreet: customerStreet || 'Hauptstraße',
+          addressHouse: customerHouseNo === '.' ? '1' : (customerHouseNo || '1'),
+          postalCode: order.shippingZip ?? '10115',
+          city: order.shippingCity ?? 'Berlin',
+          country: toIso3(order.shippingCountry),
+          ...(order.buyerEmail ? { email: order.buyerEmail } : {}),
+        },
+        // Consignee is merchant's warehouse
+        consignee: {
+          name1: (company.name || 'Empfänger').slice(0, 50),
+          addressStreet: warehouseStreet || 'Hauptstraße',
+          addressHouse: warehouseHouseNo === '.' ? '1' : (warehouseHouseNo || '1'),
+          postalCode: warehouseZip,
+          city: warehouseCity,
+          country: warehouseCountry,
+        },
+        details: {
+          weight: { uom: 'kg', value: weight },
+        }
+      }]
+    }
+
+    console.log(`[DHL Return Action] Requesting return label for order ${order.id}:`, JSON.stringify(shipmentPayload, null, 2))
+
+    const response = await fetch(`${baseUrl}/orders?labelFormat=PDF`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${basicAuth}`,
+        'dhl-api-key': apiKey,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify(shipmentPayload),
+    })
+
+    const responseText = await response.text()
+    console.log(`[DHL Return Action] Response ${response.status}:`, responseText)
+
+    if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        return { error: 'DHL-Authentifizierung fehlgeschlagen. Bitte überprüfe deine DHL-Zugangsdaten unter Integrationen > DHL.' }
+      }
+      let apiMsg = responseText
+      try {
+        const parsed = JSON.parse(responseText)
+        let rawMsg = parsed?.items?.[0]?.validationMessages?.map((v: any) => v.validationMessage).join('; ')
+          ?? parsed?.items?.[0]?.message
+          ?? parsed?.detail
+          ?? parsed?.title
+          ?? responseText
+
+        if (rawMsg) {
+          rawMsg = rawMsg
+            .replace(/consignee\.addressHouse/g, 'Hausnummer des Lagers')
+            .replace(/consignee\.addressStreet/g, 'Straße des Lagers')
+            .replace(/consignee\.postalCode/g, 'Postleitzahl des Lagers')
+            .replace(/shipper\.addressHouse/g, 'Hausnummer der Kundenadresse')
+            .replace(/shipper\.addressStreet/g, 'Straße der Kundenadresse')
+            .replace(/shipper\.postalCode/g, 'Postleitzahl der Kundenadresse')
+        }
+        apiMsg = rawMsg
+      } catch {}
+      return { error: `DHL API-Fehler (HTTP ${response.status}): ${apiMsg}` }
+    }
+
+    let data: any
+    try {
+      data = JSON.parse(responseText)
+    } catch {
+      return { error: 'Ungültige Antwort von der DHL API erhalten.' }
+    }
+
+    const shipment = data.items?.[0]
+    if (!shipment) {
+      return { error: 'Kein Sendungsobjekt in der DHL-Antwort vorhanden.' }
+    }
+
+    const returnTrackingNumber = shipment.shipmentTrackingNumber || shipment.shipmentNumber || shipment.barcode || ''
+    const returnLabelUrl = shipment.label?.url ?? (shipment.label?.b64 ? `data:application/pdf;base64,${shipment.label.b64}` : '')
+
+    if (!returnTrackingNumber || !returnLabelUrl) {
+      return { error: 'Sendungsnummer oder PDF-Label fehlt in der DHL-Antwort.' }
+    }
+
+    // Save return tracking number and label on order
+    await db
+      .update(orders)
+      .set({
+        returnTrackingNumber,
+        returnLabelUrl,
+        updatedAt: new Date(),
+      })
+      .where(eq(orders.id, order.id))
+
+    revalidatePath('/orders')
+    revalidatePath('/dashboard')
+
+    return {
+      success: true,
+      returnTrackingNumber,
+      returnLabelUrl,
+      message: `DHL-Retourenlabel erfolgreich erstellt: ${returnTrackingNumber}`,
+    }
+  } catch (error) {
+    console.error('[DHL Return Action] Error:', error)
+    return { error: error instanceof Error ? error.message : 'Fehler bei der DHL Retourenlabel-Erstellung.' }
   }
 }
 

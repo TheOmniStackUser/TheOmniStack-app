@@ -4,9 +4,9 @@ import { useState, Fragment, ReactNode, useEffect, useMemo, useTransition, useRe
 import { createPortal } from 'react-dom'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
-import { Package, Truck, CheckCircle2, Store, Clock, XCircle, RefreshCw, Copy, Check, Calendar, Scissors } from 'lucide-react'
+import { Package, Truck, CheckCircle2, Store, Clock, XCircle, RefreshCw, Copy, Check, Calendar, Scissors, RotateCcw } from 'lucide-react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { generateHermesLabelsAction, generateDhlLabelsAction } from '@/app/actions/shipping'
+import { generateHermesLabelsAction, generateDhlLabelsAction, generateSingleDhlReturnLabelAction } from '@/app/actions/shipping'
 import { archiveOrderAction, archiveOrdersBulkAction, updateOrderStatusAction, updateOrderAddressAction, updateOrderBillingAddressAction, generateOrDownloadInvoicesBulkAction, markOrderAsShippedManuallyAction, getOrderLabelsAction, updateOrderNotesAction, refundOrderAction, refundOrderPartialAction, updateOrderScheduledShipmentDateAction, bulkScheduleLaterShipmentAction } from '@/app/actions/orders'
 import { getInvoiceDownloadUrl } from '@/app/actions/invoices'
 import type { Order, OrderItem } from '@/db/schema/orders'
@@ -461,7 +461,8 @@ export function OrdersTable({
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
   
   const [showDhlModal, setShowDhlModal] = useState(false)
-  const [dhlSelections, setDhlSelections] = useState<Record<string, { productCode: string; weight: number }>>({})
+  const [dhlSelections, setDhlSelections] = useState<Record<string, { productCode: string; weight: number; withReturnLabel: boolean }>>({})
+  const [isGeneratingReturnLabelId, setIsGeneratingReturnLabelId] = useState<string | null>(null)
 
   const [deleteModalConfig, setDeleteModalConfig] = useState<{ show: boolean, isBulk: boolean, orderId?: string }>({ show: false, isBulk: false })
   const [refundModalConfig, setRefundModalConfig] = useState<{ show: boolean, orderId?: string }>({ show: false })
@@ -624,6 +625,18 @@ export function OrdersTable({
     setShowHermesModal(true)
   }
 
+  const getInitialWithReturnLabel = (order: OrderWithItems, productCode: string) => {
+    const matchingProduct = dhlConfig?.products?.find(p => p.productCode === productCode)
+    if (matchingProduct?.returnType && matchingProduct.returnType !== '' && matchingProduct.returnType !== 'none') {
+      return true
+    }
+    const platformReturn = dhlConfig?.platformReturns?.[order.marketplace]
+    if (platformReturn === 'enclosed_with_label') {
+      return true
+    }
+    return false
+  }
+
   const handleSingleOrderDhl = (order: OrderWithItems) => {
     const productCode = getDefaultDhlProductCode(order.shippingCountry, dhlConfig)
     let weight = 1
@@ -640,7 +653,8 @@ export function OrdersTable({
         weight = dhlConfig.defaultWeight ?? 1
       }
     }
-    setDhlSelections({ [order.id]: { productCode, weight } })
+    const withReturnLabel = getInitialWithReturnLabel(order, productCode)
+    setDhlSelections({ [order.id]: { productCode, weight, withReturnLabel } })
     setSelectedIds(new Set([order.id]))
     setShowDhlModal(true)
   }
@@ -1471,7 +1485,7 @@ const filteredOrders = orders;
     }
 
     // Initialize selections for each order
-    const initialSelections: Record<string, { productCode: string; weight: number }> = {}
+    const initialSelections: Record<string, { productCode: string; weight: number; withReturnLabel: boolean }> = {}
     visibleUnshipped.forEach(order => {
       // Determine if destination is domestic (Germany)
       const isDomestic = !order.shippingCountry || ['DE', 'DEU'].includes(order.shippingCountry.toUpperCase())
@@ -1488,14 +1502,13 @@ const filteredOrders = orders;
           weight = dhlConfig.defaultWeightWarenpost ?? 0.2
         } else if (productCode === 'V66WPI') {
           weight = dhlConfig.defaultWeightWarenpostInternational ?? 0.2
-        } else if (productCode === 'V86PARCEL') {
+        } else if (productCode === 'V62KP') {
           weight = dhlConfig.defaultWeightKleinpaket ?? 0.5
-        } else if (productCode === 'V87PARCEL') {
-          weight = dhlConfig.defaultWeightKleinpaketInternational ?? 0.5
         }
       }
 
-      initialSelections[order.id] = { productCode, weight }
+      const withReturnLabel = getInitialWithReturnLabel(order, productCode)
+      initialSelections[order.id] = { productCode, weight, withReturnLabel }
     })
 
     setDhlSelections(initialSelections)
@@ -1548,17 +1561,22 @@ const filteredOrders = orders;
         defaultW = dhlConfig?.defaultWeightWarenpost ?? 0.2
       } else if (newProductCode === 'V66WPI') {
         defaultW = dhlConfig?.defaultWeightWarenpostInternational ?? 0.2
-      } else if (newProductCode === 'V86PARCEL') {
+      } else if (newProductCode === 'V62KP') {
         defaultW = dhlConfig?.defaultWeightKleinpaket ?? 0.5
-      } else if (newProductCode === 'V87PARCEL') {
-        defaultW = dhlConfig?.defaultWeightKleinpaketInternational ?? 0.5
       }
+
+      const matchingProduct = dhlConfig?.products?.find(p => p.productCode === newProductCode)
+      const withReturnLabel = matchingProduct?.returnType && matchingProduct.returnType !== '' && matchingProduct.returnType !== 'none'
+        ? true
+        : current.withReturnLabel
 
       return {
         ...prev,
         [orderId]: {
+          ...current,
           productCode: newProductCode,
-          weight: defaultW
+          weight: defaultW,
+          withReturnLabel
         }
       }
     })
@@ -1576,6 +1594,60 @@ const filteredOrders = orders;
         }
       }
     })
+  }
+
+  const handleDhlReturnLabelToggle = (orderId: string, withReturnLabel: boolean) => {
+    setDhlSelections(prev => {
+      const current = prev[orderId]
+      if (!current) return prev
+      return {
+        ...prev,
+        [orderId]: {
+          ...current,
+          withReturnLabel
+        }
+      }
+    })
+  }
+
+  const handleDhlBulkReturnToggle = (enable: boolean) => {
+    setDhlSelections(prev => {
+      const next: typeof prev = {}
+      for (const [id, val] of Object.entries(prev)) {
+        next[id] = { ...val, withReturnLabel: enable }
+      }
+      return next
+    })
+  }
+
+  const handleGenerateSingleDhlReturnLabel = async (order: OrderWithItems) => {
+    setOpenMenuOrderId(null)
+    setMenuPosition(null)
+    setIsGeneratingReturnLabelId(order.id)
+    const newTab = window.open('about:blank', '_blank')
+    try {
+      const result = await generateSingleDhlReturnLabelAction(order.id)
+      if (result.error) {
+        showToast(result.error, 'error')
+        if (newTab) newTab.close()
+      } else {
+        showToast(result.message || 'DHL-Retourenlabel erfolgreich erstellt!', 'success')
+        if (result.returnLabelUrl) {
+          if (newTab) {
+            newTab.location.href = result.returnLabelUrl
+          } else {
+            window.open(result.returnLabelUrl, '_blank')
+          }
+        } else {
+          if (newTab) newTab.close()
+        }
+      }
+    } catch (err: any) {
+      showToast('Fehler beim Erstellen des Retourenlabels: ' + (err?.message || String(err)), 'error')
+      if (newTab) newTab.close()
+    } finally {
+      setIsGeneratingReturnLabelId(null)
+    }
   }
 
   const handleDelete = async (orderId: string) => {
@@ -2687,6 +2759,26 @@ const filteredOrders = orders;
                                 </span>
                               )}
 
+                              {/* 4.1 DHL-Retourenlabel erstellen */}
+                              {dhlConfig && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleGenerateSingleDhlReturnLabel(order)}
+                                  disabled={isGeneratingReturnLabelId === order.id}
+                                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-amber-800 hover:bg-amber-50 transition-colors disabled:opacity-50 whitespace-nowrap font-medium"
+                                >
+                                  {isGeneratingReturnLabelId === order.id ? (
+                                    <svg className="w-4 h-4 animate-spin text-amber-600" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                    </svg>
+                                  ) : (
+                                    <RefreshCw className="w-4 h-4 text-amber-600" />
+                                  )}
+                                  {order.returnTrackingNumber ? 'DHL-Retourenlabel erneut erstellen' : 'DHL-Retourenlabel erstellen'}
+                                </button>
+                              )}
+
                               {/* 5. Hermes-Label erstellen */}
                               {order.marketplace === 'otto' && (
                                 <button
@@ -3055,16 +3147,34 @@ const filteredOrders = orders;
                                   <span className="font-medium">Ersatzlabels & Erstattungen:</span>
                                   <div className="flex flex-wrap gap-2 mt-1">
                                     {dhlConfig && (
-                                      <button 
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          handleSingleOrderDhl(order)
-                                        }}
-                                        className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 transition-all shadow-sm"
-                                      >
-                                        <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
-                                        {order.status === 'shipped' ? 'DHL-Ersatzlabel' : 'DHL-Label'}
-                                      </button>
+                                      <>
+                                        <button 
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            handleSingleOrderDhl(order)
+                                          }}
+                                          className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 transition-all shadow-sm"
+                                        >
+                                          <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                                          {order.status === 'shipped' ? 'DHL-Ersatzlabel' : 'DHL-Label'}
+                                        </button>
+                                        <button 
+                                          disabled={isGeneratingReturnLabelId === order.id}
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            handleGenerateSingleDhlReturnLabel(order)
+                                          }}
+                                          className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 border border-amber-200 rounded-lg text-xs font-bold text-amber-800 hover:bg-amber-100 transition-all shadow-sm disabled:opacity-50"
+                                          title={order.returnLabelUrl ? "DHL-Retourenlabel erneut erstellen" : "DHL-Retourenlabel erstellen"}
+                                        >
+                                          {isGeneratingReturnLabelId === order.id ? (
+                                            <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-600" />
+                                          ) : (
+                                            <RotateCcw className="w-3.5 h-3.5 text-amber-600" />
+                                          )}
+                                          {order.returnLabelUrl ? 'DHL-Retoure erneut' : 'DHL-Retourenlabel'}
+                                        </button>
+                                      </>
                                     )}
 
                                     {order.marketplace === 'otto' && (
@@ -4208,12 +4318,32 @@ const filteredOrders = orders;
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowDhlModal(false)}></div>
           <div className="relative bg-white rounded-2xl p-6 shadow-2xl w-full max-w-2xl border border-slate-200 flex flex-col max-h-[85vh]">
-            <div className="mb-6">
-              <h3 className="text-2xl font-black text-slate-900 flex items-center gap-2">
-                <span className="bg-yellow-400 text-gray-900 px-3 py-1 rounded-lg text-sm font-black tracking-wider uppercase">DHL</span>
-                Produktauswahl & Gewichte
-              </h3>
-              <p className="text-slate-500 text-sm mt-1">Passe das Versandprodukt und das Gewicht (kg) für jede Sendung an.</p>
+            <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h3 className="text-2xl font-black text-slate-900 flex items-center gap-2">
+                  <span className="bg-yellow-400 text-gray-900 px-3 py-1 rounded-lg text-sm font-black tracking-wider uppercase">DHL</span>
+                  Produktauswahl & Gewichte
+                </h3>
+                <p className="text-slate-500 text-sm mt-1">Passe Versandprodukt, Gewicht (kg) und Retourenbeileger für jede Sendung an.</p>
+              </div>
+              {Object.keys(dhlSelections).length > 1 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleDhlBulkReturnToggle(true)}
+                    className="text-xs px-2.5 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 hover:bg-amber-100 font-bold transition-all shadow-sm"
+                  >
+                    Alle mit Retoure
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDhlBulkReturnToggle(false)}
+                    className="text-xs px-2.5 py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-slate-600 hover:bg-slate-200 font-bold transition-all"
+                  >
+                    Keine Retoure
+                  </button>
+                </div>
+              )}
             </div>
             
             <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar">
@@ -4429,25 +4559,48 @@ const filteredOrders = orders;
                         </div>
                       </div>
                     </div>
+
+                    <div className="mt-3 pt-3 border-t border-slate-200/60 flex items-center justify-between">
+                      <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={selection.withReturnLabel ?? false}
+                          onChange={(e) => handleDhlReturnLabelToggle(order.id, e.target.checked)}
+                          className="w-4 h-4 rounded border-slate-300 text-yellow-500 focus:ring-yellow-400 focus:ring-offset-0"
+                        />
+                        <span className="text-xs font-bold text-slate-800">
+                          Retourenlabel beilegen (Beilegeretoure)
+                        </span>
+                      </label>
+                      <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${selection.withReturnLabel ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-slate-100 border-slate-200 text-slate-500'}`}>
+                        {selection.withReturnLabel ? 'Retoure aktiv' : 'Keine Beilegeretoure'}
+                      </span>
+                    </div>
                   </div>
                 )
               })}
             </div>
 
-            <div className="mt-8 flex gap-4 pt-4 border-t border-slate-100">
-              <button 
-                onClick={() => setShowDhlModal(false)} 
-                className="flex-1 py-3 border border-slate-200 rounded-xl font-bold text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors text-sm"
-              >
-                Abbrechen
-              </button>
-              <button 
-                onClick={confirmGenerateDhlLabels} 
-                className="flex-1 py-4 bg-yellow-400 text-gray-900 font-black rounded-2xl hover:bg-yellow-500 shadow-xl shadow-yellow-400/30 transition-all transform active:scale-[0.98]"
-              >
-                Labels generieren ({Object.keys(dhlSelections).length})
-              </button>
-            </div>
+            {(() => {
+              const totalOrders = Object.keys(dhlSelections).length
+              const totalReturns = Object.values(dhlSelections).filter(s => s.withReturnLabel).length
+              return (
+                <div className="mt-8 flex gap-4 pt-4 border-t border-slate-100">
+                  <button 
+                    onClick={() => setShowDhlModal(false)} 
+                    className="flex-1 py-3 border border-slate-200 rounded-xl font-bold text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors text-sm"
+                  >
+                    Abbrechen
+                  </button>
+                  <button 
+                    onClick={confirmGenerateDhlLabels} 
+                    className="flex-1 py-4 bg-yellow-400 text-gray-900 font-black rounded-2xl hover:bg-yellow-500 shadow-xl shadow-yellow-400/30 transition-all transform active:scale-[0.98]"
+                  >
+                    Labels generieren ({totalOrders}{totalReturns > 0 ? ` + ${totalReturns} Retoure` : ''})
+                  </button>
+                </div>
+              )
+            })()}
           </div>
         </div>
       )}
