@@ -96,6 +96,7 @@ export const orders = pgTable('orders', {
   returnLabelUrl: text('return_label_url'),
   totalWeight: numeric('total_weight', { precision: 8, scale: 3 }),
   notes: text('notes'),
+  scheduledShipmentDate: timestamp('scheduled_shipment_date', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({

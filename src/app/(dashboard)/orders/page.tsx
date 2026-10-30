@@ -316,7 +316,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
       case 'status': orderBy = dir(orders.status); break;
       case 'kunde': orderBy = dir(orders.buyerName); break;
       case 'umsatz': orderBy = dir(orders.totalAmount); break;
-      case 'versanddatum': orderBy = dir(orders.updatedAt); break;
+      case 'versanddatum': orderBy = dir(sql`COALESCE(${orders.scheduledShipmentDate}, ${orders.updatedAt})`) as any; break;
     }
   }
 

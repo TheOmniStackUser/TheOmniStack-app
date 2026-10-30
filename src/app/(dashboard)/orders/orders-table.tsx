@@ -4,10 +4,10 @@ import { useState, Fragment, ReactNode, useEffect, useMemo, useTransition, useRe
 import { createPortal } from 'react-dom'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
-import { Package, Truck, CheckCircle2, Store, Clock, XCircle, RefreshCw, Copy, Check } from 'lucide-react'
+import { Package, Truck, CheckCircle2, Store, Clock, XCircle, RefreshCw, Copy, Check, Calendar } from 'lucide-react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { generateHermesLabelsAction, generateDhlLabelsAction } from '@/app/actions/shipping'
-import { archiveOrderAction, archiveOrdersBulkAction, updateOrderStatusAction, updateOrderAddressAction, updateOrderBillingAddressAction, generateOrDownloadInvoicesBulkAction, markOrderAsShippedManuallyAction, getOrderLabelsAction, updateOrderNotesAction, refundOrderAction, refundOrderPartialAction } from '@/app/actions/orders'
+import { archiveOrderAction, archiveOrdersBulkAction, updateOrderStatusAction, updateOrderAddressAction, updateOrderBillingAddressAction, generateOrDownloadInvoicesBulkAction, markOrderAsShippedManuallyAction, getOrderLabelsAction, updateOrderNotesAction, refundOrderAction, refundOrderPartialAction, updateOrderScheduledShipmentDateAction, bulkScheduleLaterShipmentAction } from '@/app/actions/orders'
 import { getInvoiceDownloadUrl } from '@/app/actions/invoices'
 import type { Order, OrderItem } from '@/db/schema/orders'
 import type { Invoice, InvoiceLog } from '@/db/schema/invoices'
@@ -42,6 +42,12 @@ const getOrderNumber = (order: OrderWithItems) => {
 const getOrderBuyerName = (order: OrderWithItems) => {
   const source = order as OrderWithItems & { buyer?: { name?: string | null } | null; buyerName?: string | null }
   return String(source.buyerName || source.buyer?.name || '')
+}
+
+const formatCustomerName = (name: string) => {
+  if (!name) return ''
+  if (name.length <= 20) return name
+  return name.match(/.{1,20}(\s|$)/g)?.join('\n') || name
 }
 
 const getDisplayStatus = (status: string | null) => {
@@ -473,6 +479,18 @@ export function OrdersTable({
   const [manualConfirmMarketplace, setManualConfirmMarketplace] = useState(true)
   const [isManualShipping, setIsManualShipping] = useState(false)
 
+  // Later shipment modal states
+  const [laterShipmentModalConfig, setLaterShipmentModalConfig] = useState<{
+    show: boolean
+    isBulk: boolean
+    orderId?: string
+    orderNumber?: string
+    customerName?: string
+    initialDate?: string | null
+  }>({ show: false, isBulk: false })
+  const [laterShipmentDateInput, setLaterShipmentDateInput] = useState('')
+  const [isSavingLaterShipment, setIsSavingLaterShipment] = useState(false)
+
   // Dropdown actions states & helpers
   const [openMenuOrderId, setOpenMenuOrderId] = useState<string | null>(null)
   const [menuPosition, setMenuPosition] = useState<{ top?: number; bottom?: number; left: number } | null>(null)
@@ -669,6 +687,81 @@ export function OrdersTable({
     } finally {
       setIsManualShipping(false)
     }
+  }
+
+  const openLaterShipmentModal = (order?: OrderWithItems, isBulk: boolean = false) => {
+    if (isBulk) {
+      setLaterShipmentModalConfig({
+        show: true,
+        isBulk: true,
+        orderNumber: `${selectedIds.size} Bestellungen`,
+        initialDate: '',
+      })
+      setLaterShipmentDateInput('')
+    } else if (order) {
+      const rawDate = (order as any).scheduledShipmentDate
+      let formattedDefault = ''
+      if (rawDate) {
+        try {
+          const d = new Date(rawDate)
+          if (!isNaN(d.getTime())) {
+            formattedDefault = d.toISOString().split('T')[0]
+          }
+        } catch (e) {}
+      }
+      setLaterShipmentModalConfig({
+        show: true,
+        isBulk: false,
+        orderId: order.id,
+        orderNumber: getOrderNumber(order),
+        customerName: formatCustomerName(order.buyerName || (order as any).buyer?.name || ''),
+        initialDate: formattedDefault,
+      })
+      setLaterShipmentDateInput(formattedDefault)
+    }
+  }
+
+  const handleSaveLaterShipment = async (clearDate: boolean = false) => {
+    setIsSavingLaterShipment(true)
+    try {
+      const targetDate = clearDate ? null : (laterShipmentDateInput ? laterShipmentDateInput : null)
+
+      if (laterShipmentModalConfig.isBulk) {
+        const orderIds = Array.from(selectedIds)
+        const res = await bulkScheduleLaterShipmentAction(orderIds, targetDate)
+        if (res.error) {
+          showToast(res.error, 'error')
+        } else {
+          showToast(res.message || 'Bestellungen auf späteren Versand gesetzt.', 'success')
+          setLaterShipmentModalConfig({ show: false, isBulk: false })
+          setSelectedIds(new Set())
+        }
+      } else if (laterShipmentModalConfig.orderId) {
+        const res = await updateOrderScheduledShipmentDateAction(
+          laterShipmentModalConfig.orderId,
+          targetDate
+        )
+        if (res.error) {
+          showToast(res.error, 'error')
+        } else {
+          showToast(res.message || 'Versandtermin erfolgreich gespeichert.', 'success')
+          setLaterShipmentModalConfig({ show: false, isBulk: false })
+        }
+      }
+    } catch (err) {
+      showToast('Fehler beim Speichern des Versandtermins.', 'error')
+    } finally {
+      setIsSavingLaterShipment(false)
+    }
+  }
+
+  const setDatePreset = (daysFromNow: number) => {
+    const d = new Date()
+    d.setDate(d.getDate() + daysFromNow)
+    const yyyy = d.getFullYear()
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const dd = String(d.getDate()).padStart(2, '0')
+    setLaterShipmentDateInput(`${yyyy}-${mm}-${dd}`)
   }
   
   // Address editing states
@@ -1764,6 +1857,16 @@ const filteredOrders = orders;
             </button>
           )}
 
+          {selectedUnshippedCount > 0 && (
+            <button
+              onClick={() => openLaterShipmentModal(undefined, true)}
+              className="flex items-center gap-2 bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 font-semibold py-2 px-4 rounded-md transition-colors text-sm shadow-sm"
+            >
+              <Clock className="w-4 h-4 text-purple-600" />
+              Späterer Versand ({selectedUnshippedCount})
+            </button>
+          )}
+
           {selectedIds.size > 0 && (
             <button
               onClick={handleBulkDelete}
@@ -2333,34 +2436,58 @@ const filteredOrders = orders;
                         {formattedTotal}
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-500" suppressHydrationWarning>
-                        <div>{formattedVersandDate}</div>
-                        {order.trackingNumber && (
-                          <div className="mt-1 flex items-center gap-1 group/tracking">
-                            <a
-                              href={getTrackingUrl(order.trackingNumber)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100 hover:bg-blue-100 transition-colors text-xs font-semibold font-mono"
-                              onClick={(e) => e.stopPropagation()}
-                              title="Sendungsverfolgung öffnen"
-                            >
-                              {order.trackingNumber}
-                              <svg className="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                              </svg>
-                            </a>
+                        {order.status === 'later_shipment' ? (
+                          <div className="flex flex-col gap-1 items-start">
                             <button
+                              type="button"
                               onClick={(e) => {
                                 e.stopPropagation()
-                                navigator.clipboard.writeText(order.trackingNumber || '')
-                                showToast('Sendungsnummer kopiert', 'success')
+                                openLaterShipmentModal(order)
                               }}
-                              className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 opacity-0 group-hover/tracking:opacity-100 transition-all focus:opacity-100"
-                              title="Sendungsnummer kopieren"
+                              className="group/scheduled inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 font-semibold text-xs transition-colors cursor-pointer shadow-xs"
+                              title="Geplantes Versanddatum bearbeiten"
                             >
-                              <Copy className="w-3.5 h-3.5" />
+                              <Calendar className="w-3.5 h-3.5 text-purple-600 group-hover/scheduled:scale-110 transition-transform" />
+                              {(order as any).scheduledShipmentDate ? (
+                                <span>{formatDate((order as any).scheduledShipmentDate, false)}</span>
+                              ) : (
+                                <span className="text-purple-600 italic">Datum festlegen</span>
+                              )}
                             </button>
+                            <span className="text-[10px] text-purple-500 font-medium pl-1">Späterer Versand</span>
                           </div>
+                        ) : (
+                          <>
+                            <div>{formattedVersandDate}</div>
+                            {order.trackingNumber && (
+                              <div className="mt-1 flex items-center gap-1 group/tracking">
+                                <a
+                                  href={getTrackingUrl(order.trackingNumber)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100 hover:bg-blue-100 transition-colors text-xs font-semibold font-mono"
+                                  onClick={(e) => e.stopPropagation()}
+                                  title="Sendungsverfolgung öffnen"
+                                >
+                                  {order.trackingNumber}
+                                  <svg className="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                  </svg>
+                                </a>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    navigator.clipboard.writeText(order.trackingNumber || '')
+                                    showToast('Sendungsnummer kopiert', 'success')
+                                  }}
+                                  className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 opacity-0 group-hover/tracking:opacity-100 transition-all focus:opacity-100"
+                                  title="Sendungsnummer kopieren"
+                                >
+                                  <Copy className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            )}
+                          </>
                         )}
                       </td>
                       {/* <td className="px-3 py-4 whitespace-nowrap text-center">
@@ -2594,31 +2721,46 @@ const filteredOrders = orders;
                                   onClick={() => {
                                     setOpenMenuOrderId(null)
                                     setMenuPosition(null)
-                                    handleStatusUpdate(order.id, 'later_shipment')
+                                    openLaterShipmentModal(order)
                                   }}
                                   disabled={isUpdatingStatus === order.id}
                                   className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-purple-700 hover:bg-purple-50 transition-colors disabled:opacity-50 whitespace-nowrap"
                                 >
-                                  <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                  <Clock className="w-4 h-4 text-purple-500" />
                                   Versand auf später
                                 </button>
                               ) : order.status === 'later_shipment' ? (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setOpenMenuOrderId(null)
-                                    setMenuPosition(null)
-                                    handleStatusUpdate(order.id, 'pending')
-                                  }}
-                                  disabled={isUpdatingStatus === order.id}
-                                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-yellow-700 hover:bg-yellow-50 transition-colors disabled:opacity-50 whitespace-nowrap"
-                                >
-                                  <svg className="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                                  Zurück zu Pending
-                                </button>
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenMenuOrderId(null)
+                                      setMenuPosition(null)
+                                      openLaterShipmentModal(order)
+                                    }}
+                                    disabled={isUpdatingStatus === order.id}
+                                    className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-purple-700 hover:bg-purple-50 transition-colors disabled:opacity-50 whitespace-nowrap"
+                                  >
+                                    <Calendar className="w-4 h-4 text-purple-500" />
+                                    Versandtermin bearbeiten
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenMenuOrderId(null)
+                                      setMenuPosition(null)
+                                      handleStatusUpdate(order.id, 'pending')
+                                    }}
+                                    disabled={isUpdatingStatus === order.id}
+                                    className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-yellow-700 hover:bg-yellow-50 transition-colors disabled:opacity-50 whitespace-nowrap"
+                                  >
+                                    <svg className="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                    Zurück zu Pending
+                                  </button>
+                                </>
                               ) : (
                                 <span className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-400 bg-slate-50/30 cursor-not-allowed select-none whitespace-nowrap">
-                                  <svg className="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                  <Clock className="w-4 h-4 text-slate-300" />
                                   Versand auf später
                                 </span>
                               )}
@@ -2675,9 +2817,33 @@ const filteredOrders = orders;
                                 <div>
                                   <span className="font-medium">{process.env.NEXT_PUBLIC_APP_VARIANT === 'craft' ? 'Auftragsdatum' : 'Bestelldatum'}:</span> <span className="text-gray-500">{formattedBestellDate}</span>
                                 </div>
-                                <div>
-                                  <span className="font-medium">Versanddatum:</span> <span className="text-gray-500">{formattedVersandDate}</span>
-                                </div>
+                                {order.status === 'later_shipment' ? (
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium text-purple-900">Geplanter Versand:</span>
+                                    {(order as any).scheduledShipmentDate ? (
+                                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 font-bold text-xs border border-purple-200">
+                                        <Calendar className="w-3.5 h-3.5 text-purple-500" />
+                                        {formatDate((order as any).scheduledShipmentDate, false)}
+                                      </span>
+                                    ) : (
+                                      <span className="text-purple-600 italic text-xs">Nicht festgelegt</span>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        openLaterShipmentModal(order)
+                                      }}
+                                      className="text-xs text-purple-600 hover:text-purple-800 underline font-semibold ml-1 cursor-pointer"
+                                    >
+                                      Bearbeiten
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div>
+                                    <span className="font-medium">Versanddatum:</span> <span className="text-gray-500">{formattedVersandDate}</span>
+                                  </div>
+                                )}
                                 <div>
                                   <span className="font-medium">Rechnungsdatum:</span> <span className="text-gray-500">{formattedRechnungsDate}</span>
                                 </div>
@@ -2717,28 +2883,40 @@ const filteredOrders = orders;
                                       <button 
                                         onClick={(e) => {
                                           e.stopPropagation()
-                                          handleStatusUpdate(order.id, 'later_shipment')
+                                          openLaterShipmentModal(order)
                                         }}
                                         disabled={isUpdatingStatus === order.id}
                                         className="inline-flex items-center gap-1.5 px-3 py-1 bg-purple-50 border border-purple-200 rounded-lg text-xs font-bold text-purple-700 hover:bg-purple-100 transition-all shadow-sm disabled:opacity-50"
                                       >
-                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                        <Clock className="w-3.5 h-3.5 text-purple-500" />
                                         {isUpdatingStatus === order.id ? 'Lädt...' : 'Versand auf später'}
                                       </button>
                                     )}
 
                                     {order.status === 'later_shipment' && (
-                                      <button 
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          handleStatusUpdate(order.id, 'pending')
-                                        }}
-                                        disabled={isUpdatingStatus === order.id}
-                                        className="inline-flex items-center gap-1.5 px-3 py-1 bg-yellow-50 border border-yellow-200 rounded-lg text-xs font-bold text-yellow-700 hover:bg-yellow-100 transition-all shadow-sm disabled:opacity-50"
-                                      >
-                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                                        {isUpdatingStatus === order.id ? 'Lädt...' : 'Zurück zu Pending'}
-                                      </button>
+                                      <>
+                                        <button 
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            openLaterShipmentModal(order)
+                                          }}
+                                          className="inline-flex items-center gap-1.5 px-3 py-1 bg-purple-50 border border-purple-200 rounded-lg text-xs font-bold text-purple-700 hover:bg-purple-100 transition-all shadow-sm"
+                                        >
+                                          <Calendar className="w-3.5 h-3.5 text-purple-500" />
+                                          Versandtermin ändern
+                                        </button>
+                                        <button 
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            handleStatusUpdate(order.id, 'pending')
+                                          }}
+                                          disabled={isUpdatingStatus === order.id}
+                                          className="inline-flex items-center gap-1.5 px-3 py-1 bg-yellow-50 border border-yellow-200 rounded-lg text-xs font-bold text-yellow-700 hover:bg-yellow-100 transition-all shadow-sm disabled:opacity-50"
+                                        >
+                                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                          {isUpdatingStatus === order.id ? 'Lädt...' : 'Zurück zu Pending'}
+                                        </button>
+                                      </>
                                     )}
 
                                     {order.status !== 'shipped' && (
@@ -4232,6 +4410,164 @@ const filteredOrders = orders;
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Schedule Later Shipment Modal */}
+      {laterShipmentModalConfig.show && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" 
+            onClick={() => !isSavingLaterShipment && setLaterShipmentModalConfig({ show: false, isBulk: false })}
+          />
+          <div className="relative bg-white rounded-2xl p-6 shadow-2xl w-full max-w-lg border border-slate-200 flex flex-col max-h-[85vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="mb-5">
+              <div className="flex items-center justify-between mb-2">
+                <span className="bg-purple-100 text-purple-800 px-3 py-1 rounded-lg text-xs font-black tracking-wider uppercase flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5" /> Späterer Versand
+                </span>
+                <button
+                  type="button"
+                  onClick={() => !isSavingLaterShipment && setLaterShipmentModalConfig({ show: false, isBulk: false })}
+                  disabled={isSavingLaterShipment}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                  title="Schließen"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <h3 className="text-xl font-black text-slate-900">
+                {laterShipmentModalConfig.isBulk ? 'Sammelterminierung: Späterer Versand' : 'Versandtermin planen'}
+              </h3>
+              <p className="text-slate-500 text-sm mt-1">
+                {laterShipmentModalConfig.isBulk ? (
+                  <span>Geplantes Versanddatum für <strong>{laterShipmentModalConfig.orderNumber}</strong> festlegen.</span>
+                ) : (
+                  <span>
+                    Bestellung <strong>{laterShipmentModalConfig.orderNumber}</strong>
+                    {laterShipmentModalConfig.customerName ? ` • ${laterShipmentModalConfig.customerName}` : ''}
+                  </span>
+                )}
+              </p>
+            </div>
+
+            <div className="flex-1 overflow-y-auto pr-1 space-y-4">
+              <div className="p-4 border border-slate-100 rounded-2xl bg-slate-50/70 space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                    Wann soll der Versand erfolgen?
+                  </label>
+                  <div className="relative">
+                    <input 
+                      type="date"
+                      value={laterShipmentDateInput}
+                      onChange={(e) => setLaterShipmentDateInput(e.target.value)}
+                      min={new Date().toISOString().split('T')[0]}
+                      className="w-full text-sm p-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white !text-slate-900 placeholder:!text-slate-500 font-medium shadow-xs"
+                    />
+                  </div>
+                </div>
+
+                {/* Quick Presets */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                    Schnellauswahl
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setDatePreset(1)}
+                      className="px-3 py-1.5 rounded-lg bg-white hover:bg-purple-50 text-slate-700 hover:text-purple-700 border border-slate-200 hover:border-purple-200 text-xs font-semibold transition-all shadow-xs"
+                    >
+                      Morgen
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDatePreset(3)}
+                      className="px-3 py-1.5 rounded-lg bg-white hover:bg-purple-50 text-slate-700 hover:text-purple-700 border border-slate-200 hover:border-purple-200 text-xs font-semibold transition-all shadow-xs"
+                    >
+                      In 3 Tagen
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDatePreset(7)}
+                      className="px-3 py-1.5 rounded-lg bg-white hover:bg-purple-50 text-slate-700 hover:text-purple-700 border border-slate-200 hover:border-purple-200 text-xs font-semibold transition-all shadow-xs"
+                    >
+                      In 1 Woche
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDatePreset(14)}
+                      className="px-3 py-1.5 rounded-lg bg-white hover:bg-purple-50 text-slate-700 hover:text-purple-700 border border-slate-200 hover:border-purple-200 text-xs font-semibold transition-all shadow-xs"
+                    >
+                      In 2 Wochen
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDatePreset(30)}
+                      className="px-3 py-1.5 rounded-lg bg-white hover:bg-purple-50 text-slate-700 hover:text-purple-700 border border-slate-200 hover:border-purple-200 text-xs font-semibold transition-all shadow-xs"
+                    >
+                      In 1 Monat
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-purple-50/70 border border-purple-100 rounded-xl p-3 text-xs text-purple-900 flex items-start gap-2">
+                  <Clock className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
+                  <span>
+                    Die Bestellung verbleibt im Status <strong>Späterer Versand</strong>. Das geplante Datum wird in der Übersicht und in den Bestelldetails gut sichtbar hervorgehoben.
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex items-center justify-between gap-3 pt-4 border-t border-slate-100">
+              {laterShipmentDateInput && (
+                <button
+                  type="button"
+                  onClick={() => handleSaveLaterShipment(true)}
+                  disabled={isSavingLaterShipment}
+                  className="py-2.5 px-3 rounded-xl text-xs font-semibold text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                  title="Versanddatum löschen und nur als späterer Versand belassen"
+                >
+                  Datum entfernen
+                </button>
+              )}
+              <div className="flex gap-3 ml-auto">
+                <button 
+                  type="button"
+                  onClick={() => setLaterShipmentModalConfig({ show: false, isBulk: false })}
+                  disabled={isSavingLaterShipment}
+                  className="py-2.5 px-4 border border-slate-200 rounded-xl font-bold text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors text-sm"
+                >
+                  Abbrechen
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => handleSaveLaterShipment(false)}
+                  disabled={isSavingLaterShipment}
+                  className="py-2.5 px-5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold shadow-lg shadow-purple-600/20 transition-all text-sm disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isSavingLaterShipment ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Speichere...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      {laterShipmentDateInput ? 'Termin speichern' : 'Später versenden'}
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
       </div>

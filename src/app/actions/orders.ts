@@ -57,7 +57,11 @@ export async function archiveOrdersBulkAction(orderIds: string[]) {
   }
 }
 
-export async function updateOrderStatusAction(orderId: string, status: any) {
+export async function updateOrderStatusAction(
+  orderId: string, 
+  status: any,
+  scheduledShipmentDate?: string | Date | null
+) {
   try {
     const auth = await requireAuth()
 
@@ -78,12 +82,22 @@ export async function updateOrderStatusAction(orderId: string, status: any) {
       }
     }
 
+    const updateData: any = { 
+      status,
+      updatedAt: new Date()
+    }
+
+    if (status === 'later_shipment') {
+      if (scheduledShipmentDate !== undefined) {
+        updateData.scheduledShipmentDate = scheduledShipmentDate ? new Date(scheduledShipmentDate) : null
+      }
+    } else if (status === 'pending') {
+      updateData.scheduledShipmentDate = null
+    }
+
     await db
       .update(orders)
-      .set({ 
-        status,
-        updatedAt: new Date()
-      })
+      .set(updateData)
       .where(
         and(
           eq(orders.id, orderId),
@@ -96,6 +110,72 @@ export async function updateOrderStatusAction(orderId: string, status: any) {
   } catch (error) {
     console.error('Error updating order status:', error)
     return { error: 'Fehler beim Aktualisieren des Status.' }
+  }
+}
+
+export async function updateOrderScheduledShipmentDateAction(
+  orderId: string,
+  scheduledDate: string | Date | null
+) {
+  try {
+    const auth = await requireAuth()
+
+    const dateVal = scheduledDate ? new Date(scheduledDate) : null
+
+    await db
+      .update(orders)
+      .set({
+        status: 'later_shipment',
+        scheduledShipmentDate: dateVal,
+        updatedAt: new Date()
+      })
+      .where(
+        and(
+          eq(orders.id, orderId),
+          eq(orders.companyId, auth.activeCompanyId)
+        )
+      )
+
+    revalidatePath('/orders')
+    return { success: true, message: 'Versandtermin wurde gespeichert.' }
+  } catch (error) {
+    console.error('Error updating scheduled shipment date:', error)
+    return { error: 'Fehler beim Speichern des Versandtermins.' }
+  }
+}
+
+export async function bulkScheduleLaterShipmentAction(
+  orderIds: string[],
+  scheduledDate: string | Date | null
+) {
+  try {
+    const auth = await requireAuth()
+
+    if (!orderIds || orderIds.length === 0) {
+      return { error: 'Keine Bestellungen ausgewählt.' }
+    }
+
+    const dateVal = scheduledDate ? new Date(scheduledDate) : null
+
+    await db
+      .update(orders)
+      .set({
+        status: 'later_shipment',
+        scheduledShipmentDate: dateVal,
+        updatedAt: new Date()
+      })
+      .where(
+        and(
+          inArray(orders.id, orderIds),
+          eq(orders.companyId, auth.activeCompanyId)
+        )
+      )
+
+    revalidatePath('/orders')
+    return { success: true, message: `${orderIds.length} Bestellungen auf 'Späterer Versand' gesetzt.` }
+  } catch (error) {
+    console.error('Error in bulkScheduleLaterShipmentAction:', error)
+    return { error: 'Fehler beim Aktualisieren der ausgewählten Bestellungen.' }
   }
 }
 
