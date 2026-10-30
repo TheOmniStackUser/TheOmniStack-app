@@ -456,19 +456,29 @@ export function createMarketplaceSyncWorker() {
           })
           
           if (companySettings?.syncNotificationEmail && !job.name.includes('webhook')) {
+            const openOrdersCount = (rawOrders || []).filter(order => {
+              if (order.fulfillmentType === 'FBA') return false
+              const raw = order.rawPayload as any
+              if (raw?.rawOrder?.OrderStatus === 'Shipped') return false
+              if (raw?.fulfillment_status === 'fulfilled') return false
+              if (raw?.cancelled_at != null) return false
+              if (raw?.closed_at != null) return false
+              return true
+            }).length
+
             if (job.data.syncGroupId) {
               await reportChildResult(
                 companyId, 
                 companySettings.name, 
                 companySettings.syncNotificationEmail, 
                 job.data.syncGroupId, 
-                { marketplace: job.data.marketplaceDisplayName || marketplace || 'Unbekannt', success: true, count: rawOrders.length, newCount: newlyImportedCount }
+                { marketplace: job.data.marketplaceDisplayName || marketplace || 'Unbekannt', success: true, count: openOrdersCount, newCount: newlyImportedCount }
               )
             } else {
               await sendSyncNotificationEmail({
                 toEmail: companySettings.syncNotificationEmail,
                 companyName: companySettings.name,
-                results: [{ marketplace: job.data.marketplaceDisplayName || marketplace || 'Unbekannt', success: true, count: rawOrders.length, newCount: newlyImportedCount }]
+                results: [{ marketplace: job.data.marketplaceDisplayName || marketplace || 'Unbekannt', success: true, count: openOrdersCount, newCount: newlyImportedCount }]
               })
             }
           }
