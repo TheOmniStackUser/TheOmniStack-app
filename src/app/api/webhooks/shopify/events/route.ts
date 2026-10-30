@@ -146,13 +146,14 @@ export async function POST(request: Request) {
         : `Shopify (${shopDomain})`
 
       await marketplaceSyncQueue.add(
-        `sync-shopify`,
+        `sync-shopify-webhook`,
         {
           companyId: integration.companyId,
           marketplace: 'shopify',
           triggeredByUserId: null,
           integrationId: integration.id,
           marketplaceDisplayName: shopDisplayName,
+          isWebhook: true,
         },
         {
           jobId, // This acts as a debounce within the 10-second window

@@ -48,6 +48,7 @@ export type MarketplaceSyncJobData = {
   orderId?: string
   syncGroupId?: string
   marketplaceDisplayName?: string
+  isWebhook?: boolean
 }
 
 // ─── Lazy Redis Connection & Queue Initialization ─────────────────────────────
@@ -95,6 +96,9 @@ async function reportChildResult(
   syncGroupId: string,
   result: { marketplace: string; success: boolean; count?: number; newCount?: number; error?: string }
 ) {
+  // Only process daily scheduled sync groups
+  if (!syncGroupId || !syncGroupId.startsWith('daily-')) return
+
   const redis = getRedisConnection()
   const groupKey = `sync-group:${companyId}:${syncGroupId}`
   
@@ -399,7 +403,7 @@ export function createMarketplaceSyncWorker() {
 
 
           if (rawOrders.length > 0) {
-            const isManualSync = job.name.startsWith('manual-sync')
+            const isManualSync = job.name.startsWith('manual-sync') || job.id?.startsWith('manual-sync') || job.data.syncGroupId?.startsWith('manual-')
             const result = await persistOrders(companyId, rawOrders, isManualSync, integration, adapter)
             newlyImportedCount = result.affected
           }
@@ -455,7 +459,16 @@ export function createMarketplaceSyncWorker() {
             nextState: { marketplace, completedAt: new Date().toISOString(), ordersImported: rawOrders.length },
           })
           
-          if (companySettings?.syncNotificationEmail && !job.name.includes('webhook')) {
+          const isWebhook =
+            job.name.includes('webhook') ||
+            job.id?.includes('webhook') ||
+            Boolean(job.data.isWebhook)
+
+          const isDailyScheduledSync = Boolean(
+            job.data.syncGroupId && job.data.syncGroupId.startsWith('daily-')
+          )
+
+          if (companySettings?.syncNotificationEmail && !isWebhook && isDailyScheduledSync) {
             const openOrdersCount = (rawOrders || []).filter(order => {
               if (order.fulfillmentType === 'FBA') return false
               const raw = order.rawPayload as any
@@ -466,21 +479,13 @@ export function createMarketplaceSyncWorker() {
               return true
             }).length
 
-            if (job.data.syncGroupId) {
-              await reportChildResult(
-                companyId, 
-                companySettings.name, 
-                companySettings.syncNotificationEmail, 
-                job.data.syncGroupId, 
-                { marketplace: job.data.marketplaceDisplayName || marketplace || 'Unbekannt', success: true, count: openOrdersCount, newCount: newlyImportedCount }
-              )
-            } else {
-              await sendSyncNotificationEmail({
-                toEmail: companySettings.syncNotificationEmail,
-                companyName: companySettings.name,
-                results: [{ marketplace: job.data.marketplaceDisplayName || marketplace || 'Unbekannt', success: true, count: openOrdersCount, newCount: newlyImportedCount }]
-              })
-            }
+            await reportChildResult(
+              companyId, 
+              companySettings.name, 
+              companySettings.syncNotificationEmail, 
+              job.data.syncGroupId!, 
+              { marketplace: job.data.marketplaceDisplayName || marketplace || 'Unbekannt', success: true, count: openOrdersCount, newCount: newlyImportedCount }
+            )
           }
         }
         
@@ -499,23 +504,24 @@ export function createMarketplaceSyncWorker() {
             },
           })
           
-          // Only send failure email on the LAST attempt to avoid spamming during retries
-          if (companySettings?.syncNotificationEmail && job.attemptsMade >= (job.opts.attempts || 1) - 1 && !job.name.includes('webhook')) {
-            if (job.data.syncGroupId) {
-              await reportChildResult(
-                companyId, 
-                companySettings.name, 
-                companySettings.syncNotificationEmail, 
-                job.data.syncGroupId, 
-                { marketplace: job.data.marketplaceDisplayName || marketplace || 'Unbekannt', success: false, error: error instanceof Error ? error.message : String(error) }
-              )
-            } else {
-              await sendSyncNotificationEmail({
-                toEmail: companySettings.syncNotificationEmail,
-                companyName: companySettings.name,
-                results: [{ marketplace: job.data.marketplaceDisplayName || marketplace || 'Unbekannt', success: false, error: error instanceof Error ? error.message : String(error) }]
-              })
-            }
+          const isWebhook =
+            job.name.includes('webhook') ||
+            job.id?.includes('webhook') ||
+            Boolean(job.data.isWebhook)
+
+          const isDailyScheduledSync = Boolean(
+            job.data.syncGroupId && job.data.syncGroupId.startsWith('daily-')
+          )
+
+          // Only send failure email on the LAST attempt to avoid spamming during retries, and only for scheduled daily syncs
+          if (companySettings?.syncNotificationEmail && job.attemptsMade >= (job.opts.attempts || 1) - 1 && !isWebhook && isDailyScheduledSync) {
+            await reportChildResult(
+              companyId, 
+              companySettings.name, 
+              companySettings.syncNotificationEmail, 
+              job.data.syncGroupId!, 
+              { marketplace: job.data.marketplaceDisplayName || marketplace || 'Unbekannt', success: false, error: error instanceof Error ? error.message : String(error) }
+            )
           }
         }
         throw error // Re-throw so BullMQ marks the job as failed and retries
