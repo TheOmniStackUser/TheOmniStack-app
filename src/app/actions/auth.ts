@@ -193,6 +193,9 @@ export async function loginAction(
         )
       )
 
+    const existingMeta = (existingIntegration?.metadata as any) || {}
+    const isAlreadyShopifyBilled = existingMeta.isShopifyBilled === true
+
     if (existingIntegration) {
       await db
         .update(marketplaceIntegrations)
@@ -202,10 +205,10 @@ export async function loginAction(
           isActive: true,
           updatedAt: new Date(),
           metadata: { 
-            ...((existingIntegration.metadata as any) || {}), 
+            ...existingMeta, 
             shop: pendingShopify.shopMetadata,
-            isShopifyBilled: true,
-            shopifySubscriptionStatus: 'PENDING'
+            isShopifyBilled: isAlreadyShopifyBilled,
+            ...(isAlreadyShopifyBilled ? { shopifySubscriptionStatus: existingMeta.shopifySubscriptionStatus || 'PENDING' } : { shopifySubscriptionStatus: null })
           }
         })
         .where(eq(marketplaceIntegrations.id, existingIntegration.id))
@@ -218,13 +221,14 @@ export async function loginAction(
         isActive: true,
         metadata: { 
           shop: pendingShopify.shopMetadata,
-          isShopifyBilled: true,
-          shopifySubscriptionStatus: 'PENDING'
+          isShopifyBilled: false,
         }
       })
     }
 
-    shopForRedirect = pendingShopify.shop
+    if (isAlreadyShopifyBilled) {
+      shopForRedirect = pendingShopify.shop
+    }
     await clearShopifyPendingInstall()
   }
 
@@ -318,6 +322,9 @@ export async function verifyTwoFactorLoginAction(
         )
       )
 
+    const existingMeta = (existingIntegration?.metadata as any) || {}
+    const isAlreadyShopifyBilled = existingMeta.isShopifyBilled === true
+
     if (existingIntegration) {
       await db
         .update(marketplaceIntegrations)
@@ -327,10 +334,10 @@ export async function verifyTwoFactorLoginAction(
           isActive: true,
           updatedAt: new Date(),
           metadata: { 
-            ...((existingIntegration.metadata as any) || {}), 
+            ...existingMeta, 
             shop: pendingShopify.shopMetadata,
-            isShopifyBilled: true,
-            shopifySubscriptionStatus: 'PENDING'
+            isShopifyBilled: isAlreadyShopifyBilled,
+            ...(isAlreadyShopifyBilled ? { shopifySubscriptionStatus: existingMeta.shopifySubscriptionStatus || 'PENDING' } : { shopifySubscriptionStatus: null })
           }
         })
         .where(eq(marketplaceIntegrations.id, existingIntegration.id))
@@ -343,13 +350,14 @@ export async function verifyTwoFactorLoginAction(
         isActive: true,
         metadata: { 
           shop: pendingShopify.shopMetadata,
-          isShopifyBilled: true,
-          shopifySubscriptionStatus: 'PENDING'
+          isShopifyBilled: false,
         }
       })
     }
 
-    shopForRedirect = pendingShopify.shop
+    if (isAlreadyShopifyBilled) {
+      shopForRedirect = pendingShopify.shop
+    }
     await clearShopifyPendingInstall()
   }
 

@@ -28,8 +28,9 @@ export default async function SubscribePage({
 
   const metadata = (shopifyIntegration?.metadata as any) || {}
   const isAlreadyActive = metadata.shopifySubscriptionStatus === 'ACTIVE'
+  const isNotShopifyBilled = metadata.isShopifyBilled === false
 
-  if (isAlreadyActive) {
+  if (isAlreadyActive || isNotShopifyBilled) {
     redirect('/dashboard')
   }
 

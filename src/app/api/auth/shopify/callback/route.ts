@@ -108,6 +108,11 @@ export async function GET(request: Request) {
           )
         )
 
+      const existingMeta = (existing?.metadata as any) || {}
+      // Keep isShopifyBilled true ONLY if this company was already a Shopify-billed customer.
+      // Existing OmniStack companies connecting Shopify as an integration are billed directly via OmniStack.
+      const isAlreadyShopifyBilled = existingMeta.isShopifyBilled === true
+
       if (existing) {
         await db
           .update(marketplaceIntegrations)
@@ -119,10 +124,10 @@ export async function GET(request: Request) {
             isActive: true,
             updatedAt: new Date(),
             metadata: { 
-              ...((existing.metadata as any) || {}), 
+              ...existingMeta, 
               shop: shopMetadata,
-              isShopifyBilled: true,
-              shopifySubscriptionStatus: 'PENDING'
+              isShopifyBilled: isAlreadyShopifyBilled,
+              ...(isAlreadyShopifyBilled ? { shopifySubscriptionStatus: existingMeta.shopifySubscriptionStatus || 'PENDING' } : { shopifySubscriptionStatus: null })
             }
           })
           .where(eq(marketplaceIntegrations.id, existing.id))
@@ -137,8 +142,7 @@ export async function GET(request: Request) {
           isActive: true,
           metadata: { 
             shop: shopMetadata,
-            isShopifyBilled: true,
-            shopifySubscriptionStatus: 'PENDING'
+            isShopifyBilled: false,
           }
         })
       }
@@ -212,9 +216,16 @@ export async function GET(request: Request) {
         console.error('[Shopify OAuth] Failed to trigger initial sync:', e)
       }
 
-      // 6. Cleanup CSRF cookie and redirect through Billing Check (Shopify App Review Requirement 1.2.2)
+      // 6. Cleanup CSRF cookie and redirect
       cookieStore.delete('shopify_oauth_nonce')
-      return NextResponse.redirect(new URL(`/api/billing/shopify/check?shop=${shop}`, process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'))
+
+      if (isAlreadyShopifyBilled) {
+        // App Store customer reconnecting/authenticating - check active subscription
+        return NextResponse.redirect(new URL(`/api/billing/shopify/check?shop=${shop}`, process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'))
+      }
+
+      // Existing OmniStack customer connecting Shopify as a sales channel
+      return NextResponse.redirect(new URL('/integrations?success=shopify_connected', process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'))
     } else {
       // User is NOT logged in. Save pending install to secure cookie and redirect to registration.
       await setShopifyPendingInstall({

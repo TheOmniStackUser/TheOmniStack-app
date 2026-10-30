@@ -35,6 +35,11 @@ export async function GET(request: Request) {
 
     const metadata = (integration.metadata as any) || {}
 
+    // If this merchant is billed directly by OmniStack, bypass Shopify billing entirely
+    if (metadata.isShopifyBilled === false) {
+      return NextResponse.redirect(defaultRedirect)
+    }
+
     // Verify subscription status in real-time using Shopify's GraphQL API (source of truth)
     let hasActiveSubscription = false
     let activeSubscriptionId: string | null = null
