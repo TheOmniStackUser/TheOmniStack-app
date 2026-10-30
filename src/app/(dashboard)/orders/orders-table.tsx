@@ -4766,6 +4766,19 @@ const filteredOrders = orders;
           onClose={() => setShowDecathlonRefundModal(null)}
         />
       )}
+
+      {/* Split Order Modal (Splittversand) */}
+      {splitOrderModal && (
+        <SplitOrderModal
+          order={splitOrderModal}
+          isOpen={!!splitOrderModal}
+          onClose={() => setSplitOrderModal(null)}
+          onSuccess={(res) => {
+            showToast(res.message, 'success')
+            router.refresh()
+          }}
+        />
+      )}
     </div>
   )
 }
