@@ -2409,13 +2409,13 @@ const filteredOrders = orders;
                       <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 group/order">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-mono text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-md">{orderNumber}</span>
-                          {((order.rawPayload as any)?.isSplit || /-\d+$/.test(order.marketplaceOrderId)) && (
+                          {Boolean((order.rawPayload as any)?.isSplit) && (
                             <span 
                               className="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-md"
                               title="Teillieferung (Splittversand)"
                             >
                               <Scissors className="w-3 h-3 rotate-90 text-purple-600" />
-                              Teillieferung {(order.rawPayload as any)?.splitPart || order.marketplaceOrderId.split('-').pop()}
+                              Teillieferung {(order.rawPayload as any)?.splitPart || 1}
                             </span>
                           )}
                           <button

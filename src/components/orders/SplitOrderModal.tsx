@@ -92,7 +92,10 @@ export function SplitOrderModal({ order, isOpen, onClose, onSuccess }: SplitOrde
 
   const isValid = totalSplitQty > 0 && totalRemainingQty > 0
 
-  const baseOrderId = order.marketplaceOrderId?.replace(/-\d+$/, '') || order.marketplaceOrderId
+  const baseOrderId = (order.rawPayload as any)?.originalMarketplaceOrderId || 
+    ((order.rawPayload as any)?.isSplit 
+      ? order.marketplaceOrderId?.replace(/-\d+$/, '') 
+      : order.marketplaceOrderId)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

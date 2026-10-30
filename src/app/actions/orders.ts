@@ -981,10 +981,11 @@ export async function splitOrderAction(
     }
 
     // Determine base order ID & suffix indexing
-    const baseOrderId = (order.rawPayload as any)?.originalMarketplaceOrderId || (() => {
-      const match = order.marketplaceOrderId.match(/^(.*?)(?:-(\d+))?$/)
-      return match && match[2] && !order.marketplaceOrderId.startsWith('MAN-') ? match[1] : order.marketplaceOrderId
-    })()
+    const baseOrderId = (order.rawPayload as any)?.originalMarketplaceOrderId || (
+      (order.rawPayload as any)?.isSplit && order.marketplaceOrderId.includes('-')
+        ? order.marketplaceOrderId.replace(/-\d+$/, '')
+        : order.marketplaceOrderId
+    )
 
     // Find all related orders that share this baseOrderId
     const relatedOrders = await db
