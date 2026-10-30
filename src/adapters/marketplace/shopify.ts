@@ -52,23 +52,63 @@ export class ShopifyAdapter implements MarketplaceAdapter {
   }
 
   private async fetchWithToken(shopUrl: string, token: string, options?: any, integrationId?: string): Promise<NormalizedOrder[]> {
-    const endpoint = `${shopUrl}/admin/api/2024-01/orders.json?status=any&limit=50`
-    const res = await fetch(endpoint, {
-      method: 'GET',
-      cache: 'no-store',
-      headers: {
-        'X-Shopify-Access-Token': token,
-        'Content-Type': 'application/json',
-      },
-    })
+    const params = new URLSearchParams()
+    params.set('status', 'open')
+    params.set('fulfillment_status', 'unfulfilled')
+    params.set('limit', '250')
 
-    if (!res.ok) {
-      const errText = await res.text()
-      throw new Error(`Shopify API Fehler: ${res.status} - ${errText}`)
+    if (options?.fromDate) {
+      params.set('created_at_min', options.fromDate.includes('T') ? options.fromDate : `${options.fromDate}T00:00:00Z`)
+    }
+    if (options?.toDate) {
+      params.set('created_at_max', options.toDate.includes('T') ? options.toDate : `${options.toDate}T23:59:59Z`)
     }
 
-    const data = await res.json()
-    return this.mapOrders(data.orders || [], shopUrl, integrationId)
+    let nextUrl: string | null = `${shopUrl}/admin/api/2024-01/orders.json?${params.toString()}`
+    const allOrders: any[] = []
+    let pages = 0
+
+    while (nextUrl && pages < 50) {
+      pages++
+      const res: Response = await fetch(nextUrl, {
+        method: 'GET',
+        cache: 'no-store',
+        headers: {
+          'X-Shopify-Access-Token': token,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (!res.ok) {
+        const errText = await res.text()
+        throw new Error(`Shopify API Fehler: ${res.status} - ${errText}`)
+      }
+
+      const data = await res.json()
+      if (Array.isArray(data.orders)) {
+        allOrders.push(...data.orders)
+      }
+
+      // Check Link header for pagination rel="next"
+      const linkHeader = res.headers.get('link') || res.headers.get('Link')
+      nextUrl = null
+      if (linkHeader) {
+        const match = linkHeader.match(/<([^>]+)>;\s*rel="next"/)
+        if (match) {
+          nextUrl = match[1]
+        }
+      }
+    }
+
+    // Safety filter: ensure no fulfilled, closed, or cancelled orders slip through
+    const unfulfilledOrders = allOrders.filter((order: any) => {
+      if (order.fulfillment_status === 'fulfilled') return false
+      if (order.closed_at) return false
+      if (order.cancelled_at) return false
+      return true
+    })
+
+    return this.mapOrders(unfulfilledOrders, shopUrl, integrationId)
   }
 
   private mapOrders(orders: any[], shopUrl?: string, integrationId?: string): NormalizedOrder[] {

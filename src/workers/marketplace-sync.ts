@@ -13,7 +13,7 @@ import { customers } from '@/db/schema/customers'
 import { companies } from '@/db/schema/companies'
 import { vatSettings } from '@/db/schema/vat-settings'
 import { auditLog } from '@/lib/audit'
-import { eq, and, desc, isNull, inArray, gte, sql, notInArray } from 'drizzle-orm'
+import { eq, and, desc, isNull, inArray, gte, sql, notInArray, or } from 'drizzle-orm'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { invoices, invoiceItems, invoiceLogs } from '@/db/schema/invoices'
 import { returnsLog, returnedItems } from '@/db/schema/returns'
@@ -1727,7 +1727,11 @@ export async function persistOrders(
     let existingOrder = await db.query.orders.findFirst({
       where: and(
         eq(orders.companyId, companyId),
-        eq(orders.marketplaceOrderId, order.marketplaceOrderId)
+        or(
+          eq(orders.marketplaceOrderId, order.marketplaceOrderId),
+          eq(orders.marketplaceOrderId, `${order.marketplaceOrderId}-1`),
+          sql`${orders.rawPayload}->>'originalMarketplaceOrderId' = ${order.marketplaceOrderId}`
+        )
       )
     })
 
@@ -1893,8 +1897,19 @@ export async function persistOrders(
           currency: order.currency,
           totalAmount: String(order.totalAmount),
           taxAmount: String(finalTaxAmount.toFixed(2)),
-          totalWeight: order.totalWeight ? String(order.totalWeight) : null,
-          status: order.fulfillmentType === 'FBA' || (order.rawPayload as any)?.rawOrder?.OrderStatus === 'Shipped' ? 'shipped' : 'pending',
+          status: (() => {
+            const raw = order.rawPayload as any
+            if (raw?.cancelled_at) return 'cancelled'
+            if (
+              order.fulfillmentType === 'FBA' ||
+              raw?.rawOrder?.OrderStatus === 'Shipped' ||
+              raw?.fulfillment_status === 'fulfilled' ||
+              raw?.closed_at != null
+            ) {
+              return 'shipped'
+            }
+            return 'pending'
+          })(),
           rawPayload: order.rawPayload,
           customerNumber,
           deliveryNoteNumber,

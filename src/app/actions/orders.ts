@@ -2,9 +2,10 @@
 
 import { requireAuth } from '@/lib/session'
 import { db } from '@/db/client'
-import { orders } from '@/db/schema/orders'
+import { orders, orderItems } from '@/db/schema/orders'
 import { invoices } from '@/db/schema/invoices'
-import { eq, and } from 'drizzle-orm'
+import { companies } from '@/db/schema/companies'
+import { eq, and, inArray, sql, or, like } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 
 export async function archiveOrderAction(orderId: string) {
@@ -28,8 +29,6 @@ export async function archiveOrderAction(orderId: string) {
     return { error: 'Fehler beim Löschen der Bestellung.' }
   }
 }
-
-import { inArray } from 'drizzle-orm'
 
 export async function archiveOrdersBulkAction(orderIds: string[]) {
   try {
@@ -519,8 +518,9 @@ export async function markOrderAsShippedManuallyAction(
             const isOtto = order.marketplace === 'otto'
             const ottoReturnAddressCarrierId = isOtto ? (integration.metadata as any)?.returnAddressCarrierId : undefined
 
+            const targetMarketplaceOrderId = (order.rawPayload as any)?.originalMarketplaceOrderId || order.marketplaceOrderId
             await (adapter as any).confirmShipment(
-              order.marketplaceOrderId,
+              targetMarketplaceOrderId,
               trackingNumber || '',
               carrier || 'Other',
               undefined, // returnTrackingNumber
@@ -903,3 +903,309 @@ export async function refundOrderPartialAction(orderId: string, itemsToRefund: {
     return { error: error.message || 'Fehler bei der Rückerstattung.' }
   }
 }
+
+export interface SplitOrderItemInput {
+  itemId: string
+  splitQuantity: number
+}
+
+export async function splitOrderAction(
+  orderId: string,
+  itemsToSplit: SplitOrderItemInput[],
+  newOrderStatus: 'pending' | 'later_shipment' = 'pending',
+  scheduledShipmentDate?: string | Date | null,
+  splitNote?: string
+) {
+  try {
+    const auth = await requireAuth()
+
+    const order = await db.query.orders.findFirst({
+      where: and(
+        eq(orders.id, orderId),
+        eq(orders.companyId, auth.activeCompanyId)
+      ),
+      with: { items: true }
+    })
+
+    if (!order) {
+      return { error: 'Bestellung nicht gefunden.' }
+    }
+
+    if (order.invoiceId) {
+      return { error: 'Bestellungen mit bereits erstellter Rechnung können nicht aufgeteilt werden.' }
+    }
+
+    if (order.status === 'shipped') {
+      return { error: 'Bereits versendete Bestellungen können nicht mehr aufgeteilt werden.' }
+    }
+
+    if (order.status === 'cancelled') {
+      return { error: 'Stornierte Bestellungen können nicht aufgeteilt werden.' }
+    }
+
+    if (!order.items || order.items.length === 0) {
+      return { error: 'Keine Artikel in der Bestellung vorhanden.' }
+    }
+
+    const splitMap = new Map<string, number>()
+    for (const item of itemsToSplit) {
+      splitMap.set(item.itemId, Math.max(0, Number(item.splitQuantity) || 0))
+    }
+
+    let totalSplitQty = 0
+    let totalRemainingQty = 0
+
+    const partitions: any[] = []
+
+    for (const item of order.items) {
+      const originalQty = Number(item.quantity) || 1
+      const splitQty = Math.min(originalQty, splitMap.get(item.id) || 0)
+      const remainingQty = originalQty - splitQty
+
+      totalSplitQty += splitQty
+      totalRemainingQty += remainingQty
+
+      partitions.push({
+        orderItem: item,
+        remainingQty,
+        splitQty
+      })
+    }
+
+    if (totalSplitQty <= 0) {
+      return { error: 'Bitte wähle mindestens ein Produkt mit einer Menge größer als 0 für die Teillieferung aus.' }
+    }
+
+    if (totalRemainingQty <= 0) {
+      return { error: 'Mindestens ein Artikel muss in der bestehenden Bestellung verbleiben.' }
+    }
+
+    // Determine base order ID & suffix indexing
+    const baseOrderId = (order.rawPayload as any)?.originalMarketplaceOrderId || (() => {
+      const match = order.marketplaceOrderId.match(/^(.*?)(?:-(\d+))?$/)
+      return match && match[2] && !order.marketplaceOrderId.startsWith('MAN-') ? match[1] : order.marketplaceOrderId
+    })()
+
+    // Find all related orders that share this baseOrderId
+    const relatedOrders = await db
+      .select({ marketplaceOrderId: orders.marketplaceOrderId })
+      .from(orders)
+      .where(
+        and(
+          eq(orders.companyId, auth.activeCompanyId),
+          or(
+            eq(orders.marketplaceOrderId, baseOrderId),
+            like(orders.marketplaceOrderId, `${baseOrderId}-%`),
+            sql`${orders.rawPayload}->>'originalMarketplaceOrderId' = ${baseOrderId}`
+          )
+        )
+      )
+
+    const usedNumbers = new Set<number>()
+    const escapedBase = baseOrderId.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')
+    const regex = new RegExp(`^${escapedBase}-(\\d+)$`)
+
+    for (const ro of relatedOrders) {
+      const m = ro.marketplaceOrderId.match(regex)
+      if (m) {
+        usedNumbers.add(parseInt(m[1], 10))
+      }
+    }
+
+    const maxNum = usedNumbers.size > 0 ? Math.max(...Array.from(usedNumbers)) : 1
+    const originalMatch = order.marketplaceOrderId.match(regex)
+    const originalOrderPartNum = originalMatch ? parseInt(originalMatch[1], 10) : 1
+    const newOrderPartNum = Math.max(maxNum + 1, originalOrderPartNum + 1)
+
+    const updatedOriginalMarketplaceOrderId = originalMatch
+      ? order.marketplaceOrderId
+      : `${baseOrderId}-1`
+    const newSplitMarketplaceOrderId = `${baseOrderId}-${newOrderPartNum}`
+
+    // Financial calculations
+    let remSubtotal = 0
+    let remTax = 0
+    let splitSubtotal = 0
+    let splitTax = 0
+
+    for (const p of partitions) {
+      const unitPriceNet = Number(p.orderItem.unitPrice) || 0
+      const taxRate = Number(p.orderItem.taxRate) || 0.19
+
+      if (p.remainingQty > 0) {
+        const net = unitPriceNet * p.remainingQty
+        const tax = net * taxRate
+        remSubtotal += net
+        remTax += tax
+      }
+
+      if (p.splitQty > 0) {
+        const net = unitPriceNet * p.splitQty
+        const tax = net * taxRate
+        splitSubtotal += net
+        splitTax += tax
+      }
+    }
+
+    const remTotal = remSubtotal + remTax
+    const splitTotal = splitSubtotal + splitTax
+
+    let remWeight: string | null = null
+    let splitWeight: string | null = null
+    if (order.totalWeight && Number(order.totalWeight) > 0) {
+      const origTotalQty = totalRemainingQty + totalSplitQty
+      const origWeight = Number(order.totalWeight)
+      remWeight = ((origWeight * totalRemainingQty) / origTotalQty).toFixed(3)
+      splitWeight = ((origWeight * totalSplitQty) / origTotalQty).toFixed(3)
+    }
+
+    // Partition rawPayload
+    const origRaw = (order.rawPayload as any) || {}
+    let remPositionItems: any[] | undefined
+    let splitPositionItems: any[] | undefined
+
+    if (Array.isArray(origRaw.positionItems)) {
+      const splitSkus = new Set(partitions.filter(p => p.splitQty > 0).map(p => p.orderItem.sku))
+      const remSkus = new Set(partitions.filter(p => p.remainingQty > 0).map(p => p.orderItem.sku))
+
+      remPositionItems = origRaw.positionItems.filter((pi: any) => remSkus.has(pi.product?.sku || pi.sku || pi.itemNumber))
+      splitPositionItems = origRaw.positionItems.filter((pi: any) => splitSkus.has(pi.product?.sku || pi.sku || pi.itemNumber))
+      if (remPositionItems && remPositionItems.length === 0) remPositionItems = origRaw.positionItems
+      if (splitPositionItems && splitPositionItems.length === 0) splitPositionItems = origRaw.positionItems
+    }
+
+    const remRawPayload = {
+      ...origRaw,
+      isSplit: true,
+      splitPart: originalOrderPartNum,
+      originalMarketplaceOrderId: baseOrderId,
+      name: origRaw.name ? `${origRaw.name}-1` : undefined,
+      ...(remPositionItems ? { positionItems: remPositionItems } : {})
+    }
+
+    const splitRawPayload = {
+      ...origRaw,
+      isSplit: true,
+      splitPart: newOrderPartNum,
+      originalMarketplaceOrderId: baseOrderId,
+      name: origRaw.name ? `${origRaw.name}-${newOrderPartNum}` : undefined,
+      ...(splitPositionItems ? { positionItems: splitPositionItems } : {})
+    }
+
+    let createdOrderId: string | null = null
+
+    await db.transaction(async (tx) => {
+      // 1. Fetch next delivery note number
+      const [compDN] = await tx
+        .select({ nextDeliveryNoteNumber: companies.nextDeliveryNoteNumber })
+        .from(companies)
+        .where(eq(companies.id, auth.activeCompanyId))
+      const deliveryNoteNumber = compDN?.nextDeliveryNoteNumber || '1000'
+      const nextDN = (parseInt(deliveryNoteNumber, 10) + 1).toString()
+      await tx.update(companies).set({ nextDeliveryNoteNumber: nextDN }).where(eq(companies.id, auth.activeCompanyId))
+
+      // 2. Insert new split order
+      const [newOrder] = await tx.insert(orders).values({
+        companyId: auth.activeCompanyId,
+        marketplace: order.marketplace,
+        marketplaceOrderId: newSplitMarketplaceOrderId,
+        marketplacePurchaseDate: order.marketplacePurchaseDate,
+        buyerName: order.buyerName,
+        buyerCompany: order.buyerCompany,
+        buyerEmail: order.buyerEmail,
+        buyerPhone: order.buyerPhone,
+        shippingName: order.shippingName,
+        shippingCompany: order.shippingCompany,
+        shippingAddressAddition: order.shippingAddressAddition,
+        shippingPhone: order.shippingPhone,
+        shippingStreet: order.shippingStreet,
+        shippingCity: order.shippingCity,
+        shippingZip: order.shippingZip,
+        shippingCountry: order.shippingCountry,
+        currency: order.currency,
+        subtotalAmount: splitSubtotal.toFixed(2),
+        taxAmount: splitTax.toFixed(2),
+        totalAmount: splitTotal.toFixed(2),
+        totalWeight: splitWeight,
+        status: newOrderStatus,
+        shippingStatus: 'in_preparation',
+        scheduledShipmentDate: newOrderStatus === 'later_shipment' && scheduledShipmentDate ? new Date(scheduledShipmentDate) : null,
+        customerNumber: order.customerNumber,
+        deliveryNoteNumber,
+        notes: splitNote ? splitNote.trim() : `[Splittversand: Teillieferung ${newOrderPartNum} aus ${order.marketplaceOrderId}]`,
+        rawPayload: splitRawPayload,
+      }).returning({ id: orders.id })
+
+      createdOrderId = newOrder.id
+
+      // 3. Insert items for new split order
+      const splitItemsToInsert = partitions
+        .filter(p => p.splitQty > 0)
+        .map((p, index) => ({
+          orderId: createdOrderId!,
+          companyId: auth.activeCompanyId,
+          position: String(index),
+          sku: p.orderItem.sku,
+          asin: p.orderItem.asin,
+          title: p.orderItem.title,
+          quantity: String(p.splitQty),
+          unitPrice: p.orderItem.unitPrice,
+          taxRate: p.orderItem.taxRate,
+        }))
+
+      if (splitItemsToInsert.length > 0) {
+        await tx.insert(orderItems).values(splitItemsToInsert)
+      }
+
+      // 4. Update items in original order
+      for (const p of partitions) {
+        if (p.remainingQty <= 0) {
+          await tx.delete(orderItems).where(eq(orderItems.id, p.orderItem.id))
+        } else if (p.remainingQty !== Number(p.orderItem.quantity)) {
+          await tx.update(orderItems)
+            .set({ quantity: String(p.remainingQty) })
+            .where(eq(orderItems.id, p.orderItem.id))
+        }
+      }
+
+      // 5. Update original order
+      const updatedOriginalNotes = order.notes 
+        ? `${order.notes}\n[Splittversand: Teillieferung ${newSplitMarketplaceOrderId} abgespalten]`
+        : `[Splittversand: Teillieferung ${newSplitMarketplaceOrderId} abgespalten]`
+
+      await tx.update(orders).set({
+        marketplaceOrderId: updatedOriginalMarketplaceOrderId,
+        subtotalAmount: remSubtotal.toFixed(2),
+        taxAmount: remTax.toFixed(2),
+        totalAmount: remTotal.toFixed(2),
+        totalWeight: remWeight,
+        notes: updatedOriginalNotes,
+        rawPayload: remRawPayload,
+        updatedAt: new Date()
+      }).where(eq(orders.id, order.id))
+    })
+
+    // 6. Invalidate cached delivery note in storage for original order
+    try {
+      const { deleteDocument, buildDeliveryNoteKey } = await import('@/lib/storage')
+      await deleteDocument(buildDeliveryNoteKey(auth.activeCompanyId, order.id))
+    } catch {
+      // Non-fatal
+    }
+
+    revalidatePath('/orders')
+    revalidatePath('/dashboard')
+
+    return {
+      success: true,
+      message: `Bestellung erfolgreich aufgeteilt in ${updatedOriginalMarketplaceOrderId} und ${newSplitMarketplaceOrderId}.`,
+      originalOrderNumber: updatedOriginalMarketplaceOrderId,
+      newOrderNumber: newSplitMarketplaceOrderId,
+      newOrderId: createdOrderId
+    }
+  } catch (error: any) {
+    console.error('Error in splitOrderAction:', error)
+    return { error: error.message || 'Fehler beim Aufteilen der Bestellung.' }
+  }
+}
+

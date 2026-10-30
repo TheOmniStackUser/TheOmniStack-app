@@ -272,6 +272,7 @@ export default async function DashboardPage() {
   }
 
   const pendingCount = orderStats.find(s => s.status === 'pending' || s.status === 'invoiced')?.count || 0
+  const processingCount = orderStats.find(s => s.status === 'processing')?.count || 0
   const laterShipmentCount = orderStats.find(s => s.status === 'later_shipment')?.count || 0
   const shippedCount = orderStats.find(s => s.status === 'shipped')?.count || 0
   const cancelledCount = orderStats.find(s => s.status === 'cancelled')?.count || 0
@@ -311,7 +312,7 @@ export default async function DashboardPage() {
         <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2">
           Bestellungen Übersicht
         </h3>
-        <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
           <Link href="/orders" className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all">
             <span className="text-sm font-medium text-gray-500 text-center">Gesamt</span>
             <span className="text-2xl font-bold text-gray-900 mt-1">{totalOrdersCount}</span>
@@ -319,6 +320,10 @@ export default async function DashboardPage() {
           <Link href="/orders?status=pending" className="bg-white border border-yellow-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-yellow-300 hover:shadow-md transition-all">
             <span className="text-sm font-medium text-yellow-700 text-center">Pending</span>
             <span className="text-2xl font-bold text-yellow-600 mt-1">{pendingCount}</span>
+          </Link>
+          <Link href="/orders?status=processing" className="bg-white border border-blue-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-blue-300 hover:shadow-md transition-all">
+            <span className="text-sm font-medium text-blue-700 text-center">Processing</span>
+            <span className="text-2xl font-bold text-blue-600 mt-1">{processingCount}</span>
           </Link>
           <Link href="/orders?status=later_shipment" className="bg-white border border-purple-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-purple-300 hover:shadow-md transition-all">
             <span className="text-sm font-medium text-purple-700 text-center">Späterer Versand</span>

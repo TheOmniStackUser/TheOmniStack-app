@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { db } from '@/db/client'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
+import { orders } from '@/db/schema/orders'
 import { eq, and } from 'drizzle-orm'
 import { marketplaceSyncQueue } from '@/workers/marketplace-sync'
 
@@ -87,6 +88,43 @@ export async function POST(request: Request) {
     if (!integration) {
       console.warn(`[Shopify Webhook] No active integration found for shop: ${shopDomain}`)
       return new NextResponse('OK', { status: 200 }) // Return 200 so Shopify stops retrying
+    }
+
+    // Handle direct order updates for existing records (e.g. cancellations, fulfillments)
+    if (topic.startsWith('orders/')) {
+      try {
+        const orderData = JSON.parse(rawBody)
+        if (orderData?.id) {
+          const shopifyOrderId = orderData.id.toString()
+          if (topic === 'orders/cancelled' || orderData.cancelled_at) {
+            await db
+              .update(orders)
+              .set({ status: 'cancelled', updatedAt: new Date() })
+              .where(
+                and(
+                  eq(orders.companyId, integration.companyId),
+                  eq(orders.marketplace, 'shopify'),
+                  eq(orders.marketplaceOrderId, shopifyOrderId)
+                )
+              )
+            console.log(`[Shopify Webhook] Marked order ${shopifyOrderId} as cancelled for company ${integration.companyId}`)
+          } else if (topic === 'orders/fulfilled' || orderData.fulfillment_status === 'fulfilled') {
+            await db
+              .update(orders)
+              .set({ status: 'shipped', updatedAt: new Date() })
+              .where(
+                and(
+                  eq(orders.companyId, integration.companyId),
+                  eq(orders.marketplace, 'shopify'),
+                  eq(orders.marketplaceOrderId, shopifyOrderId)
+                )
+              )
+            console.log(`[Shopify Webhook] Marked order ${shopifyOrderId} as shipped for company ${integration.companyId}`)
+          }
+        }
+      } catch (err) {
+        console.warn(`[Shopify Webhook] Failed to parse order JSON payload for topic ${topic}:`, err)
+      }
     }
 
     // Determine what to do based on the topic

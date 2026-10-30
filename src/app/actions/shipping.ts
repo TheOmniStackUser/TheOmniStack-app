@@ -164,8 +164,9 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
               const ottoIntegration = activeIntegrations.find(i => i.type === 'otto')
               const ottoReturnAddressCarrierId = ottoIntegration ? (ottoIntegration.metadata as any)?.returnAddressCarrierId : undefined
               
+              const targetMarketplaceOrderId = (order.rawPayload as any)?.originalMarketplaceOrderId || order.marketplaceOrderId
               await adapter.confirmShipment(
-                order.marketplaceOrderId, 
+                targetMarketplaceOrderId, 
                 trackingNumber, 
                 'HERMES', 
                 returnTrackingNumber || undefined,
@@ -776,8 +777,9 @@ export async function generateDhlLabelsAction(
               const ottoIntegration = activeIntegrations.find(i => i.type === 'otto')
               const ottoReturnAddressCarrierId = ottoIntegration ? (ottoIntegration.metadata as any)?.returnAddressCarrierId : undefined
               
+              const targetMarketplaceOrderId = (order.rawPayload as any)?.originalMarketplaceOrderId || order.marketplaceOrderId
               await adapter.confirmShipment(
-                order.marketplaceOrderId, 
+                targetMarketplaceOrderId, 
                 trackingNumber, 
                 'DHL', 
                 returnTrackingNumber || undefined,

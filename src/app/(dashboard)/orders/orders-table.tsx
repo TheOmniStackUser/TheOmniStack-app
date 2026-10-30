@@ -4,7 +4,7 @@ import { useState, Fragment, ReactNode, useEffect, useMemo, useTransition, useRe
 import { createPortal } from 'react-dom'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
-import { Package, Truck, CheckCircle2, Store, Clock, XCircle, RefreshCw, Copy, Check, Calendar } from 'lucide-react'
+import { Package, Truck, CheckCircle2, Store, Clock, XCircle, RefreshCw, Copy, Check, Calendar, Scissors } from 'lucide-react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { generateHermesLabelsAction, generateDhlLabelsAction } from '@/app/actions/shipping'
 import { archiveOrderAction, archiveOrdersBulkAction, updateOrderStatusAction, updateOrderAddressAction, updateOrderBillingAddressAction, generateOrDownloadInvoicesBulkAction, markOrderAsShippedManuallyAction, getOrderLabelsAction, updateOrderNotesAction, refundOrderAction, refundOrderPartialAction, updateOrderScheduledShipmentDateAction, bulkScheduleLaterShipmentAction } from '@/app/actions/orders'
@@ -14,7 +14,9 @@ import type { Invoice, InvoiceLog } from '@/db/schema/invoices'
 import type { DhlConfig } from '@/app/(dashboard)/integrations/dhl-form'
 import { OttoRefundModal } from '@/components/orders/OttoRefundModal'
 import { DecathlonRefundModal } from '@/components/orders/DecathlonRefundModal'
+import { SplitOrderModal } from '@/components/orders/SplitOrderModal'
 import { resolveBillingAddress } from '@/lib/order-address'
+import { getMarketplaceShippingInfo } from '@/lib/order-dates'
 
 export type OrderWithItems = Order & { items: OrderItem[], returns?: any[], invoice?: (Invoice & { logs?: InvoiceLog[] }) | null }
 
@@ -473,6 +475,7 @@ export function OrdersTable({
   const [showManualShipModal, setShowManualShipModal] = useState<any | null>(null)
   const [showOttoRefundModal, setShowOttoRefundModal] = useState<OrderWithItems | null>(null)
   const [showDecathlonRefundModal, setShowDecathlonRefundModal] = useState<OrderWithItems | null>(null)
+  const [splitOrderModal, setSplitOrderModal] = useState<OrderWithItems | null>(null)
   const [manualTrackingNumber, setManualTrackingNumber] = useState('')
   const [manualCarrier, setManualCarrier] = useState('DHL')
   const [customCarrier, setCustomCarrier] = useState('')
@@ -2077,6 +2080,7 @@ const filteredOrders = orders;
           >
             <option value="all">Alle Status</option>
             <option value="pending">Pending</option>
+            <option value="processing">Processing</option>
             <option value="later_shipment">Späterer Versand</option>
             <option value="shipped">Versendet</option>
             <option value="cancelled">Storniert</option>
@@ -2303,6 +2307,7 @@ const filteredOrders = orders;
 
                 const rawVersandDate = order.status === 'shipped' ? order.updatedAt : null
                 const formattedVersandDate = formatDate(rawVersandDate, false)
+                const shippingInfo = getMarketplaceShippingInfo(order)
 
                 let totalOrderedQty = 0;
                 let totalRefundedQty = 0;
@@ -2327,6 +2332,12 @@ const filteredOrders = orders;
 
                 const isOrderFullyRefunded = totalOrderedQty > 0 && totalRefundedQty >= totalOrderedQty;
                 const isOrderPartiallyRefunded = totalRefundedQty > 0 && totalRefundedQty < totalOrderedQty;
+
+                const canSplitOrder = 
+                  order.status !== 'shipped' && 
+                  order.status !== 'cancelled' && 
+                  !order.invoiceId && 
+                  ((order.items?.length || 0) > 1 || (Number(order.items?.[0]?.quantity || 0) > 1));
 
                 const isSelected = selectedIds.has(order.id)
                 const isExpanded = expandedIds.has(order.id)
@@ -2386,6 +2397,7 @@ const filteredOrders = orders;
                         ) : (
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
                             getDisplayStatus(order.status) === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                            getDisplayStatus(order.status) === 'processing' ? 'bg-blue-100 text-blue-800' :
                             getDisplayStatus(order.status) === 'later_shipment' ? 'bg-purple-100 text-purple-800' :
                             getDisplayStatus(order.status) === 'shipped' ? 'bg-green-100 text-green-800' :
                             'bg-gray-100 text-gray-800'
@@ -2395,8 +2407,17 @@ const filteredOrders = orders;
                         )}
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 group/order">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-mono text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-md">{orderNumber}</span>
+                          {((order.rawPayload as any)?.isSplit || /-\d+$/.test(order.marketplaceOrderId)) && (
+                            <span 
+                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-md"
+                              title="Teillieferung (Splittversand)"
+                            >
+                              <Scissors className="w-3 h-3 rotate-90 text-purple-600" />
+                              Teillieferung {(order.rawPayload as any)?.splitPart || order.marketplaceOrderId.split('-').pop()}
+                            </span>
+                          )}
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
@@ -2456,9 +2477,9 @@ const filteredOrders = orders;
                             </button>
                             <span className="text-[10px] text-purple-500 font-medium pl-1">Späterer Versand</span>
                           </div>
-                        ) : (
+                        ) : order.status === 'shipped' ? (
                           <>
-                            <div>{formattedVersandDate}</div>
+                            <div className="text-slate-900 font-medium">{formattedVersandDate}</div>
                             {order.trackingNumber && (
                               <div className="mt-1 flex items-center gap-1 group/tracking">
                                 <a
@@ -2488,6 +2509,33 @@ const filteredOrders = orders;
                               </div>
                             )}
                           </>
+                        ) : shippingInfo.isPreOrder ? (
+                          <div className="flex flex-col gap-1 items-start">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
+                              <Clock className="w-3.5 h-3.5 text-amber-700" />
+                              Vorbestellung
+                            </span>
+                            {shippingInfo.targetDate ? (
+                              <span className="text-xs font-medium text-slate-700 pl-0.5">
+                                <span className="text-slate-400 text-[11px] font-normal">{shippingInfo.dateType === 'delivery' ? 'Lieferung: ' : 'Versand: '}</span>
+                                <span className="font-semibold text-slate-900">{formatDate(shippingInfo.targetDate, false)}</span>
+                              </span>
+                            ) : (
+                              <span className="text-[11px] text-slate-400 italic pl-0.5">Termin offen</span>
+                            )}
+                          </div>
+                        ) : shippingInfo.targetDate ? (
+                          <div className="flex flex-col gap-0.5 items-start">
+                            <div className={`text-xs ${shippingInfo.isOverdue ? 'text-amber-800 font-bold' : 'text-slate-900 font-semibold'}`}>
+                              {formatDate(shippingInfo.targetDate, false)}
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-medium">
+                              {shippingInfo.label}
+                              {shippingInfo.isOverdue && <span className="ml-1 text-red-500 font-bold">(fällig)</span>}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-gray-300 text-xs">—</span>
                         )}
                       </td>
                       {/* <td className="px-3 py-4 whitespace-nowrap text-center">
@@ -2758,11 +2806,41 @@ const filteredOrders = orders;
                                     Zurück zu Pending
                                   </button>
                                 </>
+                              ) : order.status === 'processing' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenMenuOrderId(null)
+                                    setMenuPosition(null)
+                                    handleStatusUpdate(order.id, 'pending')
+                                  }}
+                                  disabled={isUpdatingStatus === order.id}
+                                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-yellow-700 hover:bg-yellow-50 transition-colors disabled:opacity-50 whitespace-nowrap"
+                                >
+                                  <svg className="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                  Zurück zu Pending
+                                </button>
                               ) : (
                                 <span className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-400 bg-slate-50/30 cursor-not-allowed select-none whitespace-nowrap">
                                   <Clock className="w-4 h-4 text-slate-300" />
                                   Versand auf später
                                 </span>
+                              )}
+
+                              {/* Splittversand / Bestellung aufteilen */}
+                              {canSplitOrder && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenMenuOrderId(null)
+                                    setMenuPosition(null)
+                                    setSplitOrderModal(order)
+                                  }}
+                                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-indigo-700 hover:bg-indigo-50/50 transition-colors whitespace-nowrap"
+                                >
+                                  <Scissors className="w-4 h-4 text-indigo-500 rotate-90" />
+                                  Bestellung aufteilen (Splittversand)
+                                </button>
                               )}
 
                               <div className="border-t border-slate-100 my-1"></div>
@@ -2839,9 +2917,27 @@ const filteredOrders = orders;
                                       Bearbeiten
                                     </button>
                                   </div>
-                                ) : (
+                                ) : order.status === 'shipped' ? (
                                   <div>
                                     <span className="font-medium">Versanddatum:</span> <span className="text-gray-500">{formattedVersandDate}</span>
+                                  </div>
+                                ) : (
+                                  <div>
+                                    <span className="font-medium">Marktplatz-Termin:</span>{' '}
+                                    {shippingInfo.targetDate ? (
+                                      <span className="inline-flex items-center gap-1.5 text-gray-700">
+                                        <span className="font-semibold text-slate-900">{formatDate(shippingInfo.targetDate, false)}</span>
+                                        <span className="text-xs text-gray-400">({shippingInfo.label})</span>
+                                        {shippingInfo.isPreOrder && (
+                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                                            <Clock className="w-3 h-3 text-amber-700" />
+                                            Vorbestellung
+                                          </span>
+                                        )}
+                                      </span>
+                                    ) : (
+                                      <span className="text-gray-400">—</span>
+                                    )}
                                   </div>
                                 )}
                                 <div>
@@ -2917,6 +3013,20 @@ const filteredOrders = orders;
                                           {isUpdatingStatus === order.id ? 'Lädt...' : 'Zurück zu Pending'}
                                         </button>
                                       </>
+                                    )}
+
+                                    {order.status === 'processing' && (
+                                      <button 
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleStatusUpdate(order.id, 'pending')
+                                        }}
+                                        disabled={isUpdatingStatus === order.id}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1 bg-yellow-50 border border-yellow-200 rounded-lg text-xs font-bold text-yellow-700 hover:bg-yellow-100 transition-all shadow-sm disabled:opacity-50"
+                                      >
+                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                        {isUpdatingStatus === order.id ? 'Lädt...' : 'Zurück zu Pending'}
+                                      </button>
                                     )}
 
                                     {order.status !== 'shipped' && (
@@ -3450,7 +3560,25 @@ const filteredOrders = orders;
                                               </span>
                                             )}
                                           </div>
-                                          <p className="text-xs text-gray-500 mt-1">SKU: {item.sku}</p>
+                                          {(() => {
+                                            const itemDateInfo = shippingInfo.itemDates.find(i => i.sku && item.sku && i.sku.toLowerCase() === item.sku.toLowerCase()) || (shippingInfo.itemDates.length === 1 ? shippingInfo.itemDates[0] : null)
+                                            return (
+                                              <div className="flex flex-wrap items-center gap-2 mt-1">
+                                                <span className="text-xs text-gray-500">SKU: {item.sku}</span>
+                                                {itemDateInfo?.expectedDeliveryDate && (
+                                                  <span className="text-xs text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 font-medium">
+                                                    Lieferung bis: {formatDate(itemDateInfo.expectedDeliveryDate, false)}
+                                                  </span>
+                                                )}
+                                                {itemDateInfo?.isPreOrder && (
+                                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                                                    <Clock className="w-2.5 h-2.5 text-amber-700" />
+                                                    Vorbestellung
+                                                  </span>
+                                                )}
+                                              </div>
+                                            )
+                                          })()}
                                         </div>
                                         <div className="text-right whitespace-nowrap">
                                           <div className={`text-sm font-medium text-gray-900 ${isFullyRefunded ? 'line-through text-gray-500' : ''}`}>
@@ -3468,7 +3596,17 @@ const filteredOrders = orders;
                                   )}
                                 </ul>
                               </div>
-                              <div className="flex justify-end gap-2">
+                              <div className="flex justify-end gap-2 flex-wrap">
+                                {canSplitOrder && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setSplitOrderModal(order)}
+                                    className="text-sm text-indigo-600 hover:text-indigo-800 font-medium px-3 py-1.5 border border-indigo-200 hover:bg-indigo-50 rounded-md transition-colors flex items-center gap-2"
+                                  >
+                                    <Scissors className="w-4 h-4 text-indigo-500 rotate-90" />
+                                    Splittversand / Aufteilen
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => handleOpenRefundItems(order)}
                                   className="text-sm text-orange-600 hover:text-orange-800 font-medium px-3 py-1.5 border border-orange-200 hover:bg-orange-50 rounded-md transition-colors flex items-center gap-2"

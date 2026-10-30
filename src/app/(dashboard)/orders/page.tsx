@@ -293,6 +293,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   const stats = {
     total: statsRows.reduce((sum, r) => sum + Number(r.count), 0),
     pending: statsRows.find(r => r.status === 'pending')?.count || 0,
+    processing: statsRows.find(r => r.status === 'processing')?.count || 0,
     laterShipment: statsRows.find(r => r.status === 'later_shipment')?.count || 0,
     shipped: statsRows.find(r => r.status === 'shipped')?.count || 0,
     cancelled: statsRows.find(r => r.status === 'cancelled')?.count || 0,
@@ -316,7 +317,19 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
       case 'status': orderBy = dir(orders.status); break;
       case 'kunde': orderBy = dir(orders.buyerName); break;
       case 'umsatz': orderBy = dir(orders.totalAmount); break;
-      case 'versanddatum': orderBy = dir(sql`COALESCE(${orders.scheduledShipmentDate}, ${orders.updatedAt})`) as any; break;
+      case 'versanddatum':
+        orderBy = dir(sql`COALESCE(
+          ${orders.scheduledShipmentDate},
+          CASE WHEN ${orders.status} = 'shipped' THEN ${orders.updatedAt} ELSE NULL END,
+          CASE WHEN ${orders.rawPayload}->'positionItems'->0->>'expectedDeliveryDate' ~ '^\\d{4}-\\d{2}-\\d{2}'
+               THEN (${orders.rawPayload}->'positionItems'->0->>'expectedDeliveryDate')::timestamptz ELSE NULL END,
+          CASE WHEN ${orders.rawPayload}->>'LatestShipDate' ~ '^\\d{4}-\\d{2}-\\d{2}'
+               THEN (${orders.rawPayload}->>'LatestShipDate')::timestamptz ELSE NULL END,
+          CASE WHEN ${orders.rawPayload}->>'shipping_deadline' ~ '^\\d{4}-\\d{2}-\\d{2}'
+               THEN (${orders.rawPayload}->>'shipping_deadline')::timestamptz ELSE NULL END,
+          ${orders.updatedAt}
+        )`) as any;
+        break;
     }
   }
 
@@ -472,7 +485,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
           <ManufacturerCsvDialog />
         </div>
         
-        <div className="mt-6 grid grid-cols-2 md:grid-cols-7 gap-4">
+        <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
           <Link href="/orders" className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all">
             <span className="text-sm font-medium text-gray-500">Gesamt</span>
             <span className="text-2xl font-bold text-gray-900">{stats.total}</span>
@@ -481,9 +494,13 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             <span className="text-sm font-medium text-gray-500">Pending</span>
             <span className="text-2xl font-bold text-amber-600">{stats.pending}</span>
           </Link>
+          <Link href="/orders?status=processing" className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all">
+            <span className="text-sm font-medium text-gray-500">Processing</span>
+            <span className="text-2xl font-bold text-blue-600">{stats.processing}</span>
+          </Link>
           <Link href="/orders?status=later_shipment" className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all">
             <span className="text-sm font-medium text-gray-500">Späterer Versand</span>
-            <span className="text-2xl font-bold text-blue-600">{stats.laterShipment}</span>
+            <span className="text-2xl font-bold text-purple-600">{stats.laterShipment}</span>
           </Link>
           <Link href="/orders?status=shipped" className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all">
             <span className="text-sm font-medium text-gray-500">Versendet</span>
