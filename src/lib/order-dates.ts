@@ -65,7 +65,7 @@ interface GenericMarketplacePayload {
   [key: string]: unknown
 }
 
-const PREORDER_DAYS_THRESHOLD = 6 // Standard e-commerce shipping in DE is 1-3 days; 6+ days implies pre-order / extended lead time
+const PREORDER_DAYS_THRESHOLD = 10 // Standard delivery windows spanning weekends can reach 5-7 days; 10+ days implies pre-order / extended lead time
 
 function parseDateSafe(val: unknown): Date | null {
   if (!val) return null
