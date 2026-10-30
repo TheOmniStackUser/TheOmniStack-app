@@ -109,9 +109,17 @@ export async function POST(request: Request) {
               )
             console.log(`[Shopify Webhook] Marked order ${shopifyOrderId} as cancelled for company ${integration.companyId}`)
           } else if (topic === 'orders/fulfilled' || orderData.fulfillment_status === 'fulfilled') {
+            const trackingNumber =
+              orderData.fulfillments?.[0]?.tracking_number ||
+              orderData.fulfillments?.[0]?.tracking_numbers?.[0] ||
+              null
+            const updatePayload: any = { status: 'shipped', updatedAt: new Date() }
+            if (trackingNumber) {
+              updatePayload.trackingNumber = trackingNumber
+            }
             await db
               .update(orders)
-              .set({ status: 'shipped', updatedAt: new Date() })
+              .set(updatePayload)
               .where(
                 and(
                   eq(orders.companyId, integration.companyId),

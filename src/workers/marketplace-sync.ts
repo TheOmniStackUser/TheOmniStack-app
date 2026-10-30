@@ -1767,6 +1767,34 @@ export async function persistOrders(
         affected++
       }
 
+      // Reconcile status if incoming payload indicates the order is already fulfilled or cancelled
+      if (existingOrder.status === 'pending' || existingOrder.status === 'processing') {
+        const raw = order.rawPayload as any
+        const isCancelled = !!raw?.cancelled_at
+        const isFulfilled =
+          order.fulfillmentType === 'FBA' ||
+          raw?.rawOrder?.OrderStatus === 'Shipped' ||
+          raw?.fulfillment_status === 'fulfilled' ||
+          raw?.closed_at != null
+
+        if (isCancelled) {
+          await db.update(orders)
+            .set({ status: 'cancelled', updatedAt: new Date() })
+            .where(eq(orders.id, existingOrder.id))
+        } else if (isFulfilled) {
+          const updateData: any = { status: 'shipped', updatedAt: new Date() }
+          const trackingNumber =
+            raw?.fulfillments?.[0]?.tracking_number ||
+            raw?.fulfillments?.[0]?.tracking_numbers?.[0]
+          if (trackingNumber && !existingOrder.trackingNumber) {
+            updateData.trackingNumber = trackingNumber
+          }
+          await db.update(orders)
+            .set(updateData)
+            .where(eq(orders.id, existingOrder.id))
+        }
+      }
+
       // Pre-cache/download delivery note for existing orders
       await generateOrDownloadDeliveryNote(existingOrder.id, companyId, adapter)
       
