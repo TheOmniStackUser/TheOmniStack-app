@@ -694,10 +694,11 @@ export function OrdersTable({
 
   const openLaterShipmentModal = (order?: OrderWithItems, isBulk: boolean = false) => {
     if (isBulk) {
+      const count = orders.filter(o => selectedIds.has(o.id)).length
       setLaterShipmentModalConfig({
         show: true,
         isBulk: true,
-        orderNumber: `${selectedIds.size} Bestellungen`,
+        orderNumber: `${count} Bestellungen`,
         initialDate: '',
       })
       setLaterShipmentDateInput('')
@@ -730,7 +731,7 @@ export function OrdersTable({
       const targetDate = clearDate ? null : (laterShipmentDateInput ? laterShipmentDateInput : null)
 
       if (laterShipmentModalConfig.isBulk) {
-        const orderIds = Array.from(selectedIds)
+        const orderIds = orders.filter(o => selectedIds.has(o.id)).map(o => o.id)
         const res = await bulkScheduleLaterShipmentAction(orderIds, targetDate)
         if (res.error) {
           showToast(res.error, 'error')
@@ -971,6 +972,8 @@ export function OrdersTable({
   useEffect(() => {
     // Only sync if urlParams actually changed (e.g. after a navigation)
     if (prevUrlParamsRef.current !== urlParams) {
+      setSelectedIds(new Set())
+
       if (urlParams.marketplace !== draftMarketplace) {
         setDraftMarketplace(urlParams.marketplace || 'all')
       }
@@ -1092,16 +1095,20 @@ export function OrdersTable({
       else params.set(k, v)
     })
     
+    setSelectedIds(new Set())
+
     startTransition(() => {
       router.push(`${pathname}?${params.toString()}`)
     })
   }
 
   const handleApplyFilters = () => {
+    setSelectedIds(new Set())
     pushParams({ page: '1' })
   }
 
   const handleResetFilters = () => {
+    setSelectedIds(new Set())
     setDraftSearch('')
     setDraftMarketplace('all')
     setDraftStatus('all')
@@ -1124,11 +1131,13 @@ export function OrdersTable({
   }
 
   const handleClearSearch = () => {
+    setSelectedIds(new Set())
     setDraftSearch('')
     pushParams({ search: undefined, page: '1' })
   }
 
   const handleSelectSearchSuggestion = (value: string) => {
+    setSelectedIds(new Set())
     setDraftSearch(value)
     setIsSearchFocused(false)
     document.getElementById('search')?.blur()
@@ -1270,16 +1279,11 @@ const filteredOrders = orders;
     const pageIds = paginatedOrders.map(o => o.id)
     const areAllOnPageSelected = paginatedOrders.length > 0 && paginatedOrders.every(o => selectedIds.has(o.id))
     
-    setSelectedIds(prev => {
-      if (areAllOnPageSelected) {
-        // Clear all selections across all pages when unchecking
-        return new Set()
-      } else {
-        const next = new Set(prev)
-        pageIds.forEach(id => next.add(id))
-        return next
-      }
-    })
+    if (areAllOnPageSelected) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(pageIds))
+    }
   }
 
   const toggleOne = (id: string) => {
@@ -1403,16 +1407,16 @@ const filteredOrders = orders;
   }
 
   const handleGenerateLabels = async () => {
-    const idsToProcess = Array.from(selectedIds).filter(id => orders.find(o => o.id === id)?.status !== 'shipped')
-    if (idsToProcess.length === 0) {
+    const visibleUnshipped = orders.filter(o => selectedIds.has(o.id) && o.status !== 'shipped')
+    if (visibleUnshipped.length === 0) {
       showToast('Keine unversendeten Bestellungen ausgewählt.', 'error')
       return
     }
     
     // Initialize with the configured default parcel class
     const initialSelections: Record<string, string> = {}
-    idsToProcess.forEach(id => {
-      initialSelections[id] = hermesDefaultParcelClass
+    visibleUnshipped.forEach(order => {
+      initialSelections[order.id] = hermesDefaultParcelClass
     })
     setHermesSelections(initialSelections)
     setShowHermesModal(true)
@@ -1423,7 +1427,7 @@ const filteredOrders = orders;
     setIsGenerating(true)
     const newTab = window.open('about:blank', '_blank')
     try {
-      const ids = Object.keys(hermesSelections)
+      const ids = Object.keys(hermesSelections).filter(id => orders.some(o => o.id === id))
       const result = await generateHermesLabelsAction(ids, hermesSelections)
       if (result.error) {
         showToast(result.error, 'error')
@@ -1460,18 +1464,15 @@ const filteredOrders = orders;
       return
     }
 
-    const idsToProcess = Array.from(selectedIds).filter(id => orders.find(o => o.id === id)?.status !== 'shipped')
-    if (idsToProcess.length === 0) {
+    const visibleUnshipped = orders.filter(o => selectedIds.has(o.id) && o.status !== 'shipped')
+    if (visibleUnshipped.length === 0) {
       showToast('Keine unversendeten Bestellungen ausgewählt.', 'error')
       return
     }
 
     // Initialize selections for each order
     const initialSelections: Record<string, { productCode: string; weight: number }> = {}
-    idsToProcess.forEach(id => {
-      const order = orders.find(o => o.id === id)
-      if (!order) return
-
+    visibleUnshipped.forEach(order => {
       // Determine if destination is domestic (Germany)
       const isDomestic = !order.shippingCountry || ['DE', 'DEU'].includes(order.shippingCountry.toUpperCase())
       
@@ -1494,7 +1495,7 @@ const filteredOrders = orders;
         }
       }
 
-      initialSelections[id] = { productCode, weight }
+      initialSelections[order.id] = { productCode, weight }
     })
 
     setDhlSelections(initialSelections)
@@ -1506,7 +1507,7 @@ const filteredOrders = orders;
     setIsDhlGenerating(true)
     const newTab = window.open('about:blank', '_blank')
     try {
-      const ids = Object.keys(dhlSelections)
+      const ids = Object.keys(dhlSelections).filter(id => orders.some(o => o.id === id))
       const result = await generateDhlLabelsAction(ids, dhlSelections)
       if (result.error) {
         showToast(result.error, 'error')
@@ -1582,7 +1583,8 @@ const filteredOrders = orders;
   }
 
   const handleBulkDelete = async () => {
-    if (selectedIds.size === 0) return
+    const visibleSelected = orders.filter(o => selectedIds.has(o.id))
+    if (visibleSelected.length === 0) return
     setDeleteModalConfig({ show: true, isBulk: true })
   }
 
@@ -1590,7 +1592,8 @@ const filteredOrders = orders;
     if (deleteModalConfig.isBulk) {
       setIsDeletingBulk(true)
       try {
-        const result = await archiveOrdersBulkAction(Array.from(selectedIds))
+        const ids = orders.filter(o => selectedIds.has(o.id)).map(o => o.id)
+        const result = await archiveOrdersBulkAction(ids)
         if (result.error) {
           showToast(result.error, 'error')
         } else {
@@ -1648,14 +1651,15 @@ const filteredOrders = orders;
   }
 
   const handleBulkDeliveryNotes = () => {
-    if (selectedIds.size === 0) return
-    const ids = Array.from(selectedIds).join(',')
-    window.open(`/api/orders/bulk/delivery-note?ids=${ids}`, '_blank')
+    const ids = orders.filter(o => selectedIds.has(o.id)).map(o => o.id)
+    if (ids.length === 0) return
+    window.open(`/api/orders/bulk/delivery-note?ids=${ids.join(',')}`, '_blank')
   }
 
   const handleBulkInvoices = () => {
-    const ids = Array.from(selectedIds)
-      .filter(id => !!orders.find(o => o.id === id)?.invoiceId)
+    const ids = orders
+      .filter(o => selectedIds.has(o.id) && !!o.invoiceId)
+      .map(o => o.id)
 
     if (ids.length === 0) {
       showToast('Keine Rechnungen für die ausgewählten Bestellungen gefunden.', 'error')
@@ -1666,8 +1670,9 @@ const filteredOrders = orders;
 
   // Collect stored label URLs from already-processed orders and open them merged
   const handleReprintLabels = () => {
-    const ids = Array.from(selectedIds)
-      .filter(id => !!orders.find(o => o.id === id)?.labelUrl)
+    const ids = orders
+      .filter(o => selectedIds.has(o.id) && !!o.labelUrl)
+      .map(o => o.id)
 
     if (ids.length === 0) {
       showToast('Keine gespeicherten Versandlabels für die ausgewählten Bestellungen gefunden.', 'error')
@@ -1677,7 +1682,7 @@ const filteredOrders = orders;
   }
 
   const handleBulkGenerateInvoices = async () => {
-    const ids = Array.from(selectedIds).filter(id => !orders.find(o => o.id === id)?.invoiceId)
+    const ids = orders.filter(o => selectedIds.has(o.id) && !o.invoiceId).map(o => o.id)
     if (ids.length === 0) return
 
     setIsGeneratingInvoices(true)
@@ -1711,21 +1716,20 @@ const filteredOrders = orders;
     }
   }
 
+  const selectedVisibleOrders = orders.filter(o => selectedIds.has(o.id))
+  const selectedVisibleCount = selectedVisibleOrders.length
+
   // Count selected orders that have a stored label
-  const selectedWithLabel = Array.from(selectedIds)
-    .filter(id => orders.find(o => o.id === id)?.labelUrl).length
+  const selectedWithLabel = selectedVisibleOrders.filter(o => !!o.labelUrl).length
 
   // Count selected orders that have an invoice
-  const selectedWithInvoice = Array.from(selectedIds)
-    .filter(id => !!orders.find(o => o.id === id)?.invoiceId).length
+  const selectedWithInvoice = selectedVisibleOrders.filter(o => !!o.invoiceId).length
 
   // Count selected orders that are not shipped
-  const selectedUnshippedCount = Array.from(selectedIds)
-    .filter(id => orders.find(o => o.id === id)?.status !== 'shipped').length
+  const selectedUnshippedCount = selectedVisibleOrders.filter(o => o.status !== 'shipped').length
 
   // Count selected orders that do not have an invoice yet
-  const selectedWithoutInvoice = Array.from(selectedIds)
-    .filter(id => !orders.find(o => o.id === id)?.invoiceId).length
+  const selectedWithoutInvoice = selectedVisibleOrders.filter(o => !o.invoiceId).length
 
   const renderSortableHeader = (label: string, field: string, align: 'left' | 'right' = 'left') => {
     const isSorted = sortField === field
@@ -1767,7 +1771,7 @@ const filteredOrders = orders;
       <div className="mb-4 flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
         <div className="flex items-center gap-4">
           <p className="text-sm text-gray-500">
-            {selectedIds.size} von {totalOrdersCount} Bestellungen ausgewählt
+            {selectedVisibleCount} von {totalOrdersCount} Bestellungen ausgewählt
           </p>
           <button
             onClick={toggleExpandAll}
@@ -1789,7 +1793,7 @@ const filteredOrders = orders;
               </>
             )}
           </button>
-          {selectedIds.size > 0 && (
+          {selectedVisibleCount > 0 && (
             <button
               onClick={() => setSelectedIds(new Set())}
               className="text-xs text-gray-600 hover:text-gray-800 font-semibold flex items-center gap-1.5 border border-gray-200 hover:bg-gray-50 px-2.5 py-1.5 rounded-md bg-white transition-all shadow-sm cursor-pointer"
@@ -1803,7 +1807,7 @@ const filteredOrders = orders;
         </div>
         
         <div className="flex flex-wrap gap-2">
-          {selectedIds.size > 0 && (
+          {selectedVisibleCount > 0 && (
             <button
               onClick={handleBulkDeliveryNotes}
               className="flex items-center gap-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 font-semibold py-2 px-4 rounded-md transition-colors text-sm shadow-sm"
@@ -1811,7 +1815,7 @@ const filteredOrders = orders;
               <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
               </svg>
-              Lieferscheine ({selectedIds.size})
+              Lieferscheine ({selectedVisibleCount})
             </button>
           )}
 
@@ -1870,7 +1874,7 @@ const filteredOrders = orders;
             </button>
           )}
 
-          {selectedIds.size > 0 && (
+          {selectedVisibleCount > 0 && (
             <button
               onClick={handleBulkDelete}
               disabled={isDeletingBulk || isGenerating}
@@ -1886,7 +1890,7 @@ const filteredOrders = orders;
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
               )}
-              Löschen ({selectedIds.size})
+              Löschen ({selectedVisibleCount})
             </button>
           )}
 
@@ -3959,7 +3963,7 @@ const filteredOrders = orders;
                 Bestellung{deleteModalConfig.isBulk ? 'en' : ''} löschen?
               </h3>
               <p className="text-slate-500 text-sm">
-                Möchtest du wirklich {deleteModalConfig.isBulk ? `${selectedIds.size} Bestellungen` : 'diese Bestellung'} unwiderruflich löschen? Diese Aktion kann nicht rückgängig gemacht werden.
+                Möchtest du wirklich {deleteModalConfig.isBulk ? `${selectedVisibleCount} Bestellungen` : 'diese Bestellung'} unwiderruflich löschen? Diese Aktion kann nicht rückgängig gemacht werden.
               </p>
             </div>
             
