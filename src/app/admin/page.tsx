@@ -4,7 +4,7 @@ import { orders } from '@/db/schema/orders'
 import { companies } from '@/db/schema/companies'
 import { users } from '@/db/schema/auth'
 import { companyMembers } from '@/db/schema/companies'
-import { sql, count, gte, and, lte } from 'drizzle-orm'
+import { sql, count, gte, and, lte, desc, eq } from 'drizzle-orm'
 import Link from 'next/link'
 
 import { PeriodSelector } from './components/period-selector'
@@ -80,6 +80,48 @@ export default async function AdminDashboardPage(props: {
     .groupBy(orders.companyId, companies.name)
     .orderBy(sql`count(${orders.id}) desc`)
     .limit(5)
+
+  // Last 3 new registrations
+  const latestCompanies = await db
+    .select({
+      id: companies.id,
+      name: companies.name,
+      legalName: companies.legalName,
+      email: companies.email,
+      registeredApp: companies.registeredApp,
+      trialExpiresAt: companies.trialExpiresAt,
+      canceledAt: companies.canceledAt,
+      createdAt: companies.createdAt,
+    })
+    .from(companies)
+    .orderBy(desc(companies.createdAt))
+    .limit(3)
+
+  const latestCompanyMembers = latestCompanies.length > 0
+    ? await db
+        .select({
+          companyId: companyMembers.companyId,
+          userName: users.name,
+          userEmail: users.email,
+          role: companyMembers.role,
+        })
+        .from(companyMembers)
+        .innerJoin(users, eq(companyMembers.userId, users.id))
+        .where(sql`${companyMembers.companyId} IN ${latestCompanies.map((c) => c.id)}`)
+    : []
+
+  const memberMap = new Map<string, { userName: string; userEmail: string }>()
+  for (const m of latestCompanyMembers) {
+    const existing = memberMap.get(m.companyId)
+    if (!existing || m.role === 'owner') {
+      memberMap.set(m.companyId, { userName: m.userName, userEmail: m.userEmail })
+    }
+  }
+
+  const recentRegistrations = latestCompanies.map((c) => ({
+    ...c,
+    user: memberMap.get(c.id) || null,
+  }))
 
   // Canceled companies
   const canceledCompanies = await db
@@ -179,6 +221,122 @@ export default async function AdminDashboardPage(props: {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* Recent Signups */}
+      <div className="bg-white/5 border border-emerald-500/20 rounded-2xl p-6 mt-8">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-semibold text-emerald-400 flex items-center gap-2">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+            </svg>
+            Neueste Anmeldungen
+          </h2>
+          <Link
+            href="/admin/merchants"
+            className="text-xs text-emerald-400/80 hover:text-emerald-300 transition-colors font-medium"
+          >
+            Alle Händler ansehen →
+          </Link>
+        </div>
+        {recentRegistrations.length === 0 ? (
+          <p className="text-white/30 text-sm">Keine Neuanmeldungen verzeichnet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-white/10 text-xs text-white/50 uppercase">
+                  <th className="pb-3 pr-4 font-medium">Mandant</th>
+                  <th className="pb-3 px-4 font-medium">Kontakt / Nutzer</th>
+                  <th className="pb-3 px-4 font-medium">App</th>
+                  <th className="pb-3 px-4 font-medium">Angemeldet am</th>
+                  <th className="pb-3 px-4 font-medium text-center">Status / Testphase</th>
+                  <th className="pb-3 pl-4 font-medium text-right">Details</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {recentRegistrations.map((c) => {
+                  const daysLeft = c.trialExpiresAt
+                    ? Math.ceil((new Date(c.trialExpiresAt).getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+                    : null
+
+                  return (
+                    <tr key={c.id} className="text-sm hover:bg-white/[0.02] transition-colors">
+                      <td className="py-3.5 pr-4">
+                        <div>
+                          <p className="text-white font-medium">{c.name}</p>
+                          {c.legalName && c.legalName !== c.name && (
+                            <p className="text-xs text-white/40 truncate max-w-[220px]">{c.legalName}</p>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4 text-white/70">
+                        {c.user ? (
+                          <div>
+                            <p className="text-sm text-white font-medium">{c.user.userName}</p>
+                            <p className="text-xs text-white/40">{c.user.userEmail}</p>
+                          </div>
+                        ) : c.email ? (
+                          <span className="text-xs text-white/40">{c.email}</span>
+                        ) : (
+                          <span className="text-white/30 text-xs">–</span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${
+                          c.registeredApp === 'ProfiFaktura'
+                            ? 'bg-yellow-500/10 text-yellow-500 ring-yellow-500/20'
+                            : 'bg-blue-500/10 text-blue-400 ring-blue-400/20'
+                        }`}>
+                          {c.registeredApp}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-white/70">
+                        <span className="text-sm font-medium text-white">
+                          {c.createdAt ? new Date(c.createdAt).toLocaleDateString('de-DE') : '–'}
+                        </span>
+                        {c.createdAt && (
+                          <span className="block text-xs text-white/40">
+                            {new Date(c.createdAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4 text-center">
+                        {c.canceledAt ? (
+                          <span className="bg-red-500/10 text-red-400 text-[10px] px-2 py-1 rounded-full font-bold">
+                            Gekündigt
+                          </span>
+                        ) : daysLeft !== null ? (
+                          daysLeft > 0 ? (
+                            <span className="bg-blue-500/10 text-blue-400 text-[10px] px-2 py-1 rounded-full font-bold">
+                              Testphase ({daysLeft} {daysLeft === 1 ? 'Tag' : 'Tage'})
+                            </span>
+                          ) : (
+                            <span className="bg-white/5 text-white/30 text-[10px] px-2 py-1 rounded-full font-medium">
+                              Testphase abgelaufen
+                            </span>
+                          )
+                        ) : (
+                          <span className="bg-emerald-500/10 text-emerald-400 text-[10px] px-2 py-1 rounded-full font-bold">
+                            Aktiv
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3.5 pl-4 text-right">
+                        <Link
+                          href={`/admin/merchants/${c.id}`}
+                          className="text-xs text-violet-400 hover:text-violet-300 transition-colors font-medium"
+                        >
+                          Details →
+                        </Link>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
