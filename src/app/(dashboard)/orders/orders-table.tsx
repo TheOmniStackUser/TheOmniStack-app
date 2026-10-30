@@ -70,10 +70,17 @@ const formatCountry = (code?: string | null) => {
 
 const getDefaultDhlProductCode = (country: string | null | undefined, config: DhlConfig | null | undefined): string => {
   const hasZone = (prodCode: string) => {
-    return !!config?.zones?.find(z => z.productCode === prodCode && z.billingNumber?.trim())
+    return (
+      !!config?.zones?.find(z => z.productCode === prodCode && z.billingNumber?.trim()) ||
+      !!config?.products?.find(p => p.productCode === prodCode && (p.billingNumber?.trim() || config?.accountNumber))
+    )
   }
 
   const getFirstConfigured = () => {
+    if (config?.products && config.products.length > 0) {
+      const firstProd = config.products.find(p => p.billingNumber?.trim() || config.accountNumber)
+      if (firstProd) return firstProd.productCode
+    }
     if (!config?.zones) return 'V01PAK'
     const first = config.zones.find(z => z.billingNumber?.trim())
     return first ? first.productCode : 'V01PAK'
@@ -434,15 +441,24 @@ export function OrdersTable({
   allUniqueMarketplaceCountries?: { marketplace: string | null, country: string | null }[]
 }) {
   const configuredDhlProducts = useMemo(() => {
-    if (!dhlConfig?.zones || dhlConfig.zones.length === 0) {
+    const activeCodes = new Set<string>()
+    if (dhlConfig?.products && dhlConfig.products.length > 0) {
+      for (const p of dhlConfig.products) {
+        if (p.productCode && (p.billingNumber?.trim() || dhlConfig.accountNumber)) {
+          activeCodes.add(p.productCode)
+        }
+      }
+    }
+    if (dhlConfig?.zones && dhlConfig.zones.length > 0) {
+      for (const z of dhlConfig.zones) {
+        if (z.billingNumber?.trim() && z.productCode) {
+          activeCodes.add(z.productCode)
+        }
+      }
+    }
+    if (activeCodes.size === 0) {
       return ALL_DHL_PRODUCTS
     }
-    // Set ensures we don't have duplicates if multiple zones map to the same product code
-    const activeCodes = new Set(
-      dhlConfig.zones
-        .filter(z => z.billingNumber?.trim())
-        .map(z => z.productCode)
-    )
     const configured = ALL_DHL_PRODUCTS.filter(p => activeCodes.has(p.value))
     return configured.length > 0 ? configured : ALL_DHL_PRODUCTS
   }, [dhlConfig])

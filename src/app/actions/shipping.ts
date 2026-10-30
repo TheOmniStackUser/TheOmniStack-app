@@ -392,11 +392,22 @@ export async function generateDhlLabelsAction(
       return { error: 'Es wurden keine passenden Bestellungen gefunden.' }
     }
 
-    // 3. Find the default domestic zone (or first zone with a billing number)
+    // 3. Find the default domestic zone (or first zone/product with a billing number)
+    const matchingDomesticProduct = config.products?.find(p => p.productCode === 'V01PAK' && p.billingNumber)
+      ?? config.products?.find(p => p.billingNumber)
     const domesticZone = config.zones?.find(z => z.id === 'domestic' && z.billingNumber)
       ?? config.zones?.find(z => z.billingNumber)
+      ?? (matchingDomesticProduct ? {
+          id: 'domestic',
+          name: matchingDomesticProduct.name,
+          billingNumber: matchingDomesticProduct.billingNumber!,
+          returnBillingNumber: matchingDomesticProduct.returnBillingNumber || '',
+          productCode: matchingDomesticProduct.productCode,
+          description: ''
+        } : undefined)
+
     if (!domesticZone?.billingNumber) {
-      return { error: 'Keine DHL Abrechnungsnummer konfiguriert. Bitte trage die Abrechnungsnummer unter Integrationen → DHL → Abrechnungsnummern ein.' }
+      return { error: 'Keine DHL Abrechnungsnummer konfiguriert. Bitte trage die Produkte und Abrechnungsnummern unter Integrationen → DHL → Produkte ein.' }
     }
 
     // Validate billing number: DHL requires exactly 14 digits
@@ -406,6 +417,7 @@ export async function generateDhlLabelsAction(
     }
 
     const returnBillingNum = domesticZone.returnBillingNumber?.replace(/\s/g, '')
+      || config.products?.find(p => p.productCode === 'V07PAK' && p.billingNumber)?.billingNumber?.replace(/\s/g, '')
 
     // Fetch active integrations and initialize adapters dynamically
     const activeIntegrations = await db
@@ -469,11 +481,30 @@ export async function generateDhlLabelsAction(
           needsEnclosedReturn = true
         }
 
-        // Resolve billing number for this product code
+        // Resolve billing number for this product code from products or zones
+        const productFromConfig = config.products?.find(p => p.productCode === productCode && p.billingNumber)
         let zone = config.zones?.find(z => z.productCode === productCode && z.billingNumber)
+        if (!zone && productFromConfig?.billingNumber) {
+          zone = {
+            id: productCode,
+            name: productFromConfig.name,
+            billingNumber: productFromConfig.billingNumber,
+            returnBillingNumber: productFromConfig.returnBillingNumber || '',
+            productCode: productFromConfig.productCode,
+            description: ''
+          }
+        }
         if (!zone) {
           if (['V62WP', 'V66WPI', 'V62KP'].includes(productCode)) {
             zone = config.zones?.find(z => z.id === 'warenpost' && z.billingNumber)
+              ?? (config.products?.find(p => ['V62WP', 'V62KP', 'V66WPI'].includes(p.productCode) && p.billingNumber) ? {
+                  id: 'warenpost',
+                  name: 'Warenpost / Kleinpaket',
+                  billingNumber: config.products.find(p => ['V62WP', 'V62KP', 'V66WPI'].includes(p.productCode) && p.billingNumber)!.billingNumber!,
+                  returnBillingNumber: '',
+                  productCode,
+                  description: ''
+                } : undefined)
           }
         }
         if (!zone) {

@@ -436,10 +436,11 @@ export async function testDhlConnectionAction(credentials: {
       success: false,
       message: `DHL Rückmeldung (${res.status}): ${text.slice(0, 150)}`
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unbekannter Fehler'
     return {
       success: false,
-      message: `Netzwerkfehler bei der Verbindung zu DHL: ${err?.message || 'Unbekannter Fehler'}`
+      message: `Netzwerkfehler bei der Verbindung zu DHL: ${msg}`
     }
   }
 }
