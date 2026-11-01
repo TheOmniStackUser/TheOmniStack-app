@@ -346,43 +346,113 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
     const isPriceSyncAllowed = canSyncPrice && mapping.syncPrice === true && hasPriceInUpdate
 
     if (isPriceSyncAllowed) {
-      // MSRP -> Standard Price (Marketplace price)
-      let modifiedPrice = updateDef.price !== undefined ? updateDef.price : (centralProduct.price ? parseFloat(centralProduct.price) : undefined)
-      if (modifiedPrice !== undefined) {
-        if (mapping.priceModifierType === 'fixed') {
-          modifiedPrice += parseFloat(mapping.priceModifierValue?.toString() || '0')
-        } else if (mapping.priceModifierType === 'percentage') {
-          const percent = parseFloat(mapping.priceModifierValue?.toString() || '0')
-          modifiedPrice = modifiedPrice * (1 + percent / 100)
+      // Determine modifier configuration:
+      // Product-specific mapping modifier takes precedence if explicitly set (i.e. not 'none').
+      // Otherwise, fall back to global integration sync settings.
+      const hasMappingModifier = mapping.priceModifierType && mapping.priceModifierType !== 'none'
+      const modifierType: 'none' | 'percentage' | 'fixed' = hasMappingModifier
+        ? mapping.priceModifierType
+        : (productSyncSettings?.priceModifierType || 'none')
+      const modifierValue: number = hasMappingModifier
+        ? parseFloat(mapping.priceModifierValue?.toString() || '0')
+        : (parseFloat(productSyncSettings?.priceModifierValue?.toString() || '0') || 0)
+
+      const priceBase: 'standard' | 'msrp' | 'reduced' | 'all' = productSyncSettings?.priceBase || 'standard'
+      const minPriceThreshold: number | undefined = productSyncSettings?.minPriceThreshold !== undefined && productSyncSettings.minPriceThreshold !== null && productSyncSettings.minPriceThreshold !== ''
+        ? parseFloat(productSyncSettings.minPriceThreshold.toString())
+        : undefined
+
+      const applyModifier = (originalPrice: number): number => {
+        if (modifierType === 'none' || modifierValue === 0) return originalPrice
+
+        const isReduction = modifierValue < 0
+        // Exclude products with a price below minPriceThreshold from reductions
+        if (isReduction && minPriceThreshold !== undefined && minPriceThreshold > 0 && originalPrice < minPriceThreshold) {
+          return originalPrice
         }
+
+        let calculated = originalPrice
+        if (modifierType === 'percentage') {
+          calculated = originalPrice * (1 + modifierValue / 100)
+        } else if (modifierType === 'fixed') {
+          calculated = originalPrice + modifierValue
+        }
+
+        // Ensure reduction does not drop price below the threshold
+        if (isReduction && minPriceThreshold !== undefined && minPriceThreshold > 0 && calculated < minPriceThreshold) {
+          calculated = minPriceThreshold
+        }
+
+        return Math.max(0, Math.round(calculated * 100) / 100)
+      }
+
+      const rawPrice = updateDef.price !== undefined ? updateDef.price : (centralProduct.price ? parseFloat(centralProduct.price) : undefined)
+      const rawReducedPrice = updateDef.reducedPrice !== undefined ? updateDef.reducedPrice : (centralProduct.reducedPrice ? parseFloat(centralProduct.reducedPrice) : undefined)
+      const rawMsrp = updateDef.msrp !== undefined ? updateDef.msrp : (centralProduct.msrp ? parseFloat(centralProduct.msrp) : undefined)
+
+      let modifiedPrice: number | undefined
+      let modifiedReducedPrice: number | undefined
+      let modifiedMsrp: number | undefined = rawMsrp
+
+      if (priceBase === 'msrp') {
+        // Base is MSRP (UVP)
+        if (rawMsrp !== undefined && rawMsrp > 0) {
+          modifiedPrice = applyModifier(rawMsrp)
+          modifiedMsrp = rawMsrp // Preserve original MSRP for compare_at_price / strikethrough price
+        } else if (rawPrice !== undefined) {
+          // Fallback to standard price if no MSRP is set
+          modifiedPrice = applyModifier(rawPrice)
+        }
+        if (rawReducedPrice !== undefined && rawReducedPrice > 0) {
+          modifiedReducedPrice = rawReducedPrice
+        } else if (rawReducedPrice === 0) {
+          modifiedReducedPrice = 0
+        }
+      } else if (priceBase === 'reduced') {
+        // Base is reduced price
+        modifiedPrice = rawPrice
+        if (rawReducedPrice !== undefined && rawReducedPrice > 0) {
+          modifiedReducedPrice = applyModifier(rawReducedPrice)
+        } else if (rawReducedPrice === 0) {
+          modifiedReducedPrice = 0
+        }
+      } else if (priceBase === 'all') {
+        // Apply modifier to both standard price and reduced price
+        if (rawPrice !== undefined) {
+          modifiedPrice = applyModifier(rawPrice)
+        }
+        if (rawReducedPrice !== undefined && rawReducedPrice > 0) {
+          modifiedReducedPrice = applyModifier(rawReducedPrice)
+        } else if (rawReducedPrice === 0) {
+          modifiedReducedPrice = 0
+        }
+      } else {
+        // Default: 'standard' - Apply modifier to standard price
+        if (rawPrice !== undefined) {
+          modifiedPrice = applyModifier(rawPrice)
+        }
+        if (rawReducedPrice !== undefined && rawReducedPrice > 0) {
+          modifiedReducedPrice = rawReducedPrice
+        } else if (rawReducedPrice === 0) {
+          modifiedReducedPrice = 0
+        }
+      }
+
+      if (modifiedPrice !== undefined) {
         mUpdate.price = modifiedPrice
+      }
+      if (modifiedReducedPrice !== undefined) {
+        mUpdate.reducedPrice = modifiedReducedPrice
+      }
+      if (modifiedMsrp !== undefined) {
+        mUpdate.msrp = modifiedMsrp
       }
 
       let modifiedSaleStartDate = updateDef.saleStartDate !== undefined ? (updateDef.saleStartDate ? new Date(updateDef.saleStartDate) : null) : centralProduct.saleStartDate
       let modifiedSaleEndDate = updateDef.saleEndDate !== undefined ? (updateDef.saleEndDate ? new Date(updateDef.saleEndDate) : null) : centralProduct.saleEndDate
 
       if (modifiedSaleStartDate) mUpdate.saleStartDate = modifiedSaleStartDate
-      if (modifiedSaleEndDate) mUpdate.saleEndDate = modifiedSaleEndDate
-
-      // Price -> Sales Price (Marketplace reducedPrice)
-      let modifiedReducedPrice = updateDef.reducedPrice !== undefined ? updateDef.reducedPrice : (centralProduct.reducedPrice ? parseFloat(centralProduct.reducedPrice) : undefined)
-      let modifiedMsrp = updateDef.msrp !== undefined ? updateDef.msrp : (centralProduct.msrp ? parseFloat(centralProduct.msrp) : undefined)
-      
-      if (modifiedReducedPrice !== undefined && modifiedReducedPrice > 0) {
-        if (mapping.priceModifierType === 'fixed') {
-          modifiedReducedPrice += parseFloat(mapping.priceModifierValue?.toString() || '0')
-        } else if (mapping.priceModifierType === 'percentage') {
-          const percent = parseFloat(mapping.priceModifierValue?.toString() || '0')
-          modifiedReducedPrice = modifiedReducedPrice * (1 + percent / 100)
-        }
-        mUpdate.reducedPrice = modifiedReducedPrice
-      } else if (modifiedReducedPrice === 0) {
-        mUpdate.reducedPrice = 0 // 0 means remove sale price
-      }
-
-      if (modifiedMsrp !== undefined) {
-        mUpdate.msrp = modifiedMsrp
-      }
+      if (modifiedSaleEndDate) mUpdate.saleEndDate = modifiedSaleEndDate;
 
       (mUpdate as any).fallbackPrice = modifiedPrice || 0
     }

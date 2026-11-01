@@ -15,6 +15,8 @@ export type MarketplaceSyncSettings = {
   syncPrice: boolean
   priceModifierType: 'none' | 'percentage' | 'fixed'
   priceModifierValue: number
+  priceBase?: 'standard' | 'msrp' | 'reduced' | 'all'
+  minPriceThreshold?: number
   syncIntervalHours?: number // Default is 1 if not provided
 }
 
