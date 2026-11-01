@@ -13,7 +13,7 @@ import { customers } from '@/db/schema/customers'
 import { companies } from '@/db/schema/companies'
 import { vatSettings } from '@/db/schema/vat-settings'
 import { auditLog } from '@/lib/audit'
-import { eq, and, desc, isNull, inArray, gte, sql, notInArray, or } from 'drizzle-orm'
+import { eq, and, desc, isNull, inArray, gte, sql, notInArray, or, ne } from 'drizzle-orm'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { invoices, invoiceItems, invoiceLogs } from '@/db/schema/invoices'
 import { returnsLog, returnedItems } from '@/db/schema/returns'
@@ -110,7 +110,7 @@ async function reportChildResult(
   const existingStr = await redis.hget(`${groupKey}:results`, result.marketplace)
   if (existingStr) {
     const existing = JSON.parse(existingStr)
-    result.count = (existing.count || 0) + (result.count || 0)
+    result.count = result.count !== undefined ? result.count : existing.count
     result.newCount = (existing.newCount || 0) + (result.newCount || 0)
     // If one succeeds and the other fails, keep the failure error message
     result.success = existing.success && result.success
@@ -469,15 +469,27 @@ export function createMarketplaceSyncWorker() {
           )
 
           if (companySettings?.syncNotificationEmail && !isWebhook && isDailyScheduledSync) {
-            const openOrdersCount = (rawOrders || []).filter(order => {
-              if (order.fulfillmentType === 'FBA') return false
-              const raw = order.rawPayload as any
-              if (raw?.rawOrder?.OrderStatus === 'Shipped') return false
-              if (raw?.fulfillment_status === 'fulfilled') return false
-              if (raw?.cancelled_at != null) return false
-              if (raw?.closed_at != null) return false
-              return true
-            }).length
+            const customName = (integration.metadata as any)?.customName
+            const possibleKeys = Array.from(new Set([
+              integration.type,
+              integration.type.toLowerCase(),
+              customName,
+              customName?.toLowerCase(),
+              marketplace,
+              job.data.marketplaceDisplayName?.toLowerCase()
+            ].filter(Boolean))) as string[]
+
+            const [openCountRow] = await db.select({ count: sql<number>`count(*)::int` })
+              .from(orders)
+              .where(and(
+                eq(orders.companyId, companyId),
+                eq(orders.isArchived, false),
+                ne(orders.status, 'draft'),
+                eq(orders.status, 'pending'),
+                inArray(orders.marketplace, possibleKeys)
+              ))
+
+            const openOrdersCount = openCountRow?.count ?? 0
 
             await reportChildResult(
               companyId, 
