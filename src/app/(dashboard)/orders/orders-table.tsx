@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, Fragment, ReactNode, useEffect, useMemo, useTransition, useRef } from 'react'
+import { useState, Fragment, ReactNode, useEffect, useMemo, useTransition, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
@@ -17,6 +17,7 @@ import { DecathlonRefundModal } from '@/components/orders/DecathlonRefundModal'
 import { SplitOrderModal } from '@/components/orders/SplitOrderModal'
 import { resolveBillingAddress } from '@/lib/order-address'
 import { getMarketplaceShippingInfo } from '@/lib/order-dates'
+import { getOrderDisplayNumber } from '@/lib/order-number'
 
 export type OrderWithItems = Order & { items: OrderItem[], returns?: any[], invoice?: (Invoice & { logs?: InvoiceLog[] }) | null }
 
@@ -27,18 +28,7 @@ type SearchSuggestion = {
 }
 
 const getOrderNumber = (order: OrderWithItems) => {
-  const source = order as OrderWithItems & { rawPayload?: { orderNumber?: unknown, name?: unknown } | string | null }
-  let payload = source.rawPayload
-  if (typeof payload === 'string') {
-    try {
-      payload = JSON.parse(payload)
-    } catch (e) {
-      // ignore
-    }
-  }
-  const parsedPayload = payload as { orderNumber?: unknown, name?: unknown } | null
-  const displayMarketplaceId = order.marketplaceOrderId?.startsWith('MAN-NO-ORDER-') ? '' : order.marketplaceOrderId
-  return String(parsedPayload?.name || parsedPayload?.orderNumber || displayMarketplaceId || '')
+  return getOrderDisplayNumber(order)
 }
 
 const getOrderBuyerName = (order: OrderWithItems) => {
@@ -68,6 +58,8 @@ const formatCountry = (code?: string | null) => {
   return map[code.toUpperCase()] || code.toUpperCase()
 }
 
+const DOMESTIC_DHL_PRODUCT_CODES = ['V01PAK', 'V62WP', 'V62KP']
+
 const getDefaultDhlProductCode = (country: string | null | undefined, config: DhlConfig | null | undefined): string => {
   const hasZone = (prodCode: string) => {
     return (
@@ -76,19 +68,29 @@ const getDefaultDhlProductCode = (country: string | null | undefined, config: Dh
     )
   }
 
-  const getFirstConfigured = () => {
+  const getFirstConfigured = (domesticOnly: boolean) => {
     if (config?.products && config.products.length > 0) {
-      const firstProd = config.products.find(p => p.billingNumber?.trim() || config.accountNumber)
-      if (firstProd) return firstProd.productCode
+      const match = config.products.find(p => {
+        if (!p.billingNumber?.trim() && !config.accountNumber) return false
+        const isDom = DOMESTIC_DHL_PRODUCT_CODES.includes(p.productCode)
+        return domesticOnly ? isDom : !isDom
+      })
+      if (match) return match.productCode
     }
-    if (!config?.zones) return 'V01PAK'
-    const first = config.zones.find(z => z.billingNumber?.trim())
-    return first ? first.productCode : 'V01PAK'
+    if (config?.zones && config.zones.length > 0) {
+      const match = config.zones.find(z => {
+        if (!z.billingNumber?.trim()) return false
+        const isDom = DOMESTIC_DHL_PRODUCT_CODES.includes(z.productCode)
+        return domesticOnly ? isDom : !isDom
+      })
+      if (match) return match.productCode
+    }
+    return domesticOnly ? 'V01PAK' : 'V53WPAK'
   }
 
   if (!country) {
     if (hasZone('V01PAK')) return 'V01PAK'
-    return getFirstConfigured()
+    return getFirstConfigured(true)
   }
 
   const c = country.toUpperCase()
@@ -97,7 +99,7 @@ const getDefaultDhlProductCode = (country: string | null | undefined, config: Dh
     if (hasZone('V01PAK')) return 'V01PAK'
     if (hasZone('V62WP')) return 'V62WP'
     if (hasZone('V62KP')) return 'V62KP'
-    return getFirstConfigured()
+    return getFirstConfigured(true)
   }
 
   const connectCountries = ['BE', 'BEL', 'LU', 'LUX', 'NL', 'NLD', 'AT', 'AUT', 'PL', 'POL', 'SK', 'SVK', 'CZ', 'CZE']
@@ -106,6 +108,7 @@ const getDefaultDhlProductCode = (country: string | null | undefined, config: Dh
   if (isConnect) {
     if (hasZone('V55PAK')) return 'V55PAK' // DHL Paket Connect
     if (hasZone('V53WPAK')) return 'V53WPAK' // DHL Europaket
+    if (hasZone('V66WPI')) return 'V66WPI' // Warenpost International
     if (hasZone('V06PAK')) return 'V06PAK' // DHL Paket International
   } else {
     const europeanCountries = [
@@ -116,17 +119,18 @@ const getDefaultDhlProductCode = (country: string | null | undefined, config: Dh
     const isEurope = europeanCountries.includes(c)
     if (isEurope) {
       if (hasZone('V53WPAK')) return 'V53WPAK' // DHL Europaket
+      if (hasZone('V66WPI')) return 'V66WPI' // Warenpost International
       if (hasZone('V06PAK')) return 'V06PAK' // DHL Paket International
     }
   }
 
   // Fallback / default international
-  if (hasZone('V06PAK')) return 'V06PAK'
   if (hasZone('V53WPAK')) return 'V53WPAK'
-  if (hasZone('V55PAK')) return 'V55PAK'
   if (hasZone('V66WPI')) return 'V66WPI'
+  if (hasZone('V06PAK')) return 'V06PAK'
+  if (hasZone('V55PAK')) return 'V55PAK'
   
-  return getFirstConfigured()
+  return getFirstConfigured(false)
 }
 
 const ALL_DHL_PRODUCTS = [
@@ -462,6 +466,25 @@ export function OrdersTable({
     const configured = ALL_DHL_PRODUCTS.filter(p => activeCodes.has(p.value))
     return configured.length > 0 ? configured : ALL_DHL_PRODUCTS
   }, [dhlConfig])
+
+  const getConfiguredProductsForCountry = useCallback((country: string | null | undefined) => {
+    const c = country ? country.toUpperCase() : 'DE'
+    const isDomestic = ['DE', 'DEU'].includes(c)
+    
+    // Filter active configured products based on destination country (Germany vs International)
+    const available = configuredDhlProducts.filter(p => {
+      const isDomesticProduct = DOMESTIC_DHL_PRODUCT_CODES.includes(p.value)
+      return isDomestic ? isDomesticProduct : !isDomesticProduct
+    })
+
+    if (available.length > 0) return available
+
+    // Fallback to all standard DHL products filtered by country category if no specific configured product matches
+    return ALL_DHL_PRODUCTS.filter(p => {
+      const isDomesticProduct = DOMESTIC_DHL_PRODUCT_CODES.includes(p.value)
+      return isDomestic ? isDomesticProduct : !isDomesticProduct
+    })
+  }, [configuredDhlProducts])
 
   const [isPending, startTransition] = useTransition()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -4549,11 +4572,17 @@ const filteredOrders = orders;
                         <select
                           value={selection.productCode}
                           onChange={(e) => handleDhlProductChange(order.id, e.target.value)}
-                          className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent bg-white text-slate-800 font-bold"
+                          className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent bg-white !text-slate-900 font-bold"
                         >
-                          {configuredDhlProducts.map(p => (
-                            <option key={p.value} value={p.value}>{p.label}</option>
-                          ))}
+                          {getConfiguredProductsForCountry(order.shippingCountry).map(p => {
+                            const customProduct = dhlConfig?.products?.find(cp => cp.productCode === p.value && cp.name?.trim())
+                            const displayLabel = customProduct && customProduct.name !== p.label
+                              ? `${customProduct.name} (${p.label})`
+                              : p.label
+                            return (
+                              <option key={p.value} value={p.value}>{displayLabel}</option>
+                            )
+                          })}
                         </select>
                       </div>
                       
@@ -4566,7 +4595,7 @@ const filteredOrders = orders;
                             step="0.01"
                             value={selection.weight}
                             onChange={(e) => handleDhlWeightChange(order.id, Number(e.target.value))}
-                            className="w-full px-3 py-2 text-sm border border-slate-200 rounded-l-xl focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent text-slate-800 font-bold"
+                            className="w-full px-3 py-2 text-sm border border-slate-200 rounded-l-xl focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent !text-slate-900 placeholder:!text-slate-500 font-bold"
                             placeholder="z.B. 0.2"
                           />
                           <span className="px-3 py-2 bg-slate-100 border border-l-0 border-slate-200 rounded-r-xl text-slate-600 font-bold text-sm">
@@ -4589,7 +4618,9 @@ const filteredOrders = orders;
                         </span>
                       </label>
                       <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${selection.withReturnLabel ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-slate-100 border-slate-200 text-slate-500'}`}>
-                        {selection.withReturnLabel ? 'Retoure aktiv' : 'Keine Beilegeretoure'}
+                        {selection.withReturnLabel 
+                          ? (order.shippingCountry && !['DE', 'DEU'].includes(order.shippingCountry.toUpperCase()) ? 'Retoure aktiv (Ausland)' : 'Retoure aktiv')
+                          : 'Keine Beilegeretoure'}
                       </span>
                     </div>
                   </div>

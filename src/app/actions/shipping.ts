@@ -463,10 +463,27 @@ export async function generateDhlLabelsAction(
 
     const tasks = pendingOrders.map(order => async (): Promise<ShippingTaskResult> => {
       try {
-        const { street: consigneeStreet, houseNo: consigneeHouseNo } = splitStreet(order.shippingStreet)
+        const { street: rawConsigneeStreet, houseNo: consigneeHouseNo } = splitStreet(order.shippingStreet)
+        const consigneeStreet = (rawConsigneeStreet || '').replace(/[,;]+$/, '').trim()
 
         const orderConfig = orderConfigMap?.[order.id]
-        const productCode = orderConfig?.productCode || domesticZone.productCode || 'V01PAK'
+        const destinationCountry = toIso3(order.shippingCountry)
+        const isDomestic = destinationCountry === 'DEU'
+
+        let productCode = orderConfig?.productCode || (isDomestic ? (domesticZone.productCode || 'V01PAK') : 'V53WPAK')
+
+        // Safety Guard: If shipping internationally, NEVER use domestic-only products (V01PAK, V62WP, V62KP)
+        if (!isDomestic && ['V01PAK', 'V62WP', 'V62KP'].includes(productCode)) {
+          // Re-route to an appropriate international product configured by user
+          const preferredInt = config.products?.find(p => ['V66WPI', 'V53WPAK', 'V55PAK', 'V06PAK'].includes(p.productCode) && p.billingNumber)
+            ?? config.zones?.find(z => ['V66WPI', 'V53WPAK', 'V55PAK', 'V06PAK'].includes(z.productCode) && z.billingNumber)
+          if (preferredInt) {
+            productCode = preferredInt.productCode
+          } else {
+            throw new Error(`Bestellung ${order.marketplaceOrderId ?? order.id}: Das Produkt ${productCode} (national) kann nicht für das Zielland ${order.shippingCountry} verwendet werden. Bitte hinterlege unter Integrationen → DHL ein Auslandsprodukt (z. B. DHL Europaket oder Warenpost International).`)
+          }
+        }
+
         const initialProduct = config.products?.find(p => p.productCode === productCode)
 
         // Determine if return label should be generated
@@ -495,12 +512,22 @@ export async function generateDhlLabelsAction(
           }
         }
         if (!zone) {
-          if (['V62WP', 'V66WPI', 'V62KP'].includes(productCode)) {
+          if (productCode === 'V66WPI') {
+            zone = config.zones?.find(z => (z.id === 'warenpost_international' || z.productCode === 'V66WPI') && z.billingNumber)
+              ?? (config.products?.find(p => p.productCode === 'V66WPI' && p.billingNumber) ? {
+                  id: 'warenpost_international',
+                  name: 'Warenpost International',
+                  billingNumber: config.products.find(p => p.productCode === 'V66WPI' && p.billingNumber)!.billingNumber!,
+                  returnBillingNumber: config.products.find(p => p.productCode === 'V66WPI' && p.billingNumber)!.returnBillingNumber || '',
+                  productCode: 'V66WPI',
+                  description: ''
+                } : undefined)
+          } else if (['V62WP', 'V62KP'].includes(productCode)) {
             zone = config.zones?.find(z => z.id === 'warenpost' && z.billingNumber)
-              ?? (config.products?.find(p => ['V62WP', 'V62KP', 'V66WPI'].includes(p.productCode) && p.billingNumber) ? {
+              ?? (config.products?.find(p => ['V62WP', 'V62KP'].includes(p.productCode) && p.billingNumber) ? {
                   id: 'warenpost',
                   name: 'Warenpost / Kleinpaket',
-                  billingNumber: config.products.find(p => ['V62WP', 'V62KP', 'V66WPI'].includes(p.productCode) && p.billingNumber)!.billingNumber!,
+                  billingNumber: config.products.find(p => ['V62WP', 'V62KP'].includes(p.productCode) && p.billingNumber)!.billingNumber!,
                   returnBillingNumber: '',
                   productCode,
                   description: ''
@@ -539,6 +566,11 @@ export async function generateDhlLabelsAction(
           resolvedProductCode = verfahrensMap[verfahrensId]
         }
 
+        // Final sanity check for domestic vs international
+        if (!isDomestic && ['V01PAK', 'V62WP', 'V62KP'].includes(resolvedProductCode)) {
+          throw new Error(`Bestellung ${order.marketplaceOrderId ?? order.id}: Das Produkt ${resolvedProductCode} ist nur für innerdeutsche Sendungen zulässig und kann nicht nach ${order.shippingCountry} versendet werden.`)
+        }
+
         // Resolve return billing number if return label is requested
         let resolvedReturnBillingNum: string | undefined = undefined
         if (needsEnclosedReturn) {
@@ -566,17 +598,30 @@ export async function generateDhlLabelsAction(
 
           // 3. If destination is international / EU:
           if (!resolvedReturnBillingNum && consigneeCountry !== 'DEU') {
-            const intZone = config.zones?.find(z => {
-              const num = (z.returnBillingNumber || (['V53WPAK', 'V06PAK'].includes(z.productCode) ? z.billingNumber : '')).replace(/\s/g, '')
-              return num.length === 14 && (num.slice(10, 12) === '53' || z.id === 'eu' || z.id === 'international')
-            })
-            if (intZone) {
-              const candidate = (intZone.returnBillingNumber || intZone.billingNumber).replace(/\s/g, '')
-              if (candidate.length === 14) resolvedReturnBillingNum = candidate
+            // First check if matching product in config.products has returnBillingNumber
+            const prodMatch = config.products?.find(p => p.productCode === resolvedProductCode && p.returnBillingNumber?.trim())
+            if (prodMatch?.returnBillingNumber && prodMatch.returnBillingNumber.replace(/\s/g, '').length === 14) {
+              resolvedReturnBillingNum = prodMatch.returnBillingNumber.replace(/\s/g, '')
             }
-            if (!resolvedReturnBillingNum && domesticZone.returnBillingNumber) {
-              const domRet = domesticZone.returnBillingNumber.replace(/\s/g, '')
-              if (domRet.length === 14) resolvedReturnBillingNum = domRet
+
+            // Next check if any international zone has a returnBillingNumber
+            if (!resolvedReturnBillingNum) {
+              const intZone = config.zones?.find(z => {
+                const num = (z.returnBillingNumber || (['V53WPAK', 'V06PAK', 'V66WPI'].includes(z.productCode) ? z.billingNumber : '')).replace(/\s/g, '')
+                return num.length === 14 && (num.slice(10, 12) === '53' || z.id === 'eu' || z.id === 'international' || z.id === 'warenpost_international')
+              })
+              if (intZone) {
+                const candidate = (intZone.returnBillingNumber || intZone.billingNumber).replace(/\s/g, '')
+                if (candidate.length === 14) resolvedReturnBillingNum = candidate
+              }
+            }
+
+            // Fallback to any configured product with valid 14-digit returnBillingNumber
+            if (!resolvedReturnBillingNum) {
+              const anyRetProd = config.products?.find(p => p.returnBillingNumber?.replace(/\s/g, '').length === 14)
+              if (anyRetProd?.returnBillingNumber) {
+                resolvedReturnBillingNum = anyRetProd.returnBillingNumber.replace(/\s/g, '')
+              }
             }
           }
 
@@ -1084,8 +1129,20 @@ export async function generateSingleDhlReturnLabelAction(orderId: string) {
 
     const basicAuth = Buffer.from(`${config.username}:${config.password}`).toString('base64')
 
-    const { street: customerStreet, houseNo: customerHouseNo } = splitStreet(order.shippingStreet)
-    const { street: warehouseStreet, houseNo: warehouseHouseNo } = splitStreet(warehouseStreetFull)
+    const { street: rawCustomerStreet, houseNo: rawCustomerHouseNo } = splitStreet(order.shippingStreet)
+    const { street: rawWarehouseStreet, houseNo: rawWarehouseHouseNo } = splitStreet(warehouseStreetFull)
+    const customerStreet = (rawCustomerStreet || 'Hauptstraße').replace(/[,;]+$/, '').trim()
+    const warehouseStreet = (rawWarehouseStreet || company.street || 'Hauptstraße').replace(/[,;]+$/, '').trim()
+    const customerHouseNo = rawCustomerHouseNo === '.' ? '1' : (rawCustomerHouseNo || '1')
+    const warehouseHouseNo = rawWarehouseHouseNo === '.' ? '1' : (rawWarehouseHouseNo || '1')
+
+    let customerZip = order.shippingZip ?? '10115'
+    if (toIso3(order.shippingCountry) === 'NLD') {
+      const cleanZip = customerZip.replace(/\s/g, '').toUpperCase()
+      if (/^\d{4}[A-Z]{2}$/.test(cleanZip)) {
+        customerZip = `${cleanZip.slice(0, 4)} ${cleanZip.slice(4)}`
+      }
+    }
 
     const weight = Number(order.totalWeight) > 0 ? Number(order.totalWeight) : (config.defaultWeight ?? 1)
 
@@ -1104,9 +1161,9 @@ export async function generateSingleDhlReturnLabelAction(orderId: string) {
           name1: (order.shippingCompany || order.shippingName || 'Kunde').slice(0, 50),
           ...(order.shippingCompany && order.shippingName ? { name2: order.shippingName.slice(0, 50) } : {}),
           ...(order.shippingAddressAddition ? { additionalAddressInformation1: order.shippingAddressAddition.slice(0, 50) } : {}),
-          addressStreet: customerStreet || 'Hauptstraße',
-          addressHouse: customerHouseNo === '.' ? '1' : (customerHouseNo || '1'),
-          postalCode: order.shippingZip ?? '10115',
+          addressStreet: customerStreet,
+          addressHouse: customerHouseNo,
+          postalCode: customerZip,
           city: order.shippingCity ?? 'Berlin',
           country: toIso3(order.shippingCountry),
           ...(order.buyerEmail ? { email: order.buyerEmail } : {}),
