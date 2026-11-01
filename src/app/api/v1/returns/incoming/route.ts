@@ -102,7 +102,9 @@ export async function POST(req: Request) {
           ilike(orders.customerNumber, scanInput),
           ilike(orders.deliveryNoteNumber, scanInput),
           sql`${orders.rawPayload}->>'orderNumber' ILIKE ${scanInput}`,
-          sql`${orders.rawPayload}->>'receiptNumber' ILIKE ${scanInput}`
+          sql`${orders.rawPayload}->>'receiptNumber' ILIKE ${scanInput}`,
+          sql`${orders.rawPayload}->>'name' ILIKE ${scanInput}`,
+          sql`${orders.rawPayload}->>'order_number' ILIKE ${scanInput}`
         )
       )
     })

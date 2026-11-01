@@ -6,6 +6,7 @@ import { eq, and, desc } from 'drizzle-orm'
 import React from 'react'
 import { uploadDocument, buildInvoiceKey } from '@/lib/storage'
 import { resolveBillingAddress } from '@/lib/order-address'
+import { getOrderDisplayNumber } from '@/lib/order-number'
 
 function getCalendarWeek(d: Date): number {
   const target = new Date(d.valueOf())
@@ -233,6 +234,7 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
   if (documentType === 'delivery_note') {
     const { DeliveryNoteDocument } = await import('@/components/pdf/delivery-note')
     const mappedOrder = {
+      ...order,
       shippingName: order.shippingName || order.buyerName || '',
       shippingCompany: order.shippingCompany || '',
       shippingAddressAddition: order.shippingAddressAddition || '',
@@ -243,6 +245,8 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
       shippingCountry: order.shippingCountry || 'DE',
       customerNumber: order.customerNumber || '–',
       deliveryNoteNumber: invoiceNumber,
+      marketplace: order.marketplace,
+      rawPayload: order.rawPayload,
       marketplaceOrderId: order.marketplaceOrderId,
       marketplacePurchaseDate: order.marketplacePurchaseDate || new Date(),
       items: order.items.map((i: typeof orderItems.$inferSelect) => ({
@@ -259,12 +263,13 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
     )
   } else {
     const { InvoiceDocument } = await import('@/components/pdf/invoice')
+    const displayOrderNum = getOrderDisplayNumber(order)
     pdfBuffer = await renderToBuffer(
       React.createElement(InvoiceDocument, {
         invoiceNumber,
         date: new Date(),
         dueDate: customDueDate || new Date(),
-        orderNumber: customOrderNumber || metadata.orderNumber || (order.marketplace === 'manual' ? undefined : order.marketplaceOrderId),
+        orderNumber: customOrderNumber || metadata.orderNumber || (order.marketplace === 'manual' ? undefined : displayOrderNum),
         orderDate: customOrderDate || order.marketplacePurchaseDate || undefined,
         buyerReference: buyerReference || metadata.buyerReference,
         externalId: externalId || metadata.externalId,
@@ -563,6 +568,7 @@ export async function regenerateInvoicePdf(invoiceId: string, companyId: string)
   if (invoice.documentType === 'delivery_note') {
     const { DeliveryNoteDocument } = await import('@/components/pdf/delivery-note')
     const mappedOrder = {
+      ...(order || {}),
       shippingName: invoice.recipientName || '',
       shippingCompany: invoice.recipientCompany || '',
       shippingAddressAddition: invoice.recipientAddressAddition || '',
@@ -573,6 +579,8 @@ export async function regenerateInvoicePdf(invoiceId: string, companyId: string)
       shippingCountry: invoice.recipientCountry || 'DE',
       customerNumber: order?.customerNumber || '–',
       deliveryNoteNumber: invoice.invoiceNumber,
+      marketplace: order?.marketplace,
+      rawPayload: order?.rawPayload,
       marketplaceOrderId: order?.marketplaceOrderId || '–',
       marketplacePurchaseDate: order?.marketplacePurchaseDate || invoice.createdAt,
       items: invoice.items.map((i: any) => ({
@@ -589,12 +597,13 @@ export async function regenerateInvoicePdf(invoiceId: string, companyId: string)
     )
   } else {
     const { InvoiceDocument } = await import('@/components/pdf/invoice')
+    const displayOrderNum = order ? getOrderDisplayNumber(order) : undefined
     pdfBuffer = await renderToBuffer(
       React.createElement(InvoiceDocument, {
         invoiceNumber: invoice.invoiceNumber,
         date: invoice.createdAt,
         dueDate: invoice.dueAt || invoice.createdAt,
-        orderNumber: (order?.marketplace === 'manual' ? (metadata.orderNumber || undefined) : order?.marketplaceOrderId) || undefined,
+        orderNumber: (order?.marketplace === 'manual' ? (metadata.orderNumber || undefined) : displayOrderNum) || undefined,
         orderDate: order?.marketplacePurchaseDate || undefined,
         customerNumber: order?.customerNumber || '–',
         customText: metadata.customText || undefined,

@@ -1,6 +1,7 @@
 import React from 'react'
 import { Document, Page, Text, View, StyleSheet, Image, Font } from '@react-pdf/renderer'
 import { format } from 'date-fns'
+import { getOrderDisplayNumber } from '@/lib/order-number'
 
 // Optional: Register a custom font if you want something specific, standard Helvetica is usually fine
 
@@ -159,29 +160,7 @@ function DeliveryNotePage({ order, company }: DeliveryNoteProps) {
 
   const shippingCountryFull = getCountryName(countryCode, lang)
 
-  const getDisplayOrderId = () => {
-    const raw = order.rawPayload as any
-    if (!raw) return order.marketplaceOrderId
-
-    // Marketplace specific display IDs
-    if (order.marketplace === 'otto') {
-      return raw.orderNumber || raw.salesOrderId || order.marketplaceOrderId
-    }
-    if (order.marketplace === 'shopify') {
-      return raw.name || raw.order_number?.toString() || order.marketplaceOrderId
-    }
-    if (order.marketplace?.startsWith('mirakl_')) {
-      return raw.display_id || order.marketplaceOrderId
-    }
-    
-    if (order.marketplace === 'manual') {
-      return raw.manualMetadata?.orderNumber || undefined
-    }
-    
-    return order.marketplaceOrderId
-  }
-
-  const displayOrderId = getDisplayOrderId()
+  const displayOrderId = getOrderDisplayNumber(order)
 
   const t = {
     de: {

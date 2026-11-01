@@ -1,6 +1,7 @@
 import { db } from '@/db/client'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { eq, and } from 'drizzle-orm'
+import { getOrderDisplayNumber } from '@/lib/order-number'
 
 export class HermesAdapter {
   private integrationId: string | null
@@ -186,16 +187,11 @@ export class HermesAdapter {
 
     const shipperAddr = this.splitStreet(company.warehouseStreet || company.street)
 
-    // Try to find a human-readable order number (especially for Otto where marketplaceOrderId might be a UUID)
-    let displayOrderId = order.marketplaceOrderId
-    if (order.marketplace === 'otto' && order.rawPayload?.orderNumber) {
-      displayOrderId = order.rawPayload.orderNumber
-    } else if (order.marketplace === 'aboutyou' && order.rawPayload?.order_number) {
-      displayOrderId = order.rawPayload.order_number
-    }
+    // Resolve human-readable order number (e.g. #10007 for Shopify, orderNumber for Otto/AboutYou/Shopware)
+    const displayOrderId = getOrderDisplayNumber(order)
 
     const payload = {
-      clientReference: displayOrderId ? displayOrderId.slice(0, 20) : order.id.slice(0, 20),
+      clientReference: (displayOrderId || order.marketplaceOrderId || order.id || '').slice(0, 20),
       receiverName: {
         firstname: order.shippingName?.split(' ')[0] || 'Vorname',
         lastname: order.shippingName?.split(' ').slice(1).join(' ') || 'Nachname'

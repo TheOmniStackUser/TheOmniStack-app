@@ -3,7 +3,8 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 import { db } from '@/db/client'
 import { companies } from '@/db/schema/companies'
 import { orders } from '@/db/schema/orders'
-import { eq, and, or } from 'drizzle-orm'
+import { eq, and, or, sql } from 'drizzle-orm'
+import { getOrderDisplayNumber } from '@/lib/order-number'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300 // Erhöht auf 5 Minuten, da Gemini (vor allem im Fallback) länger brauchen kann
@@ -224,7 +225,10 @@ export async function POST(req: NextRequest) {
           or(
             eq(orders.marketplaceOrderId, scanInput),
             eq(orders.trackingNumber, scanInput),
-            eq(orders.returnTrackingNumber, scanInput)
+            eq(orders.returnTrackingNumber, scanInput),
+            sql`${orders.rawPayload}->>'orderNumber' = ${scanInput}`,
+            sql`${orders.rawPayload}->>'name' = ${scanInput}`,
+            sql`${orders.rawPayload}->>'order_number' = ${scanInput}`
           )
         ),
         with: {
@@ -234,7 +238,7 @@ export async function POST(req: NextRequest) {
 
       if (matchedOrder) {
         // Correct order number if a tracking number was scanned
-        parsedData.order_number = matchedOrder.marketplaceOrderId
+        parsedData.order_number = getOrderDisplayNumber(matchedOrder)
 
         // Resolve marketplace
         if (!parsedData.marketplace && matchedOrder.marketplace) {
