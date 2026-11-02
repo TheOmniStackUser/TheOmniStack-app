@@ -4,6 +4,7 @@ import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { eq, and } from 'drizzle-orm'
 import crypto from 'crypto'
 import { cookies } from 'next/headers'
+import { revalidatePath } from 'next/cache'
 
 const ETSY_CLIENT_ID = 'c5j4zwilbc679dv552svbzbi'
 const ETSY_CLIENT_SECRET = 'pp0wbvvv22'
@@ -134,6 +135,7 @@ async function handleCallback(request: NextRequest) {
         accessToken: tokenData.access_token,
         refreshToken: tokenData.refresh_token,
         expiresAt: new Date(Date.now() + tokenData.expires_in * 1000),
+        isActive: true,
         updatedAt: new Date()
       })
       .where(eq(marketplaceIntegrations.id, integration.id))
@@ -149,11 +151,14 @@ async function handleCallback(request: NextRequest) {
         accessToken: tokenData.access_token,
         refreshToken: tokenData.refresh_token,
         expiresAt: new Date(Date.now() + tokenData.expires_in * 1000),
+        isActive: true,
       })
   }
 
   // Clean up cookie
   cookieStore.delete('etsy_oauth_state')
+
+  revalidatePath('/integrations')
 
   return NextResponse.redirect(new URL('/integrations?status=etsy_success', request.url))
 }
