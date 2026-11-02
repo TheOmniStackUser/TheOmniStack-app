@@ -746,7 +746,7 @@ export function DhlIntegrationForm({
             <div>
               <p className="font-semibold text-slate-900">Aktive DHL-Produkte & Abrechnungsnummern</p>
               <p className="text-xs text-slate-500 mt-0.5">
-                Diese Produkte erscheinen beim Label-Druck. Klicke auf <strong>„Produkte abrufen“</strong>, um alle Produkte mit deinen 14-stelligen Abrechnungsnummern automatisch anzulegen.
+                Hier verwaltest du deine DHL-Produkte. Beim Label-Druck werden automatisch die passenden Produkte für das jeweilige Lieferland angeboten (Inlandsprodukte für DE, Exportprodukte für das Ausland und Retourenprodukte für Rücksendungen).
               </p>
             </div>
             <div className="flex items-center gap-2.5 flex-shrink-0">

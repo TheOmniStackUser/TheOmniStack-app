@@ -72,6 +72,7 @@ const getDefaultDhlProductCode = (country: string | null | undefined, config: Dh
     if (config?.products && config.products.length > 0) {
       const match = config.products.find(p => {
         if (!p.billingNumber?.trim() && !config.accountNumber) return false
+        if (p.productCode === 'V07PAK') return false
         const isDom = DOMESTIC_DHL_PRODUCT_CODES.includes(p.productCode)
         return domesticOnly ? isDom : !isDom
       })
@@ -80,6 +81,7 @@ const getDefaultDhlProductCode = (country: string | null | undefined, config: Dh
     if (config?.zones && config.zones.length > 0) {
       const match = config.zones.find(z => {
         if (!z.billingNumber?.trim()) return false
+        if (z.productCode === 'V07PAK') return false
         const isDom = DOMESTIC_DHL_PRODUCT_CODES.includes(z.productCode)
         return domesticOnly ? isDom : !isDom
       })
@@ -467,24 +469,62 @@ export function OrdersTable({
     return configured.length > 0 ? configured : ALL_DHL_PRODUCTS
   }, [dhlConfig])
 
-  const getConfiguredProductsForCountry = useCallback((country: string | null | undefined) => {
+  const getProductsCategorizedForCountry = useCallback((country: string | null | undefined) => {
     const c = country ? country.toUpperCase() : 'DE'
     const isDomestic = ['DE', 'DEU'].includes(c)
-    
-    // Filter active configured products based on destination country (Germany vs International)
-    const available = configuredDhlProducts.filter(p => {
-      const isDomesticProduct = DOMESTIC_DHL_PRODUCT_CODES.includes(p.value)
-      return isDomestic ? isDomesticProduct : !isDomesticProduct
-    })
 
-    if (available.length > 0) return available
+    // Build unique product list from user's dhlConfig.products first
+    const userProducts: { value: string; label: string; isDomestic: boolean; isReturn: boolean; billingNumber?: string }[] = []
+    const seenValues = new Set<string>()
 
-    // Fallback to all standard DHL products filtered by country category if no specific configured product matches
-    return ALL_DHL_PRODUCTS.filter(p => {
-      const isDomesticProduct = DOMESTIC_DHL_PRODUCT_CODES.includes(p.value)
-      return isDomestic ? isDomesticProduct : !isDomesticProduct
-    })
-  }, [configuredDhlProducts])
+    if (dhlConfig?.products && dhlConfig.products.length > 0) {
+      for (const p of dhlConfig.products) {
+        if (!p.productCode || (!p.billingNumber?.trim() && !dhlConfig.accountNumber)) continue
+        const isReturn = p.productCode === 'V07PAK' || (p.billingNumber?.replace(/\s/g, '').slice(10, 12) === '07' && !p.productCode.includes('PAK'))
+        const isDom = DOMESTIC_DHL_PRODUCT_CODES.includes(p.productCode)
+        const customName = p.name?.trim()
+        const defaultLabel = ALL_DHL_PRODUCTS.find(ap => ap.value === p.productCode)?.label || p.productCode
+        const label = customName && customName !== defaultLabel ? `${customName} (${defaultLabel})` : (customName || defaultLabel)
+
+        userProducts.push({
+          value: p.productCode,
+          label,
+          isDomestic: isDom,
+          isReturn,
+          billingNumber: p.billingNumber,
+        })
+        seenValues.add(p.productCode)
+      }
+    }
+
+    // Add any configured products from zones not in userProducts
+    for (const cp of configuredDhlProducts) {
+      if (!seenValues.has(cp.value) && cp.value !== 'V07PAK') {
+        userProducts.push({
+          value: cp.value,
+          label: cp.label,
+          isDomestic: DOMESTIC_DHL_PRODUCT_CODES.includes(cp.value),
+          isReturn: false,
+        })
+        seenValues.add(cp.value)
+      }
+    }
+
+    // Separate into available outbound products vs incompatible/export products
+    const available = userProducts.filter(p => !p.isReturn && (isDomestic ? p.isDomestic : !p.isDomestic))
+    const incompatible = userProducts.filter(p => !p.isReturn && (isDomestic ? !p.isDomestic : p.isDomestic))
+    const returnProducts = userProducts.filter(p => p.isReturn)
+
+    // If available is empty, fallback to ALL_DHL_PRODUCTS filtered by domestic/international
+    if (available.length === 0) {
+      const fallback = ALL_DHL_PRODUCTS
+        .filter(p => isDomestic ? DOMESTIC_DHL_PRODUCT_CODES.includes(p.value) : !DOMESTIC_DHL_PRODUCT_CODES.includes(p.value))
+        .map(p => ({ ...p, isDomestic, isReturn: false }))
+      return { available: fallback, incompatible, returnProducts, isDomestic, totalConfigured: userProducts.length }
+    }
+
+    return { available, incompatible, returnProducts, isDomestic, totalConfigured: userProducts.length }
+  }, [dhlConfig, configuredDhlProducts])
 
   const [isPending, startTransition] = useTransition()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -4566,63 +4606,118 @@ const filteredOrders = orders;
                       </div>
                     )}
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">DHL Produkt</label>
-                        <select
-                          value={selection.productCode}
-                          onChange={(e) => handleDhlProductChange(order.id, e.target.value)}
-                          className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent bg-white !text-slate-900 font-bold"
-                        >
-                          {getConfiguredProductsForCountry(order.shippingCountry).map(p => {
-                            const customProduct = dhlConfig?.products?.find(cp => cp.productCode === p.value && cp.name?.trim())
-                            const displayLabel = customProduct && customProduct.name !== p.label
-                              ? `${customProduct.name} (${p.label})`
-                              : p.label
-                            return (
-                              <option key={p.value} value={p.value}>{displayLabel}</option>
-                            )
-                          })}
-                        </select>
-                      </div>
-                      
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Gewicht (in kg)</label>
-                        <div className="flex">
-                          <input
-                            type="number"
-                            min="0.01"
-                            step="0.01"
-                            value={selection.weight}
-                            onChange={(e) => handleDhlWeightChange(order.id, Number(e.target.value))}
-                            className="w-full px-3 py-2 text-sm border border-slate-200 rounded-l-xl focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent !text-slate-900 placeholder:!text-slate-500 font-bold"
-                            placeholder="z.B. 0.2"
-                          />
-                          <span className="px-3 py-2 bg-slate-100 border border-l-0 border-slate-200 rounded-r-xl text-slate-600 font-bold text-sm">
-                            kg
-                          </span>
-                        </div>
-                      </div>
-                    </div>
+                    {(() => {
+                      const categorized = getProductsCategorizedForCountry(order.shippingCountry)
+                      const countryCode = order.shippingCountry?.toUpperCase() || 'DE'
+                      const isDE = ['DE', 'DEU'].includes(countryCode)
+                      const activeGroupLabel = isDE 
+                        ? 'Verfügbar für Lieferland DE (Deutschland):'
+                        : `Verfügbar für Lieferland ${countryCode}:`
+                      const incompatibleGroupLabel = isDE
+                        ? 'Hinterlegte Auslandsprodukte (nur bei Auslandsversand):'
+                        : 'Hinterlegte Inlandsprodukte (nur bei Inlandsversand DE):'
+                      const returnProd = categorized.returnProducts[0] || (dhlConfig?.products?.find(p => p.productCode === 'V07PAK') ? { label: dhlConfig.products.find(p => p.productCode === 'V07PAK')?.name || 'DHL Retoure Online', billingNumber: dhlConfig.products.find(p => p.productCode === 'V07PAK')?.billingNumber } : null)
+                      const returnBillingNum = returnProd?.billingNumber || (dhlConfig?.accountNumber ? `${dhlConfig.accountNumber.trim()}0701` : null)
+                      const returnProdName = returnProd?.label || 'DHL Retoure Online'
 
-                    <div className="mt-3 pt-3 border-t border-slate-200/60 flex items-center justify-between">
-                      <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={selection.withReturnLabel ?? false}
-                          onChange={(e) => handleDhlReturnLabelToggle(order.id, e.target.checked)}
-                          className="w-4 h-4 rounded border-slate-300 text-yellow-500 focus:ring-yellow-400 focus:ring-offset-0"
-                        />
-                        <span className="text-xs font-bold text-slate-800">
-                          Retourenlabel beilegen (Beilegeretoure)
-                        </span>
-                      </label>
-                      <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${selection.withReturnLabel ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-slate-100 border-slate-200 text-slate-500'}`}>
-                        {selection.withReturnLabel 
-                          ? (order.shippingCountry && !['DE', 'DEU'].includes(order.shippingCountry.toUpperCase()) ? 'Retoure aktiv (Ausland)' : 'Retoure aktiv')
-                          : 'Keine Beilegeretoure'}
-                      </span>
-                    </div>
+                      return (
+                        <>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <label className="block text-xs font-bold text-slate-700 uppercase">
+                                  DHL Produkt
+                                </label>
+                                <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                                  {categorized.available.length} passend für {isDE ? 'DE' : countryCode}
+                                </span>
+                              </div>
+                              <select
+                                value={selection.productCode}
+                                onChange={(e) => handleDhlProductChange(order.id, e.target.value)}
+                                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent bg-white text-slate-900 font-bold"
+                              >
+                                <optgroup label={activeGroupLabel}>
+                                  {categorized.available.map(p => (
+                                    <option key={p.value} value={p.value} className="text-slate-900 font-bold">
+                                      {p.label}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                                {categorized.incompatible.length > 0 && (
+                                  <optgroup label={incompatibleGroupLabel}>
+                                    {categorized.incompatible.map(p => (
+                                      <option key={p.value} value={p.value} disabled className="text-slate-400 bg-slate-50">
+                                        {p.label} (nur für {isDE ? 'Ausland' : 'DE'})
+                                      </option>
+                                    ))}
+                                  </optgroup>
+                                )}
+                              </select>
+                              {categorized.incompatible.length > 0 && (
+                                <p className="text-[11px] text-slate-500 mt-1 leading-tight">
+                                  {isDE 
+                                    ? `Hinweis: Deine ${categorized.incompatible.length} hinterlegten Auslandsprodukte sind für DE-Lieferungen deaktiviert.`
+                                    : `Hinweis: Deine ${categorized.incompatible.length} hinterlegten Inlandsprodukte sind für ${countryCode} deaktiviert.`}
+                                </p>
+                              )}
+                            </div>
+                            
+                            <div>
+                              <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Gewicht (in kg)</label>
+                              <div className="flex">
+                                <input
+                                  type="number"
+                                  min="0.01"
+                                  step="0.01"
+                                  value={selection.weight}
+                                  onChange={(e) => handleDhlWeightChange(order.id, Number(e.target.value))}
+                                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-l-xl focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent text-slate-900 placeholder:text-slate-500 font-bold bg-white"
+                                  placeholder="z.B. 0.2"
+                                />
+                                <span className="px-3 py-2 bg-slate-100 border border-l-0 border-slate-200 rounded-r-xl text-slate-600 font-bold text-sm">
+                                  kg
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="mt-3 pt-3 border-t border-slate-200/60">
+                            <div className="flex items-center justify-between">
+                              <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={selection.withReturnLabel ?? false}
+                                  onChange={(e) => handleDhlReturnLabelToggle(order.id, e.target.checked)}
+                                  className="w-4 h-4 rounded border-slate-300 text-yellow-500 focus:ring-yellow-400 focus:ring-offset-0"
+                                />
+                                <span className="text-xs font-bold text-slate-800">
+                                  Retourenlabel beilegen (Beilegeretoure)
+                                </span>
+                              </label>
+                              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${selection.withReturnLabel ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-slate-100 border-slate-200 text-slate-500'}`}>
+                                {selection.withReturnLabel 
+                                  ? (order.shippingCountry && !['DE', 'DEU'].includes(order.shippingCountry.toUpperCase()) ? 'Retoure aktiv (Ausland)' : 'Retoure aktiv')
+                                  : 'Keine Beilegeretoure'}
+                              </span>
+                            </div>
+                            {selection.withReturnLabel && (
+                              <div className="mt-2 text-[11px] bg-amber-50/70 border border-amber-200/70 rounded-lg px-2.5 py-1.5 text-amber-900 flex items-center justify-between flex-wrap gap-1">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-semibold text-amber-950">Retouren-Produkt:</span>
+                                  <span>{returnProdName}</span>
+                                </div>
+                                {returnBillingNum && (
+                                  <span className="font-mono text-[10px] text-amber-800 bg-amber-100/60 px-1.5 py-0.5 rounded border border-amber-200">
+                                    Abrechnungs-Nr.: {returnBillingNum}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )
+                    })()}
                   </div>
                 )
               })}
