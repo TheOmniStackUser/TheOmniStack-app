@@ -1670,235 +1670,255 @@ export class MiraklAdapter implements MarketplaceAdapter {
         'Content-Type': 'application/json'
       }
 
+      const apiKey = this.config.clientSecret === '' || !this.config.clientSecret 
+        ? this.config.clientId 
+        : this.config.apiKey
+
       if (token) {
         headers['Authorization'] = `Bearer ${token}`
-      } else {
-        const apiKey = this.config.clientSecret === '' || !this.config.clientSecret 
-          ? this.config.clientId 
-          : this.config.apiKey
-        
-        if (apiKey) {
-          headers['Authorization'] = apiKey
-          headers['X-Mirakl-Api-Key'] = apiKey
-        }
+      } else if (apiKey) {
+        headers['Authorization'] = apiKey
+        headers['X-Mirakl-Api-Key'] = apiKey
       }
 
       const baseUrl = this.config.baseUrl.replace(/\/$/, '')
-      let url = `${baseUrl}/api/offers`
-      if (this.config.shopId) {
-        url += `?shop_id=${this.config.shopId}`
+
+      // ── Step 1: Partition updates into stock-only vs price/full updates ──
+      // Stock-only updates MUST use Mirakl's dedicated STO01 endpoint (POST /api/offers/stock/imports).
+      // STO01 strictly updates quantities and NEVER touches prices, MSRP, or promotional discounts!
+      const stockOnlyUpdates = updates.filter(u => u.stock !== undefined && u.price === undefined && u.reducedPrice === undefined)
+      const priceOrFullUpdates = updates.filter(u => u.price !== undefined || u.reducedPrice !== undefined || (u.stock === undefined && u.price === undefined && u.reducedPrice === undefined))
+
+      // ── Step 2: Handle stock-only updates via STO01 ──
+      if (stockOnlyUpdates.length > 0) {
+        const stockUrl = `${baseUrl}/api/offers/stock/imports${this.config.shopId ? `?shop_id=${this.config.shopId}` : ''}`
+        console.log(`[MiraklAdapter:${this.marketplace}] Pushing ${stockOnlyUpdates.length} stock updates via STO01 (${stockUrl})...`)
+
+        const stockAuthHeaders: Record<string, string> = {}
+        if (token) {
+          stockAuthHeaders['Authorization'] = `Bearer ${token}`
+        } else if (apiKey) {
+          stockAuthHeaders['Authorization'] = apiKey
+          stockAuthHeaders['X-Mirakl-Api-Key'] = apiKey
+        }
+
+        const stockChunkSize = 5000
+        for (let i = 0; i < stockOnlyUpdates.length; i += stockChunkSize) {
+          const chunk = stockOnlyUpdates.slice(i, i + stockChunkSize)
+          const csvLines = ['offer-sku;quantity;update-delete']
+          for (const item of chunk) {
+            csvLines.push(`${item.sku};${item.stock};update`)
+          }
+          const csvContent = csvLines.join('\n') + '\n'
+          const blob = new Blob([csvContent], { type: 'text/csv' })
+          const formData = new FormData()
+          formData.append('file', blob, 'stock.csv')
+
+          let retryCount = 0
+          let success = false
+          while (!success && retryCount < 3) {
+            const response = await fetch(stockUrl, {
+              method: 'POST',
+              headers: stockAuthHeaders,
+              body: formData
+            })
+
+            if (response.status === 429) {
+              console.warn(`[MiraklAdapter:${this.marketplace}] Rate limited (429) during STO01 stock import. Retrying after 5s...`)
+              await new Promise(r => setTimeout(r, 5000))
+              retryCount++
+              continue
+            }
+
+            if (!response.ok) {
+              const errText = await response.text()
+              console.error(`[MiraklAdapter:${this.marketplace}] STO01 stock import failed (${response.status}): ${errText}`)
+              throw new Error(`Mirakl API STO01 stock import failed: ${errText}`)
+            }
+
+            const data = await response.json().catch(() => ({}))
+            console.log(`[MiraklAdapter:${this.marketplace}] STO01 stock import batch (${i}-${i + chunk.length}) dispatched. Import ID: ${data.import_id || 'unknown'}`)
+            success = true
+          }
+
+          if (!success) {
+            throw new Error(`Mirakl API STO01 stock import failed after ${retryCount} retries.`)
+          }
+
+          if (i + stockChunkSize < stockOnlyUpdates.length) {
+            await new Promise(r => setTimeout(r, 1000))
+          }
+        }
       }
 
-      // We must fetch existing offers to preserve their discount (if active) and price (if not provided).
-      const currentOffersMap: Record<string, any> = {}
+      // ── Step 3: Handle price/full updates via OF01 ──
+      if (priceOrFullUpdates.length > 0) {
+        let url = `${baseUrl}/api/offers`
+        if (this.config.shopId) {
+          url += `?shop_id=${this.config.shopId}`
+        }
 
-      const itemsNeedingLookup = updates.filter(u => u.price === undefined || u.price === null)
+        // We fetch existing offers only when base price is missing to satisfy OF01 mandatory price requirement
+        const currentOffersMap: Record<string, any> = {}
+        const itemsNeedingLookup = priceOrFullUpdates.filter(u => u.price === undefined || u.price === null)
 
-      if (itemsNeedingLookup.length > 0) {
-        console.log(`[MiraklAdapter:${this.marketplace}] Fetching existing offers to preserve marketplace prices and discounts for ${itemsNeedingLookup.length} items...`)
-        try {
-          // Fast-path: If only a few items need lookups and have marketplaceProductId (offer ID), fetch directly
-          if (itemsNeedingLookup.length <= 15 && itemsNeedingLookup.every(u => u.marketplaceProductId)) {
+        if (itemsNeedingLookup.length > 0) {
+          console.log(`[MiraklAdapter:${this.marketplace}] Fetching existing offers to preserve marketplace prices for ${itemsNeedingLookup.length} items...`)
+          try {
             await Promise.all(itemsNeedingLookup.map(async (u) => {
               try {
-                const res = await fetch(`${baseUrl}/api/offers/${u.marketplaceProductId}`, { headers })
+                const lookupUrl = u.marketplaceProductId
+                  ? `${baseUrl}/api/offers/${u.marketplaceProductId}`
+                  : `${url}${url.includes('?') ? '&' : '?'}sku=${encodeURIComponent(u.sku)}`
+                const res = await fetch(lookupUrl, { headers })
                 if (res.ok) {
-                  const offer = await res.json()
-                  let normalPrice = offer.price
-                  if (offer.discount && offer.discount.origin_price !== undefined) {
-                    normalPrice = offer.discount.origin_price
-                  }
-                  currentOffersMap[offer.shop_sku || u.sku] = {
-                    price: normalPrice,
-                    discount: offer.discount
+                  const data = await res.json()
+                  const offer = data.offers ? data.offers[0] : data
+                  if (offer && offer.shop_sku) {
+                    let normalPrice = offer.price
+                    if (offer.discount && offer.discount.origin_price !== undefined) {
+                      normalPrice = offer.discount.origin_price
+                    }
+                    currentOffersMap[offer.shop_sku || u.sku] = {
+                      price: normalPrice,
+                      discount: offer.discount
+                    }
                   }
                 }
               } catch (err) {
-                console.warn(`[MiraklAdapter:${this.marketplace}] Failed to fetch offer ${u.marketplaceProductId} for SKU ${u.sku}:`, err)
+                console.warn(`[MiraklAdapter:${this.marketplace}] Failed to fetch offer for SKU ${u.sku}:`, err)
               }
             }))
+          } catch (e) {
+            console.warn(`[MiraklAdapter:${this.marketplace}] Failed to fetch existing offers for price fallback:`, e)
           }
+        }
 
-          // Fallback pagination for any items not yet found
-          const missingSkus = new Set(itemsNeedingLookup.filter(u => !currentOffersMap[u.sku]).map(u => u.sku))
-          if (missingSkus.size > 0) {
-            let offset = 0
-            let retryCount = 0
-            while (true) {
-              const fetchUrl = url.includes('?') 
-                ? `${url}&max=100&offset=${offset}`
-                : `${url}?max=100&offset=${offset}`
-                
-              const res = await fetch(fetchUrl, { headers })
-              
-              if (res.status === 429 && retryCount < 3) {
-                console.warn(`[MiraklAdapter:${this.marketplace}] Rate limited (429) during price fetch. Retrying after 2s...`)
-                await new Promise(r => setTimeout(r, 2000))
-                retryCount++
-                continue
-              }
-              
-              if (!res.ok) break
-              const data = await res.json()
-              if (!data.offers || data.offers.length === 0) break
-              
-              for (const offer of data.offers) {
-                if (offer.shop_sku && offer.price !== undefined && offer.price !== null) {
-                  let normalPrice = offer.price
-                  if (offer.discount && offer.discount.origin_price !== undefined) {
-                    normalPrice = offer.discount.origin_price
-                  }
-
-                  currentOffersMap[offer.shop_sku] = {
-                    price: normalPrice,
-                    discount: offer.discount
-                  }
-                  missingSkus.delete(offer.shop_sku)
-                }
-              }
-              
-              // Early exit once all needed SKUs have been resolved
-              if (missingSkus.size === 0) break
-              if (data.offers.length < 100) break
-              offset += 100
-              retryCount = 0
-              
-              await new Promise(r => setTimeout(r, 500))
-            }
+        // Format payload for Mirakl OF01
+        const offers = priceOrFullUpdates.map(update => {
+          const offer: any = {
+            shop_sku: update.sku,
+            update_delete: 'update'
           }
-          console.log(`[MiraklAdapter:${this.marketplace}] Resolved ${Object.keys(currentOffersMap).length} existing offers.`)
-        } catch (e) {
-          console.warn(`[MiraklAdapter:${this.marketplace}] Failed to fetch existing offers for price fallback:`, e)
-        }
-      }
-
-      // Format payload for Mirakl OF01
-      const offers = updates.map(update => {
-        const offer: any = {
-          shop_sku: update.sku,
-          update_delete: 'update'
-        }
-        if (update.stock !== undefined) offer.quantity = update.stock
-        
-        // Price is mandatory in Mirakl OF01
-        if (update.price !== undefined && update.price !== null) {
-          offer.price = update.price
-        } else if (currentOffersMap[update.sku] !== undefined) {
-          offer.price = currentOffersMap[update.sku].price
-        } else if (update.fallbackPrice !== undefined && update.fallbackPrice !== null) {
-          offer.price = update.fallbackPrice
-        } else {
-          console.warn(`[MiraklAdapter:${this.marketplace}] Warning: SKU ${update.sku} has no price available, import might fail.`)
-        }
-
-        const isLimango = this.marketplace.toLowerCase().includes('limango') || baseUrl.includes('limango.mirakl.net')
-
-        // Handle discount (sales price)
-        if (update.reducedPrice !== undefined) {
-          if (update.reducedPrice > 0) {
-            const startDate = update.saleStartDate ? update.saleStartDate.toISOString() : new Date().toISOString()
-            const endDate = (update.saleEndDate && new Date(update.saleEndDate).getTime() > Date.now()) ? update.saleEndDate.toISOString() : new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000).toISOString()
-
-            offer['discount-price'] = update.reducedPrice
-            offer['discount-start-date'] = startDate
-            offer['discount-end-date'] = endDate
-            offer.discount_price = update.reducedPrice
-            offer.discount = {
-              price: update.reducedPrice,
-              discount_price: update.reducedPrice,
-              start_date: startDate,
-              end_date: endDate
-            }
+          if (update.stock !== undefined) offer.quantity = update.stock
+          
+          // Price is mandatory in Mirakl OF01
+          if (update.price !== undefined && update.price !== null) {
+            offer.price = update.price
+          } else if (currentOffersMap[update.sku] !== undefined) {
+            offer.price = currentOffersMap[update.sku].price
+          } else if (update.fallbackPrice !== undefined && update.fallbackPrice !== null) {
+            offer.price = update.fallbackPrice
           } else {
-            // Remove discount (leave fields empty/null)
-            offer['discount-price'] = ''
-            offer['discount-start-date'] = ''
-            offer['discount-end-date'] = ''
-            offer.discount_price = null
-            offer.discount = {
-              discount_price: null,
-              start_date: null,
-              end_date: null
+            console.warn(`[MiraklAdapter:${this.marketplace}] Warning: SKU ${update.sku} has no price available, import might fail.`)
+          }
+
+          const isLimango = this.marketplace.toLowerCase().includes('limango') || baseUrl.includes('limango.mirakl.net')
+
+          // Handle promotional discount (Angebotspreis)
+          if (update.reducedPrice !== undefined) {
+            if (update.reducedPrice > 0) {
+              const startDate = update.saleStartDate ? update.saleStartDate.toISOString() : new Date().toISOString()
+              const endDate = (update.saleEndDate && new Date(update.saleEndDate).getTime() > Date.now()) 
+                ? update.saleEndDate.toISOString() 
+                : new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000).toISOString()
+
+              offer.discount = {
+                price: update.reducedPrice,
+                discount_price: update.reducedPrice,
+                start_date: startDate,
+                end_date: endDate
+              }
+              offer['discount-price'] = update.reducedPrice
+              offer['discount-start-date'] = startDate
+              offer['discount-end-date'] = endDate
+              offer.discount_price = update.reducedPrice
+            } else {
+              // Remove discount explicitly
+              offer.discount = null
+              offer['discount-price'] = ''
+              offer['discount-start-date'] = ''
+              offer['discount-end-date'] = ''
+              offer.discount_price = null
+            }
+          } else if (currentOffersMap[update.sku] && currentOffersMap[update.sku].discount) {
+            // Preserve existing discount when only standard price was changed
+            const rawDisc = currentOffersMap[update.sku].discount
+            const discPrice = rawDisc.discount_price !== undefined ? rawDisc.discount_price : rawDisc.price
+            if (discPrice !== undefined && discPrice !== null) {
+              offer.discount = {
+                price: discPrice,
+                discount_price: discPrice,
+                start_date: rawDisc.start_date || undefined,
+                end_date: rawDisc.end_date || undefined
+              }
+              offer['discount-price'] = discPrice
+              if (rawDisc.start_date) offer['discount-start-date'] = rawDisc.start_date
+              if (rawDisc.end_date) offer['discount-end-date'] = rawDisc.end_date
             }
           }
-        } else if (currentOffersMap[update.sku] && currentOffersMap[update.sku].discount) {
-          // Preserve existing discount
-          const rawDisc = currentOffersMap[update.sku].discount;
-          const discPrice = rawDisc.discount_price !== undefined ? rawDisc.discount_price : rawDisc.price
-          if (discPrice !== undefined && discPrice !== null) {
-            offer['discount-price'] = discPrice
-            if (rawDisc.start_date) offer['discount-start-date'] = rawDisc.start_date
-            if (rawDisc.end_date) offer['discount-end-date'] = rawDisc.end_date
-            offer.discount = {
-              price: discPrice,
-              discount_price: discPrice,
-              start_date: rawDisc.start_date || undefined,
-              end_date: rawDisc.end_date || undefined
-            }
-          }
-        }
 
-        // Handle MSRP / UVP / Additional fields
-        const rrpValue = (update.msrp !== undefined && update.msrp !== null && update.msrp > 0)
-          ? update.msrp
-          : (update.price !== undefined && update.price !== null && update.price > 0 ? update.price : null)
+          // Handle MSRP / UVP / Additional fields
+          const rrpValue = (update.msrp !== undefined && update.msrp !== null && update.msrp > 0)
+            ? update.msrp
+            : (update.price !== undefined && update.price !== null && update.price > 0 ? update.price : null)
 
-        if (rrpValue !== null) {
-          offer.msrp = rrpValue
-        }
-
-        if (isLimango) {
-          offer.offer_additional_fields = [
-            ...(rrpValue !== null ? [{ code: 'rrp-de', value: String(rrpValue) }] : []),
-            { code: 'vat-class-de', value: 'standard' }
-          ]
-        }
-        
-        return offer
-      })
-
-      console.log(`[MiraklAdapter:${this.marketplace}] Updating ${offers.length} offers via POST ${url}...`)
-      
-      const chunkSize = 1000
-      for (let i = 0; i < offers.length; i += chunkSize) {
-        const chunk = offers.slice(i, i + chunkSize)
-        let retryCount = 0
-        let success = false
-        
-        while (!success && retryCount < 3) {
-          const response = await fetch(url, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ offers: chunk })
-          })
-
-          if (response.status === 429) {
-            console.warn(`[MiraklAdapter:${this.marketplace}] Rate limited (429) during offer update chunk (${i}-${i + chunk.length}). Retrying after 5s...`)
-            await new Promise(r => setTimeout(r, 5000))
-            retryCount++
-            continue
+          if (rrpValue !== null) {
+            offer.msrp = rrpValue
           }
 
-          if (!response.ok) {
-            const errText = await response.text()
-            console.error(`[MiraklAdapter:${this.marketplace}] Update offers chunk failed (${response.status}): ${errText}`)
-            throw new Error(`Mirakl API offer update failed: ${errText}`)
+          if (isLimango) {
+            offer.offer_additional_fields = [
+              ...(rrpValue !== null ? [{ code: 'rrp-de', value: String(rrpValue) }] : []),
+              { code: 'vat-class-de', value: 'standard' }
+            ]
           }
           
-          success = true
-        }
+          return offer
+        })
+
+        console.log(`[MiraklAdapter:${this.marketplace}] Updating ${offers.length} price offers via POST ${url}...`)
         
-        if (!success) {
-          throw new Error(`Mirakl API offer update failed after ${retryCount} retries.`)
-        }
-        
-        if (i + chunkSize < offers.length) {
-          // Delay between chunks to prevent rate limiting
-          await new Promise(r => setTimeout(r, 1000))
+        const chunkSize = 1000
+        for (let i = 0; i < offers.length; i += chunkSize) {
+          const chunk = offers.slice(i, i + chunkSize)
+          let retryCount = 0
+          let success = false
+          
+          while (!success && retryCount < 3) {
+            const response = await fetch(url, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({ offers: chunk })
+            })
+
+            if (response.status === 429) {
+              console.warn(`[MiraklAdapter:${this.marketplace}] Rate limited (429) during offer update chunk (${i}-${i + chunk.length}). Retrying after 5s...`)
+              await new Promise(r => setTimeout(r, 5000))
+              retryCount++
+              continue
+            }
+
+            if (!response.ok) {
+              const errText = await response.text()
+              console.error(`[MiraklAdapter:${this.marketplace}] Update offers chunk failed (${response.status}): ${errText}`)
+              throw new Error(`Mirakl API offer update failed: ${errText}`)
+            }
+            
+            success = true
+          }
+          
+          if (!success) {
+            throw new Error(`Mirakl API offer update failed after ${retryCount} retries.`)
+          }
+          
+          if (i + chunkSize < offers.length) {
+            await new Promise(r => setTimeout(r, 1000))
+          }
         }
       }
 
-      console.log(`[MiraklAdapter:${this.marketplace}] Offers successfully updated.`)
+      console.log(`[MiraklAdapter:${this.marketplace}] Listings successfully updated.`)
     } catch (error) {
       console.error(`[MiraklAdapter:${this.marketplace}] Error updating listings:`, error)
       throw error

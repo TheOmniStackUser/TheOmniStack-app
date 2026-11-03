@@ -3,7 +3,7 @@
 import { requireAuth } from '@/lib/session'
 import { db } from '@/db/client'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
-import { eq, and, inArray, ilike, or, ne } from 'drizzle-orm'
+import { eq, and, inArray, ilike, or, ne, isNotNull, gt } from 'drizzle-orm'
 import { products, productMappings, unmappedMarketplaceProducts } from '@/db/schema/products'
 import { revalidatePath, unstable_noStore } from 'next/cache'
 import { after } from 'next/server'
@@ -1549,5 +1549,81 @@ export async function setProductMainSku(productId: string, newSku: string) {
     console.error("setProductMainSku error:", err)
     return { success: false, error: err.message || "Fehler beim Aktualisieren der Haupt-SKU" }
   }
+}
+
+export async function restoreMarketplaceOfferPrices(integrationId: string) {
+  const auth = await requireAuth()
+
+  const [integration] = await db
+    .select()
+    .from(marketplaceIntegrations)
+    .where(
+      and(
+        eq(marketplaceIntegrations.id, integrationId),
+        eq(marketplaceIntegrations.companyId, auth.activeCompanyId)
+      )
+    )
+    .limit(1)
+
+  if (!integration) {
+    throw new Error('Integration nicht gefunden.')
+  }
+
+  const { getAdapterForIntegration } = await import('@/workers/marketplace-sync')
+  const adapter = getAdapterForIntegration(integration)
+  if (!adapter || !adapter.updateListings) {
+    throw new Error('Adapter unterstützt keine Angebotsaktualisierungen.')
+  }
+
+  const mappedItems = await db
+    .select({
+      marketplaceSku: productMappings.marketplaceSku,
+      marketplaceProductId: productMappings.marketplaceProductId,
+      price: products.price,
+      msrp: products.msrp,
+      reducedPrice: products.reducedPrice,
+      saleStartDate: products.saleStartDate,
+      saleEndDate: products.saleEndDate,
+      stock: products.currentStock
+    })
+    .from(productMappings)
+    .innerJoin(products, eq(productMappings.productId, products.id))
+    .where(
+      and(
+        eq(productMappings.integrationId, integrationId),
+        eq(productMappings.companyId, auth.activeCompanyId),
+        isNotNull(products.reducedPrice),
+        gt(products.reducedPrice, '0')
+      )
+    )
+
+  if (mappedItems.length === 0) {
+    return { success: true, count: 0, message: 'Keine Produkte mit reduziertem Preis gefunden.' }
+  }
+
+  const updates = mappedItems.map(item => {
+    const rawPrice = item.price ? parseFloat(item.price) : undefined
+    const rawMsrp = item.msrp ? parseFloat(item.msrp) : undefined
+    const basePrice = (rawPrice && rawPrice > 0) ? rawPrice : (rawMsrp || 49.90)
+    const redPrice = parseFloat(item.reducedPrice!)
+
+    return {
+      sku: item.marketplaceSku,
+      marketplaceProductId: item.marketplaceProductId || undefined,
+      price: basePrice,
+      reducedPrice: redPrice,
+      msrp: rawMsrp || basePrice,
+      saleStartDate: item.saleStartDate ? new Date(item.saleStartDate) : null,
+      saleEndDate: item.saleEndDate ? new Date(item.saleEndDate) : null,
+      stock: item.stock ? parseFloat(item.stock) : undefined
+    }
+  })
+
+  await adapter.updateListings(auth.activeCompanyId, updates)
+
+  revalidatePath('/products')
+  revalidatePath('/products/settings')
+
+  return { success: true, count: updates.length }
 }
 
