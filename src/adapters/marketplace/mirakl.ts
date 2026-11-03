@@ -1791,17 +1791,30 @@ export class MiraklAdapter implements MarketplaceAdapter {
           console.warn(`[MiraklAdapter:${this.marketplace}] Warning: SKU ${update.sku} has no price available, import might fail.`)
         }
 
+        const isLimango = this.marketplace.toLowerCase().includes('limango') || baseUrl.includes('limango.mirakl.net')
+
         // Handle discount (sales price)
         if (update.reducedPrice !== undefined) {
           if (update.reducedPrice > 0) {
-            // Set new discount
+            const startDate = update.saleStartDate ? update.saleStartDate.toISOString() : new Date().toISOString()
+            const endDate = (update.saleEndDate && new Date(update.saleEndDate).getTime() > Date.now()) ? update.saleEndDate.toISOString() : new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000).toISOString()
+
+            offer['discount-price'] = update.reducedPrice
+            offer['discount-start-date'] = startDate
+            offer['discount-end-date'] = endDate
+            offer.discount_price = update.reducedPrice
             offer.discount = {
+              price: update.reducedPrice,
               discount_price: update.reducedPrice,
-              start_date: update.saleStartDate ? update.saleStartDate.toISOString() : new Date().toISOString(),
-              end_date: (update.saleEndDate && new Date(update.saleEndDate).getTime() > Date.now()) ? update.saleEndDate.toISOString() : new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000).toISOString()
+              start_date: startDate,
+              end_date: endDate
             }
           } else {
-            // Remove discount (Mirakl allows removing by passing empty strings)
+            // Remove discount (leave fields empty/null)
+            offer['discount-price'] = ''
+            offer['discount-start-date'] = ''
+            offer['discount-end-date'] = ''
+            offer.discount_price = null
             offer.discount = {
               discount_price: null,
               start_date: null,
@@ -1811,18 +1824,34 @@ export class MiraklAdapter implements MarketplaceAdapter {
         } else if (currentOffersMap[update.sku] && currentOffersMap[update.sku].discount) {
           // Preserve existing discount
           const rawDisc = currentOffersMap[update.sku].discount;
-          offer.discount = {};
-          if (rawDisc.discount_price !== undefined) {
-            offer.discount.discount_price = rawDisc.discount_price;
-          } else if (rawDisc.price !== undefined) {
-            offer.discount.discount_price = rawDisc.price;
+          const discPrice = rawDisc.discount_price !== undefined ? rawDisc.discount_price : rawDisc.price
+          if (discPrice !== undefined && discPrice !== null) {
+            offer['discount-price'] = discPrice
+            if (rawDisc.start_date) offer['discount-start-date'] = rawDisc.start_date
+            if (rawDisc.end_date) offer['discount-end-date'] = rawDisc.end_date
+            offer.discount = {
+              price: discPrice,
+              discount_price: discPrice,
+              start_date: rawDisc.start_date || undefined,
+              end_date: rawDisc.end_date || undefined
+            }
           }
-          if (rawDisc.start_date) {
-            offer.discount.start_date = rawDisc.start_date;
-          }
-          if (rawDisc.end_date) {
-            offer.discount.end_date = rawDisc.end_date;
-          }
+        }
+
+        // Handle MSRP / UVP / Additional fields
+        const rrpValue = (update.msrp !== undefined && update.msrp !== null && update.msrp > 0)
+          ? update.msrp
+          : (update.price !== undefined && update.price !== null && update.price > 0 ? update.price : null)
+
+        if (rrpValue !== null) {
+          offer.msrp = rrpValue
+        }
+
+        if (isLimango) {
+          offer.offer_additional_fields = [
+            ...(rrpValue !== null ? [{ code: 'rrp-de', value: String(rrpValue) }] : []),
+            { code: 'vat-class-de', value: 'standard' }
+          ]
         }
         
         return offer
