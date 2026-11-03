@@ -203,7 +203,35 @@ export async function syncProductsForCompany(companyId: string, integrationId?: 
         }
       }
 
-      await updateSyncStatus(integration.id, { isRunning: false, status: 'done', message: `Import erfolgreich abgeschlossen.`, progress: totalCount, total: totalCount })
+      const alreadyMappedCount = marketplaceProducts.length - toUpsertUnmapped.length
+      const meta = integration.metadata as any
+      const fallbackNames: Record<string, string> = {
+        'otto': 'Otto',
+        'mirakl_decathlon': 'Decathlon',
+        'mirakl_decathlon_eu': 'Decathlon EU',
+        'mirakl_mediamarkt': 'MediaMarkt',
+        'aboutyou': 'About You',
+        'amazon': 'Amazon',
+        'kaufland': 'Kaufland',
+        'ebay': 'eBay',
+        'etsy': 'Etsy',
+        'shopify': 'Shopify',
+        'woocommerce': 'WooCommerce',
+        'shopware': 'Shopware',
+        'mirakl_custom': 'Marktplatz'
+      }
+      const displayName = meta?.customName || fallbackNames[integration.type] || integration.type
+
+      let doneMessage = `Import abgeschlossen: ${totalCount} Produkte gefunden.`
+      if (toUpsertUnmapped.length === 0) {
+        doneMessage = `Alle ${totalCount} Produkte von ${displayName} sind bereits verknüpft (gemappt). Es wurden keine neuen ungemappten Produkte gefunden.`
+      } else if (alreadyMappedCount > 0) {
+        doneMessage = `${toUpsertUnmapped.length} neue ungemappte Produkte von ${displayName} hinzugefügt (${alreadyMappedCount} bereits verknüpft).`
+      } else {
+        doneMessage = `${toUpsertUnmapped.length} neue ungemappte Produkte von ${displayName} hinzugefügt.`
+      }
+
+      await updateSyncStatus(integration.id, { isRunning: false, status: 'done', message: doneMessage, progress: totalCount, total: totalCount })
       console.log(`[ProductSync] Completed ${integration.type}: ${toAutoMap.length} auto-mapped, ${toUpsertUnmapped.length} unmapped.`)
       
     } catch (error: any) {

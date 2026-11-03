@@ -8,6 +8,25 @@ import { useRouter } from 'next/navigation'
 
 type Product = any
 
+function formatMarketplaceName(name: string): string {
+  const map: Record<string, string> = {
+    otto: 'Otto',
+    aboutyou: 'About You',
+    amazon: 'Amazon',
+    shopify: 'Shopify',
+    ebay: 'eBay',
+    etsy: 'Etsy',
+    kaufland: 'Kaufland',
+    mirakl_decathlon: 'Decathlon',
+    mirakl_decathlon_eu: 'Decathlon EU',
+    mirakl_mediamarkt: 'MediaMarkt',
+    mirakl_custom: 'Mirakl Custom',
+    woocommerce: 'WooCommerce',
+    shopware: 'Shopware',
+  }
+  return map[name.toLowerCase()] || name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+}
+
 function StockEditor({ product, onToast }: { product: Product; onToast?: (message: string, type: 'success' | 'error' | 'info') => void }) {
   const [isEditing, setIsEditing] = useState(false)
   const [value, setValue] = useState(product.currentStock || '0')
@@ -1542,7 +1561,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
               <option value="all">Alle Marktplätze</option>
               {availableMarketplaces.map(m => (
                 <option key={m} value={m}>
-                  {m.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                  {formatMarketplaceName(m)}
                 </option>
               ))}
             </select>

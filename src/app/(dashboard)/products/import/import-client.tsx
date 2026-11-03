@@ -62,7 +62,7 @@ export function ImportClient({ marketplaces }: { marketplaces: any[] }) {
           if (status?.status === 'error') {
             showNotification('Fehler beim Import', status.message || 'Ein Fehler ist aufgetreten.', 'error')
           } else {
-            showNotification('Import abgeschlossen', 'Die Produktliste wurde aktualisiert.', 'success')
+            showNotification('Import abgeschlossen', status?.message || 'Die Produktliste wurde aktualisiert.', 'success')
           }
         }
       } catch (e) {}

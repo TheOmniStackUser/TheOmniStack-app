@@ -40,6 +40,8 @@ export default async function ProductsPage() {
       syncStock: productMappings.syncStock,
       syncPrice: productMappings.syncPrice,
       marketplace: productMappings.marketplace,
+      integrationType: marketplaceIntegrations.type,
+      integrationMetadata: marketplaceIntegrations.metadata,
     })
     .from(productMappings)
     .innerJoin(marketplaceIntegrations, eq(productMappings.integrationId, marketplaceIntegrations.id))
@@ -60,7 +62,12 @@ export default async function ProductsPage() {
       hasSyncStockOff: pMappings.some(m => !m.syncStock),
       hasSyncPriceOn: pMappings.some(m => m.syncPrice),
       hasSyncPriceOff: pMappings.some(m => !m.syncPrice),
-      marketplaces: Array.from(new Set(pMappings.map(m => m.marketplace))),
+      marketplaces: Array.from(new Set(pMappings.map(m => {
+        if (m.integrationType === 'mirakl_custom' && (m.integrationMetadata as any)?.customName) {
+          return (m.integrationMetadata as any).customName
+        }
+        return m.marketplace
+      }))),
     }
   })
 
