@@ -17,6 +17,9 @@ export type MarketplaceSyncSettings = {
   priceModifierValue: number
   priceBase?: 'standard' | 'msrp' | 'reduced' | 'all'
   minPriceThreshold?: number
+  targetCurrency?: string // 'EUR', 'SEK', 'PLN', 'CZK', etc.
+  exchangeRate?: number // e.g. 11.0 for SEK
+  roundingMode?: 'round' | 'decimals' // 'round' for integers (e.g. 349 kr), 'decimals' for 2 decimals
   syncIntervalHours?: number // Default is 1 if not provided
 }
 
@@ -1601,6 +1604,25 @@ export async function restoreMarketplaceOfferPrices(integrationId: string) {
     return { success: true, count: 0, message: 'Keine Produkte mit reduziertem Preis gefunden.' }
   }
 
+  const meta = (integration.metadata as any) || {}
+  const syncSettings = meta.productSync || {}
+  const targetCurrency = syncSettings.targetCurrency || 
+    (meta.customName?.toLowerCase().includes('se') || meta.shopId === '4362' ? 'SEK' : 'EUR')
+  const isSek = targetCurrency === 'SEK'
+  const exchangeRate = syncSettings.exchangeRate !== undefined && syncSettings.exchangeRate > 0
+    ? parseFloat(syncSettings.exchangeRate.toString())
+    : (isSek ? 11.0 : 1.0)
+  const roundingMode: 'round' | 'decimals' = syncSettings.roundingMode || (isSek ? 'round' : 'decimals')
+
+  const convertCurrency = (val: number): number => {
+    if (!exchangeRate || exchangeRate === 1.0) return Math.round(val * 100) / 100
+    const converted = val * exchangeRate
+    if (roundingMode === 'round') {
+      return Math.round(converted)
+    }
+    return Math.round(converted * 100) / 100
+  }
+
   const updates = mappedItems.map(item => {
     const rawPrice = item.price ? parseFloat(item.price) : undefined
     const rawMsrp = item.msrp ? parseFloat(item.msrp) : undefined
@@ -1610,9 +1632,9 @@ export async function restoreMarketplaceOfferPrices(integrationId: string) {
     return {
       sku: item.marketplaceSku,
       marketplaceProductId: item.marketplaceProductId || undefined,
-      price: basePrice,
-      reducedPrice: redPrice,
-      msrp: rawMsrp || basePrice,
+      price: convertCurrency(basePrice),
+      reducedPrice: convertCurrency(redPrice),
+      msrp: convertCurrency(rawMsrp || basePrice),
       saleStartDate: item.saleStartDate ? new Date(item.saleStartDate) : null,
       saleEndDate: item.saleEndDate ? new Date(item.saleEndDate) : null,
       stock: item.stock ? parseFloat(item.stock) : undefined

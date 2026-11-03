@@ -32,6 +32,45 @@ async function restorePricesForIntegration(integrationId: string) {
     return
   }
 
+  // Currency configuration
+  const syncSettings = meta.productSync || {}
+  const isSekShop = meta.customName?.toLowerCase().includes('se') || shopId === '4362'
+  const targetCurrency = syncSettings.targetCurrency || (isSekShop ? 'SEK' : 'EUR')
+  const isSek = targetCurrency === 'SEK'
+  const exchangeRate = syncSettings.exchangeRate !== undefined && syncSettings.exchangeRate > 0
+    ? parseFloat(syncSettings.exchangeRate.toString())
+    : (isSek ? 11.0 : 1.0)
+  const roundingMode: 'round' | 'decimals' = syncSettings.roundingMode || (isSek ? 'round' : 'decimals')
+
+  console.log(`Currency Settings: Currency=${targetCurrency}, Exchange Rate=${exchangeRate}, Rounding=${roundingMode}`)
+
+  // Persist currency settings in metadata if not yet saved
+  if (!syncSettings.targetCurrency || !syncSettings.exchangeRate) {
+    const updatedMeta = {
+      ...meta,
+      productSync: {
+        ...syncSettings,
+        targetCurrency,
+        exchangeRate,
+        roundingMode
+      }
+    }
+    await db
+      .update(marketplaceIntegrations)
+      .set({ metadata: updatedMeta, updatedAt: new Date() })
+      .where(eq(marketplaceIntegrations.id, integrationId))
+    console.log(`Saved updated currency settings to database metadata.`)
+  }
+
+  const convertCurrency = (val: number): number => {
+    if (!exchangeRate || exchangeRate === 1.0) return Math.round(val * 100) / 100
+    const converted = val * exchangeRate
+    if (roundingMode === 'round') {
+      return Math.round(converted)
+    }
+    return Math.round(converted * 100) / 100
+  }
+
   // Fetch all mappings that have a reduced price in TheOmniStack
   const mappedItems = await db
     .select({
@@ -71,13 +110,19 @@ async function restorePricesForIntegration(integrationId: string) {
     return {
       sku: item.marketplaceSku,
       marketplaceProductId: item.marketplaceProductId || undefined,
-      price: basePrice,
-      reducedPrice: redPrice,
-      msrp: rawMsrp || basePrice,
+      price: convertCurrency(basePrice),
+      reducedPrice: convertCurrency(redPrice),
+      msrp: convertCurrency(rawMsrp || basePrice),
       saleStartDate: item.saleStartDate ? new Date(item.saleStartDate) : null,
       saleEndDate: item.saleEndDate ? new Date(item.saleEndDate) : null,
       stock: item.stock ? parseFloat(item.stock) : undefined
     }
+  })
+
+  // Log sample updates
+  console.log("Sample updates being pushed:")
+  updates.slice(0, 3).forEach(u => {
+    console.log(`  SKU ${u.sku}: Price = ${u.price} ${targetCurrency}, Reduced = ${u.reducedPrice} ${targetCurrency}, MSRP = ${u.msrp} ${targetCurrency}`)
   })
 
   console.log(`Submitting ${updates.length} updates to ${shopName} via adapter.updateListings...`)

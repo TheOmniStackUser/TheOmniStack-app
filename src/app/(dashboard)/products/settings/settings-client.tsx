@@ -28,6 +28,17 @@ function getMarketplaceName(integration: any) {
 
 function IntegrationCard({ integration, showNotification }: { integration: any, showNotification: any }) {
   const metadata = (integration.metadata as any) || {}
+  const customNameLower = (metadata?.customName || '').toLowerCase()
+  const isSekMarketplace = customNameLower.includes('se') || metadata?.shopId === '4362'
+  const isPlnMarketplace = customNameLower.includes('pl') || metadata?.shopId === '9883'
+  const isCzkMarketplace = customNameLower.includes('cz') || metadata?.shopId === '11560'
+  const isHufMarketplace = customNameLower.includes('hu') || metadata?.shopId === '10737'
+  const isChfMarketplace = customNameLower.includes('ch') || metadata?.shopId === '14276'
+
+  const detectedCurrency = isSekMarketplace ? 'SEK' : isPlnMarketplace ? 'PLN' : isCzkMarketplace ? 'CZK' : isHufMarketplace ? 'HUF' : isChfMarketplace ? 'CHF' : 'EUR'
+  const detectedRate = isSekMarketplace ? 11.0 : isPlnMarketplace ? 4.3 : isCzkMarketplace ? 25.0 : isHufMarketplace ? 400.0 : isChfMarketplace ? 0.95 : 1.0
+  const detectedRound: 'round' | 'decimals' = (isSekMarketplace || isCzkMarketplace || isHufMarketplace) ? 'round' : 'decimals'
+
   const initialSettings: MarketplaceSyncSettings = {
     enabled: false,
     syncStock: true,
@@ -36,6 +47,9 @@ function IntegrationCard({ integration, showNotification }: { integration: any, 
     priceModifierValue: 0,
     priceBase: 'standard',
     minPriceThreshold: undefined,
+    targetCurrency: detectedCurrency,
+    exchangeRate: detectedRate,
+    roundingMode: detectedRound,
     ...(metadata.productSync || {}),
   }
 
@@ -195,6 +209,92 @@ function IntegrationCard({ integration, showNotification }: { integration: any, 
           </div>
 
           <p className="text-xs text-slate-500 mt-3">Nutzen Sie negative Werte (z.B. -5) für einen Discount/Abschlag.</p>
+        </div>
+
+        {/* Währung & Umrechnungsfaktor */}
+        <div className={`pt-4 border-t border-slate-100 transition-all ${!settings.syncPrice ? 'opacity-50 pointer-events-none' : ''}`}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-4">
+            <h3 className="text-sm font-bold text-slate-900">Währung & Umrechnungsfaktor</h3>
+            <span className="text-xs text-slate-500">Umrechnung von Basispreisen (€) in Marktplatzwährung</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* Währung */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Marktplatzwährung</label>
+              <select 
+                className="w-full bg-white border border-slate-200 rounded-lg px-4 py-2.5 text-sm font-medium text-slate-900 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all shadow-sm"
+                value={settings.targetCurrency || 'EUR'}
+                onChange={(e) => {
+                  const curr = e.target.value
+                  let defaultRate = 1.0
+                  let defaultRound: 'round' | 'decimals' = 'decimals'
+                  if (curr === 'SEK') { defaultRate = 11.0; defaultRound = 'round' }
+                  else if (curr === 'PLN') { defaultRate = 4.3; defaultRound = 'decimals' }
+                  else if (curr === 'CZK') { defaultRate = 25.0; defaultRound = 'round' }
+                  else if (curr === 'HUF') { defaultRate = 400.0; defaultRound = 'round' }
+                  else if (curr === 'CHF') { defaultRate = 0.95; defaultRound = 'decimals' }
+                  setSettings({ 
+                    ...settings, 
+                    targetCurrency: curr, 
+                    exchangeRate: settings.exchangeRate && settings.targetCurrency === curr ? settings.exchangeRate : defaultRate,
+                    roundingMode: settings.roundingMode || defaultRound
+                  })
+                }}
+              >
+                <option value="EUR" className="text-slate-900 bg-white">EUR (€) - Euro</option>
+                <option value="SEK" className="text-slate-900 bg-white">SEK (kr) - Schwedische Krone</option>
+                <option value="PLN" className="text-slate-900 bg-white">PLN (zł) - Polnischer Złoty</option>
+                <option value="CZK" className="text-slate-900 bg-white">CZK (Kč) - Tschechische Krone</option>
+                <option value="CHF" className="text-slate-900 bg-white">CHF (Fr.) - Schweizer Franken</option>
+                <option value="HUF" className="text-slate-900 bg-white">HUF (Ft) - Ungarischer Forint</option>
+                <option value="RON" className="text-slate-900 bg-white">RON (lei) - Rumänischer Leu</option>
+                <option value="GBP" className="text-slate-900 bg-white">GBP (£) - Britisches Pfund</option>
+                <option value="USD" className="text-slate-900 bg-white">USD ($) - US-Dollar</option>
+              </select>
+            </div>
+
+            {/* Umrechnungsfaktor */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Umrechnungsfaktor (1 € =)</label>
+              <div className="relative">
+                <input 
+                  type="number"
+                  step="0.0001"
+                  min="0.0001"
+                  className="w-full bg-white border border-slate-200 rounded-lg pl-4 pr-12 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-500 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all shadow-sm"
+                  placeholder="z.B. 11.0"
+                  value={settings.exchangeRate !== undefined && settings.exchangeRate !== null ? settings.exchangeRate : (settings.targetCurrency === 'SEK' ? 11.0 : 1.0)}
+                  onChange={(e) => {
+                    const raw = e.target.value
+                    setSettings({ 
+                      ...settings, 
+                      exchangeRate: raw === '' ? undefined : (parseFloat(raw) || 1.0) 
+                    })
+                  }}
+                />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-xs pointer-events-none">
+                  {settings.targetCurrency === 'SEK' ? 'kr' : settings.targetCurrency || 'EUR'}
+                </div>
+              </div>
+            </div>
+
+            {/* Rundung */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Rundungsmodus</label>
+              <select 
+                className="w-full bg-white border border-slate-200 rounded-lg px-4 py-2.5 text-sm font-medium text-slate-900 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all shadow-sm"
+                value={settings.roundingMode || (settings.targetCurrency === 'SEK' ? 'round' : 'decimals')}
+                onChange={(e) => setSettings({ ...settings, roundingMode: e.target.value as any })}
+              >
+                <option value="round" className="text-slate-900 bg-white">Ganze Zahl (z.B. 349 kr)</option>
+                <option value="decimals" className="text-slate-900 bg-white">2 Nachkommastellen (z.B. 349.50)</option>
+              </select>
+            </div>
+          </div>
+          <p className="text-xs text-slate-500 mt-2">
+            Basispreise und Angebotspreise in Euro (€) werden automatisch mit diesem Faktor multipliziert.
+          </p>
         </div>
 
       </div>

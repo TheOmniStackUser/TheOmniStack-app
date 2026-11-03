@@ -466,14 +466,34 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
         }
       }
 
+      // Currency conversion & exchange rate
+      const targetCurrency = productSyncSettings?.targetCurrency || 
+        ((integration.metadata as any)?.customName?.toLowerCase().includes('se') || (integration.metadata as any)?.shopId === '4362' ? 'SEK' : 'EUR')
+      
+      const isSek = targetCurrency === 'SEK'
+      const exchangeRate = productSyncSettings?.exchangeRate !== undefined && productSyncSettings.exchangeRate > 0
+        ? parseFloat(productSyncSettings.exchangeRate.toString())
+        : (isSek ? 11.0 : 1.0)
+      
+      const roundingMode: 'round' | 'decimals' = productSyncSettings?.roundingMode || (isSek ? 'round' : 'decimals')
+
+      const convertCurrency = (val: number): number => {
+        if (!exchangeRate || exchangeRate === 1.0) return Math.round(val * 100) / 100
+        const converted = val * exchangeRate
+        if (roundingMode === 'round') {
+          return Math.round(converted)
+        }
+        return Math.round(converted * 100) / 100
+      }
+
       if (modifiedPrice !== undefined) {
-        mUpdate.price = modifiedPrice
+        mUpdate.price = convertCurrency(modifiedPrice)
       }
       if (modifiedReducedPrice !== undefined) {
-        mUpdate.reducedPrice = modifiedReducedPrice
+        mUpdate.reducedPrice = modifiedReducedPrice > 0 ? convertCurrency(modifiedReducedPrice) : 0
       }
       if (modifiedMsrp !== undefined) {
-        mUpdate.msrp = modifiedMsrp
+        mUpdate.msrp = convertCurrency(modifiedMsrp)
       }
 
       let modifiedSaleStartDate = updateDef.saleStartDate !== undefined ? (updateDef.saleStartDate ? new Date(updateDef.saleStartDate) : null) : centralProduct.saleStartDate
@@ -482,7 +502,7 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
       if (modifiedSaleStartDate) mUpdate.saleStartDate = modifiedSaleStartDate
       if (modifiedSaleEndDate) mUpdate.saleEndDate = modifiedSaleEndDate;
 
-      (mUpdate as any).fallbackPrice = modifiedPrice || 0
+      (mUpdate as any).fallbackPrice = mUpdate.price || 0
     }
 
     if (mUpdate.stock !== undefined || mUpdate.price !== undefined || mUpdate.reducedPrice !== undefined || mUpdate.msrp !== undefined || mUpdate.gpsrDetails !== undefined) {
