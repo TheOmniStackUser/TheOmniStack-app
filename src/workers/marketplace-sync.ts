@@ -476,6 +476,7 @@ export function createMarketplaceSyncWorker() {
               customName,
               customName?.toLowerCase(),
               marketplace,
+              job.data.marketplaceDisplayName,
               job.data.marketplaceDisplayName?.toLowerCase()
             ].filter(Boolean))) as string[]
 
@@ -485,7 +486,7 @@ export function createMarketplaceSyncWorker() {
                 eq(orders.companyId, companyId),
                 eq(orders.isArchived, false),
                 ne(orders.status, 'draft'),
-                eq(orders.status, 'pending'),
+                inArray(orders.status, ['pending', 'processing', 'later_shipment']),
                 inArray(orders.marketplace, possibleKeys)
               ))
 
