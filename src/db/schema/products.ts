@@ -143,11 +143,15 @@ export const unmappedMarketplaceProducts = pgTable('unmapped_marketplace_product
   stock: numeric('stock', { precision: 10, scale: 0 }),
   rawPayload: jsonb('raw_payload'),
   
+  isBlocked: boolean('is_blocked').notNull().default(false),
+  blockedAt: timestamp('blocked_at', { withTimezone: true }),
+  
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({
   unqUnmappedListing: unique('unq_company_marketplace_unmapped_sku').on(t.companyId, t.integrationId, t.marketplaceSku),
   companyUnmappedIdx: index('unmapped_company_idx').on(t.companyId),
+  companyBlockedIdx: index('unmapped_company_blocked_idx').on(t.companyId, t.isBlocked),
 }))
 
 export const syncLogStatusEnum = pgEnum('sync_log_status', [

@@ -415,6 +415,54 @@ export async function bulkDeleteProducts(productIds: string[]) {
   return { success: true }
 }
 
+export async function blockUnmappedProducts(unmappedProductIds: string[]) {
+  const auth = await requireAuth()
+
+  if (!unmappedProductIds || unmappedProductIds.length === 0) return { success: true, blockedUnmapped: [] }
+
+  const blockedUnmapped = await db
+    .update(unmappedMarketplaceProducts)
+    .set({
+      isBlocked: true,
+      blockedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(unmappedMarketplaceProducts.companyId, auth.activeCompanyId),
+        inArray(unmappedMarketplaceProducts.id, unmappedProductIds)
+      )
+    )
+    .returning()
+
+  revalidatePath('/products/import')
+  return { success: true, blockedUnmapped }
+}
+
+export async function unblockMarketplaceProducts(unmappedProductIds: string[]) {
+  const auth = await requireAuth()
+
+  if (!unmappedProductIds || unmappedProductIds.length === 0) return { success: true, unblockedUnmapped: [] }
+
+  const unblockedUnmapped = await db
+    .update(unmappedMarketplaceProducts)
+    .set({
+      isBlocked: false,
+      blockedAt: null,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(unmappedMarketplaceProducts.companyId, auth.activeCompanyId),
+        inArray(unmappedMarketplaceProducts.id, unmappedProductIds)
+      )
+    )
+    .returning()
+
+  revalidatePath('/products/import')
+  return { success: true, unblockedUnmapped }
+}
+
 export async function deleteUnmappedProducts(unmappedProductIds: string[]) {
   const auth = await requireAuth()
 
@@ -902,7 +950,12 @@ export async function getAutoMappableProducts() {
   const unmapped = await db
     .select()
     .from(unmappedMarketplaceProducts)
-    .where(eq(unmappedMarketplaceProducts.companyId, auth.activeCompanyId))
+    .where(
+      and(
+        eq(unmappedMarketplaceProducts.companyId, auth.activeCompanyId),
+        eq(unmappedMarketplaceProducts.isBlocked, false)
+      )
+    )
 
   if (unmapped.length === 0) return []
 
@@ -1108,7 +1161,7 @@ export async function bulkAutoMapProducts(mappings: { unmappedId: string, matche
 }
 
 export async function undoUnmappedAction(payload: {
-  type: 'delete' | 'map' | 'create';
+  type: 'delete' | 'map' | 'create' | 'block' | 'unblock';
   restoredUnmapped: any[];
   createdProductIds?: string[];
   createdMappingIds?: string[];
@@ -1118,13 +1171,39 @@ export async function undoUnmappedAction(payload: {
     return { success: true }
   }
 
-  // 1. Restore the unmapped products
-  const valuesToInsert = payload.restoredUnmapped.map((p: any) => ({
-    ...p,
-    createdAt: new Date(p.createdAt),
-    updatedAt: new Date(),
-  }))
-  await db.insert(unmappedMarketplaceProducts).values(valuesToInsert).onConflictDoNothing()
+  if (payload.type === 'block') {
+    // Unblock the products
+    const ids = payload.restoredUnmapped.map((p: any) => p.id)
+    await db
+      .update(unmappedMarketplaceProducts)
+      .set({ isBlocked: false, blockedAt: null, updatedAt: new Date() })
+      .where(
+        and(
+          eq(unmappedMarketplaceProducts.companyId, auth.activeCompanyId),
+          inArray(unmappedMarketplaceProducts.id, ids)
+        )
+      )
+  } else if (payload.type === 'unblock') {
+    // Re-block the products
+    const ids = payload.restoredUnmapped.map((p: any) => p.id)
+    await db
+      .update(unmappedMarketplaceProducts)
+      .set({ isBlocked: true, blockedAt: new Date(), updatedAt: new Date() })
+      .where(
+        and(
+          eq(unmappedMarketplaceProducts.companyId, auth.activeCompanyId),
+          inArray(unmappedMarketplaceProducts.id, ids)
+        )
+      )
+  } else {
+    // 1. Restore the unmapped products
+    const valuesToInsert = payload.restoredUnmapped.map((p: any) => ({
+      ...p,
+      createdAt: new Date(p.createdAt),
+      updatedAt: new Date(),
+    }))
+    await db.insert(unmappedMarketplaceProducts).values(valuesToInsert).onConflictDoNothing()
+  }
 
   // 2. Revert side-effects
   if (payload.type === 'map' && payload.createdMappingIds && payload.createdMappingIds.length > 0) {

@@ -1,8 +1,19 @@
 'use client'
 
 import { useState, useMemo, useEffect, useDeferredValue } from 'react'
-import { Database, Search, Filter, Loader2, CheckSquare, Square, X, Info, AlertTriangle, Trash2, Download } from 'lucide-react'
-import { bulkCreateProductsFromUnmapped, deleteUnmappedProducts, searchProducts, mapUnmappedProductToExisting, getSuggestedProducts, getAutoMappableProducts, bulkAutoMapProducts, undoUnmappedAction } from '@/app/actions/products'
+import { Database, Search, Filter, Loader2, CheckSquare, Square, X, Info, AlertTriangle, Trash2, Download, Ban, RotateCcw, ShieldCheck } from 'lucide-react'
+import {
+  bulkCreateProductsFromUnmapped,
+  deleteUnmappedProducts,
+  blockUnmappedProducts,
+  unblockMarketplaceProducts,
+  searchProducts,
+  mapUnmappedProductToExisting,
+  getSuggestedProducts,
+  getAutoMappableProducts,
+  bulkAutoMapProducts,
+  undoUnmappedAction
+} from '@/app/actions/products'
 import { useRouter } from 'next/navigation'
 import { UnmappedMarketplaceProduct } from '@/db/schema/products'
 import { AlertModal } from '@/components/alert-modal'
@@ -123,10 +134,12 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
   const [search, setSearch] = useState('')
   const [searchField, setSearchField] = useState<'all' | 'sku' | 'ean' | 'title'>('all')
   const [marketplaceFilter, setMarketplaceFilter] = useState<string>('all')
+  const [activeTab, setActiveTab] = useState<'unmapped' | 'blocked'>('unmapped')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [detailsProduct, setDetailsProduct] = useState<UnmappedMarketplaceProduct | null>(null)
   const [alertState, setAlertState] = useState<{ isOpen: boolean; title?: string; message: string }>({ isOpen: false, message: '' })
+  const [blockConfirmation, setBlockConfirmation] = useState<{ isOpen: boolean, type: 'single' | 'bulk', id?: string }>({ isOpen: false, type: 'single' })
   const [deleteConfirmation, setDeleteConfirmation] = useState<{ isOpen: boolean, type: 'single' | 'bulk', id?: string }>({ isOpen: false, type: 'single' })
   const [mapConfirmation, setMapConfirmation] = useState<{ isOpen: boolean, products: UnmappedMarketplaceProduct[] }>({ isOpen: false, products: [] })
   const [searchQuery, setSearchQuery] = useState('')
@@ -140,7 +153,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
   const [autoMapState, setAutoMapState] = useState<{ isOpen: boolean, matches: any[], isLoading: boolean }>({ isOpen: false, matches: [], isLoading: false })
   const [autoMapOptions, setAutoMapOptions] = useState({ matchEan: true, matchSku: true })
 
-  const [lastAction, setLastAction] = useState<{ type: 'delete'|'map'|'create', restoredUnmapped: any[], createdProductIds?: string[], createdMappingIds?: string[], description: string } | null>(null)
+  const [lastAction, setLastAction] = useState<{ type: 'delete' | 'map' | 'create' | 'block' | 'unblock', restoredUnmapped: any[], createdProductIds?: string[], createdMappingIds?: string[], description: string } | null>(null)
   const [isUndoing, setIsUndoing] = useState(false)
 
   const handleUndo = async () => {
@@ -241,10 +254,22 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
     return displayMap[type] || type
   }
 
+  const activeUnmappedProducts = useMemo(() => {
+    return localProducts.filter(p => !p.isBlocked)
+  }, [localProducts])
+
+  const blockedProducts = useMemo(() => {
+    return localProducts.filter(p => !!p.isBlocked)
+  }, [localProducts])
+
+  const currentTabProducts = useMemo(() => {
+    return activeTab === 'unmapped' ? activeUnmappedProducts : blockedProducts
+  }, [activeTab, activeUnmappedProducts, blockedProducts])
+
   // Get unique marketplaces for the filter dropdown
   const uniqueMarketplaces = useMemo(() => {
     const integrationsMap = new Map<string, { type: string, id: string | null }>()
-    for (const p of localProducts) {
+    for (const p of currentTabProducts) {
       const key = (p as any).integrationId || p.marketplace
       if (!integrationsMap.has(key)) {
         integrationsMap.set(key, { type: p.marketplace, id: (p as any).integrationId || null })
@@ -255,14 +280,14 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
       type: int.type,
       name: getMarketplaceDisplayName(int.type, int.id || undefined)
     })).sort((a, b) => a.name.localeCompare(b.name))
-  }, [localProducts, marketplaces])
+  }, [currentTabProducts, marketplaces])
 
   const enrichedProducts = useMemo(() => {
-    return localProducts.map(p => ({
+    return currentTabProducts.map(p => ({
       ...p,
       parsedEan: getEanFromPayload(p.rawPayload)
     }))
-  }, [localProducts])
+  }, [currentTabProducts])
 
   const filteredProducts = useMemo(() => {
     return enrichedProducts.filter(p => {
@@ -293,7 +318,11 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
 
   useEffect(() => {
     setDisplayCount(50)
-  }, [deferredSearch, marketplaceFilter])
+  }, [deferredSearch, marketplaceFilter, activeTab])
+
+  useEffect(() => {
+    setSelectedIds([])
+  }, [activeTab])
 
   const toggleSelectAll = () => {
     if (selectedIds.length === filteredProducts.length && filteredProducts.length > 0) {
@@ -317,11 +346,102 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
       if (res.deletedUnmapped) {
         setLastAction({ type: 'create', restoredUnmapped: res.deletedUnmapped, createdProductIds: res.createdProductIds, description: `${res.deletedUnmapped.length} Produkte als Neu angelegt` })
       }
+      setLocalProducts(prev => prev.filter(p => !selectedIds.includes(p.id)))
       setSelectedIds([])
       router.refresh()
     } catch (error) {
       console.error(error)
       showAlert('Fehler beim Anlegen der Produkte', 'Fehler')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleBulkBlock = async () => {
+    if (selectedIds.length === 0) return
+    setIsSubmitting(true)
+    try {
+      const res = await blockUnmappedProducts(selectedIds)
+      if (res.blockedUnmapped) {
+        setLastAction({
+          type: 'block',
+          restoredUnmapped: res.blockedUnmapped,
+          description: `${res.blockedUnmapped.length} Produkte blockiert`
+        })
+      }
+      setLocalProducts(prev => prev.map(p => selectedIds.includes(p.id) ? { ...p, isBlocked: true, blockedAt: new Date() } : p))
+      setSelectedIds([])
+      setBlockConfirmation({ isOpen: false, type: 'single' })
+      router.refresh()
+    } catch (error) {
+      console.error(error)
+      showAlert('Fehler beim Blockieren der Produkte', 'Fehler')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleBlockSingle = async (id: string) => {
+    setIsSubmitting(true)
+    try {
+      const res = await blockUnmappedProducts([id])
+      if (res.blockedUnmapped) {
+        setLastAction({
+          type: 'block',
+          restoredUnmapped: res.blockedUnmapped,
+          description: `1 Produkt blockiert`
+        })
+      }
+      setLocalProducts(prev => prev.map(p => p.id === id ? { ...p, isBlocked: true, blockedAt: new Date() } : p))
+      setBlockConfirmation({ isOpen: false, type: 'single' })
+      router.refresh()
+    } catch (error) {
+      console.error(error)
+      showAlert('Fehler beim Blockieren des Produkts', 'Fehler')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleBulkUnblock = async () => {
+    if (selectedIds.length === 0) return
+    setIsSubmitting(true)
+    try {
+      const res = await unblockMarketplaceProducts(selectedIds)
+      if (res.unblockedUnmapped) {
+        setLastAction({
+          type: 'unblock',
+          restoredUnmapped: res.unblockedUnmapped,
+          description: `${res.unblockedUnmapped.length} Produkte freigegeben`
+        })
+      }
+      setLocalProducts(prev => prev.map(p => selectedIds.includes(p.id) ? { ...p, isBlocked: false, blockedAt: null } : p))
+      setSelectedIds([])
+      router.refresh()
+    } catch (error) {
+      console.error(error)
+      showAlert('Fehler beim Freigeben der Produkte', 'Fehler')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleUnblockSingle = async (id: string) => {
+    setIsSubmitting(true)
+    try {
+      const res = await unblockMarketplaceProducts([id])
+      if (res.unblockedUnmapped) {
+        setLastAction({
+          type: 'unblock',
+          restoredUnmapped: res.unblockedUnmapped,
+          description: `1 Produkt freigegeben`
+        })
+      }
+      setLocalProducts(prev => prev.map(p => p.id === id ? { ...p, isBlocked: false, blockedAt: null } : p))
+      router.refresh()
+    } catch (error) {
+      console.error(error)
+      showAlert('Fehler beim Freigeben des Produkts', 'Fehler')
     } finally {
       setIsSubmitting(false)
     }
@@ -335,6 +455,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
       if (res.deletedUnmapped) {
         setLastAction({ type: 'delete', restoredUnmapped: res.deletedUnmapped, description: `${res.deletedUnmapped.length} Produkte gelöscht` })
       }
+      setLocalProducts(prev => prev.filter(p => !selectedIds.includes(p.id)))
       setSelectedIds([])
       setDeleteConfirmation({ isOpen: false, type: 'single' })
       router.refresh()
@@ -353,6 +474,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
       if (res.deletedUnmapped) {
         setLastAction({ type: 'delete', restoredUnmapped: res.deletedUnmapped, description: `1 Produkt gelöscht` })
       }
+      setLocalProducts(prev => prev.filter(p => p.id !== id))
       setDeleteConfirmation({ isOpen: false, type: 'single' })
       router.refresh()
     } catch (error) {
@@ -580,22 +702,72 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
   return (
     <>
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mt-8">
-      <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col gap-4">
+      {/* Tabs */}
+      <div className="flex border-b border-slate-200 bg-slate-50/60 px-6 pt-3 gap-2">
+        <button
+          onClick={() => { setActiveTab('unmapped'); setSelectedIds([]) }}
+          className={`flex items-center gap-2.5 px-5 py-3 text-sm font-bold border-b-2 transition-all -mb-px ${
+            activeTab === 'unmapped'
+              ? 'border-indigo-600 text-indigo-600 bg-white rounded-t-xl shadow-sm'
+              : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
+          }`}
+        >
+          <Database className="w-4 h-4" />
+          <span>Ungemappte Produkte</span>
+          <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+            activeTab === 'unmapped' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-200 text-slate-600'
+          }`}>
+            {activeUnmappedProducts.length}
+          </span>
+        </button>
+
+        <button
+          onClick={() => { setActiveTab('blocked'); setSelectedIds([]) }}
+          className={`flex items-center gap-2.5 px-5 py-3 text-sm font-bold border-b-2 transition-all -mb-px ${
+            activeTab === 'blocked'
+              ? 'border-rose-600 text-rose-600 bg-white rounded-t-xl shadow-sm'
+              : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
+          }`}
+        >
+          <Ban className="w-4 h-4" />
+          <span>Geblockte Produkte</span>
+          <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+            activeTab === 'blocked' ? 'bg-rose-100 text-rose-700' : 'bg-slate-200 text-slate-600'
+          }`}>
+            {blockedProducts.length}
+          </span>
+        </button>
+      </div>
+
+      <div className="p-6 border-b border-slate-100 bg-slate-50/30 flex flex-col gap-4">
         <div>
           <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-            <Database className="w-5 h-5 text-slate-400" />
-            Ungemappte Marktplatz-Produkte
-            <span className="ml-2 bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full text-xs font-bold">
+            {activeTab === 'unmapped' ? (
+              <>
+                <Database className="w-5 h-5 text-indigo-500" />
+                Ungemappte Marktplatz-Produkte
+              </>
+            ) : (
+              <>
+                <Ban className="w-5 h-5 text-rose-500" />
+                Geblockte Marktplatz-Produkte
+              </>
+            )}
+            <span className="ml-2 bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full text-xs font-bold">
               {filteredProducts.length}
             </span>
           </h2>
-          <p className="text-sm text-slate-500 mt-1">Diese Artikel wurden auf angebundenen Marktplätzen gefunden, sind aber noch keinem Stammprodukt zugewiesen.</p>
+          <p className="text-sm text-slate-500 mt-1">
+            {activeTab === 'unmapped'
+              ? 'Diese Artikel wurden auf angebundenen Marktplätzen gefunden, sind aber noch keinem Stammprodukt zugewiesen.'
+              : 'Diese Artikel wurden blockiert und werden bei zukünftigen Marktplatz-Importen ignoriert. Sie können sie hier jederzeit wieder freigeben.'}
+          </p>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 items-center">
           <div className="relative flex-1 w-full flex shadow-sm rounded-lg">
             <select
-              className="border border-r-0 border-slate-200 rounded-l-lg bg-slate-50 text-sm py-2 pl-3 pr-8 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700 font-medium"
+              className="border border-r-0 border-slate-200 rounded-l-lg bg-slate-50 text-sm py-2 pl-3 pr-8 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900 font-medium"
               value={searchField}
               onChange={(e) => setSearchField(e.target.value as any)}
             >
@@ -627,7 +799,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <Filter className="w-4 h-4 text-slate-400" />
             <select
-              className="w-full sm:w-auto border border-slate-200 rounded-lg text-sm py-2 pl-3 pr-8 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900 bg-white"
+              className="w-full sm:w-auto border border-slate-200 rounded-lg text-sm py-2 pl-3 pr-8 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900 bg-white font-medium"
               value={marketplaceFilter}
               onChange={(e) => setMarketplaceFilter(e.target.value)}
             >
@@ -639,13 +811,15 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
           </div>
           
           <div className="flex gap-2 w-full sm:w-auto ml-auto">
-            <button
-              onClick={handleOpenAutoMap}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 hover:border-indigo-300 transition-all font-semibold shadow-sm text-sm"
-            >
-              <CheckSquare className="w-4 h-4" />
-              Auto-Map
-            </button>
+            {activeTab === 'unmapped' && (
+              <button
+                onClick={handleOpenAutoMap}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 hover:border-indigo-300 transition-all font-semibold shadow-sm text-sm"
+              >
+                <CheckSquare className="w-4 h-4" />
+                Auto-Map
+              </button>
+            )}
             <button
               onClick={handleExportCsv}
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-all font-semibold shadow-sm text-sm"
@@ -662,39 +836,73 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
               {selectedIds.length} Produkte ausgewählt
             </span>
             <div className="flex gap-2">
-              <button
-                onClick={() => setDeleteConfirmation({ isOpen: true, type: 'bulk' })}
-                disabled={isSubmitting}
-                className="inline-flex items-center gap-2 px-4 py-1.5 bg-white border border-rose-200 text-rose-600 text-sm font-semibold rounded-md hover:bg-rose-50 transition-all disabled:opacity-50 shadow-sm"
-              >
-                Löschen
-              </button>
-              <button
-                onClick={handleMapBulk}
-                disabled={isSubmitting}
-                className="inline-flex items-center gap-2 px-4 py-1.5 bg-white border border-slate-200 text-slate-700 text-sm font-semibold rounded-md hover:bg-slate-50 transition-all disabled:opacity-50 shadow-sm"
-              >
-                Ausgewählte mappen
-              </button>
-              <button
-                onClick={handleBulkCreate}
-                disabled={isSubmitting}
-                className="inline-flex items-center gap-2 px-4 py-1.5 bg-indigo-600 text-white text-sm font-semibold rounded-md hover:bg-indigo-700 transition-all disabled:opacity-50 shadow-sm"
-              >
-                {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                Ausgewählte als Neu anlegen
-              </button>
+              {activeTab === 'unmapped' ? (
+                <>
+                  <button
+                    onClick={() => setBlockConfirmation({ isOpen: true, type: 'bulk' })}
+                    disabled={isSubmitting}
+                    className="inline-flex items-center gap-2 px-4 py-1.5 bg-white border border-rose-200 text-rose-600 text-sm font-semibold rounded-md hover:bg-rose-50 transition-all disabled:opacity-50 shadow-sm"
+                  >
+                    <Ban className="w-4 h-4" />
+                    Blockieren
+                  </button>
+                  <button
+                    onClick={handleMapBulk}
+                    disabled={isSubmitting}
+                    className="inline-flex items-center gap-2 px-4 py-1.5 bg-white border border-slate-200 text-slate-700 text-sm font-semibold rounded-md hover:bg-slate-50 transition-all disabled:opacity-50 shadow-sm"
+                  >
+                    Ausgewählte mappen
+                  </button>
+                  <button
+                    onClick={handleBulkCreate}
+                    disabled={isSubmitting}
+                    className="inline-flex items-center gap-2 px-4 py-1.5 bg-indigo-600 text-white text-sm font-semibold rounded-md hover:bg-indigo-700 transition-all disabled:opacity-50 shadow-sm"
+                  >
+                    {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                    Ausgewählte als Neu anlegen
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={handleBulkUnblock}
+                    disabled={isSubmitting}
+                    className="inline-flex items-center gap-2 px-4 py-1.5 bg-indigo-600 text-white text-sm font-semibold rounded-md hover:bg-indigo-700 transition-all disabled:opacity-50 shadow-sm"
+                  >
+                    {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+                    Ausgewählte freigeben
+                  </button>
+                  <button
+                    onClick={() => setDeleteConfirmation({ isOpen: true, type: 'bulk' })}
+                    disabled={isSubmitting}
+                    className="inline-flex items-center gap-2 px-4 py-1.5 bg-white border border-rose-200 text-rose-600 text-sm font-semibold rounded-md hover:bg-rose-50 transition-all disabled:opacity-50 shadow-sm"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Endgültig löschen
+                  </button>
+                </>
+              )}
             </div>
           </div>
         )}
       </div>
 
       <div className="divide-y divide-slate-100">
-        {unmappedProducts.length === 0 ? (
+        {currentTabProducts.length === 0 ? (
           <div className="p-12 text-center flex flex-col items-center justify-center text-slate-500">
-            <Database className="w-12 h-12 text-slate-200 mb-4" />
-            <p className="text-lg font-semibold text-slate-700">Keine ungemappten Produkte</p>
-            <p className="text-sm mt-1 max-w-sm">Starten Sie oben einen Import, um neue Produkte von Ihren Marktplätzen abzurufen.</p>
+            {activeTab === 'unmapped' ? (
+              <>
+                <Database className="w-12 h-12 text-slate-200 mb-4" />
+                <p className="text-lg font-semibold text-slate-700">Keine ungemappten Produkte</p>
+                <p className="text-sm mt-1 max-w-sm">Starten Sie oben einen Import, um neue Produkte von Ihren Marktplätzen abzurufen.</p>
+              </>
+            ) : (
+              <>
+                <ShieldCheck className="w-12 h-12 text-slate-200 mb-4" />
+                <p className="text-lg font-semibold text-slate-700">Keine geblockten Produkte</p>
+                <p className="text-sm mt-1 max-w-sm">Artikel, die Sie nicht anlegen oder mappen möchten, können Sie im Reiter &quot;Ungemappte Produkte&quot; blockieren. Sie werden dann hier gesammelt und bei zukünftigen Importen ignoriert.</p>
+              </>
+            )}
           </div>
         ) : filteredProducts.length === 0 ? (
           <div className="p-12 text-center flex flex-col items-center justify-center text-slate-500">
@@ -731,33 +939,70 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
                   </div>
                   
                   <div>
-                    <div className="flex items-center gap-3 mb-2">
+                    <div className="flex items-center gap-3 mb-2 flex-wrap">
                       <span className="px-2.5 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold rounded-md uppercase tracking-wider">
                         {getMarketplaceDisplayName(p.marketplace, (p as any).integrationId)}
                       </span>
                       <span className="font-mono text-sm font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
                         {p.marketplaceSku}
                       </span>
+                      {p.isBlocked && (
+                        <span className="px-2.5 py-0.5 bg-rose-50 text-rose-700 border border-rose-200 text-xs font-bold rounded-md flex items-center gap-1">
+                          <Ban className="w-3 h-3" /> Geblockt
+                        </span>
+                      )}
                     </div>
                     <h3 className="text-lg font-bold text-slate-900">{p.title}</h3>
-                    <div className="flex gap-4 mt-2 text-sm text-slate-500 font-medium">
+                    <div className="flex flex-wrap gap-4 mt-2 text-sm text-slate-500 font-medium items-center">
                       {p.parsedEan && <span>EAN: {p.parsedEan}</span>}
                       <span>Preis: {p.price} €</span>
                       <span>Bestand: {p.stock !== null ? p.stock : 'Unbekannt'}</span>
+                      {p.isBlocked && p.blockedAt && (
+                        <span className="text-xs text-slate-400">
+                          Blockiert am {new Date(p.blockedAt).toLocaleDateString('de-DE')}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
 
                 <div className="flex gap-3 w-full lg:w-auto lg:pl-10 items-center">
-                  <button onClick={(e) => { e.stopPropagation(); setDeleteConfirmation({ isOpen: true, type: 'single', id: p.id }); }} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors focus:outline-none" title="Eintrag verwerfen">
-                    <Trash2 className="w-5 h-5" />
-                  </button>
-                  <button onClick={(e) => { e.stopPropagation(); handleMapSingle(p as any); }} className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-all font-semibold shadow-sm text-sm">
-                    Mappen
-                  </button>
-                  <button disabled={isSubmitting} onClick={(e) => { e.stopPropagation(); handleCreateSingle(p.id); }} className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-lg hover:from-emerald-400 hover:to-teal-400 transition-all font-semibold shadow-sm text-sm disabled:opacity-50">
-                    Als Neu anlegen
-                  </button>
+                  {activeTab === 'unmapped' ? (
+                    <>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setBlockConfirmation({ isOpen: true, type: 'single', id: p.id }); }} 
+                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors focus:outline-none" 
+                        title="Produkt blockieren (ignoriert zukünftige Importe)"
+                      >
+                        <Ban className="w-5 h-5" />
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); handleMapSingle(p as any); }} className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-all font-semibold shadow-sm text-sm">
+                        Mappen
+                      </button>
+                      <button disabled={isSubmitting} onClick={(e) => { e.stopPropagation(); handleCreateSingle(p.id); }} className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-lg hover:from-emerald-400 hover:to-teal-400 transition-all font-semibold shadow-sm text-sm disabled:opacity-50">
+                        Als Neu anlegen
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        disabled={isSubmitting}
+                        onClick={(e) => { e.stopPropagation(); handleUnblockSingle(p.id); }}
+                        className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 bg-white border border-indigo-200 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all font-semibold shadow-sm text-sm"
+                        title="Aus Blockierung entfernen und wieder in ungemappte Produkte verschieben"
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                        Freigeben
+                      </button>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setDeleteConfirmation({ isOpen: true, type: 'single', id: p.id }); }} 
+                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors focus:outline-none" 
+                        title="Endgültig aus der Datenbank löschen"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             ))}
@@ -890,8 +1135,38 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
         })()}
       </Modal>
 
+      {/* Block Confirmation Modal */}
+      <Modal isOpen={blockConfirmation.isOpen} onClose={() => setBlockConfirmation({ isOpen: false, type: 'single' })} title="Produkt blockieren?">
+        <div className="space-y-6 text-sm">
+          <div className="flex items-center justify-center p-4">
+            <div className="w-16 h-16 rounded-full bg-rose-100 flex items-center justify-center">
+              <Ban className="w-8 h-8 text-rose-600" />
+            </div>
+          </div>
+          <p className="text-center text-slate-600 text-base">
+            Möchtest du {blockConfirmation.type === 'bulk' ? `die ${selectedIds.length} ausgewählten Produkte` : 'dieses Produkt'} wirklich blockieren?
+          </p>
+          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-600 leading-relaxed space-y-1.5">
+            <div className="font-semibold text-slate-800 flex items-center gap-1.5">
+              <Info className="w-4 h-4 text-indigo-500" /> Was bedeutet Blockieren?
+            </div>
+            <p>• Die Produkte werden in den Reiter <strong>&quot;Geblockte Produkte&quot;</strong> verschoben.</p>
+            <p>• Bei zukünftigen Marktplatz-Importen werden diese Produkte <strong>automatisch ignoriert</strong> und tauchen nicht wieder auf.</p>
+            <p>• Du kannst sie im Reiter &quot;Geblockte Produkte&quot; jederzeit wieder <strong>freigeben</strong>.</p>
+          </div>
+          <div className="flex justify-center gap-3 pt-4 border-t border-slate-100">
+            <button onClick={() => setBlockConfirmation({ isOpen: false, type: 'single' })} className="px-6 py-2.5 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 transition-colors" disabled={isSubmitting}>
+              Abbrechen
+            </button>
+            <button onClick={() => blockConfirmation.type === 'bulk' ? handleBulkBlock() : blockConfirmation.id && handleBlockSingle(blockConfirmation.id)} className="px-6 py-2.5 text-sm font-semibold text-white bg-rose-600 rounded-xl hover:bg-rose-700 shadow-sm shadow-rose-600/20 transition-all flex items-center gap-2" disabled={isSubmitting}>
+              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Blockieren'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
       {/* Delete Confirmation Modal */}
-      <Modal isOpen={deleteConfirmation.isOpen} onClose={() => setDeleteConfirmation({ isOpen: false, type: 'single' })} title="Einträge löschen?">
+      <Modal isOpen={deleteConfirmation.isOpen} onClose={() => setDeleteConfirmation({ isOpen: false, type: 'single' })} title="Einträge endgültig löschen?">
         <div className="space-y-6 text-sm">
           <div className="flex items-center justify-center p-4">
             <div className="w-16 h-16 rounded-full bg-rose-100 flex items-center justify-center">
@@ -899,14 +1174,17 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
             </div>
           </div>
           <p className="text-center text-slate-600 text-base">
-            Möchtest du {deleteConfirmation.type === 'bulk' ? `die ${selectedIds.length} ausgewählten Einträge` : 'diesen Eintrag'} wirklich löschen? Du kannst sie später durch einen erneuten Import wieder abrufen.
+            Möchtest du {deleteConfirmation.type === 'bulk' ? `die ${selectedIds.length} ausgewählten Einträge` : 'diesen Eintrag'} wirklich dauerhaft aus der Datenbank löschen?
           </p>
+          <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-800 leading-relaxed">
+            <strong>Hinweis:</strong> Wenn diese Produkte auf dem Marktplatz weiterhin aktiv sind, werden sie beim nächsten Import erneut als ungemappte Produkte geladen. Um sie dauerhaft zu ignorieren, belasse sie im Reiter &quot;Geblockt&quot;.
+          </div>
           <div className="flex justify-center gap-3 pt-4 border-t border-slate-100">
             <button onClick={() => setDeleteConfirmation({ isOpen: false, type: 'single' })} className="px-6 py-2.5 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 transition-colors" disabled={isSubmitting}>
               Abbrechen
             </button>
             <button onClick={() => deleteConfirmation.type === 'bulk' ? handleBulkDelete() : deleteConfirmation.id && handleDeleteSingle(deleteConfirmation.id)} className="px-6 py-2.5 text-sm font-semibold text-white bg-rose-600 rounded-xl hover:bg-rose-700 shadow-sm shadow-rose-600/20 transition-all flex items-center gap-2" disabled={isSubmitting}>
-              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Löschen'}
+              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Endgültig löschen'}
             </button>
           </div>
         </div>
