@@ -3,6 +3,7 @@ import { db } from '@/db/client'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { orders } from '@/db/schema/orders'
 import { eq, and } from 'drizzle-orm'
+import { normalizePostalCode } from '@/lib/postal-codes'
 
 export class EbayAdapter implements MarketplaceAdapter {
   readonly marketplace = 'ebay'
@@ -83,7 +84,7 @@ export class EbayAdapter implements MarketplaceAdapter {
           name: shipping.fullName || 'eBay Kunde',
           street: `${shipping.contactAddress?.addressLine1 || ''} ${shipping.contactAddress?.addressLine2 || ''}`.trim(),
           city: shipping.contactAddress?.city || '',
-          zip: shipping.contactAddress?.postalCode || '',
+          zip: normalizePostalCode(shipping.contactAddress?.postalCode, shipping.contactAddress?.countryCode || 'DE'),
           country: shipping.contactAddress?.countryCode || 'DE',
           company: shipping.companyName || undefined,
         },

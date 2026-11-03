@@ -1,3 +1,5 @@
+import { normalizePostalCode } from '@/lib/postal-codes'
+
 export type ResolvedBillingAddress = {
   name: string
   company: string
@@ -209,7 +211,7 @@ export function resolveBillingAddress(order: OrderAddressLike): ResolvedBillingA
         company,
         addressAddition,
         street,
-        zip: sa.PostalCode || '',
+        zip: normalizePostalCode(sa.PostalCode, sa.CountryCode || 'DE'),
         city: sa.City || '',
         country: sa.CountryCode || 'DE',
         phone: sa.Phone || order.buyerPhone || '',
@@ -225,7 +227,7 @@ export function resolveBillingAddress(order: OrderAddressLike): ResolvedBillingA
       company: order.shippingCompany || '',
       addressAddition: order.shippingAddressAddition || '',
       street: order.shippingStreet,
-      zip: order.shippingZip || '',
+      zip: normalizePostalCode(order.shippingZip, order.shippingCountry || 'DE'),
       city: order.shippingCity || '',
       country: order.shippingCountry || 'DE',
       phone: order.buyerPhone || order.shippingPhone || '',

@@ -106,6 +106,7 @@ export async function setupScheduledSyncs() {
       name: companies.name,
       fetchOrdersDaily: companies.fetchOrdersDaily,
       fetchOrdersTime: companies.fetchOrdersTime,
+      fetchOrdersTimes: companies.fetchOrdersTimes,
       fetchOrdersMarketplaces: companies.fetchOrdersMarketplaces,
     })
     .from(companies)
@@ -116,29 +117,43 @@ export async function setupScheduledSyncs() {
       continue
     }
 
-    const time = company.fetchOrdersTime || '03:00'
-    const [hourStr, minuteStr] = time.split(':')
-    const hour = parseInt(hourStr || '0', 10)
-    const minute = parseInt(minuteStr || '0', 10)
-    const cronPattern = `${minute} ${hour} * * *`
+    const rawTimes: string[] = Array.isArray(company.fetchOrdersTimes) && company.fetchOrdersTimes.length > 0
+      ? company.fetchOrdersTimes
+      : [company.fetchOrdersTime || '03:00']
 
-    const jobId = `daily-sync-${company.id}`
+    const validTimes = Array.from(
+      new Set(rawTimes.filter((t) => typeof t === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(t.trim())))
+    ).sort()
 
-    await marketplaceSyncQueue.add(
-      'daily-marketplace-sync',
-      { companyId: company.id },
-      {
-        jobId,
-        repeat: {
-          pattern: cronPattern,
-          tz: 'Europe/Berlin',
-        },
-        removeOnComplete: true,
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 5000 },
-      }
-    )
-    console.log(`   - Scheduled daily sync at ${time} (Europe/Berlin) for company: ${company.name}`)
+    if (validTimes.length === 0) {
+      validTimes.push('03:00')
+    }
+
+    for (const time of validTimes) {
+      const [hourStr, minuteStr] = time.split(':')
+      const hour = parseInt(hourStr || '0', 10)
+      const minute = parseInt(minuteStr || '0', 10)
+      const cronPattern = `${minute} ${hour} * * *`
+      const formattedHour = hour.toString().padStart(2, '0')
+      const formattedMinute = minute.toString().padStart(2, '0')
+      const jobId = `daily-sync-${company.id}-${formattedHour}${formattedMinute}`
+
+      await marketplaceSyncQueue.add(
+        'daily-marketplace-sync',
+        { companyId: company.id },
+        {
+          jobId,
+          repeat: {
+            pattern: cronPattern,
+            tz: 'Europe/Berlin',
+          },
+          removeOnComplete: true,
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 5000 },
+        }
+      )
+      console.log(`   - Scheduled daily sync at ${time} (Europe/Berlin) for company: ${company.name}`)
+    }
   }
 }
 

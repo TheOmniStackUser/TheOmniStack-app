@@ -35,6 +35,7 @@ export default async function IntegrationsPage(props: {
       .select({
         fetchOrdersDaily: companies.fetchOrdersDaily,
         fetchOrdersTime: companies.fetchOrdersTime,
+        fetchOrdersTimes: companies.fetchOrdersTimes,
         fetchOrdersMarketplaces: companies.fetchOrdersMarketplaces,
         syncNotificationEmail: companies.syncNotificationEmail,
       })

@@ -7,6 +7,7 @@ import { invoices } from '@/db/schema/invoices'
 import { companies } from '@/db/schema/companies'
 import { eq, and, inArray, sql, or, like } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
+import { normalizePostalCode } from '@/lib/postal-codes'
 
 export async function archiveOrderAction(orderId: string) {
   try {
@@ -232,7 +233,7 @@ export async function updateOrderAddressAction(
         shippingCompany: address.shippingCompany,
         shippingAddressAddition: address.shippingAddressAddition,
         shippingStreet: address.shippingStreet,
-        shippingZip: address.shippingZip,
+        shippingZip: normalizePostalCode(address.shippingZip, address.shippingCountry),
         shippingCity: address.shippingCity,
         shippingCountry: address.shippingCountry,
         shippingPhone: address.buyerPhone || (order as any).shippingPhone,

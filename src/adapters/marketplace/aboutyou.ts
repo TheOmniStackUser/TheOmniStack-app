@@ -172,7 +172,9 @@ export class AboutYouAdapter implements MarketplaceAdapter {
         const countryCode = (rawOrder?.shipping_country_code || rawOrder?.shipping?.country_code || 'DE').toUpperCase()
         if (carrierKey === 'HERMES') {
           if (countryCode === 'AT') {
-            carrierKey = 'HERMES_POST_AUT'
+            // About You has no HERMES carrier registered for Austria (only DHL_AT and DHL_POST_AUT exist).
+            // About You strictly requires: "All items must have the same carrier as the order".
+            carrierKey = rawOrder?.carrier_key || 'DHL_AT'
           } else {
             carrierKey = 'HERMES_KLV' // Default to Germany
           }
@@ -195,13 +197,23 @@ export class AboutYouAdapter implements MarketplaceAdapter {
         }
       }
 
+      // Fallback: If rawOrder specifies a carrier and our carrierKey is generic, honor the order's carrier
+      if (rawOrder?.carrier_key && (carrierKey === 'HERMES' || carrierKey === 'DHL')) {
+        carrierKey = rawOrder.carrier_key
+      }
+
+      // Ensure return_tracking_key is never empty (About You API requires min_length: 1)
+      const returnKey = (returnTrackingNumber && returnTrackingNumber.trim() !== '')
+        ? returnTrackingNumber.trim()
+        : (rawOrder?.return_tracking_key || rawOrder?.return_tracking_number || trackingNumber)
+
       const shipmentPayload = {
         items: [
           {
             order_items: orderItemIds,
             carrier_key: carrierKey,
             shipment_tracking_key: trackingNumber,
-            return_tracking_key: returnTrackingNumber || ""
+            return_tracking_key: returnKey
           }
         ]
       }

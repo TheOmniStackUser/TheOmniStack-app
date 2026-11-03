@@ -858,7 +858,9 @@ export async function saveShopwareIntegrationAction(
 
 const SyncSettingsSchema = z.object({
   fetchOrdersDaily: z.boolean(),
-  fetchOrdersTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'Ungültiges Uhrzeitformat (HH:MM).' }),
+  fetchOrdersTimes: z
+    .array(z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'Ungültiges Uhrzeitformat (HH:MM).' }))
+    .min(1, { message: 'Mindestens eine Abrufzeit ist erforderlich.' }),
   fetchOrdersMarketplaces: z.array(z.string().uuid()),
   syncNotificationEmail: z.union([z.literal(''), z.string().email({ message: 'Ungültige E-Mail-Adresse.' })]).optional().transform(v => v === '' ? null : v),
 })
@@ -870,11 +872,30 @@ export async function saveSyncSettingsAction(
   const auth = await requireAuth()
 
   const fetchOrdersDaily = formData.get('fetchOrdersDaily') === 'true'
-  const fetchOrdersTime = (formData.get('fetchOrdersTime') as string) || '03:00'
+  const fetchOrdersTimesRaw = (formData.get('fetchOrdersTimes') as string) || ''
+  const fallbackTime = (formData.get('fetchOrdersTime') as string) || '03:00'
   const marketplacesListRaw = (formData.get('marketplacesList') as string) || '[]'
   const syncNotificationEmail = formData.get('syncNotificationEmail') as string | null
 
-  
+  let parsedTimes: string[] = []
+  if (fetchOrdersTimesRaw) {
+    try {
+      const parsed = JSON.parse(fetchOrdersTimesRaw)
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        parsedTimes = parsed
+      }
+    } catch (e) {
+      parsedTimes = [fallbackTime]
+    }
+  } else {
+    parsedTimes = [fallbackTime]
+  }
+
+  // Deduplicate and sort chronologically
+  const fetchOrdersTimes = Array.from(
+    new Set(parsedTimes.map((t) => (typeof t === 'string' ? t.trim() : '')).filter(Boolean))
+  ).sort()
+
   let fetchOrdersMarketplaces: string[] = []
   try {
     fetchOrdersMarketplaces = JSON.parse(marketplacesListRaw)
@@ -884,7 +905,7 @@ export async function saveSyncSettingsAction(
 
   const validated = SyncSettingsSchema.safeParse({
     fetchOrdersDaily,
-    fetchOrdersTime,
+    fetchOrdersTimes,
     fetchOrdersMarketplaces,
     syncNotificationEmail,
   })
@@ -894,13 +915,15 @@ export async function saveSyncSettingsAction(
   }
 
   const data = validated.data
+  const primaryTime = data.fetchOrdersTimes[0] || '03:00'
 
   // Update company config in the database
   await db
     .update(companies)
     .set({
       fetchOrdersDaily: data.fetchOrdersDaily,
-      fetchOrdersTime: data.fetchOrdersTime,
+      fetchOrdersTime: primaryTime,
+      fetchOrdersTimes: data.fetchOrdersTimes,
       fetchOrdersMarketplaces: data.fetchOrdersMarketplaces,
       syncNotificationEmail: data.syncNotificationEmail,
       updatedAt: new Date(),
@@ -922,33 +945,39 @@ export async function saveSyncSettingsAction(
         } catch (e) {}
       }
 
-      if (jobId === `daily-sync-${auth.activeCompanyId}`) {
+      if (jobId === `daily-sync-${auth.activeCompanyId}` || jobId?.startsWith(`daily-sync-${auth.activeCompanyId}-`)) {
         await marketplaceSyncQueue.removeRepeatableByKey(job.key)
-        console.log(`   - Cleared old repeatable sync job: ${jobId}`)
+        console.log(`   - Cleared old repeatable sync job: ${jobId || job.key}`)
       }
     }
 
-    // Schedule the new repeatable job if daily fetching is enabled and at least one marketplace is selected
+    // Schedule the new repeatable jobs if daily fetching is enabled and at least one marketplace is selected
     if (data.fetchOrdersDaily && data.fetchOrdersMarketplaces.length > 0) {
-      const [hourStr, minuteStr] = data.fetchOrdersTime.split(':')
-      const hour = parseInt(hourStr || '0', 10)
-      const minute = parseInt(minuteStr || '0', 10)
-      const cronPattern = `${minute} ${hour} * * *`
+      for (const time of data.fetchOrdersTimes) {
+        const [hourStr, minuteStr] = time.split(':')
+        const hour = parseInt(hourStr || '0', 10)
+        const minute = parseInt(minuteStr || '0', 10)
+        const cronPattern = `${minute} ${hour} * * *`
+        const formattedHour = hour.toString().padStart(2, '0')
+        const formattedMinute = minute.toString().padStart(2, '0')
+        const jobId = `daily-sync-${auth.activeCompanyId}-${formattedHour}${formattedMinute}`
 
-      await marketplaceSyncQueue.add(
-        'daily-marketplace-sync',
-        { companyId: auth.activeCompanyId },
-        {
-          jobId: `daily-sync-${auth.activeCompanyId}`,
-          repeat: {
-            pattern: cronPattern,
-            tz: 'Europe/Berlin',
-          },
-          removeOnComplete: true,
-          attempts: 3,
-          backoff: { type: 'exponential', delay: 5000 },
-        }
-      )
+        await marketplaceSyncQueue.add(
+          'daily-marketplace-sync',
+          { companyId: auth.activeCompanyId },
+          {
+            jobId,
+            repeat: {
+              pattern: cronPattern,
+              tz: 'Europe/Berlin',
+            },
+            removeOnComplete: true,
+            attempts: 3,
+            backoff: { type: 'exponential', delay: 5000 },
+          }
+        )
+        console.log(`   - Scheduled daily sync at ${time} (Europe/Berlin) for company: ${auth.activeCompanyId}`)
+      }
     }
   } catch (err: any) {
     console.error('[SyncSettingsAction] Failed to manage repeatable BullMQ jobs:', err)

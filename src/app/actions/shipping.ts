@@ -12,6 +12,7 @@ import { revalidatePath } from 'next/cache'
 import type { DhlConfig } from '@/app/(dashboard)/integrations/dhl-form'
 import { OttoAdapter } from '@/adapters/marketplace/otto'
 import { AboutYouAdapter } from '@/adapters/marketplace/aboutyou'
+import { normalizePostalCode, splitStreet } from '@/lib/postal-codes'
 
 export async function generateHermesLabelsAction(orderIds?: string[], parcelClassMap?: string | Record<string, string>) {
   const auth = await requireAuth()
@@ -312,20 +313,6 @@ const toIso3 = (code: string | null | undefined): string => {
   return map[upper] ?? (upper.length === 3 ? upper : 'DEU')
 }
 
-// Helper: split "Musterstraße 12a" into street + house number
-const splitStreet = (full: string | null | undefined): { street: string; houseNo: string } => {
-  if (!full) return { street: '', houseNo: '.' }
-  // Try to find a number/complex part at the end (supports 12, 12a, 74/1, 10-12)
-  const match = full.match(/^(.+?)\s+([\d\-\/]+\s*[a-zA-Z]*)$/)
-  if (match) return { street: match[1].trim(), houseNo: match[2].trim().slice(0, 10) }
-  // Fallback: split by last space
-  const parts = full.trim().split(/\s+/)
-  if (parts.length > 1) {
-    const last = parts.pop()!
-    return { street: parts.join(' ').trim(), houseNo: last.slice(0, 10) }
-  }
-  return { street: full.trim(), houseNo: '.' }
-}
 
 export async function generateDhlLabelsAction(
   orderIds?: string[],
@@ -651,15 +638,9 @@ export async function generateDhlLabelsAction(
           }
         }
 
-        // Normalize Dutch zip code to '9999 AA' format
-        let resolvedZip = order.shippingZip ?? ''
+        // Normalize postal code according to UPU guidelines for destination country
         const upperCountry = toIso3(order.shippingCountry)
-        if (upperCountry === 'NLD') {
-          const cleanZip = resolvedZip.replace(/\s/g, '').toUpperCase()
-          if (/^\d{4}[A-Z]{2}$/.test(cleanZip)) {
-            resolvedZip = `${cleanZip.slice(0, 4)} ${cleanZip.slice(4)}`
-          }
-        }
+        const resolvedZip = normalizePostalCode(order.shippingZip, upperCountry)
 
         const matchingProduct = config.products?.find(p => p.productCode === resolvedProductCode) || config.products?.find(p => p.productCode === productCode)
         const additionalServices = matchingProduct?.additionalServices || []
@@ -684,6 +665,9 @@ export async function generateDhlLabelsAction(
 
         const passEmail = additionalServices.includes('Paketankündigung')
 
+        const shipperIso3 = toIso3(company.warehouseCountry || company.country) || 'DEU'
+        const shipperZip = normalizePostalCode(company.warehouseZip || company.zip || '53113', shipperIso3)
+
         const shipmentPayload: any = {
           profile: 'STANDARD_GRUPPENPROFIL',
           combinedPrinting: useCombine,
@@ -701,9 +685,9 @@ export async function generateDhlLabelsAction(
               addressHouse: splitStreet(company.warehouseStreet || company.street || '').houseNo === '.' 
                 ? '1' 
                 : (splitStreet(company.warehouseStreet || company.street || '').houseNo || '1'),
-              postalCode: company.warehouseZip || company.zip || '53113',
+              postalCode: shipperZip,
               city: company.warehouseCity || company.city || 'Bonn',
-              country: toIso3(company.warehouseCountry || company.country) || 'DEU',
+              country: shipperIso3,
             },
             consignee: {
               name1: (order.shippingCompany || order.shippingName || 'Empfänger').slice(0, 50),
@@ -1136,13 +1120,8 @@ export async function generateSingleDhlReturnLabelAction(orderId: string) {
     const customerHouseNo = rawCustomerHouseNo === '.' ? '1' : (rawCustomerHouseNo || '1')
     const warehouseHouseNo = rawWarehouseHouseNo === '.' ? '1' : (rawWarehouseHouseNo || '1')
 
-    let customerZip = order.shippingZip ?? '10115'
-    if (toIso3(order.shippingCountry) === 'NLD') {
-      const cleanZip = customerZip.replace(/\s/g, '').toUpperCase()
-      if (/^\d{4}[A-Z]{2}$/.test(cleanZip)) {
-        customerZip = `${cleanZip.slice(0, 4)} ${cleanZip.slice(4)}`
-      }
-    }
+    const customerCountry = toIso3(order.shippingCountry)
+    const customerZip = normalizePostalCode(order.shippingZip || '10115', customerCountry)
 
     const weight = Number(order.totalWeight) > 0 ? Number(order.totalWeight) : (config.defaultWeight ?? 1)
 
@@ -1165,7 +1144,7 @@ export async function generateSingleDhlReturnLabelAction(orderId: string) {
           addressHouse: customerHouseNo,
           postalCode: customerZip,
           city: order.shippingCity ?? 'Berlin',
-          country: toIso3(order.shippingCountry),
+          country: customerCountry,
           ...(order.buyerEmail ? { email: order.buyerEmail } : {}),
         },
         // Consignee is merchant's warehouse
@@ -1173,7 +1152,7 @@ export async function generateSingleDhlReturnLabelAction(orderId: string) {
           name1: (company.name || 'Empfänger').slice(0, 50),
           addressStreet: warehouseStreet || 'Hauptstraße',
           addressHouse: warehouseHouseNo === '.' ? '1' : (warehouseHouseNo || '1'),
-          postalCode: warehouseZip,
+          postalCode: normalizePostalCode(warehouseZip, warehouseCountry),
           city: warehouseCity,
           country: warehouseCountry,
         },

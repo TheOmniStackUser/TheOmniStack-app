@@ -2,7 +2,7 @@
 
 import { useActionState, useState, useEffect } from 'react'
 import { saveSyncSettingsAction } from '@/app/actions/integrations'
-import { HelpCircle, Clock, CheckCircle } from 'lucide-react'
+import { HelpCircle, Clock, CheckCircle, Plus, Trash2 } from 'lucide-react'
 
 type MarketplaceOption = {
   value: string
@@ -13,6 +13,7 @@ type SyncSettingsFormProps = {
   company: {
     fetchOrdersDaily: boolean
     fetchOrdersTime: string
+    fetchOrdersTimes?: string[] | null
     fetchOrdersMarketplaces: string[]
     syncNotificationEmail: string | null
   }
@@ -22,9 +23,23 @@ type SyncSettingsFormProps = {
 export function SyncSettingsForm({ company, activeMarketplaces }: SyncSettingsFormProps) {
   const [state, action, pending] = useActionState(saveSyncSettingsAction, undefined)
   const [isEnabled, setIsEnabled] = useState(company.fetchOrdersDaily)
+  const [syncTimes, setSyncTimes] = useState<string[]>(() => {
+    if (company.fetchOrdersTimes && company.fetchOrdersTimes.length > 0) {
+      return company.fetchOrdersTimes
+    }
+    return [company.fetchOrdersTime || '03:00']
+  })
   const [selectedMarketplaces, setSelectedMarketplaces] = useState<string[]>(
     company.fetchOrdersMarketplaces || []
   )
+
+  useEffect(() => {
+    if (company.fetchOrdersTimes && company.fetchOrdersTimes.length > 0) {
+      setSyncTimes(company.fetchOrdersTimes)
+    } else if (company.fetchOrdersTime) {
+      setSyncTimes([company.fetchOrdersTime])
+    }
+  }, [company.fetchOrdersTimes, company.fetchOrdersTime])
 
   useEffect(() => {
     setSelectedMarketplaces(company.fetchOrdersMarketplaces || [])
@@ -34,6 +49,34 @@ export function SyncSettingsForm({ company, activeMarketplaces }: SyncSettingsFo
     setSelectedMarketplaces((prev) =>
       prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value]
     )
+  }
+
+  const handleTimeChange = (index: number, val: string) => {
+    setSyncTimes((prev) => {
+      const next = [...prev]
+      next[index] = val
+      return next
+    })
+  }
+
+  const handleAddTime = () => {
+    setSyncTimes((prev) => {
+      let newTime = '10:00'
+      if (prev.includes(newTime)) {
+        if (!prev.includes('14:00')) newTime = '14:00'
+        else if (!prev.includes('18:00')) newTime = '18:00'
+        else if (!prev.includes('22:00')) newTime = '22:00'
+        else newTime = '12:00'
+      }
+      return [...prev, newTime]
+    })
+  }
+
+  const handleRemoveTime = (index: number) => {
+    setSyncTimes((prev) => {
+      if (prev.length <= 1) return prev
+      return prev.filter((_, i) => i !== index)
+    })
   }
 
   return (
@@ -60,7 +103,7 @@ export function SyncSettingsForm({ company, activeMarketplaces }: SyncSettingsFo
               <HelpCircle size={14} className="text-gray-400 cursor-help hover:text-blue-500 transition-colors" />
               <div className="absolute left-6 top-0 w-64 p-3 bg-slate-900 text-white text-xs rounded-xl shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 transform -translate-y-1/4">
                 <p className="leading-relaxed text-slate-300">
-                  Wenn aktiviert, ruft theomnistack einmal täglich automatisch neue, unversandte Bestellungen von den ausgewählten Marktplätzen ab.
+                  Wenn aktiviert, ruft theomnistack zu den konfigurierten Uhrzeiten automatisch neue, unversandte Bestellungen von den ausgewählten Marktplätzen ab.
                 </p>
                 <div className="absolute left-0 top-3 -translate-x-full border-8 border-transparent border-r-slate-900"></div>
               </div>
@@ -85,39 +128,76 @@ export function SyncSettingsForm({ company, activeMarketplaces }: SyncSettingsFo
 
       {isEnabled && (
         <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
-          {/* Time Picker and Email Notification */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label htmlFor="fetchOrdersTime" className="block text-sm font-semibold text-gray-700 flex items-center gap-1.5">
-                <Clock className="w-4 h-4 text-gray-400" />
-                Abruf-Uhrzeit (täglich)
-              </label>
-              <input
-                id="fetchOrdersTime"
-                name="fetchOrdersTime"
-                type="time"
-                defaultValue={company.fetchOrdersTime || '03:00'}
-                required
-                className="block w-full max-w-[150px] px-4 py-2.5 border border-gray-300 rounded-xl shadow-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all bg-white font-medium"
-              />
-              <p className="text-xs text-gray-500">Wähle die Uhrzeit, zu der die Bestellungen importiert werden sollen.</p>
+          {/* Multiple Times Configuration */}
+          <div className="p-4 bg-white rounded-2xl border border-gray-150 shadow-sm space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+              <div>
+                <label className="block text-sm font-semibold text-gray-800 flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-blue-600" />
+                  Abruf-Uhrzeiten (täglich)
+                </label>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Füge bei Bedarf mehrere Uhrzeiten pro Tag für den automatischen Import hinzu.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleAddTime}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 hover:text-blue-700 rounded-xl transition-all cursor-pointer border border-blue-200 active:scale-95 select-none"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Weitere Uhrzeit
+              </button>
             </div>
 
-            <div className="space-y-2">
-              <label htmlFor="syncNotificationEmail" className="block text-sm font-semibold text-gray-700 flex items-center gap-1.5">
-                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                Benachrichtigungs-E-Mail (Optional)
-              </label>
-              <input
-                id="syncNotificationEmail"
-                name="syncNotificationEmail"
-                type="email"
-                defaultValue={company.syncNotificationEmail || ''}
-                placeholder="z.B. info@dein-shop.de"
-                className="block w-full px-4 py-2.5 border border-gray-300 rounded-xl shadow-sm text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all bg-white font-medium"
-              />
-              <p className="text-xs text-gray-500">Erhalte eine E-Mail-Zusammenfassung nach jedem automatischen Import.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {syncTimes.map((time, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center gap-2 p-2.5 bg-gray-50/70 border border-gray-200 rounded-xl shadow-xs transition-all hover:border-gray-300"
+                >
+                  <span className="text-xs font-semibold text-gray-500 min-w-[62px]">
+                    {idx + 1}. Abruf:
+                  </span>
+                  <input
+                    type="time"
+                    value={time}
+                    onChange={(e) => handleTimeChange(idx, e.target.value)}
+                    required
+                    aria-label={`Abruf-Uhrzeit ${idx + 1}`}
+                    className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg shadow-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all bg-white font-medium text-sm"
+                  />
+                  {syncTimes.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveTime(idx)}
+                      title="Uhrzeit entfernen"
+                      aria-label={`Uhrzeit ${idx + 1} entfernen`}
+                      className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              ))}
             </div>
+          </div>
+
+          {/* Email Notification */}
+          <div className="space-y-2">
+            <label htmlFor="syncNotificationEmail" className="block text-sm font-semibold text-gray-700 flex items-center gap-1.5">
+              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+              Benachrichtigungs-E-Mail (Optional)
+            </label>
+            <input
+              id="syncNotificationEmail"
+              name="syncNotificationEmail"
+              type="email"
+              defaultValue={company.syncNotificationEmail || ''}
+              placeholder="z.B. info@dein-shop.de"
+              className="block w-full px-4 py-2.5 border border-gray-300 rounded-xl shadow-sm text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all bg-white font-medium"
+            />
+            <p className="text-xs text-gray-500">Erhalte eine E-Mail-Zusammenfassung nach jedem automatischen Import.</p>
           </div>
 
           {/* Marketplaces Checklist */}
@@ -189,7 +269,17 @@ export function SyncSettingsForm({ company, activeMarketplaces }: SyncSettingsFo
         </div>
       )}
 
-      {/* Hidden inputs to pass data when checkboxes are used */}
+      {/* Hidden inputs to pass data */}
+      <input
+        type="hidden"
+        name="fetchOrdersTimes"
+        value={JSON.stringify(syncTimes)}
+      />
+      <input
+        type="hidden"
+        name="fetchOrdersTime"
+        value={syncTimes[0] || '03:00'}
+      />
       <input
         type="hidden"
         name="marketplacesList"

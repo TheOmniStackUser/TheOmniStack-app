@@ -3,6 +3,7 @@ import type { MarketplaceAdapter, NormalizedOrder } from './base'
 import { db } from '@/db/client'
 import { orders } from '@/db/schema/orders'
 import { eq, and } from 'drizzle-orm'
+import { normalizePostalCode } from '@/lib/postal-codes'
 
 type AmazonAdapterConfig = {
   sellerId: string
@@ -302,7 +303,7 @@ export class AmazonAdapter implements MarketplaceAdapter {
         phone: rawOrder.ShippingAddress?.Phone || undefined,
         street,
         city: rawOrder.ShippingAddress?.City || '',
-        zip: rawOrder.ShippingAddress?.PostalCode || '',
+        zip: normalizePostalCode(rawOrder.ShippingAddress?.PostalCode, rawOrder.ShippingAddress?.CountryCode || 'DE'),
         country: rawOrder.ShippingAddress?.CountryCode || 'DE',
       },
       currency: rawOrder.OrderTotal?.CurrencyCode || 'EUR',

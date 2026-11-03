@@ -33,6 +33,7 @@ import { EtsyAdapter } from '@/adapters/marketplace/etsy'
 import type { NormalizedOrder, MarketplaceAdapter } from '@/adapters/marketplace/base'
 import { createInvoiceForOrder, formatDocumentNumber, getDefaultSettings, extractPaymentInfo } from '@/lib/invoice-service'
 import { get2LetterCountryCode } from '@/lib/countries'
+import { normalizePostalCode } from '@/lib/postal-codes'
 
 // ─── Queue Name Constants ─────────────────────────────────────────────────────
 export const QUEUE_MARKETPLACE_SYNC = process.env.NODE_ENV === 'production' ? 'marketplace-sync' : 'marketplace-sync-dev'
@@ -1949,7 +1950,7 @@ export async function persistOrders(
           shippingPhone: order.shippingAddress.phone,
           shippingStreet: order.shippingAddress.street,
           shippingCity: order.shippingAddress.city,
-          shippingZip: order.shippingAddress.zip,
+          shippingZip: normalizePostalCode(order.shippingAddress.zip, shippingCountryCode),
           shippingCountry: shippingCountryCode,
           currency: order.currency,
           totalAmount: String(order.totalAmount),

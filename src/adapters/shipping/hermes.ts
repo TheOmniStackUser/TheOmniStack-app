@@ -190,6 +190,17 @@ export class HermesAdapter {
     // Resolve human-readable order number (e.g. #10007 for Shopify, orderNumber for Otto/AboutYou/Shopware)
     const displayOrderId = getOrderDisplayNumber(order)
 
+    // Auto-fix for composite town names with "bei" (e.g. "Fünfing bei Sankt Ruprecht an der Raab")
+    // Hermes enforces a 30-char limit for receiverAddress.town and validates against official municipality names.
+    let recipientTown = (order.shippingCity || 'Stadt').trim()
+    if (recipientTown.length > 30 && recipientTown.includes(' bei ')) {
+      const parts = recipientTown.split(/\s+bei\s+/i)
+      recipientTown = parts[parts.length - 1].trim()
+    }
+    if (recipientTown.length > 30) {
+      recipientTown = recipientTown.slice(0, 30).trim()
+    }
+
     const payload = {
       clientReference: (displayOrderId || order.marketplaceOrderId || order.id || '').slice(0, 20),
       receiverName: {
@@ -200,7 +211,7 @@ export class HermesAdapter {
         street: recipientAddr.street || 'Strasse',
         houseNumber: recipientAddr.houseNo === '.' ? '1' : recipientAddr.houseNo,
         zipCode: order.shippingZip || '12345',
-        town: order.shippingCity || 'Stadt',
+        town: recipientTown,
         countryCode: order.shippingCountry === 'DE' ? 'DE' : (order.shippingCountry?.slice(0, 2) || 'DE')
       },
       senderName: {
