@@ -17,6 +17,7 @@ export type MarketplaceSyncSettings = {
   priceModifierValue: number
   priceBase?: 'standard' | 'msrp' | 'reduced' | 'all'
   minPriceThreshold?: number
+  enableCurrencyConversion?: boolean // whether foreign currency conversion is enabled
   targetCurrency?: string // 'EUR', 'SEK', 'PLN', 'CZK', etc.
   exchangeRate?: number // e.g. 11.0 for SEK
   roundingMode?: 'round' | 'decimals' // 'round' for integers (e.g. 349 kr), 'decimals' for 2 decimals
@@ -1606,16 +1607,21 @@ export async function restoreMarketplaceOfferPrices(integrationId: string) {
 
   const meta = (integration.metadata as any) || {}
   const syncSettings = meta.productSync || {}
-  const targetCurrency = syncSettings.targetCurrency || 
-    (meta.customName?.toLowerCase().includes('se') || meta.shopId === '4362' ? 'SEK' : 'EUR')
+  const isConversionEnabled = syncSettings.enableCurrencyConversion !== undefined
+    ? syncSettings.enableCurrencyConversion
+    : (syncSettings.targetCurrency ? syncSettings.targetCurrency !== 'EUR' : (meta.customName?.toLowerCase().includes('se') || meta.shopId === '4362'))
+
+  const targetCurrency = isConversionEnabled
+    ? (syncSettings.targetCurrency || ((meta.customName?.toLowerCase().includes('se') || meta.shopId === '4362') ? 'SEK' : 'EUR'))
+    : 'EUR'
   const isSek = targetCurrency === 'SEK'
-  const exchangeRate = syncSettings.exchangeRate !== undefined && syncSettings.exchangeRate > 0
+  const exchangeRate = isConversionEnabled && syncSettings.exchangeRate !== undefined && syncSettings.exchangeRate > 0
     ? parseFloat(syncSettings.exchangeRate.toString())
-    : (isSek ? 11.0 : 1.0)
+    : (isConversionEnabled && isSek ? 11.0 : 1.0)
   const roundingMode: 'round' | 'decimals' = syncSettings.roundingMode || (isSek ? 'round' : 'decimals')
 
   const convertCurrency = (val: number): number => {
-    if (!exchangeRate || exchangeRate === 1.0) return Math.round(val * 100) / 100
+    if (!isConversionEnabled || !exchangeRate || exchangeRate === 1.0) return Math.round(val * 100) / 100
     const converted = val * exchangeRate
     if (roundingMode === 'round') {
       return Math.round(converted)

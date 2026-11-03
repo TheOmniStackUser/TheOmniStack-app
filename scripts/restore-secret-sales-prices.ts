@@ -35,21 +35,28 @@ async function restorePricesForIntegration(integrationId: string) {
   // Currency configuration
   const syncSettings = meta.productSync || {}
   const isSekShop = meta.customName?.toLowerCase().includes('se') || shopId === '4362'
-  const targetCurrency = syncSettings.targetCurrency || (isSekShop ? 'SEK' : 'EUR')
+  const isConversionEnabled = syncSettings.enableCurrencyConversion !== undefined
+    ? syncSettings.enableCurrencyConversion
+    : (syncSettings.targetCurrency ? syncSettings.targetCurrency !== 'EUR' : isSekShop)
+
+  const targetCurrency = isConversionEnabled
+    ? (syncSettings.targetCurrency || (isSekShop ? 'SEK' : 'EUR'))
+    : 'EUR'
   const isSek = targetCurrency === 'SEK'
-  const exchangeRate = syncSettings.exchangeRate !== undefined && syncSettings.exchangeRate > 0
+  const exchangeRate = isConversionEnabled && syncSettings.exchangeRate !== undefined && syncSettings.exchangeRate > 0
     ? parseFloat(syncSettings.exchangeRate.toString())
-    : (isSek ? 11.0 : 1.0)
+    : (isConversionEnabled && isSek ? 11.0 : 1.0)
   const roundingMode: 'round' | 'decimals' = syncSettings.roundingMode || (isSek ? 'round' : 'decimals')
 
-  console.log(`Currency Settings: Currency=${targetCurrency}, Exchange Rate=${exchangeRate}, Rounding=${roundingMode}`)
+  console.log(`Currency Settings: Enabled=${isConversionEnabled}, Currency=${targetCurrency}, Exchange Rate=${exchangeRate}, Rounding=${roundingMode}`)
 
   // Persist currency settings in metadata if not yet saved
-  if (!syncSettings.targetCurrency || !syncSettings.exchangeRate) {
+  if (!syncSettings.targetCurrency || !syncSettings.exchangeRate || syncSettings.enableCurrencyConversion === undefined) {
     const updatedMeta = {
       ...meta,
       productSync: {
         ...syncSettings,
+        enableCurrencyConversion: isConversionEnabled,
         targetCurrency,
         exchangeRate,
         roundingMode
@@ -63,7 +70,7 @@ async function restorePricesForIntegration(integrationId: string) {
   }
 
   const convertCurrency = (val: number): number => {
-    if (!exchangeRate || exchangeRate === 1.0) return Math.round(val * 100) / 100
+    if (!isConversionEnabled || !exchangeRate || exchangeRate === 1.0) return Math.round(val * 100) / 100
     const converted = val * exchangeRate
     if (roundingMode === 'round') {
       return Math.round(converted)
