@@ -95,7 +95,7 @@ async function reportChildResult(
   companyName: string,
   syncNotificationEmail: string,
   syncGroupId: string,
-  result: { marketplace: string; success: boolean; count?: number; newCount?: number; error?: string }
+  result: { marketplace: string; success: boolean; count?: number; newCount?: number; laterCount?: number; error?: string }
 ) {
   // Only process daily scheduled sync groups
   if (!syncGroupId || !syncGroupId.startsWith('daily-')) return
@@ -113,6 +113,7 @@ async function reportChildResult(
     const existing = JSON.parse(existingStr)
     result.count = result.count !== undefined ? result.count : existing.count
     result.newCount = (existing.newCount || 0) + (result.newCount || 0)
+    result.laterCount = (existing.laterCount || 0) + (result.laterCount || 0)
     // If one succeeds and the other fails, keep the failure error message
     result.success = existing.success && result.success
     result.error = existing.error || result.error
@@ -481,7 +482,10 @@ export function createMarketplaceSyncWorker() {
               job.data.marketplaceDisplayName?.toLowerCase()
             ].filter(Boolean))) as string[]
 
-            const [openCountRow] = await db.select({ count: sql<number>`count(*)::int` })
+            const [openCountRow] = await db.select({ 
+              openCount: sql<number>`count(*) filter (where ${orders.status} in ('pending', 'processing'))::int`,
+              laterCount: sql<number>`count(*) filter (where ${orders.status} = 'later_shipment')::int`
+            })
               .from(orders)
               .where(and(
                 eq(orders.companyId, companyId),
@@ -491,14 +495,21 @@ export function createMarketplaceSyncWorker() {
                 inArray(orders.marketplace, possibleKeys)
               ))
 
-            const openOrdersCount = openCountRow?.count ?? 0
+            const openOrdersCount = openCountRow?.openCount ?? 0
+            const laterOrdersCount = openCountRow?.laterCount ?? 0
 
             await reportChildResult(
               companyId, 
               companySettings.name, 
               companySettings.syncNotificationEmail, 
               job.data.syncGroupId!, 
-              { marketplace: job.data.marketplaceDisplayName || marketplace || 'Unbekannt', success: true, count: openOrdersCount, newCount: newlyImportedCount }
+              { 
+                marketplace: job.data.marketplaceDisplayName || marketplace || 'Unbekannt', 
+                success: true, 
+                count: openOrdersCount, 
+                newCount: newlyImportedCount,
+                laterCount: laterOrdersCount
+              }
             )
           }
         }

@@ -18,6 +18,7 @@ type SyncResult = {
   success: boolean;
   count?: number;
   newCount?: number;
+  laterCount?: number;
   error?: string;
 };
 
@@ -35,6 +36,7 @@ export const SyncNotificationEmail = ({
   const allSuccess = results.every(r => r.success);
   const totalNewOrders = results.reduce((acc, curr) => acc + (curr.newCount !== undefined ? curr.newCount : (curr.count || 0)), 0);
   const totalFetchedOrders = results.reduce((acc, curr) => acc + (curr.count || 0), 0);
+  const totalLaterOrders = results.reduce((acc, curr) => acc + (curr.laterCount || 0), 0);
 
   return (
     <Html>
@@ -88,7 +90,7 @@ export const SyncNotificationEmail = ({
                       {result.success ? (
                         <Text className="m-0 text-[14px] text-green-600 font-medium">
                           ✅ Erfolgreich: {result.newCount !== undefined 
-                            ? `${result.newCount} neue ${result.newCount === 1 ? 'Bestellung' : 'Bestellungen'} importiert (${result.count} total offene Bestellungen)` 
+                            ? `${result.newCount} neue ${result.newCount === 1 ? 'Bestellung' : 'Bestellungen'} importiert (${result.count} total offene Bestellungen${result.laterCount ? `, ${result.laterCount} mit späterem Versand` : ''})` 
                             : `${result.count} neue ${result.count === 1 ? 'Bestellung' : 'Bestellungen'}`}
                         </Text>
                       ) : (
@@ -103,7 +105,7 @@ export const SyncNotificationEmail = ({
 
               <Section className="mb-[32px]">
                 <Text className="text-gray-700 text-[14px] font-medium leading-[24px] text-center">
-                  Insgesamt wurden <span className="font-bold">{totalNewOrders}</span> neue {totalNewOrders === 1 ? 'Bestellung' : 'Bestellungen'} importiert ({totalFetchedOrders} total offene Bestellungen).
+                  Insgesamt wurden <span className="font-bold">{totalNewOrders}</span> neue {totalNewOrders === 1 ? 'Bestellung' : 'Bestellungen'} importiert ({totalFetchedOrders} total offene Bestellungen{totalLaterOrders > 0 ? `, ${totalLaterOrders} mit späterem Versand` : ''}).
                 </Text>
               </Section>
 

@@ -241,7 +241,7 @@ export async function sendSyncNotificationEmail({
 }: {
   toEmail: string
   companyName: string
-  results: Array<{ marketplace: string; success: boolean; count?: number; newCount?: number; error?: string }>
+  results: Array<{ marketplace: string; success: boolean; count?: number; newCount?: number; laterCount?: number; error?: string }>
 }) {
   try {
     const { data, error } = await resend.emails.send({
