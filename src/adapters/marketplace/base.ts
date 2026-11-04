@@ -67,7 +67,8 @@ export interface MarketplaceAdapter {
     trackingNumber: string, 
     carrier: string, 
     returnTrackingNumber?: string,
-    rawOrderPayload?: unknown
+    rawOrderPayload?: unknown,
+    returnAddressCarrierId?: string
   ): Promise<void>
 
   /**

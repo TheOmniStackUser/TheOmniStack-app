@@ -430,6 +430,7 @@ export async function markOrderAsShippedManuallyAction(
       .set({
         status: 'shipped',
         trackingNumber: trackingNumber || null,
+        marketplaceConfirmationStatus: confirmOnMarketplace && order.marketplace !== 'manual' ? 'pending' : 'not_applicable',
         updatedAt: new Date()
       })
       .where(
@@ -529,6 +530,17 @@ export async function markOrderAsShippedManuallyAction(
               isOtto ? ottoReturnAddressCarrierId : undefined
             )
 
+            // Mark confirmation as success in DB
+            await db
+              .update(orders)
+              .set({
+                marketplaceConfirmationStatus: 'confirmed',
+                marketplaceConfirmationError: null,
+                marketplaceConfirmedAt: new Date(),
+                updatedAt: new Date(),
+              })
+              .where(eq(orders.id, order.id))
+
             // Auto-download invoice after shipping confirmation if enabled
             const downloadInvoice = !!(integration.metadata as any)?.downloadInvoice
             if (downloadInvoice) {
@@ -569,6 +581,16 @@ export async function markOrderAsShippedManuallyAction(
         const msg = confirmErr?.message ?? String(confirmErr)
         console.error(`[Manual-Shipment-Action] Marketplace confirmation failed:`, msg)
         warning = `Bestellung wurde lokal auf "versendet" gestellt, aber die Übertragung an den Marktplatz ist fehlgeschlagen: ${msg}`
+
+        // Persist failure in DB
+        await db
+          .update(orders)
+          .set({
+            marketplaceConfirmationStatus: 'failed',
+            marketplaceConfirmationError: warning,
+            updatedAt: new Date(),
+          })
+          .where(eq(orders.id, order.id))
       }
     }
 
@@ -1215,4 +1237,131 @@ export async function splitOrderAction(
     return { error: error.message || 'Fehler beim Aufteilen der Bestellung.' }
   }
 }
+
+export async function retryMarketplaceConfirmationAction(orderId: string) {
+  const auth = await requireAuth()
+
+  try {
+    const [order] = await db
+      .select()
+      .from(orders)
+      .where(
+        and(
+          eq(orders.id, orderId),
+          eq(orders.companyId, auth.activeCompanyId)
+        )
+      )
+      .limit(1)
+
+    if (!order) {
+      return { error: 'Bestellung nicht gefunden.' }
+    }
+
+    if (order.marketplace === 'manual') {
+      await db
+        .update(orders)
+        .set({
+          marketplaceConfirmationStatus: 'not_applicable',
+          marketplaceConfirmationError: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(orders.id, orderId))
+      revalidatePath('/orders')
+      return { success: true, message: 'Manuelle Bestellungen erfordern keine Marktplatz-Übermittlung.' }
+    }
+
+    const { marketplaceIntegrations } = await import('@/db/schema/integrations')
+    const activeIntegrations = await db
+      .select()
+      .from(marketplaceIntegrations)
+      .where(
+        and(
+          eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
+          eq(marketplaceIntegrations.isActive, true)
+        )
+      )
+
+    const { getAdapterForIntegration } = await import('@/workers/marketplace-sync')
+    const integration = activeIntegrations.find(i => 
+      i.type === order.marketplace ||
+      (i.type === 'mirakl_decathlon' && order.marketplace === 'Decathlon DE') ||
+      (i.type === 'mirakl_custom' && 
+       ((i.metadata as any)?.customName || '').toLowerCase() === order.marketplace.toLowerCase())
+    )
+
+    if (!integration) {
+      return { error: `Keine aktive Integration für Marktplatz ${order.marketplace} gefunden.` }
+    }
+
+    const adapter = getAdapterForIntegration(integration)
+    if (!adapter || typeof adapter.confirmShipment !== 'function') {
+      return { error: `Der Marktplatz ${order.marketplace} unterstützt keine automatische Versandbestätigung.` }
+    }
+
+    const targetMarketplaceOrderId = (order.rawPayload as any)?.originalMarketplaceOrderId || order.marketplaceOrderId
+    if (!targetMarketplaceOrderId) {
+      return { error: 'Keine Marktplatz-Bestellnummer vorhanden.' }
+    }
+
+    const isOtto = order.marketplace === 'otto'
+    const ottoReturnAddressCarrierId = isOtto ? (integration.metadata as any)?.returnAddressCarrierId : undefined
+
+    let carrier = 'DHL'
+    if (order.trackingNumber) {
+      const tn = order.trackingNumber.trim()
+      if (tn.startsWith('0034') || tn.startsWith('05') || tn.length === 14) {
+        carrier = 'DHL'
+      } else if (tn.length >= 16) {
+        carrier = 'HERMES'
+      }
+    }
+
+    console.log(`[Retry-Marketplace-Action] Confirming shipment for ${targetMarketplaceOrderId} on ${order.marketplace}...`)
+
+    await adapter.confirmShipment(
+      targetMarketplaceOrderId,
+      order.trackingNumber || '',
+      carrier,
+      order.returnTrackingNumber || undefined,
+      order.rawPayload,
+      isOtto ? ottoReturnAddressCarrierId : undefined
+    )
+
+    await db
+      .update(orders)
+      .set({
+        marketplaceConfirmationStatus: 'confirmed',
+        marketplaceConfirmationError: null,
+        marketplaceConfirmedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(orders.id, order.id))
+
+    revalidatePath('/orders')
+    revalidatePath('/dashboard')
+
+    return { 
+      success: true, 
+      message: `Versandbestätigung an ${order.marketplace.toUpperCase()} erfolgreich übermittelt!` 
+    }
+  } catch (error: any) {
+    const msg = error?.message ?? String(error)
+    console.error('[Retry-Marketplace-Action] Failed:', msg)
+
+    await db
+      .update(orders)
+      .set({
+        marketplaceConfirmationStatus: 'failed',
+        marketplaceConfirmationError: `Übertragung an Marktplatz fehlgeschlagen: ${msg}`,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(orders.id, orderId), eq(orders.companyId, auth.activeCompanyId)))
+
+    revalidatePath('/orders')
+    revalidatePath('/dashboard')
+
+    return { error: `Fehler bei der Marktplatz-Übermittlung: ${msg}` }
+  }
+}
+
 

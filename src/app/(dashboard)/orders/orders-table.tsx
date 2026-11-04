@@ -4,10 +4,10 @@ import { useState, Fragment, ReactNode, useEffect, useMemo, useTransition, useRe
 import { createPortal } from 'react-dom'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
-import { Package, Truck, CheckCircle2, Store, Clock, XCircle, RefreshCw, Copy, Check, Calendar, Scissors, RotateCcw } from 'lucide-react'
+import { Package, Truck, CheckCircle2, Store, Clock, XCircle, RefreshCw, Copy, Check, Calendar, Scissors, RotateCcw, AlertTriangle } from 'lucide-react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { generateHermesLabelsAction, generateDhlLabelsAction, generateSingleDhlReturnLabelAction } from '@/app/actions/shipping'
-import { archiveOrderAction, archiveOrdersBulkAction, updateOrderStatusAction, updateOrderAddressAction, updateOrderBillingAddressAction, generateOrDownloadInvoicesBulkAction, markOrderAsShippedManuallyAction, getOrderLabelsAction, updateOrderNotesAction, refundOrderAction, refundOrderPartialAction, updateOrderScheduledShipmentDateAction, bulkScheduleLaterShipmentAction } from '@/app/actions/orders'
+import { archiveOrderAction, archiveOrdersBulkAction, updateOrderStatusAction, updateOrderAddressAction, updateOrderBillingAddressAction, generateOrDownloadInvoicesBulkAction, markOrderAsShippedManuallyAction, getOrderLabelsAction, updateOrderNotesAction, refundOrderAction, refundOrderPartialAction, updateOrderScheduledShipmentDateAction, bulkScheduleLaterShipmentAction, retryMarketplaceConfirmationAction } from '@/app/actions/orders'
 import { getInvoiceDownloadUrl } from '@/app/actions/invoices'
 import type { Order, OrderItem } from '@/db/schema/orders'
 import type { Invoice, InvoiceLog } from '@/db/schema/invoices'
@@ -343,8 +343,13 @@ const renderOrderProgress = (order: OrderWithItems, customMiraklIntegrations: an
   // 3. Shipped (Versendet)
   const shippedDate = states.shipped ? order.updatedAt : null
   const shippedDateStr = shippedDate ? format(new Date(shippedDate), 'dd.MM.yyyy', { locale: de }) : ''
-  const shippedTooltipTitle = states.shipped ? "Versendet" : "Versand ausstehend"
-  const shippedTooltipSubtitle = states.shipped ? `Versendet am ${shippedDateStr}` : "Noch nicht versendet"
+  const isMarketplaceFailed = order.marketplaceConfirmationStatus === 'failed'
+  const shippedTooltipTitle = isMarketplaceFailed 
+    ? "Marktplatz-Übertragung fehlgeschlagen" 
+    : (states.shipped ? "Versendet" : "Versand ausstehend")
+  const shippedTooltipSubtitle = isMarketplaceFailed 
+    ? (order.marketplaceConfirmationError || "Übertragung an Marktplatz fehlgeschlagen")
+    : (states.shipped ? `Versendet am ${shippedDateStr}` : "Noch nicht versendet")
 
   // 4. Invoice (Rechnung)
   const invoiceNumber = order.invoice?.invoiceNumber
@@ -381,12 +386,20 @@ const renderOrderProgress = (order: OrderWithItems, customMiraklIntegrations: an
 
       {/* 3. Versendet */}
       <Tooltip title={shippedTooltipTitle} subtitle={shippedTooltipSubtitle}>
-        <svg className={`w-5 h-5 ${getIconClass(states.shipped)}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-          <rect x="2" y="7" width="13" height="10" rx="1" />
-          <polygon points="15 8 19 8 22 11 22 17 15 17 15 8" />
-          <circle cx="7" cy="17" r="2" />
-          <circle cx="17" cy="17" r="2" />
-        </svg>
+        <div className="relative inline-flex items-center justify-center">
+          <svg className={`w-5 h-5 ${isMarketplaceFailed ? 'text-amber-500 hover:text-amber-600' : getIconClass(states.shipped)}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <rect x="2" y="7" width="13" height="10" rx="1" />
+            <polygon points="15 8 19 8 22 11 22 17 15 17 15 8" />
+            <circle cx="7" cy="17" r="2" />
+            <circle cx="17" cy="17" r="2" />
+          </svg>
+          {isMarketplaceFailed && (
+            <span className="absolute -top-1 -right-1 flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+            </span>
+          )}
+        </div>
       </Tooltip>
 
       {/* 4. Rechnung */}
@@ -1743,6 +1756,24 @@ const filteredOrders = orders;
     }
   }
 
+  const [retryingConfirmationOrderId, setRetryingConfirmationOrderId] = useState<string | null>(null)
+
+  const handleRetryMarketplaceConfirmation = async (order: OrderWithItems) => {
+    setRetryingConfirmationOrderId(order.id)
+    try {
+      const res = await retryMarketplaceConfirmationAction(order.id)
+      if (res.error) {
+        showToast(res.error, 'error')
+      } else {
+        showToast(res.message || 'Versand erfolgreich an Marktplatz übermittelt!', 'success')
+      }
+    } catch (err: any) {
+      showToast('Fehler bei der Marktplatz-Übermittlung: ' + (err?.message || String(err)), 'error')
+    } finally {
+      setRetryingConfirmationOrderId(null)
+    }
+  }
+
   const handleDelete = async (orderId: string) => {
     setDeleteModalConfig({ show: true, isBulk: false, orderId })
   }
@@ -2255,6 +2286,7 @@ const filteredOrders = orders;
             <option value="cancelled">Storniert</option>
             <option value="refunded">Erstattet</option>
             <option value="partially_refunded">Teilerstattet</option>
+            <option value="marketplace_failed">⚠️ Marktplatz nicht bestätigt</option>
           </select>
 
           {/* Shipping status filter temporarily hidden per user request */}
@@ -2544,15 +2576,26 @@ const filteredOrders = orders;
                             Teilerstattet
                           </span>
                         ) : (
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
-                            getDisplayStatus(order.status) === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                            getDisplayStatus(order.status) === 'processing' ? 'bg-blue-100 text-blue-800' :
-                            getDisplayStatus(order.status) === 'later_shipment' ? 'bg-purple-100 text-purple-800' :
-                            getDisplayStatus(order.status) === 'shipped' ? 'bg-green-100 text-green-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {getDisplayStatus(order.status) === 'later_shipment' ? 'Späterer Versand' : getDisplayStatus(order.status)}
-                          </span>
+                          <div className="flex flex-col gap-1 items-start">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
+                              getDisplayStatus(order.status) === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                              getDisplayStatus(order.status) === 'processing' ? 'bg-blue-100 text-blue-800' :
+                              getDisplayStatus(order.status) === 'later_shipment' ? 'bg-purple-100 text-purple-800' :
+                              getDisplayStatus(order.status) === 'shipped' ? 'bg-green-100 text-green-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {getDisplayStatus(order.status) === 'later_shipment' ? 'Späterer Versand' : getDisplayStatus(order.status)}
+                            </span>
+                            {order.marketplaceConfirmationStatus === 'failed' && (
+                              <span 
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-xs cursor-help"
+                                title={order.marketplaceConfirmationError || 'Marktplatz-Übertragung fehlgeschlagen'}
+                              >
+                                <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
+                                Nicht bestätigt
+                              </span>
+                            )}
+                          </div>
                         )}
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 group/order">
@@ -2929,6 +2972,26 @@ const filteredOrders = orders;
                                 </span>
                               )}
 
+                              {order.marketplace !== 'manual' && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenMenuOrderId(null)
+                                    setMenuPosition(null)
+                                    handleRetryMarketplaceConfirmation(order)
+                                  }}
+                                  disabled={retryingConfirmationOrderId === order.id}
+                                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-amber-700 hover:bg-amber-50/50 transition-colors whitespace-nowrap disabled:opacity-50"
+                                >
+                                  {retryingConfirmationOrderId === order.id ? (
+                                    <RefreshCw className="w-4 h-4 animate-spin text-amber-600" />
+                                  ) : (
+                                    <RotateCcw className="w-4 h-4 text-amber-600" />
+                                  )}
+                                  Marktplatz-Bestätigung wiederholen
+                                </button>
+                              )}
+
                               <div className="border-t border-slate-100 my-1"></div>
 
                               {/* 7. Status updates: Versand auf später / Zurück zu Pending */}
@@ -3037,6 +3100,42 @@ const filteredOrders = orders;
                     {isExpanded && (
                       <tr className="bg-gray-50 border-t border-b border-gray-100">
                         <td colSpan={11} className="px-6 py-6">
+                          {order.marketplaceConfirmationStatus === 'failed' && (
+                            <div className="mb-6 p-4 bg-amber-50/90 border border-amber-300 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
+                              <div className="flex items-start gap-3">
+                                <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+                                <div>
+                                  <div className="text-sm font-bold text-amber-950">
+                                    Marktplatz-Übertragung fehlgeschlagen
+                                  </div>
+                                  <div className="text-xs text-amber-900 mt-0.5 max-w-2xl font-mono">
+                                    {order.marketplaceConfirmationError || 'Die Sendung wurde lokal erstellt, konnte aber noch nicht an den Marktplatz übermittelt werden. Die Bestellung ist auf dem Marktplatz weiterhin offen.'}
+                                  </div>
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleRetryMarketplaceConfirmation(order)
+                                }}
+                                disabled={retryingConfirmationOrderId === order.id}
+                                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-all flex items-center gap-2 shrink-0 disabled:opacity-50 cursor-pointer"
+                              >
+                                {retryingConfirmationOrderId === order.id ? (
+                                  <>
+                                    <RefreshCw className="w-4 h-4 animate-spin" />
+                                    Übertrage an Marktplatz...
+                                  </>
+                                ) : (
+                                  <>
+                                    <RotateCcw className="w-4 h-4" />
+                                    Bestätigung wiederholen
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          )}
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                             {/* Addresses & Info */}
                             <div>

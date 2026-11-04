@@ -203,6 +203,8 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
       } else {
         whereConditions.push(sql`1=0`)
       }
+    } else if (status === 'marketplace_failed') {
+      whereConditions.push(eq(orders.marketplaceConfirmationStatus, 'failed'))
     } else {
       whereConditions.push(eq(orders.status, status as any))
     }
