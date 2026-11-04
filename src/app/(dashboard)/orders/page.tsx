@@ -15,6 +15,7 @@ import Link from 'next/link'
 
 import { ManufacturerCsvDialog } from './manufacturer-csv-dialog'
 import { resolveBillingAddress } from '@/lib/order-address'
+import { calculateOrderRefundStats } from '@/lib/order-refunds'
 
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
   const auth = await requireAuth()
@@ -94,28 +95,11 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         const orderItemsList = itemsByOrder[orderId] || []
         const orderReturnsList = returnsByOrder[orderId] || []
 
-        let totalOrderedQty = 0
-        let totalRefundedQty = 0
+        const stats = calculateOrderRefundStats(orderItemsList, orderReturnsList)
 
-        for (const item of orderItemsList) {
-          totalOrderedQty += Number(item.quantity || 1)
-          
-          const refundedCount = orderReturnsList.reduce((acc, ret) => {
-            if (ret.status === 'bearbeitet' && (ret.metadata as any)?.refundedItems) {
-              const matched = ((ret.metadata as any).refundedItems as any[]).find((r: any) => r.sku === item.sku)
-              if (matched && matched.quantity) {
-                return acc + Number(matched.quantity)
-              }
-            }
-            return acc
-          }, 0)
-          
-          totalRefundedQty += refundedCount
-        }
-
-        if (totalOrderedQty > 0 && totalRefundedQty >= totalOrderedQty) {
+        if (stats.isFullyRefunded) {
           fullyRefundedIds.push(orderId)
-        } else if (totalRefundedQty > 0 && totalRefundedQty < totalOrderedQty) {
+        } else if (stats.isPartiallyRefunded) {
           partiallyRefundedIds.push(orderId)
         }
       }

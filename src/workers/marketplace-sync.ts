@@ -195,6 +195,26 @@ export function createMarketplaceSyncWorker() {
           const groupKey = `sync-group:${companyId}:${syncGroupId}`
           await redis.set(`${groupKey}:total`, toSync.length, 'EX', 86400) // 24h expire
 
+          const getMarketplaceDisplayName = (integ: any) => {
+            if ((integ.metadata as any)?.customName) return (integ.metadata as any).customName
+            const names: Record<string, string> = {
+              'otto': 'Otto',
+              'amazon': 'Amazon',
+              'shopify': 'Shopify',
+              'aboutyou': 'About You',
+              'kaufland': 'Kaufland',
+              'ebay': 'eBay',
+              'etsy': 'Etsy',
+              'woocommerce': 'WooCommerce',
+              'shopware': 'Shopware',
+              'mirakl_decathlon': 'Decathlon',
+              'mirakl_decathlon_eu': 'Decathlon EU',
+              'mirakl_mediamarkt': 'MediaMarkt',
+              'mirakl_custom': 'Marktplatz',
+            }
+            return names[integ.type] || (integ.type.charAt(0).toUpperCase() + integ.type.slice(1))
+          }
+
           for (const integration of toSync) {
             await marketplaceSyncQueue.add(
               `sync-${integration.type}`,
@@ -204,7 +224,7 @@ export function createMarketplaceSyncWorker() {
                 triggeredByUserId: null,
                 integrationId: integration.id,
                 syncGroupId,
-                marketplaceDisplayName: (integration.metadata as any)?.customName || integration.type,
+                marketplaceDisplayName: getMarketplaceDisplayName(integration),
               },
               {
                 jobId: `sync-${integration.type}-${integration.id}-${companyId}-${Date.now()}`
@@ -212,6 +232,26 @@ export function createMarketplaceSyncWorker() {
             )
           }
         } else {
+          const getMarketplaceDisplayName = (integ: any) => {
+            if ((integ.metadata as any)?.customName) return (integ.metadata as any).customName
+            const names: Record<string, string> = {
+              'otto': 'Otto',
+              'amazon': 'Amazon',
+              'shopify': 'Shopify',
+              'aboutyou': 'About You',
+              'kaufland': 'Kaufland',
+              'ebay': 'eBay',
+              'etsy': 'Etsy',
+              'woocommerce': 'WooCommerce',
+              'shopware': 'Shopware',
+              'mirakl_decathlon': 'Decathlon',
+              'mirakl_decathlon_eu': 'Decathlon EU',
+              'mirakl_mediamarkt': 'MediaMarkt',
+              'mirakl_custom': 'Marktplatz',
+            }
+            return names[integ.type] || (integ.type.charAt(0).toUpperCase() + integ.type.slice(1))
+          }
+
           for (const integration of toSync) {
             await marketplaceSyncQueue.add(
               `sync-${integration.type}`,
@@ -220,7 +260,7 @@ export function createMarketplaceSyncWorker() {
                 marketplace: integration.type as any,
                 triggeredByUserId: null,
                 integrationId: integration.id,
-                marketplaceDisplayName: (integration.metadata as any)?.customName || integration.type,
+                marketplaceDisplayName: getMarketplaceDisplayName(integration),
               },
               {
                 jobId: `sync-${integration.type}-${integration.id}-${companyId}-${Date.now()}`
@@ -395,6 +435,11 @@ export function createMarketplaceSyncWorker() {
               toDate: job.data.toDate
             })
           } else if (marketplace === 'shopware') {
+            rawOrders = await adapter.fetchUnshippedOrders(companyId, {
+              fromDate: job.data.fromDate,
+              toDate: job.data.toDate
+            })
+          } else if (marketplace === 'etsy' || typeof (adapter as any).fetchUnshippedOrders === 'function') {
             rawOrders = await adapter.fetchUnshippedOrders(companyId, {
               fromDate: job.data.fromDate,
               toDate: job.data.toDate
@@ -608,7 +653,7 @@ export function getAdapterForIntegration(
   }
   if (integration.type === 'etsy') {
     if (!integration.clientId || !integration.clientSecret) return null
-    return new EtsyAdapter()
+    return new EtsyAdapter(integration)
   }
   if (integration.type === 'aboutyou') {
     if (!integration.apiKey) return null
@@ -1905,14 +1950,61 @@ export async function persistOrders(
           })
       }
 
-      // Determine Delivery Note Number
+      // Determine Delivery Note Number and Tax Rate Source
       const [compDN] = await tx
-        .select({ nextDeliveryNoteNumber: companies.nextDeliveryNoteNumber })
+        .select({ 
+          nextDeliveryNoteNumber: companies.nextDeliveryNoteNumber,
+          taxRateSource: companies.taxRateSource 
+        })
         .from(companies)
         .where(eq(companies.id, companyId))
       const deliveryNoteNumber = compDN.nextDeliveryNoteNumber
       const nextDN = (parseInt(deliveryNoteNumber) + 1).toString()
       await tx.update(companies).set({ nextDeliveryNoteNumber: nextDN }).where(eq(companies.id, companyId))
+
+      const companyTaxRateSource = (compDN?.taxRateSource as 'platform' | 'product') || 'platform'
+      const integrationMeta = (integration?.metadata as any) || {}
+      const effectiveTaxRateSource: 'platform' | 'product' = 
+        (integrationMeta.taxRateSource && integrationMeta.taxRateSource !== 'default') 
+          ? integrationMeta.taxRateSource 
+          : companyTaxRateSource
+
+      // Pre-fetch product tax rates from TheOmniStack catalog for all items in order
+      const itemSkus = Array.from(new Set(order.items.map(i => i.sku).filter((s): s is string => Boolean(s && s !== 'N/A' && s !== 'UNKNOWN'))))
+      const productTaxRatesBySku: Record<string, number> = {}
+
+      if (itemSkus.length > 0) {
+        const matchingCatalogProducts = await tx
+          .select({
+            sku: products.sku,
+            taxRate: products.taxRate,
+            mappingSku: productMappings.marketplaceSku,
+            mappingProductId: productMappings.marketplaceProductId,
+          })
+          .from(products)
+          .leftJoin(productMappings, eq(products.id, productMappings.productId))
+          .where(
+            and(
+              eq(products.companyId, companyId),
+              or(
+                inArray(products.sku, itemSkus),
+                inArray(productMappings.marketplaceSku, itemSkus),
+                inArray(productMappings.marketplaceProductId, itemSkus)
+              )
+            )
+          )
+
+        for (const p of matchingCatalogProducts) {
+          if (p.taxRate !== null && p.taxRate !== undefined) {
+            const parsed = parseFloat(p.taxRate)
+            if (!isNaN(parsed)) {
+              if (p.sku) productTaxRatesBySku[p.sku] = parsed
+              if (p.mappingSku) productTaxRatesBySku[p.mappingSku] = parsed
+              if (p.mappingProductId) productTaxRatesBySku[p.mappingProductId] = parsed
+            }
+          }
+        }
+      }
 
       // Lookup VAT Settings
       const shippingCountryCode = get2LetterCountryCode(order.shippingAddress.country)
@@ -1923,26 +2015,74 @@ export async function persistOrders(
         )
       })
 
-      // Resolve the VAT rate to apply
-      let resolvedVatRate = 0.19 // Default to German VAT
+      // Resolve standard default VAT rate
+      let defaultVatRate = 0.19 // Default to German standard VAT
       if (countryVat) {
         if (countryVat.vatType === 'below_threshold') {
-          resolvedVatRate = 0.19 // below threshold uses German VAT (19%)
+          defaultVatRate = 0.19 // below threshold uses German VAT (19%)
         } else if (countryVat.vatType === 'third_country') {
-          resolvedVatRate = 0.00 // Third country uses 0%
+          defaultVatRate = 0.00 // Third country uses 0%
         } else {
-          resolvedVatRate = parseFloat(countryVat.vatRate)
+          defaultVatRate = parseFloat(countryVat.vatRate)
         }
       }
 
-      let finalTaxAmount = order.taxAmount
-      if (countryVat) {
-        finalTaxAmount = order.items.reduce((sum, item) => {
-          const gross = item.unitPrice * item.quantity
-          const net = gross / (1 + resolvedVatRate)
-          return sum + (gross - net)
-        }, 0)
-      }
+      const isThirdCountry = countryVat?.vatType === 'third_country'
+
+      // Calculate each item's tax rate and net amounts
+      const calculatedItems = order.items.map((item) => {
+        const productTaxRate = (item.sku && productTaxRatesBySku[item.sku] !== undefined)
+          ? productTaxRatesBySku[item.sku]
+          : undefined
+
+        const hasPlatformRate = typeof item.taxRate === 'number' && !isNaN(item.taxRate) && item.taxRate >= 0
+        const platformRate = hasPlatformRate ? item.taxRate : undefined
+
+        let appliedRate: number
+        if (isThirdCountry) {
+          appliedRate = 0.00
+        } else if (effectiveTaxRateSource === 'product') {
+          if (productTaxRate !== undefined) {
+            appliedRate = productTaxRate
+          } else if (platformRate !== undefined) {
+            appliedRate = platformRate
+          } else {
+            appliedRate = defaultVatRate
+          }
+        } else {
+          // platform-first
+          if (platformRate !== undefined) {
+            appliedRate = platformRate
+          } else if (productTaxRate !== undefined) {
+            appliedRate = productTaxRate
+          } else {
+            appliedRate = defaultVatRate
+          }
+        }
+
+        const grossUnitPrice = item.unitPrice
+        const netUnitPrice = grossUnitPrice / (1 + appliedRate)
+        const itemGrossTotal = grossUnitPrice * item.quantity
+        const itemNetTotal = netUnitPrice * item.quantity
+        const itemTaxTotal = itemGrossTotal - itemNetTotal
+
+        return {
+          sku: item.sku || 'N/A',
+          asin: item.asin || null,
+          title: item.title,
+          quantity: item.quantity,
+          grossUnitPrice,
+          netUnitPrice,
+          appliedRate,
+          itemGrossTotal,
+          itemNetTotal,
+          itemTaxTotal
+        }
+      })
+
+      const calculatedSubtotal = calculatedItems.reduce((sum, i) => sum + i.itemNetTotal, 0)
+      const calculatedTax = calculatedItems.reduce((sum, i) => sum + i.itemTaxTotal, 0)
+      const calculatedTotal = calculatedSubtotal + calculatedTax
 
       // Insert Order
       const [inserted] = await tx
@@ -1964,8 +2104,9 @@ export async function persistOrders(
           shippingZip: normalizePostalCode(order.shippingAddress.zip, shippingCountryCode),
           shippingCountry: shippingCountryCode,
           currency: order.currency,
-          totalAmount: String(order.totalAmount),
-          taxAmount: String(finalTaxAmount.toFixed(2)),
+          subtotalAmount: String(calculatedSubtotal.toFixed(2)),
+          totalAmount: String(order.totalAmount || calculatedTotal.toFixed(2)),
+          taxAmount: String(calculatedTax.toFixed(2)),
           status: (() => {
             const raw = order.rawPayload as any
             if (raw?.cancelled_at) return 'cancelled'
@@ -1990,22 +2131,19 @@ export async function persistOrders(
       affected++
 
       // Insert Order Items
-      if (order.items.length > 0) {
+      if (calculatedItems.length > 0) {
         await tx.insert(orderItems).values(
-          order.items.map((item) => {
-            const rate = resolvedVatRate
-            const gross = item.unitPrice
-            const net = gross / (1 + rate)
-            
+          calculatedItems.map((item, index) => {
             return {
               orderId: inserted.id,
               companyId,
-              sku: item.sku || 'N/A',
-              asin: item.asin || null,
+              position: index.toString(),
+              sku: item.sku,
+              asin: item.asin,
               title: item.title,
               quantity: item.quantity.toString(),
-              unitPrice: net.toFixed(4), // Store with more precision to avoid rounding errors
-              taxRate: rate.toString(),
+              unitPrice: item.netUnitPrice.toFixed(4), // Store with more precision to avoid rounding errors
+              taxRate: item.appliedRate.toString(),
             }
           })
         )

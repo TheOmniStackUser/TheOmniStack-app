@@ -7,6 +7,7 @@ import { returnsLog } from '@/db/schema/returns'
 import { invoices } from '@/db/schema/invoices'
 import { SyncButton } from './sync-button'
 import Link from 'next/link'
+import { calculateOrderRefundStats } from '@/lib/order-refunds'
 
 function getMarketplaceName(id: string) {
   if (!id) return 'Unbekannt'
@@ -244,28 +245,11 @@ export default async function DashboardPage() {
       const orderItemsList = itemsByOrder[orderId] || []
       const orderReturnsList = returnsByOrder[orderId] || []
 
-      let totalOrderedQty = 0
-      let totalRefundedQty = 0
+      const stats = calculateOrderRefundStats(orderItemsList, orderReturnsList)
 
-      for (const item of orderItemsList) {
-        totalOrderedQty += Number(item.quantity || 1)
-        
-        const refundedCount = orderReturnsList.reduce((acc, ret) => {
-          if (ret.status === 'bearbeitet' && (ret.metadata as any)?.refundedItems) {
-            const matched = ((ret.metadata as any).refundedItems as any[]).find((r: any) => r.sku === item.sku)
-            if (matched && matched.quantity) {
-              return acc + Number(matched.quantity)
-            }
-          }
-          return acc
-        }, 0)
-        
-        totalRefundedQty += refundedCount
-      }
-
-      if (totalOrderedQty > 0 && totalRefundedQty >= totalOrderedQty) {
+      if (stats.isFullyRefunded) {
         fullyRefundedCount++
-      } else if (totalRefundedQty > 0 && totalRefundedQty < totalOrderedQty) {
+      } else if (stats.isPartiallyRefunded) {
         partiallyRefundedCount++
       }
     }

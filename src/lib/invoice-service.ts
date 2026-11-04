@@ -499,6 +499,9 @@ export function extractPaymentInfo(order: any) {
       paymentMethod = 'Kaufland'
     } else if (marketplace === 'ebay') {
       paymentMethod = 'eBay'
+    } else if (marketplace === 'etsy') {
+      paymentMethod = 'Etsy'
+      isPaid = true
     } else if (
       marketplace.startsWith('mirakl_') ||
       marketplace.includes('decathlon') ||

@@ -65,6 +65,7 @@ export const companies = pgTable('companies', {
   nextInvoiceNumber: text('next_invoice_number').notNull().default('1'),
   nextCustomerNumber: text('next_customer_number').notNull().default('1'),
   nextDeliveryNoteNumber: text('next_delivery_note_number').notNull().default('1'),
+  taxRateSource: text('tax_rate_source').notNull().default('platform'), // 'platform' | 'product'
   documentNumberSettings: jsonb('document_number_settings').$type<{
     invoice?: {
       auto: boolean;

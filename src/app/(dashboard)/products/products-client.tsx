@@ -179,6 +179,11 @@ function PriceEditor({ product, onToast }: { product: Product; onToast?: (messag
         title="Standard Preis bearbeiten"
       >
         <span className="font-semibold text-slate-700 border-b border-slate-300 border-dashed whitespace-nowrap">{Number(product.price || 0).toFixed(2)} €</span>
+        {product.taxRate && Math.round(parseFloat(product.taxRate) * 100) !== 19 && (
+          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+            {Number((parseFloat(product.taxRate) * 100).toFixed(0))}%
+          </span>
+        )}
         {isSaving ? (
           <Loader2 className="w-3 h-3 animate-spin text-slate-400" />
         ) : (
@@ -1096,6 +1101,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
   const [bulkStock, setBulkStock] = useState('')
   const [bulkMsrp, setBulkMsrp] = useState('')
   const [bulkPrice, setBulkPrice] = useState('')
+  const [bulkTaxRate, setBulkTaxRate] = useState('')
   const [bulkReducedPrice, setBulkReducedPrice] = useState('')
   const [bulkSaleStartDate, setBulkSaleStartDate] = useState('')
   const [bulkSaleEndDate, setBulkSaleEndDate] = useState('')
@@ -1125,19 +1131,29 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
         if (!isNaN(parsed)) newReducedPrice = Math.max(0, parsed)
       }
 
-      if (newStock === undefined && parsedMsrp === undefined && newPrice === undefined && newReducedPrice === undefined && newSaleStartDate === undefined && newSaleEndDate === undefined) {
+      if (newStock === undefined && parsedMsrp === undefined && newPrice === undefined && newReducedPrice === undefined && newSaleStartDate === undefined && newSaleEndDate === undefined && bulkTaxRate.trim() === '') {
         showToast('Keine Änderungen eingegeben', 'info')
         setIsBulkEditing(false)
         return
       }
 
-      await bulkUpdateStockAndPrice(Array.from(selectedProductIds), newStock, newPrice, newReducedPrice, parsedMsrp, newSaleStartDate, newSaleEndDate)
+      await bulkUpdateStockAndPrice(
+        Array.from(selectedProductIds), 
+        newStock, 
+        newPrice, 
+        newReducedPrice, 
+        parsedMsrp, 
+        newSaleStartDate, 
+        newSaleEndDate,
+        bulkTaxRate.trim() !== '' ? bulkTaxRate : undefined
+      )
       setShowBulkEditModal(false)
       setBulkStock('')
       setBulkMsrp('')
       setBulkPrice('')
+      setBulkTaxRate('')
       setBulkReducedPrice('')
-      showToast('Bestand/Preis erfolgreich für ausgewählte Produkte aktualisiert', 'success')
+      showToast('Daten erfolgreich für ausgewählte Produkte aktualisiert', 'success')
       router.refresh()
     } catch (e) {
       console.error(e)
@@ -2274,6 +2290,20 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                     placeholder="z.B. 19.90" 
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 placeholder:text-slate-500" 
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700">Neuer Steuersatz (MwSt.)</label>
+                  <select 
+                    value={bulkTaxRate} 
+                    onChange={e => setBulkTaxRate(e.target.value)} 
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 font-medium"
+                  >
+                    <option value="">Keine Änderung</option>
+                    <option value="19">19% (Regulärer Steuersatz)</option>
+                    <option value="7">7% (Ermäßigter Steuersatz - z.B. Lebensmittel, Bücher)</option>
+                    <option value="0">0% (Steuerbefreit)</option>
+                  </select>
                 </div>
 
                 <div className="space-y-2">

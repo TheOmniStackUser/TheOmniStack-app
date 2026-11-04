@@ -51,6 +51,12 @@ export async function saveCompanySettingsAction(prevState: any, formData: FormDa
 
     setIfPresent('phone')
     setIfPresent('website')
+    if (formData.has('taxRateSource')) {
+      const trs = formData.get('taxRateSource') as string
+      if (trs === 'product' || trs === 'platform') {
+        updateData.taxRateSource = trs
+      }
+    }
 
     // Handle logoUrl
     if (formData.has('logoFile') || formData.has('existingLogoUrl')) {
@@ -272,13 +278,32 @@ export async function deleteVatSettingAction(id: string) {
   }
 }
 
+export async function saveTaxRateSourceAction(taxRateSource: 'platform' | 'product') {
+  const auth = await requireAuth()
+  try {
+    await db.update(companies)
+      .set({ 
+        taxRateSource: taxRateSource === 'product' ? 'product' : 'platform',
+        updatedAt: new Date() 
+      })
+      .where(eq(companies.id, auth.activeCompanyId))
+
+    revalidatePath('/settings')
+    return { success: true, message: 'Steuersatz-Quelle erfolgreich gespeichert.' }
+  } catch (error) {
+    console.error('Error saving tax rate source:', error)
+    return { success: false, message: 'Fehler beim Speichern der Steuersatz-Quelle.' }
+  }
+}
+
 export async function saveMarketplaceAutomationAction(
   integrationId: string, 
   autoInvoice: boolean, 
   uploadInvoice: boolean,
   downloadInvoice?: boolean,
   autoCreditNote?: boolean,
-  autoRefund?: boolean
+  autoRefund?: boolean,
+  taxRateSource?: 'platform' | 'product' | 'default'
 ) {
   const auth = await requireAuth()
   const { marketplaceIntegrations } = await import('@/db/schema/integrations')
@@ -319,7 +344,8 @@ export async function saveMarketplaceAutomationAction(
       autoInvoiceEnabledAt,
       ...(downloadInvoice !== undefined ? { downloadInvoice } : {}),
       ...(autoCreditNote !== undefined ? { autoCreditNote } : {}),
-      ...(autoRefund !== undefined ? { autoRefund } : {})
+      ...(autoRefund !== undefined ? { autoRefund } : {}),
+      ...(taxRateSource !== undefined ? { taxRateSource } : {})
     }
 
     await db.update(marketplaceIntegrations)

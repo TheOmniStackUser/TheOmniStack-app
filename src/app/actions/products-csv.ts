@@ -39,6 +39,7 @@ export async function exportProductsCsv() {
       UVP: p.msrp?.toString() || '',
       'Reduzierter Preis': p.reducedPrice?.toString() || '',
       Einkaufspreis: p.purchasePrice?.toString() || '',
+      Steuersatz: p.taxRate ? `${(parseFloat(p.taxRate) * 100).toFixed(0)}%` : '19%',
       Gewicht: p.weight?.toString() || '',
       Lagerort: p.storageLocation || '',
       'HS-Code': p.hsCode || '',
@@ -114,6 +115,16 @@ export async function importProductsCsvAction(csvString: string) {
     const color = (row['Farbe'] || row['Color'])?.trim() || parsedVariant.color || null
     const size = (row['Größe'] || row['Groesse'] || row['Size'])?.trim() || parsedVariant.size || null
     
+    let taxRate: string | undefined
+    const rawTaxRate = (row['Steuersatz'] || row['MwSt'] || row['Tax Rate'] || row['USt'])?.trim()
+    if (rawTaxRate) {
+      const parsed = parseFloat(rawTaxRate.replace('%', '').replace(',', '.'))
+      if (!isNaN(parsed)) {
+        const rate = parsed > 1 ? parsed / 100 : parsed
+        taxRate = rate.toFixed(4)
+      }
+    }
+
     const [insertedProduct] = await db.insert(products).values({
       companyId: auth.activeCompanyId,
       sku,
@@ -127,6 +138,7 @@ export async function importProductsCsvAction(csvString: string) {
       msrp,
       reducedPrice,
       purchasePrice,
+      taxRate: taxRate || '0.1900',
       weight,
       storageLocation,
       hsCode,
@@ -145,6 +157,7 @@ export async function importProductsCsvAction(csvString: string) {
         msrp,
         reducedPrice,
         purchasePrice,
+        ...(taxRate ? { taxRate } : {}),
         weight,
         storageLocation,
         hsCode,

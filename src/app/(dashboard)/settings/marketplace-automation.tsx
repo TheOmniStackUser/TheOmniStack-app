@@ -113,9 +113,37 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
         }
         return int
       }))
-      alert(result.message)
     }
     setLoadingId(null)
+  }
+
+  const handleTaxRateSourceChange = async (id: string, newSource: 'platform' | 'product' | 'default') => {
+    setLocalIntegrations(prev => prev.map(int => {
+      if (int.id === id) {
+        const currentMetadata = getMarketplaceMetadata(int.metadata)
+        return {
+          ...int,
+          metadata: {
+            ...currentMetadata,
+            taxRateSource: newSource
+          }
+        }
+      }
+      return int
+    }))
+
+    const integration = localIntegrations.find(i => i.id === id)
+    if (!integration) return
+
+    await saveMarketplaceAutomationAction(
+      id,
+      integration.autoInvoice,
+      integration.uploadInvoice,
+      !!getMarketplaceMetadata(integration.metadata).downloadInvoice,
+      !!getMarketplaceMetadata(integration.metadata).autoCreditNote,
+      !!getMarketplaceMetadata(integration.metadata).autoRefund,
+      newSource
+    )
   }
 
   const getLabel = (int: Integration) => {
@@ -282,6 +310,17 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
                         <RefreshCw size={14} />
                         {loadingId === `${int.id}-autoRefund` ? '...' : 'Auto-Erstattung'}
                       </button>
+
+                      <select
+                        value={(metadata.taxRateSource as string) || 'default'}
+                        onChange={(e) => handleTaxRateSourceChange(int.id, e.target.value as any)}
+                        className="px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                        title="Steuersatz-Quelle für diesen Marktplatz"
+                      >
+                        <option value="default">Steuer: Standard</option>
+                        <option value="platform">Steuer: Plattform</option>
+                        <option value="product">Steuer: TheOmniStack</option>
+                      </select>
                     </div>
                   </div>
                 </div>

@@ -96,7 +96,10 @@ export default async function SettingsPage(props: {
 
       <DunningSettings smtpSettings={company.smtpSettings ?? undefined} />
 
-      <VatSettings initialSettings={initialVatSettings} />
+      <VatSettings 
+        initialSettings={initialVatSettings} 
+        initialTaxRateSource={(company.taxRateSource as 'platform' | 'product') || 'platform'} 
+      />
 
     </div>
   )

@@ -97,6 +97,9 @@ export const orders = pgTable('orders', {
   totalWeight: numeric('total_weight', { precision: 8, scale: 3 }),
   notes: text('notes'),
   scheduledShipmentDate: timestamp('scheduled_shipment_date', { withTimezone: true }),
+  marketplaceConfirmationStatus: text('marketplace_confirmation_status'),
+  marketplaceConfirmationError: text('marketplace_confirmation_error'),
+  marketplaceConfirmedAt: timestamp('marketplace_confirmed_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({

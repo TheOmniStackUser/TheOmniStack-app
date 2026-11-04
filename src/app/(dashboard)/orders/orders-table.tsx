@@ -18,6 +18,7 @@ import { SplitOrderModal } from '@/components/orders/SplitOrderModal'
 import { resolveBillingAddress } from '@/lib/order-address'
 import { getMarketplaceShippingInfo } from '@/lib/order-dates'
 import { getOrderDisplayNumber } from '@/lib/order-number'
+import { calculateOrderRefundStats, allocateRefundsToOrderItems } from '@/lib/order-refunds'
 
 export type OrderWithItems = Order & { items: OrderItem[], returns?: any[], invoice?: (Invoice & { logs?: InvoiceLog[] }) | null }
 
@@ -163,6 +164,7 @@ const formatMarketplaceName = (mp: string | null, shippingCountry?: string | nul
   if (lower === 'amazon') return 'Amazon'
   if (lower === 'kaufland') return 'Kaufland'
   if (lower === 'ebay') return 'eBay'
+  if (lower === 'etsy') return 'Etsy'
 
   let resolvedName = mp
   if (lower === 'mirakl_custom') {
@@ -270,6 +272,8 @@ const getMarketplaceBadgeStyle = (mp: string) => {
       return { backgroundColor: '#fce8e6', color: '#c5221f' }
     case 'ebay':
       return { backgroundColor: '#e8f0fe', color: '#1967d2' }
+    case 'etsy':
+      return { backgroundColor: '#fff0e6', color: '#f1641e' }
     default:
       // Custom Mirakl integration style (nice clean green)
       return { backgroundColor: '#e8f5e9', color: '#1b5e20' }
@@ -296,7 +300,7 @@ const Tooltip = ({ title, subtitle, children }: { title: string; subtitle: strin
 
 const getOrderProgressStates = (order: OrderWithItems, customMiraklIntegrations: any[] = []) => {
   const customMpNames = customMiraklIntegrations.map((i: any) => (i.metadata?.customName || '').toLowerCase())
-  const isMarketplacePrepaid = ['otto', 'amazon', 'mirakl_decathlon', 'mirakl_decathlon_eu', 'mirakl_mediamarkt', 'aboutyou', 'kaufland', 'ebay'].includes(order.marketplace?.toLowerCase() || '') || customMpNames.includes(order.marketplace?.toLowerCase() || '')
+  const isMarketplacePrepaid = ['otto', 'amazon', 'mirakl_decathlon', 'mirakl_decathlon_eu', 'mirakl_mediamarkt', 'aboutyou', 'kaufland', 'ebay', 'etsy'].includes(order.marketplace?.toLowerCase() || '') || customMpNames.includes(order.marketplace?.toLowerCase() || '')
   const isShopifyPaid = order.marketplace === 'shopify' && ((order.rawPayload as any)?.financial_status === 'paid' || (order.rawPayload as any)?.financial_status === undefined)
   const paymentLog = order.invoice?.logs?.find((l: any) => l.action === 'payment')
   const isInvoicePaid = !!paymentLog
@@ -327,7 +331,7 @@ const renderOrderProgress = (order: OrderWithItems, customMiraklIntegrations: an
     if (paymentLog) {
       const paymentDate = paymentLog.createdAt ? format(new Date(paymentLog.createdAt), 'dd.MM.yyyy HH:mm', { locale: de }) : ''
       paidTooltipSubtitle = `Zahlung erfasst am ${paymentDate}`
-    } else if (['otto', 'amazon', 'mirakl_decathlon', 'mirakl_decathlon_eu', 'mirakl_mediamarkt', 'aboutyou', 'kaufland', 'ebay'].includes(order.marketplace) || customMiraklIntegrations.map((i: any) => (i.metadata?.customName || '').toLowerCase()).includes(order.marketplace?.toLowerCase() || '')) {
+    } else if (['otto', 'amazon', 'mirakl_decathlon', 'mirakl_decathlon_eu', 'mirakl_mediamarkt', 'aboutyou', 'kaufland', 'ebay', 'etsy'].includes(order.marketplace?.toLowerCase() || '') || customMiraklIntegrations.map((i: any) => (i.metadata?.customName || '').toLowerCase()).includes(order.marketplace?.toLowerCase() || '')) {
       paidTooltipSubtitle = `Zahlung über ${formatMarketplaceName(order.marketplace, order.shippingCountry)}`
     } else if (order.marketplace === 'shopify') {
       paidTooltipSubtitle = "Zahlung über Shopify abgewickelt"
@@ -1254,23 +1258,17 @@ export function OrdersTable({
   }
 
   const handleOpenRefundItems = (order: any) => {
-    const inputs = order.items.map((orderItem: any) => {
-      const refundedCount = order.returns?.reduce((acc: number, ret: any) => {
-        if (ret.status === 'bearbeitet' && ret.metadata?.refundedItems) {
-          const matched = (ret.metadata.refundedItems as any[]).find((r: any) => r.sku === orderItem.sku)
-          if (matched) return acc + (Number(matched.quantity) || 0)
-        }
-        return acc
-      }, 0) || 0
-  
+    const stats = calculateOrderRefundStats(order.items, order.returns)
+    const allocated = allocateRefundsToOrderItems(order.items || [], stats.refundedBySku)
+
+    const inputs = allocated.map((orderItem: any) => {
       const orderQty = Number(orderItem.quantity) || 1
-  
       return {
         sku: orderItem.sku || 'N/A',
         title: orderItem.title,
         orderQty,
-        returnedQty: refundedCount,
-        refundQty: Math.max(0, orderQty - refundedCount),
+        returnedQty: orderItem.allocatedRefund,
+        refundQty: orderItem.remainingQtyToRefund,
         restock: true
       }
     })
@@ -1301,14 +1299,30 @@ export function OrdersTable({
   
   const handleExecutePartialRefund = async () => {
     if (!refundOrder) return
-    const payload = refundItemsInput.filter(item => item.refundQty > 0).map(item => ({ sku: item.sku, quantity: item.refundQty, restock: item.restock }))
-    if (payload.length === 0) {
+    const activeItems = refundItemsInput.filter(item => item.refundQty > 0)
+    if (activeItems.length === 0) {
       showToast('Bitte wähle mindestens einen Artikel mit einer Menge größer als 0 aus.', 'error')
       return
     }
+
+    // Aggregate by SKU in case multiple line items share the same SKU
+    const aggregatedPayload: { sku: string; quantity: number; restock?: boolean }[] = []
+    const map = new Map<string, { sku: string; quantity: number; restock?: boolean }>()
+    for (const item of activeItems) {
+      const existing = map.get(item.sku)
+      if (existing) {
+        existing.quantity += item.refundQty
+        if (item.restock === false) existing.restock = false
+      } else {
+        const entry = { sku: item.sku, quantity: item.refundQty, restock: item.restock }
+        map.set(item.sku, entry)
+        aggregatedPayload.push(entry)
+      }
+    }
+
     startRefundItemsTransition(async () => {
       try {
-        const res = await refundOrderPartialAction(refundOrder.id, payload)
+        const res = await refundOrderPartialAction(refundOrder.id, aggregatedPayload)
         if ('success' in res && res.success && 'creditNoteNumber' in res) {
           showToast(`Erstattung erfolgreich veranlasst (Gutschrift: ${res.creditNoteNumber}).`, 'success')
           setRefundOrder(null)
@@ -2464,29 +2478,9 @@ const filteredOrders = orders;
                 const formattedVersandDate = formatDate(rawVersandDate, false)
                 const shippingInfo = getMarketplaceShippingInfo(order)
 
-                let totalOrderedQty = 0;
-                let totalRefundedQty = 0;
-
-                if (order.items) {
-                  for (const item of order.items) {
-                    totalOrderedQty += Number(item.quantity || 1);
-                    
-                    const refundedCount = order.returns?.reduce((acc, ret) => {
-                      if (ret.status === 'bearbeitet' && (ret.metadata as any)?.refundedItems) {
-                        const matched = ((ret.metadata as any).refundedItems as any[]).find((r: any) => r.sku === item.sku);
-                        if (matched && matched.quantity) {
-                          return acc + Number(matched.quantity);
-                        }
-                      }
-                      return acc;
-                    }, 0) || 0;
-                    
-                    totalRefundedQty += refundedCount;
-                  }
-                }
-
-                const isOrderFullyRefunded = totalOrderedQty > 0 && totalRefundedQty >= totalOrderedQty;
-                const isOrderPartiallyRefunded = totalRefundedQty > 0 && totalRefundedQty < totalOrderedQty;
+                const refundStats = calculateOrderRefundStats(order.items, order.returns);
+                const isOrderFullyRefunded = refundStats.isFullyRefunded;
+                const isOrderPartiallyRefunded = refundStats.isPartiallyRefunded;
 
                 const canSplitOrder = 
                   order.status !== 'shipped' && 
@@ -3712,19 +3706,10 @@ const filteredOrders = orders;
                               <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Bestellte Produkte</h4>
                               <div className="bg-white rounded-md border border-gray-200 overflow-hidden mb-4">
                                 <ul className="divide-y divide-gray-200">
-                                  {order.items?.map((item) => {
-                                    const refundedCount = order.returns?.reduce((acc, ret) => {
-                                      if (ret.status === 'bearbeitet' && ret.metadata?.refundedItems) {
-                                        const matched = (ret.metadata.refundedItems as any[]).find((r: any) => r.sku === item.sku)
-                                        if (matched && matched.quantity) {
-                                          return acc + Number(matched.quantity)
-                                        }
-                                      }
-                                      return acc
-                                    }, 0) || 0
-
-                                    const isFullyRefunded = refundedCount >= Number(item.quantity)
-                                    const isPartiallyRefunded = refundedCount > 0 && refundedCount < Number(item.quantity)
+                                  {allocateRefundsToOrderItems(order.items || [], refundStats.refundedBySku).map((item) => {
+                                    const isFullyRefunded = item.isFullyRefunded;
+                                    const isPartiallyRefunded = item.isPartiallyRefunded;
+                                    const refundedCount = item.allocatedRefund;
 
                                     return (
                                       <li key={item.id} className={`p-3 hover:bg-gray-50 flex items-start gap-3 ${isFullyRefunded ? 'opacity-75 bg-red-50/30' : ''}`}>

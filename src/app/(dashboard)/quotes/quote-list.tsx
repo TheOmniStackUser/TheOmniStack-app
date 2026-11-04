@@ -54,6 +54,7 @@ const formatMarketplaceName = (mp: string | null, shippingCountry?: string | nul
   if (lower === 'amazon') return 'Amazon'
   if (lower === 'kaufland') return 'Kaufland'
   if (lower === 'ebay') return 'eBay'
+  if (lower === 'etsy') return 'Etsy'
 
   let resolvedName = mp
   if (lower === 'mirakl_custom') {
@@ -111,6 +112,8 @@ const getMarketplaceBadgeStyle = (mp: string | null) => {
       return { backgroundColor: '#fce8e6', color: '#c5221f' }
     case 'ebay':
       return { backgroundColor: '#e8f0fe', color: '#1967d2' }
+    case 'etsy':
+      return { backgroundColor: '#fff0e6', color: '#f1641e' }
     default:
       return { backgroundColor: '#e8f5e9', color: '#1b5e20' }
   }

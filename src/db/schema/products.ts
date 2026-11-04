@@ -50,6 +50,7 @@ export const products = pgTable('products', {
   reducedPrice: numeric('reduced_price', { precision: 12, scale: 2 }),
   saleStartDate: timestamp('sale_start_date', { withTimezone: true }),
   saleEndDate: timestamp('sale_end_date', { withTimezone: true }),
+  taxRate: numeric('tax_rate', { precision: 5, scale: 4 }).default('0.19'),
   
   // Optional Fields
   weight: numeric('weight', { precision: 8, scale: 3 }), // kg

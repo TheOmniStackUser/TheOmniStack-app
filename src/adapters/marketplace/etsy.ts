@@ -7,13 +7,18 @@ import { eq, and } from 'drizzle-orm'
 export class EtsyAdapter implements MarketplaceAdapter {
   readonly marketplace = 'etsy'
   private readonly baseUrl = 'https://openapi.etsy.com/v3/application'
+  private integration?: any
+
+  constructor(integration?: any) {
+    this.integration = integration
+  }
 
   async fetchUnshippedOrders(companyId: string, options?: { fromDate?: string; toDate?: string }): Promise<NormalizedOrder[]> {
     const integration = await this.getIntegration(companyId)
     if (!integration) return []
 
     const accessToken = await this.getAccessToken(integration)
-    const shopId = await this.getShopId(integration.clientId!, integration.clientSecret!, accessToken)
+    const shopId = await this.getShopId(integration.clientId!, integration.clientSecret!, accessToken, integration)
 
     // Fetch unshipped orders
     const endpoint = `${this.baseUrl}/shops/${shopId}/receipts?was_shipped=false&was_paid=true&limit=100`
@@ -63,6 +68,17 @@ export class EtsyAdapter implements MarketplaceAdapter {
         }
       })
 
+      const shippingAmount = (receipt.total_shipping_cost?.amount || 0) / (receipt.total_shipping_cost?.divisor || 1)
+      if (shippingAmount > 0) {
+        items.push({
+          sku: 'SHIPPING',
+          title: 'Versandkosten',
+          quantity: 1,
+          unitPrice: shippingAmount,
+          taxRate: 0.19,
+        })
+      }
+
       return {
         marketplaceOrderId: receipt.receipt_id.toString(),
         marketplace: 'etsy',
@@ -109,7 +125,7 @@ export class EtsyAdapter implements MarketplaceAdapter {
     if (!integration) return
 
     const accessToken = await this.getAccessToken(integration)
-    const shopId = await this.getShopId(integration.clientId!, integration.clientSecret!, accessToken)
+    const shopId = await this.getShopId(integration.clientId!, integration.clientSecret!, accessToken, integration)
 
     const payload = new URLSearchParams({
       tracking_code: trackingNumber,
@@ -138,7 +154,7 @@ export class EtsyAdapter implements MarketplaceAdapter {
     if (!integration) return []
 
     const accessToken = await this.getAccessToken(integration)
-    const shopId = await this.getShopId(integration.clientId!, integration.clientSecret!, accessToken)
+    const shopId = await this.getShopId(integration.clientId!, integration.clientSecret!, accessToken, integration)
 
     let offset = 0
     let limit = 100
@@ -216,6 +232,10 @@ export class EtsyAdapter implements MarketplaceAdapter {
   }
 
   private async getIntegration(companyId: string) {
+    if (this.integration && this.integration.companyId === companyId) {
+      return this.integration
+    }
+
     const [integration] = await db
       .select()
       .from(marketplaceIntegrations)
@@ -233,6 +253,7 @@ export class EtsyAdapter implements MarketplaceAdapter {
       return null
     }
 
+    this.integration = integration
     return integration
   }
 
@@ -282,10 +303,18 @@ export class EtsyAdapter implements MarketplaceAdapter {
       })
       .where(eq(marketplaceIntegrations.id, integration.id))
 
+    integration.accessToken = newAccessToken
+    integration.refreshToken = newRefreshToken
+    integration.expiresAt = new Date(Date.now() + expiresIn * 1000)
+
     return newAccessToken
   }
 
-  private async getShopId(clientId: string, clientSecret: string, accessToken: string): Promise<string> {
+  private async getShopId(clientId: string, clientSecret: string, accessToken: string, integration?: any): Promise<string> {
+    if (integration?.metadata?.shopId) {
+      return String(integration.metadata.shopId)
+    }
+
     // 1. Get user id
     const userRes = await fetch(`${this.baseUrl}/users/me`, {
        method: 'GET',
@@ -324,7 +353,20 @@ export class EtsyAdapter implements MarketplaceAdapter {
       throw new Error('No Etsy shop found for this user.')
     }
     
+    const shopId = shopData.shop_id.toString()
+    if (integration?.id) {
+      try {
+        const metadata = { ...(integration.metadata || {}), shopId }
+        integration.metadata = metadata
+        await db.update(marketplaceIntegrations)
+          .set({ metadata, updatedAt: new Date() })
+          .where(eq(marketplaceIntegrations.id, integration.id))
+      } catch (err) {
+        console.warn('[Etsy] Failed to cache shopId in metadata:', err)
+      }
+    }
+
     // In Etsy API V3 /users/{user_id}/shops returns a single shop object if user has a shop
-    return shopData.shop_id.toString()
+    return shopId
   }
 }

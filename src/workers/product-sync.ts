@@ -551,6 +551,11 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
       'aboutyou': 'About You',
       'amazon': 'Amazon',
       'kaufland': 'Kaufland',
+      'ebay': 'eBay',
+      'etsy': 'Etsy',
+      'shopify': 'Shopify',
+      'woocommerce': 'WooCommerce',
+      'shopware': 'Shopware',
       'mirakl_custom': 'Limango'
     }
     const displayName = meta?.customName || fallbackNames[marketplace] || marketplace

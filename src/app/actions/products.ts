@@ -1312,15 +1312,32 @@ export async function bulkUpdateCustomsData(productIds: string[], hsCode: string
 }
 
 
-export async function bulkUpdateStockAndPrice(productIds: string[], newStock?: number, newPrice?: number, newReducedPrice?: number, newMsrp?: number, newSaleStartDate?: Date | null, newSaleEndDate?: Date | null) {
+export async function bulkUpdateStockAndPrice(
+  productIds: string[], 
+  newStock?: number, 
+  newPrice?: number, 
+  newReducedPrice?: number, 
+  newMsrp?: number, 
+  newSaleStartDate?: Date | null, 
+  newSaleEndDate?: Date | null,
+  newTaxRate?: string | number
+) {
   const auth = await requireAuth()
   if (productIds.length === 0) return { success: true }
 
-  const updates: Partial<{ currentStock: string; price: string; reducedPrice: string | null; msrp: string | null; saleStartDate: Date | null; saleEndDate: Date | null; updatedAt: Date }> = { updatedAt: new Date() }
+  const updates: Partial<{ currentStock: string; price: string; reducedPrice: string | null; msrp: string | null; saleStartDate: Date | null; saleEndDate: Date | null; taxRate: string; updatedAt: Date }> = { updatedAt: new Date() }
   let safeStock: number | undefined
   let safePrice: number | undefined
   let safeReducedPrice: number | undefined
   let safeMsrp: number | undefined
+
+  if (newTaxRate !== undefined && newTaxRate !== '') {
+    const parsed = typeof newTaxRate === 'number' ? newTaxRate : parseFloat(newTaxRate.toString().replace('%', '').replace(',', '.'))
+    if (!isNaN(parsed)) {
+      const rate = parsed > 1 ? parsed / 100 : parsed
+      updates.taxRate = rate.toFixed(4)
+    }
+  }
 
   if (newStock !== undefined) {
     safeStock = Math.max(0, newStock)

@@ -106,6 +106,16 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
     const saleEndDateRaw = (formData.get('saleEndDate') as string) || ''
     const saleEndDate = saleEndDateRaw ? new Date(saleEndDateRaw) : null
 
+    const taxRateRaw = (formData.get('taxRate') as string) || ''
+    let taxRate = '0.1900'
+    if (taxRateRaw.trim() !== '') {
+      const parsed = parseFloat(taxRateRaw.replace('%', '').replace(',', '.'))
+      if (!isNaN(parsed)) {
+        const rate = parsed > 1 ? parsed / 100 : parsed
+        taxRate = rate.toFixed(4)
+      }
+    }
+
     await db.update(products).set({
       title: formData.get('title') as string,
       sku: formData.get('sku') as string,
@@ -119,6 +129,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       reducedPrice: reducedPrice !== null ? reducedPrice.toString() : null,
       saleStartDate,
       saleEndDate,
+      taxRate,
       purchasePrice: (formData.get('purchasePrice') as string) || null,
       msrp: (formData.get('msrp') as string) || null,
       currentStock: Math.max(0, parseInt((formData.get('currentStock') as string) || '0', 10)).toString(),
@@ -296,6 +307,23 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700">Einkaufspreis (€)</label>
                 <input type="number" name="purchasePrice" step="0.01" defaultValue={product.purchasePrice ? Number(product.purchasePrice) : ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 placeholder:text-slate-500" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700">Steuersatz (MwSt.)</label>
+                <select 
+                  name="taxRate" 
+                  defaultValue={product.taxRate ? Number((parseFloat(product.taxRate) * 100).toFixed(2)).toString() : '19'} 
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 font-medium"
+                >
+                  <option value="19">19% (Regulärer Steuersatz)</option>
+                  <option value="7">7% (Ermäßigter Steuersatz - z.B. Lebensmittel, Bücher)</option>
+                  <option value="0">0% (Steuerbefreit)</option>
+                  {product.taxRate && ![0, 7, 19].includes(Math.round(parseFloat(product.taxRate) * 100)) && (
+                    <option value={Number((parseFloat(product.taxRate) * 100).toFixed(2))}>
+                      {Number((parseFloat(product.taxRate) * 100).toFixed(2))}% (Individuell)
+                    </option>
+                  )}
+                </select>
               </div>
 
               <div className="space-y-2">

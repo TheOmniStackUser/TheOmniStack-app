@@ -1,8 +1,8 @@
 'use client'
 
 import { useActionState, useState } from 'react'
-import { saveVatSettingAction, deleteVatSettingAction } from '@/app/actions/settings'
-import { Trash2, Plus, Percent } from 'lucide-react'
+import { saveVatSettingAction, deleteVatSettingAction, saveTaxRateSourceAction } from '@/app/actions/settings'
+import { Trash2, Plus, Percent, CheckCircle2, Loader2 } from 'lucide-react'
 import { CollapsibleSection } from '@/components/collapsible-section'
 
 type VatSetting = {
@@ -13,13 +13,45 @@ type VatSetting = {
   localVatId: string | null
 }
 
-export function VatSettings({ initialSettings }: { initialSettings: VatSetting[] }) {
+export function VatSettings({ 
+  initialSettings, 
+  initialTaxRateSource = 'platform' 
+}: { 
+  initialSettings: VatSetting[]
+  initialTaxRateSource?: 'platform' | 'product' 
+}) {
   const [state, action, isPending] = useActionState(saveVatSettingAction, undefined)
   const [showAdd, setShowAdd] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
   const [vatType, setVatType] = useState('oss')
   const [selectedCountry, setSelectedCountry] = useState('')
   const [vatRateValue, setVatRateValue] = useState('')
+  const [taxRateSource, setTaxRateSource] = useState<'platform' | 'product'>(initialTaxRateSource)
+  const [isSavingSource, setIsSavingSource] = useState(false)
+  const [sourceMessage, setSourceMessage] = useState<string | null>(null)
+
+  const handleTaxRateSourceChange = async (newSource: 'platform' | 'product') => {
+    if (newSource === taxRateSource) return
+    const prev = taxRateSource
+    setTaxRateSource(newSource)
+    setIsSavingSource(true)
+    setSourceMessage(null)
+    try {
+      const res = await saveTaxRateSourceAction(newSource)
+      if (res.success) {
+        setSourceMessage('Gespeichert')
+        setTimeout(() => setSourceMessage(null), 3000)
+      } else {
+        setTaxRateSource(prev)
+        setSourceMessage('Fehler beim Speichern')
+      }
+    } catch {
+      setTaxRateSource(prev)
+      setSourceMessage('Fehler beim Speichern')
+    } finally {
+      setIsSavingSource(false)
+    }
+  }
 
   const getSuggestedRate = (countryCode: string, type: string) => {
     if (type === 'third_country') return '0'
@@ -116,6 +148,85 @@ export function VatSettings({ initialSettings }: { initialSettings: VatSetting[]
       }
     >
       <div className="p-6 space-y-6">
+        {/* Steuersatz-Quelle für Bestellungen & Rechnungen */}
+        <div className="p-5 bg-gradient-to-r from-slate-50 to-blue-50/40 rounded-2xl border border-slate-200/80 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                Steuersatz-Ermittlung bei Bestellungen & Rechnungen
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Bestimmt, welcher Steuersatz verwendet wird, wenn Bestellungen von Verkaufsplattformen importiert und Rechnungen generiert werden.
+              </p>
+            </div>
+            {isSavingSource && (
+              <span className="text-xs font-medium text-slate-500 flex items-center gap-1.5 self-start sm:self-auto">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Speichern...
+              </span>
+            )}
+            {sourceMessage && (
+              <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 flex items-center gap-1 self-start sm:self-auto">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                {sourceMessage}
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <label 
+              className={`p-4 rounded-xl border-2 transition-all cursor-pointer flex items-start gap-3 select-none ${
+                taxRateSource === 'platform' 
+                  ? 'bg-white border-blue-600 shadow-sm' 
+                  : 'bg-white/70 border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              <input
+                type="radio"
+                name="taxRateSourceRadio"
+                checked={taxRateSource === 'platform'}
+                onChange={() => handleTaxRateSourceChange('platform')}
+                disabled={isSavingSource}
+                className="mt-1 text-blue-600 focus:ring-blue-500 h-4 w-4 shrink-0"
+              />
+              <div>
+                <span className="font-bold text-slate-900 text-sm block">
+                  Plattform-Steuersatz verwenden (Standard)
+                </span>
+                <span className="text-xs text-slate-500 mt-1 block leading-relaxed">
+                  Übernimmt den von der Verkaufsplattform (Shopify, Otto, WooCommerce etc.) für die Position übermittelten Steuersatz. Falls die Plattform keinen Steuersatz liefert, wird der TheOmniStack-Produktsteuersatz genutzt.
+                </span>
+              </div>
+            </label>
+
+            <label 
+              className={`p-4 rounded-xl border-2 transition-all cursor-pointer flex items-start gap-3 select-none ${
+                taxRateSource === 'product' 
+                  ? 'bg-white border-blue-600 shadow-sm' 
+                  : 'bg-white/70 border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              <input
+                type="radio"
+                name="taxRateSourceRadio"
+                checked={taxRateSource === 'product'}
+                onChange={() => handleTaxRateSourceChange('product')}
+                disabled={isSavingSource}
+                className="mt-1 text-blue-600 focus:ring-blue-500 h-4 w-4 shrink-0"
+              />
+              <div>
+                <span className="font-bold text-slate-900 text-sm block flex items-center gap-1.5">
+                  TheOmniStack Produkt-Steuersatz bevorzugen
+                  <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-1.5 py-0.5 rounded">z.B. 7%</span>
+                </span>
+                <span className="text-xs text-slate-500 mt-1 block leading-relaxed">
+                  Verwendet vorrangig den beim Produkt in TheOmniStack hinterlegten Steuersatz (z.B. 7% MwSt.). Ideal, wenn Sie ermäßigte Waren verkaufen und Ihre Rechnungen immer genau 7% ausweisen sollen.
+                </span>
+              </div>
+            </label>
+          </div>
+        </div>
+
         {showAdd && (
           <form action={action} className="p-4 bg-gray-50 rounded-2xl border border-gray-200 animate-in fade-in slide-in-from-top-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

@@ -102,6 +102,7 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
             labelUrl: labelUrl,
             returnTrackingNumber: returnTrackingNumber,
             returnLabelUrl: returnLabelUrl ?? null,
+            marketplaceConfirmationStatus: order.marketplace === 'manual' ? 'not_applicable' : 'pending',
             updatedAt: new Date() 
           })
           .where(eq(orders.id, order.id))
@@ -175,6 +176,17 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
                 isOtto ? ottoReturnAddressCarrierId : undefined
               )
 
+              // Mark confirmation as success in DB
+              await db
+                .update(orders)
+                .set({
+                  marketplaceConfirmationStatus: 'confirmed',
+                  marketplaceConfirmationError: null,
+                  marketplaceConfirmedAt: new Date(),
+                  updatedAt: new Date(),
+                })
+                .where(eq(orders.id, order.id))
+
               // Auto-download invoice after shipping confirmation if enabled
               const integration = activeIntegrations.find(i => i.type === order.marketplace)
               const downloadInvoice = integration ? !!(integration.metadata as any)?.downloadInvoice : false
@@ -214,6 +226,16 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
               const msg = confirmErr?.message ?? String(confirmErr)
               console.error(`[${order.marketplace}] Failed to confirm shipment for ${order.marketplaceOrderId}:`, msg)
               confirmError = `Bestätigung für ${order.marketplace} fehlgeschlagen (${order.marketplaceOrderId}): ${msg}`
+
+              // Persist failure in DB so order is flagged in UI
+              await db
+                .update(orders)
+                .set({
+                  marketplaceConfirmationStatus: 'failed',
+                  marketplaceConfirmationError: confirmError,
+                  updatedAt: new Date(),
+                })
+                .where(eq(orders.id, order.id))
             }
           }
         }

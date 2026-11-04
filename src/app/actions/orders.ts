@@ -760,25 +760,30 @@ export async function refundOrderAction(orderId: string) {
       if (ret.status === 'bearbeitet' && ret.metadata && (ret.metadata as any).refundedItems) {
         const items = (ret.metadata as any).refundedItems as any[]
         for (const item of items) {
-          if (!refundedCounts[item.sku]) refundedCounts[item.sku] = 0
-          refundedCounts[item.sku] += Number(item.quantity)
+          const skuKey = (item.sku || '').toLowerCase().trim()
+          if (skuKey) {
+            refundedCounts[skuKey] = (refundedCounts[skuKey] || 0) + (Number(item.quantity) || 0)
+          }
         }
       }
     }
 
+    const { allocateRefundsToOrderItems } = await import('@/lib/order-refunds')
+    const allocatedItems = allocateRefundsToOrderItems(order.items, refundedCounts)
+
     const itemsToRefund: { sku: string; quantity: number }[] = []
-    
-    for (const item of order.items) {
-      const sku = item.sku || 'UNKNOWN'
-      const orderQty = Number(item.quantity) || 1
-      const returnedQty = refundedCounts[sku] || 0
-      const remainingQty = Math.max(0, orderQty - returnedQty)
-      
-      if (remainingQty > 0) {
-        itemsToRefund.push({
-          sku,
-          quantity: remainingQty
-        })
+    const skuMap = new Map<string, { sku: string; quantity: number }>()
+    for (const item of allocatedItems) {
+      if (item.remainingQtyToRefund > 0) {
+        const sku = item.sku || 'UNKNOWN'
+        const existing = skuMap.get(sku)
+        if (existing) {
+          existing.quantity += item.remainingQtyToRefund
+        } else {
+          const entry = { sku, quantity: item.remainingQtyToRefund }
+          skuMap.set(sku, entry)
+          itemsToRefund.push(entry)
+        }
       }
     }
 
