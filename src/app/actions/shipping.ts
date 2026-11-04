@@ -1130,9 +1130,14 @@ export async function generateSingleDhlReturnLabelAction(orderId: string) {
     }
 
     const isDomestic = toIso3(order.shippingCountry) === 'DEU'
+    if (!isDomestic) {
+      return { 
+        error: `Für das Zielland ${order.shippingCountry || 'Ausland'} kann über diesen DHL-Vertrag kein Retourenlabel generiert werden. Die DHL Paket API unterstützt Retourenlabels nur mit Absenderadresse in Deutschland. Bitte erstelle das Retourenlabel für dieses Land direkt im Marktplatz-Portal (z. B. About You Seller Center) oder über den lokalen Paketdienst (z. B. Post AT).` 
+      }
+    }
 
     // Reverse shipment: Customer is sender, merchant warehouse is recipient.
-    let productCode = isDomestic ? 'V01PAK' : 'V53WPAK'
+    let productCode = 'V01PAK'
     let zone = config.zones?.find(z => z.productCode === productCode && z.billingNumber)
     if (!zone && isDomestic) {
       zone = domesticZone
