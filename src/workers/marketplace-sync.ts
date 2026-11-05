@@ -113,7 +113,7 @@ async function reportChildResult(
     const existing = JSON.parse(existingStr)
     result.count = result.count !== undefined ? result.count : existing.count
     result.newCount = (existing.newCount || 0) + (result.newCount || 0)
-    result.laterCount = (existing.laterCount || 0) + (result.laterCount || 0)
+    result.laterCount = result.laterCount !== undefined ? result.laterCount : existing.laterCount
     // If one succeeds and the other fails, keep the failure error message
     result.success = existing.success && result.success
     result.error = existing.error || result.error

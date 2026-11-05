@@ -90,7 +90,7 @@ export const SyncNotificationEmail = ({
                       {result.success ? (
                         <Text className="m-0 text-[14px] text-green-600 font-medium">
                           ✅ Erfolgreich: {result.newCount !== undefined 
-                            ? `${result.newCount} neue ${result.newCount === 1 ? 'Bestellung' : 'Bestellungen'} importiert (${result.count} total offene Bestellungen${result.laterCount ? `, ${result.laterCount} mit späterem Versand` : ''})` 
+                            ? `${result.newCount} neue ${result.newCount === 1 ? 'Bestellung' : 'Bestellungen'} importiert (${result.count} offene ${result.count === 1 ? 'Bestellung' : 'Bestellungen'}${result.laterCount ? `, ${result.laterCount} mit späterem Versand` : ''})` 
                             : `${result.count} neue ${result.count === 1 ? 'Bestellung' : 'Bestellungen'}`}
                         </Text>
                       ) : (
@@ -105,7 +105,7 @@ export const SyncNotificationEmail = ({
 
               <Section className="mb-[32px]">
                 <Text className="text-gray-700 text-[14px] font-medium leading-[24px] text-center">
-                  Insgesamt wurden <span className="font-bold">{totalNewOrders}</span> neue {totalNewOrders === 1 ? 'Bestellung' : 'Bestellungen'} importiert ({totalFetchedOrders} total offene Bestellungen{totalLaterOrders > 0 ? `, ${totalLaterOrders} mit späterem Versand` : ''}).
+                  Insgesamt wurden <span className="font-bold">{totalNewOrders}</span> neue {totalNewOrders === 1 ? 'Bestellung' : 'Bestellungen'} importiert ({totalFetchedOrders} offene {totalFetchedOrders === 1 ? 'Bestellung' : 'Bestellungen'}{totalLaterOrders > 0 ? `, ${totalLaterOrders} mit späterem Versand` : ''}).
                 </Text>
               </Section>
 
