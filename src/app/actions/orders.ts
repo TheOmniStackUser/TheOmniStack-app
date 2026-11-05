@@ -527,7 +527,7 @@ export async function markOrderAsShippedManuallyAction(
               targetMarketplaceOrderId,
               trackingNumber || '',
               carrier || 'Other',
-              undefined, // returnTrackingNumber
+              returnTrackingNumber || order.returnTrackingNumber || undefined,
               order.rawPayload,
               isOtto ? ottoReturnAddressCarrierId : undefined
             )
@@ -582,17 +582,37 @@ export async function markOrderAsShippedManuallyAction(
       } catch (confirmErr: any) {
         const msg = confirmErr?.message ?? String(confirmErr)
         console.error(`[Manual-Shipment-Action] Marketplace confirmation failed:`, msg)
-        warning = `Bestellung wurde lokal auf "versendet" gestellt, aber die Übertragung an den Marktplatz ist fehlgeschlagen: ${msg}`
 
-        // Persist failure in DB
-        await db
-          .update(orders)
-          .set({
-            marketplaceConfirmationStatus: 'failed',
-            marketplaceConfirmationError: warning,
-            updatedAt: new Date(),
-          })
-          .where(eq(orders.id, order.id))
+        const isAlreadyShipped = 
+          msg.toLowerCase().includes('bereits auf otto als versendet') ||
+          msg.toLowerCase().includes('position_item_included_in_other_shipment') ||
+          msg.toLowerCase().includes('already shipped') ||
+          msg.toLowerCase().includes('already fulfilled') ||
+          msg.toLowerCase().includes('is already fulfilled')
+
+        if (isAlreadyShipped) {
+          console.log(`[Manual-Shipment-Action] Order ${order.marketplaceOrderId} was already marked as shipped on ${order.marketplace}. Treating as confirmed.`)
+          await db
+            .update(orders)
+            .set({
+              marketplaceConfirmationStatus: 'confirmed',
+              marketplaceConfirmationError: null,
+              marketplaceConfirmedAt: new Date(),
+              updatedAt: new Date(),
+            })
+            .where(eq(orders.id, order.id))
+        } else {
+          warning = `Bestellung wurde lokal auf "versendet" gestellt, aber die Übertragung an den Marktplatz ist fehlgeschlagen: ${msg}`
+          // Persist failure in DB
+          await db
+            .update(orders)
+            .set({
+              marketplaceConfirmationStatus: 'failed',
+              marketplaceConfirmationError: warning,
+              updatedAt: new Date(),
+            })
+            .where(eq(orders.id, order.id))
+        }
       }
     }
 
@@ -1350,6 +1370,34 @@ export async function retryMarketplaceConfirmationAction(orderId: string) {
     const msg = error?.message ?? String(error)
     console.error('[Retry-Marketplace-Action] Failed:', msg)
 
+    const isAlreadyShipped = 
+      msg.toLowerCase().includes('bereits auf otto als versendet') ||
+      msg.toLowerCase().includes('position_item_included_in_other_shipment') ||
+      msg.toLowerCase().includes('already shipped') ||
+      msg.toLowerCase().includes('already fulfilled') ||
+      msg.toLowerCase().includes('is already fulfilled')
+
+    if (isAlreadyShipped) {
+      console.log(`[Retry-Marketplace-Action] Order was already marked as shipped on marketplace. Treating as confirmed.`)
+      await db
+        .update(orders)
+        .set({
+          marketplaceConfirmationStatus: 'confirmed',
+          marketplaceConfirmationError: null,
+          marketplaceConfirmedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(and(eq(orders.id, orderId), eq(orders.companyId, auth.activeCompanyId)))
+
+      revalidatePath('/orders')
+      revalidatePath('/dashboard')
+
+      return { 
+        success: true, 
+        message: `Bestellung war auf dem Marktplatz bereits als versendet markiert. Status wurde auf bestätigt gesetzt!` 
+      }
+    }
+
     await db
       .update(orders)
       .set({
@@ -1365,5 +1413,86 @@ export async function retryMarketplaceConfirmationAction(orderId: string) {
     return { error: `Fehler bei der Marktplatz-Übermittlung: ${msg}` }
   }
 }
+
+export async function markMarketplaceConfirmationAsConfirmedAction(orderId: string) {
+  try {
+    const auth = await requireAuth()
+
+    const [order] = await db
+      .select()
+      .from(orders)
+      .where(
+        and(
+          eq(orders.id, orderId),
+          eq(orders.companyId, auth.activeCompanyId)
+        )
+      )
+      .limit(1)
+
+    if (!order) {
+      return { error: 'Bestellung nicht gefunden.' }
+    }
+
+    await db
+      .update(orders)
+      .set({
+        marketplaceConfirmationStatus: 'confirmed',
+        marketplaceConfirmationError: null,
+        marketplaceConfirmedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(and(eq(orders.id, orderId), eq(orders.companyId, auth.activeCompanyId)))
+
+    revalidatePath('/orders')
+    revalidatePath('/dashboard')
+
+    return {
+      success: true,
+      message: 'Bestellung wurde manuell als auf Marktplatz bestätigt markiert.'
+    }
+  } catch (error: any) {
+    console.error('[Mark-Confirmed-Action] Failed:', error)
+    return { error: error?.message || 'Fehler beim Markieren als bestätigt.' }
+  }
+}
+
+export async function markMarketplaceConfirmationsBulkAction(orderIds: string[]) {
+  try {
+    const auth = await requireAuth()
+
+    if (!orderIds || orderIds.length === 0) {
+      return { error: 'Keine Bestellungen ausgewählt.' }
+    }
+
+    const { inArray } = await import('drizzle-orm')
+
+    await db
+      .update(orders)
+      .set({
+        marketplaceConfirmationStatus: 'confirmed',
+        marketplaceConfirmationError: null,
+        marketplaceConfirmedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          inArray(orders.id, orderIds),
+          eq(orders.companyId, auth.activeCompanyId)
+        )
+      )
+
+    revalidatePath('/orders')
+    revalidatePath('/dashboard')
+
+    return {
+      success: true,
+      message: `${orderIds.length} Bestellung(en) manuell als bestätigt markiert.`
+    }
+  } catch (error: any) {
+    console.error('[Bulk-Mark-Confirmed-Action] Failed:', error)
+    return { error: error?.message || 'Fehler beim Markieren als bestätigt.' }
+  }
+}
+
 
 
