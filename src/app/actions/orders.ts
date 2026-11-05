@@ -403,7 +403,8 @@ export async function markOrderAsShippedManuallyAction(
   orderId: string,
   trackingNumber?: string,
   carrier?: string,
-  confirmOnMarketplace = true
+  confirmOnMarketplace = true,
+  returnTrackingNumber?: string
 ) {
   try {
     const auth = await requireAuth()
@@ -430,6 +431,7 @@ export async function markOrderAsShippedManuallyAction(
       .set({
         status: 'shipped',
         trackingNumber: trackingNumber || null,
+        returnTrackingNumber: returnTrackingNumber || order.returnTrackingNumber || null,
         marketplaceConfirmationStatus: confirmOnMarketplace && order.marketplace !== 'manual' ? 'pending' : 'not_applicable',
         updatedAt: new Date()
       })

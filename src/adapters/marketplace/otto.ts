@@ -342,7 +342,8 @@ export class OttoAdapter implements MarketplaceAdapter {
       if (positionItems.length === 0) {
         const hasItems = rawOrderPayload?.positionItems?.length > 0;
         if (hasItems) {
-          throw new Error(`Alle Artikel der Bestellung ${marketplaceOrderId} sind bereits versendet oder storniert.`)
+          console.log(`[OttoAdapter] All items for order ${marketplaceOrderId} are already shipped, cancelled or processed on Otto. Treating as success.`)
+          return
         }
         throw new Error(`Keine versendbaren Artikel (positionItemIds) für Bestellung ${marketplaceOrderId} gefunden.`)
       }
@@ -399,7 +400,8 @@ export class OttoAdapter implements MarketplaceAdapter {
         console.error(`[OttoAdapter] Failed to confirm shipment: ${response?.status} - ${errText}`)
         
         if (errText.includes('POSITION_ITEM_INCLUDED_IN_OTHER_SHIPMENT')) {
-          throw new Error(`Bestellung wurde bereits auf Otto als versendet markiert.`)
+          console.log(`[OttoAdapter] Order ${marketplaceOrderId} is already marked as shipped on Otto (POSITION_ITEM_INCLUDED_IN_OTHER_SHIPMENT). Treating as success.`)
+          return
         }
 
         let message = `HTTP ${response?.status}`
