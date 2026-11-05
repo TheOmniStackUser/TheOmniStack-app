@@ -225,17 +225,37 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
             } catch (confirmErr: any) {
               const msg = confirmErr?.message ?? String(confirmErr)
               console.error(`[${order.marketplace}] Failed to confirm shipment for ${order.marketplaceOrderId}:`, msg)
-              confirmError = `Bestätigung für ${order.marketplace} fehlgeschlagen (${order.marketplaceOrderId}): ${msg}`
 
-              // Persist failure in DB so order is flagged in UI
-              await db
-                .update(orders)
-                .set({
-                  marketplaceConfirmationStatus: 'failed',
-                  marketplaceConfirmationError: confirmError,
-                  updatedAt: new Date(),
-                })
-                .where(eq(orders.id, order.id))
+              const isAlreadyShipped = 
+                msg.toLowerCase().includes('bereits auf otto als versendet') ||
+                msg.toLowerCase().includes('position_item_included_in_other_shipment') ||
+                msg.toLowerCase().includes('already shipped') ||
+                msg.toLowerCase().includes('already fulfilled') ||
+                msg.toLowerCase().includes('is already fulfilled')
+
+              if (isAlreadyShipped) {
+                console.log(`[${order.marketplace}] Order was already marked as shipped on marketplace. Treating as confirmed.`)
+                await db
+                  .update(orders)
+                  .set({
+                    marketplaceConfirmationStatus: 'confirmed',
+                    marketplaceConfirmationError: null,
+                    marketplaceConfirmedAt: new Date(),
+                    updatedAt: new Date(),
+                  })
+                  .where(eq(orders.id, order.id))
+              } else {
+                confirmError = `Bestätigung für ${order.marketplace} fehlgeschlagen (${order.marketplaceOrderId}): ${msg}`
+                // Persist failure in DB so order is flagged in UI
+                await db
+                  .update(orders)
+                  .set({
+                    marketplaceConfirmationStatus: 'failed',
+                    marketplaceConfirmationError: confirmError,
+                    updatedAt: new Date(),
+                  })
+                  .where(eq(orders.id, order.id))
+              }
             }
           }
         }
@@ -967,17 +987,37 @@ export async function generateDhlLabelsAction(
             } catch (confirmErr: any) {
               const msg = confirmErr?.message ?? String(confirmErr)
               console.error(`[${order.marketplace}] Failed to confirm shipment for ${order.marketplaceOrderId}:`, msg)
-              confirmError = `Bestätigung für ${order.marketplace} fehlgeschlagen (${order.marketplaceOrderId}): ${msg}`
 
-              // Persist failure in DB so order is flagged in UI
-              await db
-                .update(orders)
-                .set({
-                  marketplaceConfirmationStatus: 'failed',
-                  marketplaceConfirmationError: confirmError,
-                  updatedAt: new Date(),
-                })
-                .where(eq(orders.id, order.id))
+              const isAlreadyShipped = 
+                msg.toLowerCase().includes('bereits auf otto als versendet') ||
+                msg.toLowerCase().includes('position_item_included_in_other_shipment') ||
+                msg.toLowerCase().includes('already shipped') ||
+                msg.toLowerCase().includes('already fulfilled') ||
+                msg.toLowerCase().includes('is already fulfilled')
+
+              if (isAlreadyShipped) {
+                console.log(`[${order.marketplace}] Order was already marked as shipped on marketplace. Treating as confirmed.`)
+                await db
+                  .update(orders)
+                  .set({
+                    marketplaceConfirmationStatus: 'confirmed',
+                    marketplaceConfirmationError: null,
+                    marketplaceConfirmedAt: new Date(),
+                    updatedAt: new Date(),
+                  })
+                  .where(eq(orders.id, order.id))
+              } else {
+                confirmError = `Bestätigung für ${order.marketplace} fehlgeschlagen (${order.marketplaceOrderId}): ${msg}`
+                // Persist failure in DB so order is flagged in UI
+                await db
+                  .update(orders)
+                  .set({
+                    marketplaceConfirmationStatus: 'failed',
+                    marketplaceConfirmationError: confirmError,
+                    updatedAt: new Date(),
+                  })
+                  .where(eq(orders.id, order.id))
+              }
             }
           }
         }
