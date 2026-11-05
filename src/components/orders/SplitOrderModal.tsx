@@ -164,16 +164,16 @@ export function SplitOrderModal({ order, isOpen, onClose, onSuccess }: SplitOrde
         role="dialog"
         aria-modal="true"
         aria-labelledby="split-order-title"
-        className="relative bg-white border border-slate-200/80 rounded-2xl shadow-2xl w-full max-w-2xl my-8 overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-200"
+        className="relative bg-white border border-slate-200/80 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] my-auto flex flex-col overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-200"
       >
         {/* Header */}
-        <div className="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-white to-indigo-50/30 flex items-center justify-between">
+        <div className="px-6 py-4 sm:py-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-white to-indigo-50/30 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm">
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm shrink-0">
               <Scissors className="w-5 h-5 rotate-90" />
             </div>
             <div>
-              <h3 id="split-order-title" className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <h3 id="split-order-title" className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
                 Bestellung aufteilen (Splittversand)
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
@@ -192,32 +192,33 @@ export function SplitOrderModal({ order, isOpen, onClose, onSuccess }: SplitOrde
         </div>
 
         {/* Info Banner */}
-        <div className="px-6 py-3 bg-amber-50/70 border-b border-amber-200/60 flex items-start gap-2.5 text-xs text-amber-900">
+        <div className="px-6 py-2.5 sm:py-3 bg-amber-50/70 border-b border-amber-200/60 flex items-start gap-2.5 text-xs text-amber-900 shrink-0">
           <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
           <p>
             Verteile die Produkte auf zwei Lieferungen. Die verbleibenden Artikel können <strong>sofort versendet</strong> werden, während die neue Teillieferung (z.&nbsp;B. eine Vorbestellung) auf <strong>Pending</strong> oder <strong>späterer Versand</strong> gesetzt wird.
           </p>
         </div>
 
-        {error && (
-          <div className="mx-6 mt-4 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm flex items-start gap-2.5 animate-in fade-in slide-in-from-top-1">
-            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-            <div>{error}</div>
-          </div>
-        )}
-
         {/* Content Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Section: Products to split */}
-          <div>
-            <div className="flex items-center justify-between mb-2.5">
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Produkte &amp; Mengen aufteilen
-              </label>
-              <span className="text-xs text-slate-500">
-                {items.length} {items.length === 1 ? 'Artikel' : 'Artikel'} in Bestellung
-              </span>
-            </div>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6 custom-scrollbar">
+            {error && (
+              <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm flex items-start gap-2.5 animate-in fade-in slide-in-from-top-1">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <div>{error}</div>
+              </div>
+            )}
+
+            {/* Section: Products to split */}
+            <div>
+              <div className="flex items-center justify-between mb-2.5">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Produkte &amp; Mengen aufteilen
+                </label>
+                <span className="text-xs text-slate-500">
+                  {items.length} {items.length === 1 ? 'Artikel' : 'Artikel'} in Bestellung
+                </span>
+              </div>
 
             <div className="space-y-3">
               {items.map((item: any) => {
@@ -465,14 +466,15 @@ export function SplitOrderModal({ order, isOpen, onClose, onSuccess }: SplitOrde
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Footer Actions */}
-          <div className="pt-2 flex flex-col-reverse sm:flex-row items-center justify-end gap-2.5">
+          {/* Fixed Footer Actions */}
+          <div className="shrink-0 px-6 py-4 bg-slate-50 border-t border-slate-200/80 flex flex-col-reverse sm:flex-row items-center justify-end gap-2.5">
             <button
               type="button"
               onClick={() => !isSubmitting && onClose()}
               disabled={isSubmitting}
-              className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-300 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+              className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-300 text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors disabled:opacity-50"
             >
               Abbrechen
             </button>
