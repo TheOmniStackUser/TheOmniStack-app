@@ -1323,6 +1323,82 @@ export async function generateSingleDhlReturnLabelAction(orderId: string) {
       })
       .where(eq(orders.id, order.id))
 
+    // If marketplace confirmation was failed or pending, attempt to confirm to marketplace with the new return tracking number
+    let confirmationSuffix = ''
+    if (order.marketplaceConfirmationStatus === 'failed' || order.marketplaceConfirmationStatus === 'pending') {
+      try {
+        const { marketplaceIntegrations } = await import('@/db/schema/integrations')
+        const [integration] = await db
+          .select()
+          .from(marketplaceIntegrations)
+          .where(and(eq(marketplaceIntegrations.companyId, auth.activeCompanyId), eq(marketplaceIntegrations.type, order.marketplace as any)))
+          .limit(1)
+
+        if (integration) {
+          const { getAdapterForIntegration } = await import('@/workers/marketplace-sync')
+          const adapter = getAdapterForIntegration(integration)
+          if (adapter && typeof adapter.confirmShipment === 'function') {
+            const isOtto = order.marketplace === 'otto'
+            const ottoReturnAddressCarrierId = isOtto ? (integration.metadata as any)?.returnAddressCarrierId : undefined
+            const targetMarketplaceOrderId = (order.rawPayload as any)?.originalMarketplaceOrderId || order.marketplaceOrderId
+
+            let carrier = 'DHL'
+            if (order.trackingNumber) {
+              const tn = order.trackingNumber.trim()
+              if (tn.startsWith('0034') || tn.startsWith('05') || tn.length === 14) {
+                carrier = 'DHL'
+              } else if (tn.length >= 16) {
+                carrier = 'HERMES'
+              }
+            }
+
+            await adapter.confirmShipment(
+              targetMarketplaceOrderId,
+              order.trackingNumber || '',
+              carrier,
+              returnTrackingNumber,
+              order.rawPayload,
+              isOtto ? ottoReturnAddressCarrierId : undefined
+            )
+
+            await db
+              .update(orders)
+              .set({
+                marketplaceConfirmationStatus: 'confirmed',
+                marketplaceConfirmationError: null,
+                marketplaceConfirmedAt: new Date(),
+                updatedAt: new Date(),
+              })
+              .where(eq(orders.id, order.id))
+
+            confirmationSuffix = ` & Marktplatz (${order.marketplace.toUpperCase()}) bestätigt!`
+          }
+        }
+      } catch (confirmErr: any) {
+        const msg = confirmErr?.message ?? String(confirmErr)
+        console.warn('[DHL Return Action] Auto-confirm shipment with return label:', msg)
+        const isAlreadyShipped = 
+          msg.toLowerCase().includes('bereits auf otto als versendet') ||
+          msg.toLowerCase().includes('position_item_included_in_other_shipment') ||
+          msg.toLowerCase().includes('already shipped') ||
+          msg.toLowerCase().includes('already fulfilled') ||
+          msg.toLowerCase().includes('is already fulfilled')
+
+        if (isAlreadyShipped) {
+          await db
+            .update(orders)
+            .set({
+              marketplaceConfirmationStatus: 'confirmed',
+              marketplaceConfirmationError: null,
+              marketplaceConfirmedAt: new Date(),
+              updatedAt: new Date(),
+            })
+            .where(eq(orders.id, order.id))
+          confirmationSuffix = ` & Marktplatz-Status auf bestätigt aktualisiert!`
+        }
+      }
+    }
+
     revalidatePath('/orders')
     revalidatePath('/dashboard')
 
@@ -1330,7 +1406,7 @@ export async function generateSingleDhlReturnLabelAction(orderId: string) {
       success: true,
       returnTrackingNumber,
       returnLabelUrl,
-      message: `DHL-Retourenlabel erfolgreich erstellt: ${returnTrackingNumber}`,
+      message: `DHL-Retourenlabel erfolgreich erstellt: ${returnTrackingNumber}${confirmationSuffix}`,
     }
   } catch (error) {
     console.error('[DHL Return Action] Error:', error)

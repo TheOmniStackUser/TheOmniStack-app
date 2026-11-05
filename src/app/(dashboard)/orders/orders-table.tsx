@@ -7,7 +7,7 @@ import { de } from 'date-fns/locale'
 import { Package, Truck, CheckCircle2, Store, Clock, XCircle, RefreshCw, Copy, Check, Calendar, Scissors, RotateCcw, AlertTriangle } from 'lucide-react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { generateHermesLabelsAction, generateDhlLabelsAction, generateSingleDhlReturnLabelAction } from '@/app/actions/shipping'
-import { archiveOrderAction, archiveOrdersBulkAction, updateOrderStatusAction, updateOrderAddressAction, updateOrderBillingAddressAction, generateOrDownloadInvoicesBulkAction, markOrderAsShippedManuallyAction, getOrderLabelsAction, updateOrderNotesAction, refundOrderAction, refundOrderPartialAction, updateOrderScheduledShipmentDateAction, bulkScheduleLaterShipmentAction, retryMarketplaceConfirmationAction } from '@/app/actions/orders'
+import { archiveOrderAction, archiveOrdersBulkAction, updateOrderStatusAction, updateOrderAddressAction, updateOrderBillingAddressAction, generateOrDownloadInvoicesBulkAction, markOrderAsShippedManuallyAction, getOrderLabelsAction, updateOrderNotesAction, refundOrderAction, refundOrderPartialAction, updateOrderScheduledShipmentDateAction, bulkScheduleLaterShipmentAction, retryMarketplaceConfirmationAction, markMarketplaceConfirmationAsConfirmedAction, markMarketplaceConfirmationsBulkAction } from '@/app/actions/orders'
 import { getInvoiceDownloadUrl } from '@/app/actions/invoices'
 import type { Order, OrderItem } from '@/db/schema/orders'
 import type { Invoice, InvoiceLog } from '@/db/schema/invoices'
@@ -574,10 +574,13 @@ export function OrdersTable({
   const [showDecathlonRefundModal, setShowDecathlonRefundModal] = useState<OrderWithItems | null>(null)
   const [splitOrderModal, setSplitOrderModal] = useState<OrderWithItems | null>(null)
   const [manualTrackingNumber, setManualTrackingNumber] = useState('')
+  const [manualReturnTrackingNumber, setManualReturnTrackingNumber] = useState('')
   const [manualCarrier, setManualCarrier] = useState('DHL')
   const [customCarrier, setCustomCarrier] = useState('')
   const [manualConfirmMarketplace, setManualConfirmMarketplace] = useState(true)
   const [isManualShipping, setIsManualShipping] = useState(false)
+  const [markingConfirmedOrderId, setMarkingConfirmedOrderId] = useState<string | null>(null)
+  const [isBulkMarkingConfirmed, setIsBulkMarkingConfirmed] = useState(false)
 
   // Later shipment modal states
   const [laterShipmentModalConfig, setLaterShipmentModalConfig] = useState<{
@@ -782,7 +785,8 @@ export function OrdersTable({
         showManualShipModal.id,
         manualTrackingNumber || undefined,
         carrierValue || undefined,
-        manualConfirmMarketplace
+        manualConfirmMarketplace,
+        manualReturnTrackingNumber || undefined
       )
 
       if (result.error) {
@@ -791,6 +795,7 @@ export function OrdersTable({
         showToast(result.message, result.warning ? 'error' : 'success')
         setShowManualShipModal(null)
         setManualTrackingNumber('')
+        setManualReturnTrackingNumber('')
         setManualCarrier('DHL')
         setCustomCarrier('')
         setManualConfirmMarketplace(true)
@@ -1774,6 +1779,42 @@ const filteredOrders = orders;
     }
   }
 
+  const handleMarkMarketplaceConfirmationAsConfirmed = async (orderId: string) => {
+    setMarkingConfirmedOrderId(orderId)
+    try {
+      const res = await markMarketplaceConfirmationAsConfirmedAction(orderId)
+      if (res.error) {
+        showToast(res.error, 'error')
+      } else {
+        showToast(res.message || 'Bestellung manuell als bestätigt markiert!', 'success')
+      }
+    } catch (err: any) {
+      showToast('Fehler: ' + (err?.message || String(err)), 'error')
+    } finally {
+      setMarkingConfirmedOrderId(null)
+    }
+  }
+
+  const handleBulkMarkMarketplaceConfirmationAsConfirmed = async () => {
+    const failedOrders = orders.filter(o => selectedIds.has(o.id) && o.marketplaceConfirmationStatus === 'failed')
+    const ids = failedOrders.length > 0 ? failedOrders.map(o => o.id) : orders.filter(o => selectedIds.has(o.id)).map(o => o.id)
+    if (ids.length === 0) return
+
+    setIsBulkMarkingConfirmed(true)
+    try {
+      const res = await markMarketplaceConfirmationsBulkAction(ids)
+      if (res.error) {
+        showToast(res.error, 'error')
+      } else {
+        showToast(res.message || `${ids.length} Bestellung(en) als bestätigt markiert!`, 'success')
+      }
+    } catch (err: any) {
+      showToast('Fehler: ' + (err?.message || String(err)), 'error')
+    } finally {
+      setIsBulkMarkingConfirmed(false)
+    }
+  }
+
   const handleDelete = async (orderId: string) => {
     setDeleteModalConfig({ show: true, isBulk: false, orderId })
   }
@@ -1927,6 +1968,9 @@ const filteredOrders = orders;
   // Count selected orders that do not have an invoice yet
   const selectedWithoutInvoice = selectedVisibleOrders.filter(o => !o.invoiceId).length
 
+  // Count selected orders with failed marketplace confirmation
+  const selectedFailedConfirmationCount = selectedVisibleOrders.filter(o => o.marketplaceConfirmationStatus === 'failed').length
+
   const renderSortableHeader = (label: string, field: string, align: 'left' | 'right' = 'left') => {
     const isSorted = sortField === field
     return (
@@ -2067,6 +2111,22 @@ const filteredOrders = orders;
             >
               <Clock className="w-4 h-4 text-purple-600" />
               Späterer Versand ({selectedUnshippedCount})
+            </button>
+          )}
+
+          {selectedFailedConfirmationCount > 0 && (
+            <button
+              onClick={handleBulkMarkMarketplaceConfirmationAsConfirmed}
+              disabled={isBulkMarkingConfirmed}
+              className="flex items-center gap-1.5 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-300 font-semibold py-2 px-3.5 rounded-md transition-colors disabled:opacity-50 text-sm shadow-sm"
+              title="Ausgewählte nicht bestätigte Bestellungen als auf Marktplatz bestätigt markieren"
+            >
+              {isBulkMarkingConfirmed ? (
+                <RefreshCw className="w-4 h-4 animate-spin text-emerald-600" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              )}
+              Als bestätigt markieren ({selectedFailedConfirmationCount})
             </button>
           )}
 
@@ -2992,6 +3052,26 @@ const filteredOrders = orders;
                                 </button>
                               )}
 
+                              {order.marketplace !== 'manual' && order.marketplaceConfirmationStatus === 'failed' && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenMenuOrderId(null)
+                                    setMenuPosition(null)
+                                    handleMarkMarketplaceConfirmationAsConfirmed(order.id)
+                                  }}
+                                  disabled={markingConfirmedOrderId === order.id}
+                                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-emerald-700 hover:bg-emerald-50/50 transition-colors whitespace-nowrap disabled:opacity-50"
+                                >
+                                  {markingConfirmedOrderId === order.id ? (
+                                    <RefreshCw className="w-4 h-4 animate-spin text-emerald-600" />
+                                  ) : (
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                  )}
+                                  Auf Marktplatz als bestätigt markieren
+                                </button>
+                              )}
+
                               <div className="border-t border-slate-100 my-1"></div>
 
                               {/* 7. Status updates: Versand auf später / Zurück zu Pending */}
@@ -3113,27 +3193,46 @@ const filteredOrders = orders;
                                   </div>
                                 </div>
                               </div>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleRetryMarketplaceConfirmation(order)
-                                }}
-                                disabled={retryingConfirmationOrderId === order.id}
-                                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-all flex items-center gap-2 shrink-0 disabled:opacity-50 cursor-pointer"
-                              >
-                                {retryingConfirmationOrderId === order.id ? (
-                                  <>
-                                    <RefreshCw className="w-4 h-4 animate-spin" />
-                                    Übertrage an Marktplatz...
-                                  </>
-                                ) : (
-                                  <>
-                                    <RotateCcw className="w-4 h-4" />
-                                    Bestätigung wiederholen
-                                  </>
-                                )}
-                              </button>
+                              <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleMarkMarketplaceConfirmationAsConfirmed(order.id)
+                                  }}
+                                  disabled={markingConfirmedOrderId === order.id}
+                                  className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-800 text-xs font-semibold rounded-lg border border-amber-300 shadow-xs transition-all flex items-center gap-1.5 shrink-0 disabled:opacity-50 cursor-pointer"
+                                  title="Bestätigung manuell als erfolgreich markieren, falls die Bestellung bereits direkt im Marktplatz-Portal bestätigt wurde"
+                                >
+                                  {markingConfirmedOrderId === order.id ? (
+                                    <RefreshCw className="w-4 h-4 animate-spin text-slate-600" />
+                                  ) : (
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                  )}
+                                  Als bestätigt markieren
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleRetryMarketplaceConfirmation(order)
+                                  }}
+                                  disabled={retryingConfirmationOrderId === order.id}
+                                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-all flex items-center gap-2 shrink-0 disabled:opacity-50 cursor-pointer"
+                                >
+                                  {retryingConfirmationOrderId === order.id ? (
+                                    <>
+                                      <RefreshCw className="w-4 h-4 animate-spin" />
+                                      Übertrage an Marktplatz...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <RotateCcw className="w-4 h-4" />
+                                      Bestätigung wiederholen
+                                    </>
+                                  )}
+                                </button>
+                              </div>
                             </div>
                           )}
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -4896,6 +4995,24 @@ const filteredOrders = orders;
                     />
                   </div>
                 )}
+
+                <div>
+                  <label className="block text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">
+                    Retourennummer (optional, z.B. für Otto)
+                  </label>
+                  <input 
+                    type="text" 
+                    value={manualReturnTrackingNumber} 
+                    onChange={(e) => setManualReturnTrackingNumber(e.target.value)}
+                    placeholder="z.B. 0034043488... (DHL Retourennummer)"
+                    className="w-full text-sm p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white text-slate-900 placeholder:text-slate-500 font-medium" 
+                  />
+                  {showManualShipModal.marketplace === 'otto' && (
+                    <p className="text-[11px] text-amber-600 mt-1">
+                      Hinweis: Otto verlangt bei DHL-Sendungen zwingend eine Retouren-Sendungsnummer für die API-Bestätigung.
+                    </p>
+                  )}
+                </div>
 
                 {showManualShipModal.marketplace && showManualShipModal.marketplace !== 'manual' && (
                   <div className="flex items-center gap-2 pt-2">

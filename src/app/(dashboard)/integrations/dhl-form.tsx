@@ -1050,7 +1050,7 @@ export function DhlIntegrationForm({
             const value = platformReturns[key] ?? (['shopify', 'aboutyou'].includes(key) ? 'none' : 'online')
             
             let hint = ''
-            if (type === 'otto') hint = 'Otto-Kunden drucken das Label über das Otto-Portal – kein eigenes DHL-Label nötig.'
+            if (type === 'otto') hint = 'Otto verlangt bei DHL-Versand zwingend eine Retouren-Sendungsnummer (returnTrackingKey). Empfehlung: „Beilage mit Label“ auswählen, damit das Retourenlabel automatisch miterstellt und an Otto übertragen wird.'
             else if (type === 'amazon') hint = 'Amazon bietet ein eigenes Retouren-Portal an.'
 
             return (
