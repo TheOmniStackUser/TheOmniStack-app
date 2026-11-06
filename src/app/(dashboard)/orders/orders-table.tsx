@@ -3961,7 +3961,7 @@ const filteredOrders = orders;
                                             {new Intl.NumberFormat('de-DE', { style: 'currency', currency: order.currency }).format(Number(item.unitPrice) * Number(item.quantity) * (1 + Number(item.taxRate)))}
                                           </div>
                                           <div className="text-xs text-gray-500 mt-1">
-                                            inkl. {Number(item.taxRate) * 100}% MwSt.
+                                            inkl. {Number((Number(item.taxRate || 0) * 100).toFixed(2)).toLocaleString('de-DE')}% MwSt.
                                           </div>
                                         </div>
                                       </li>
