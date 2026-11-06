@@ -64,7 +64,6 @@ export class EtsyAdapter implements MarketplaceAdapter {
           title: t.title || 'Etsy Item',
           quantity: t.quantity || 1,
           unitPrice,
-          taxRate: 0.19, // Default tax rate if unknown
         }
       })
 

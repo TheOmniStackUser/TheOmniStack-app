@@ -1794,6 +1794,39 @@ export async function syncMiraklReturns(
   }
 }
 
+/**
+ * Strips common marketplace prefixes (e.g. AZ-, AMZ-, FBA-, EB-, OT-)
+ * and suffixes (e.g. -MP, -FBA, -MV, -DE) from an SKU to find the core catalog SKU.
+ */
+export function normalizeMarketplaceSku(rawSku: string): string[] {
+  const skus = new Set<string>()
+  const trimmed = rawSku.trim()
+  if (!trimmed) return []
+  skus.add(trimmed)
+
+  // Strip prefixes like AZ-, AMZ-, FBA-, EB-, OT-, etc.
+  const prefixMatch = trimmed.match(/^(?:AZ|AMZ|FBA|EB|OT)[-_](.+)$/i)
+  if (prefixMatch && prefixMatch[1]) {
+    skus.add(prefixMatch[1])
+  }
+
+  // Strip suffixes like -MP, -FBA, -MV, -DE, etc.
+  const suffixMatch = trimmed.match(/^(.+)[-_](?:MP|FBA|MV|DE)$/i)
+  if (suffixMatch && suffixMatch[1]) {
+    skus.add(suffixMatch[1])
+  }
+
+  // Also check prefix + suffix combined (e.g. AZ-GC-GG-100-MP)
+  if (prefixMatch && prefixMatch[1]) {
+    const combinedSuffix = prefixMatch[1].match(/^(.+)[-_](?:MP|FBA|MV|DE)$/i)
+    if (combinedSuffix && combinedSuffix[1]) {
+      skus.add(combinedSuffix[1])
+    }
+  }
+
+  return Array.from(skus)
+}
+
 // ─── Persist Orders ───────────────────────────────────────────────────────────
 /**
  * Upsert normalized orders into the database.
@@ -1970,10 +2003,19 @@ export async function persistOrders(
           : companyTaxRateSource
 
       // Pre-fetch product tax rates from TheOmniStack catalog for all items in order
-      const itemSkus = Array.from(new Set(order.items.map(i => i.sku).filter((s): s is string => Boolean(s && s !== 'N/A' && s !== 'UNKNOWN'))))
+      const rawItemSkus = order.items
+        .map(i => i.sku)
+        .filter((s): s is string => Boolean(s && s !== 'N/A' && s !== 'UNKNOWN'))
+      const itemAsins = order.items
+        .map(i => (i as any).asin)
+        .filter((a): a is string => Boolean(a && a !== 'N/A'))
+      const allCandidateSkus = Array.from(new Set([
+        ...rawItemSkus.flatMap(s => normalizeMarketplaceSku(s)),
+        ...itemAsins
+      ]))
       const productTaxRatesBySku: Record<string, number> = {}
 
-      if (itemSkus.length > 0) {
+      if (allCandidateSkus.length > 0) {
         const matchingCatalogProducts = await tx
           .select({
             sku: products.sku,
@@ -1987,9 +2029,9 @@ export async function persistOrders(
             and(
               eq(products.companyId, companyId),
               or(
-                inArray(products.sku, itemSkus),
-                inArray(productMappings.marketplaceSku, itemSkus),
-                inArray(productMappings.marketplaceProductId, itemSkus)
+                inArray(products.sku, allCandidateSkus),
+                inArray(productMappings.marketplaceSku, allCandidateSkus),
+                inArray(productMappings.marketplaceProductId, allCandidateSkus)
               )
             )
           )
@@ -2031,9 +2073,17 @@ export async function persistOrders(
 
       // Calculate each item's tax rate and net amounts
       const calculatedItems = order.items.map((item) => {
-        const productTaxRate = (item.sku && productTaxRatesBySku[item.sku] !== undefined)
-          ? productTaxRatesBySku[item.sku]
-          : undefined
+        const skuCandidates = item.sku ? normalizeMarketplaceSku(item.sku) : []
+        let productTaxRate: number | undefined = undefined
+        for (const candidate of skuCandidates) {
+          if (productTaxRatesBySku[candidate] !== undefined) {
+            productTaxRate = productTaxRatesBySku[candidate]
+            break
+          }
+        }
+        if (productTaxRate === undefined && (item as any).asin && productTaxRatesBySku[(item as any).asin] !== undefined) {
+          productTaxRate = productTaxRatesBySku[(item as any).asin]
+        }
 
         const hasPlatformRate = typeof item.taxRate === 'number' && !isNaN(item.taxRate) && item.taxRate >= 0
         const platformRate = hasPlatformRate ? item.taxRate : undefined
@@ -2050,11 +2100,15 @@ export async function persistOrders(
             appliedRate = defaultVatRate
           }
         } else {
-          // platform-first
-          if (platformRate !== undefined) {
+          // platform-first:
+          // If the product has an explicitly configured tax rate in TheOmniStack (e.g. 7% or 0%),
+          // and platform didn't provide a tax rate or is the standard 19%, honor the merchant's explicit product tax rate!
+          if (platformRate !== undefined && (productTaxRate === undefined || productTaxRate === platformRate)) {
             appliedRate = platformRate
           } else if (productTaxRate !== undefined) {
             appliedRate = productTaxRate
+          } else if (platformRate !== undefined) {
+            appliedRate = platformRate
           } else {
             appliedRate = defaultVatRate
           }
@@ -2151,17 +2205,21 @@ export async function persistOrders(
         // Deduct stock for each item (matching direct SKU or via productMappings)
         for (const item of order.items) {
           if (!item.sku || item.sku === 'N/A' || item.sku === 'UNKNOWN') continue;
+          const candidates = normalizeMarketplaceSku(item.sku)
           
           await tx.execute(sql`
             UPDATE ${products}
             SET current_stock = GREATEST(0, current_stock - ${item.quantity})
             WHERE company_id = ${companyId}
               AND (
-                sku = ${item.sku}
+                sku IN (${sql.join(candidates.map(s => sql`${s}`), sql`, `)})
                 OR id IN (
                   SELECT product_id FROM ${productMappings}
                   WHERE company_id = ${companyId}
-                    AND (marketplace_sku = ${item.sku} OR marketplace_product_id = ${item.sku})
+                    AND (
+                      marketplace_sku IN (${sql.join(candidates.map(s => sql`${s}`), sql`, `)})
+                      OR marketplace_product_id IN (${sql.join(candidates.map(s => sql`${s}`), sql`, `)})
+                    )
                 )
               )
           `);
@@ -2176,13 +2234,13 @@ export async function persistOrders(
       await generateOrDownloadDeliveryNote(newOrderId, companyId, adapter)
       
       // 2. Trigger pushUpdatesToMarketplaces for the updated stock
-      const updates = order.items
+      const rawUpdates = order.items
         .filter(i => i.sku && i.sku !== 'N/A' && i.sku !== 'UNKNOWN')
-        .map(i => ({ sku: i.sku as string }))
+        .map(i => i.sku as string)
 
-      if (updates.length > 0) {
+      if (rawUpdates.length > 0) {
         // Fetch current stock from db to pass to pushUpdatesToMarketplaces
-        const skus = updates.map(u => u.sku)
+        const skus = Array.from(new Set(rawUpdates.flatMap(s => normalizeMarketplaceSku(s))))
         const updatedProducts = await db
           .select({ sku: products.sku, currentStock: products.currentStock })
           .from(products)

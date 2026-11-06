@@ -22,7 +22,7 @@ export function VatSettings({
 }) {
   const [state, action, isPending] = useActionState(saveVatSettingAction, undefined)
   const [showAdd, setShowAdd] = useState(false)
-  const [isOpen, setIsOpen] = useState(false)
+  const [isOpen, setIsOpen] = useState(true)
   const [vatType, setVatType] = useState('oss')
   const [selectedCountry, setSelectedCountry] = useState('')
   const [vatRateValue, setVatRateValue] = useState('')
@@ -119,8 +119,8 @@ export function VatSettings({
 
   return (
     <CollapsibleSection
-      title="Umsatzsteuersätze pro Land"
-      subtitle="Konfiguriere OSS, lokale Registrierungen oder Drittland-Regelungen."
+      title="Umsatzsteuer & Steuersätze pro Land"
+      subtitle="Steuersatz-Quelle für Rechnungen festlegen und OSS / Ländersätze konfigurieren."
       icon={
         <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center flex-shrink-0 border border-gray-100">
           <Percent className="text-gray-500 w-6 h-6" />

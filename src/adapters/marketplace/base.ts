@@ -9,7 +9,7 @@ export type MarketplaceOrderItem = {
   title: string
   quantity: number
   unitPrice: number
-  taxRate: number
+  taxRate?: number
 }
 
 export type MarketplaceAddress = {

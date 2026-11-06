@@ -307,13 +307,22 @@ export class AmazonAdapter implements MarketplaceAdapter {
         country: rawOrder.ShippingAddress?.CountryCode || 'DE',
       },
       currency: rawOrder.OrderTotal?.CurrencyCode || 'EUR',
-      items: rawItems.map(item => ({
-        sku: item.SellerSKU || '',
-        title: item.Title || '',
-        quantity: Number(item.QuantityOrdered || 1),
-        unitPrice: parseFloat(item.ItemPrice?.Amount || '0') / Number(item.QuantityOrdered || 1),
-        taxRate: 0.19, // Standard for Amazon DE if not specified
-      })),
+      items: rawItems.map(item => {
+        const itemPrice = parseFloat(item.ItemPrice?.Amount || '0')
+        const itemTax = item.ItemTax ? parseFloat(item.ItemTax.Amount || '0') : 0
+        let taxRate: number | undefined = undefined
+        if (itemTax > 0 && itemPrice > itemTax) {
+          taxRate = itemTax / (itemPrice - itemTax)
+        }
+        return {
+          sku: item.SellerSKU || '',
+          asin: item.ASIN || undefined,
+          title: item.Title || '',
+          quantity: Number(item.QuantityOrdered || 1),
+          unitPrice: itemPrice / Number(item.QuantityOrdered || 1),
+          taxRate,
+        }
+      }),
       totalAmount,
       taxAmount,
       fulfillmentType: rawOrder.FulfillmentChannel === 'AFN' ? 'FBA' : 'MFN',

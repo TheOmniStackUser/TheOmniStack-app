@@ -60,12 +60,18 @@ export class EbayAdapter implements MarketplaceAdapter {
       const taxAmount = parseFloat(order.pricingSummary?.tax?.value || '0')
       
       const items = (order.lineItems || []).map((item: any) => {
+        let taxRate: number | undefined = undefined
+        const lineTax = parseFloat(item.taxes?.[0]?.amount?.value || '0')
+        const lineCost = parseFloat(item.lineItemCost?.value || '0')
+        if (lineTax > 0 && lineCost > lineTax) {
+          taxRate = lineTax / (lineCost - lineTax)
+        }
         return {
           sku: item.sku || item.legacyItemId || 'unknown',
           title: item.title || 'eBay Item',
           quantity: item.quantity || 1,
-          unitPrice: parseFloat(item.lineItemCost?.value || '0'),
-          taxRate: 0.19 // Defaulting, eBay doesn't always provide % easily
+          unitPrice: lineCost,
+          taxRate,
         }
       })
 
