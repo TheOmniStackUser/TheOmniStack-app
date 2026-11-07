@@ -2,9 +2,10 @@
 
 import React, { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
-import { Package, Search, ChevronUp, ChevronDown, ChevronRight, Scale, MapPin, Tag, FileText, Barcode, ExternalLink, Trash2, Building2, X, Loader2, Copy, MoreHorizontal, GitMerge, CheckCircle2, RotateCcw, Filter, Palette, Check } from 'lucide-react'
+import { Package, Search, ChevronUp, ChevronDown, ChevronRight, Scale, MapPin, Tag, FileText, Barcode, ExternalLink, Trash2, Building2, X, Loader2, Copy, MoreHorizontal, GitMerge, CheckCircle2, RotateCcw, Filter, Palette, Check, CalendarClock } from 'lucide-react'
 import { DeleteProductButton } from './delete-button'
 import { useRouter } from 'next/navigation'
+import { PreorderSetupModal } from './preorder-setup-modal'
 
 type Product = any
 
@@ -25,6 +26,65 @@ function formatMarketplaceName(name: string): string {
     shopware: 'Shopware',
   }
   return map[name.toLowerCase()] || name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+}
+
+function PreorderToggle({ product, onToast }: { product: Product; onToast?: (message: string, type: 'success' | 'error' | 'info') => void }) {
+  const [isPreorder, setIsPreorder] = useState(!!product.isPreorder)
+  const [isUpdating, setIsUpdating] = useState(false)
+  const router = useRouter()
+
+  useEffect(() => {
+    setIsPreorder(!!product.isPreorder)
+  }, [product.isPreorder])
+
+  const handleToggle = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    const nextVal = !isPreorder
+    setIsPreorder(nextVal)
+    setIsUpdating(true)
+
+    try {
+      const { toggleProductPreorder } = await import('@/app/actions/products')
+      await toggleProductPreorder(product.id, nextVal)
+      product.isPreorder = nextVal
+      onToast?.(
+        nextVal
+          ? `Vorbestellung für ${product.sku} aktiviert (Bestand wird nur an freigegebene Marktplätze gesendet)`
+          : `Vorbestellung für ${product.sku} deaktiviert`,
+        'success'
+      )
+      router.refresh()
+    } catch (err: any) {
+      console.error(err)
+      setIsPreorder(!nextVal)
+      onToast?.(err.message || 'Fehler beim Ändern des Vorbestellungs-Status', 'error')
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  return (
+    <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        onClick={handleToggle}
+        disabled={isUpdating}
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all border cursor-pointer select-none ${
+          isPreorder
+            ? 'bg-amber-500/10 text-amber-800 border-amber-300 hover:bg-amber-500/20'
+            : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100 hover:text-slate-600'
+        } disabled:opacity-50`}
+        title={isPreorder ? 'Vorbestellung aktiv (klicken zum Deaktivieren)' : 'Reguläres Produkt (klicken für Vorbestellung)'}
+      >
+        {isUpdating ? (
+          <Loader2 className="w-3 h-3 animate-spin text-amber-600" />
+        ) : (
+          <div className={`w-2 h-2 rounded-full ${isPreorder ? 'bg-amber-500 animate-pulse' : 'bg-slate-300'}`} />
+        )}
+        <span>{isPreorder ? 'Vorbestellung' : 'Aus'}</span>
+      </button>
+    </div>
+  )
 }
 
 function StockEditor({ product, onToast }: { product: Product; onToast?: (message: string, type: 'success' | 'error' | 'info') => void }) {
@@ -1019,12 +1079,14 @@ function MultiSelectFacetFilter({
   )
 }
 
-export function ProductsClient({ initialProducts }: { initialProducts: Product[] }) {
+export function ProductsClient({ initialProducts, integrations = [] }: { initialProducts: Product[]; integrations?: any[] }) {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
   const [searchField, setSearchField] = useState<'all' | 'sku' | 'title' | 'color' | 'size' | 'ean'>('all')
   const [syncFilter, setSyncFilter] = useState<'all' | 'stock_on' | 'stock_off' | 'price_on' | 'price_off'>('all')
   const [marketplaceFilter, setMarketplaceFilter] = useState<string>('all')
+  const [preorderFilter, setPreorderFilter] = useState<'all' | 'preorder_only' | 'regular_only'>('all')
+  const [showPreorderSetupModal, setShowPreorderSetupModal] = useState(false)
 
   const [selectedColors, setSelectedColors] = useState<Set<string>>(new Set())
   const [selectedSizes, setSelectedSizes] = useState<Set<string>>(new Set())
@@ -1310,6 +1372,14 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
       result = result.filter(p => p.marketplaces && p.marketplaces.includes(marketplaceFilter))
     }
 
+    if (preorderFilter !== 'all') {
+      result = result.filter(p => {
+        if (preorderFilter === 'preorder_only') return !!p.isPreorder
+        if (preorderFilter === 'regular_only') return !p.isPreorder
+        return true
+      })
+    }
+
     if (selectedColors.size > 0) {
       result = result.filter(p => {
         const c = p.color?.trim()
@@ -1367,6 +1437,9 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
       if (sortColumn === 'price' || sortColumn === 'currentStock') {
         aVal = Number(aVal) || 0
         bVal = Number(bVal) || 0
+      } else if (sortColumn === 'isPreorder') {
+        aVal = a.isPreorder ? 1 : 0
+        bVal = b.isPreorder ? 1 : 0
       } else if (sortColumn === 'updatedAt' || sortColumn === 'createdAt') {
         aVal = new Date(aVal || 0).getTime()
         bVal = new Date(bVal || 0).getTime()
@@ -1385,13 +1458,14 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
     })
 
     return result
-  }, [initialProducts, searchQuery, sortColumn, sortDirection, searchField, syncFilter, marketplaceFilter, selectedColors, selectedSizes])
+  }, [initialProducts, searchQuery, sortColumn, sortDirection, searchField, syncFilter, marketplaceFilter, preorderFilter, selectedColors, selectedSizes])
 
   const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
     sku: 140,
     title: 250,
     color: 110,
     size: 90,
+    isPreorder: 140,
     currentStock: 110,
     msrp: 100,
     price: 130,
@@ -1431,6 +1505,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
       title: 140,
       color: 80,
       size: 70,
+      isPreorder: 100,
       currentStock: 80,
       msrp: 75,
       price: 85,
@@ -1583,6 +1658,16 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
             </select>
           )}
 
+          <select
+            value={preorderFilter}
+            onChange={(e) => setPreorderFilter(e.target.value as any)}
+            className="w-44 px-3 py-2 pr-8 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all text-slate-900 font-medium"
+          >
+            <option value="all">Alle Artikel (Vorbestellung)</option>
+            <option value="preorder_only">Nur Vorbestellungen</option>
+            <option value="regular_only">Nur reguläre Artikel</option>
+          </select>
+
           {/* Color Facet Filter */}
           <MultiSelectFacetFilter
             title="Farbe"
@@ -1640,6 +1725,15 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
             >
               Suchen
             </button>
+            <button
+              type="button"
+              onClick={() => setShowPreorderSetupModal(true)}
+              className="px-3.5 py-2 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-lg transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-2xs hover:shadow-xs"
+              title="Vorbestellungen für Marktplätze konfigurieren"
+            >
+              <CalendarClock className="w-4 h-4 text-amber-600" />
+              Vorbestellung Setup
+            </button>
             {isColumnsCustomized && (
               <button
                 onClick={handleResetAllWidths}
@@ -1654,7 +1748,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
         </div>
 
         {/* Active Filter Chips */}
-        {(selectedColors.size > 0 || selectedSizes.size > 0 || syncFilter !== 'all' || marketplaceFilter !== 'all' || searchQuery) && (
+        {(selectedColors.size > 0 || selectedSizes.size > 0 || syncFilter !== 'all' || marketplaceFilter !== 'all' || preorderFilter !== 'all' || searchQuery) && (
           <div className="flex flex-wrap items-center gap-2 pt-3 mt-3 border-t border-slate-100 text-xs">
             <span className="font-semibold text-slate-500 flex items-center gap-1">
               <Filter className="w-3.5 h-3.5 text-slate-400" />
@@ -1719,6 +1813,18 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                 </button>
               </span>
             )}
+            {preorderFilter !== 'all' && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 border border-amber-300 font-semibold">
+                <span>Vorbestellung: {preorderFilter === 'preorder_only' ? 'Nur Vorbesteller' : 'Nur regulär'}</span>
+                <button 
+                  type="button"
+                  onClick={() => setPreorderFilter('all')} 
+                  className="hover:text-amber-950 ml-0.5 font-bold cursor-pointer"
+                >
+                  ✕
+                </button>
+              </span>
+            )}
             <button
               type="button"
               onClick={() => {
@@ -1726,6 +1832,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                 setSelectedSizes(new Set())
                 setSyncFilter('all')
                 setMarketplaceFilter('all')
+                setPreorderFilter('all')
                 setSearchQuery('')
               }}
               className="text-xs text-rose-600 hover:text-rose-700 font-semibold underline underline-offset-2 ml-1 cursor-pointer"
@@ -1787,6 +1894,35 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                     showToast('Preis-Sync deaktiviert', 'success');
                   }}
                   className="px-3 py-1 text-xs font-bold rounded-md bg-white text-slate-600 hover:bg-rose-50 hover:text-rose-600 border border-slate-200 shadow-sm transition-colors whitespace-nowrap"
+                >
+                  AUS
+                </button>
+              </div>
+
+              <div className="flex items-center gap-1 bg-amber-50/80 p-1 rounded-lg border border-amber-200/90">
+                <span className="text-xs font-semibold text-amber-900 px-2 whitespace-nowrap flex items-center gap-1">
+                  <CalendarClock className="w-3.5 h-3.5 text-amber-600" />
+                  Vorbestellung:
+                </span>
+                <button
+                  onClick={async () => {
+                    const { bulkToggleProductPreorder } = await import('@/app/actions/products');
+                    await bulkToggleProductPreorder(Array.from(selectedProductIds), true);
+                    showToast('Vorbestellung für ausgewählte Produkte aktiviert', 'success');
+                    router.refresh();
+                  }}
+                  className="px-3 py-1 text-xs font-bold rounded-md bg-white text-amber-800 hover:bg-amber-100/80 border border-amber-200 shadow-xs transition-colors whitespace-nowrap cursor-pointer"
+                >
+                  AN
+                </button>
+                <button
+                  onClick={async () => {
+                    const { bulkToggleProductPreorder } = await import('@/app/actions/products');
+                    await bulkToggleProductPreorder(Array.from(selectedProductIds), false);
+                    showToast('Vorbestellung für ausgewählte Produkte deaktiviert', 'success');
+                    router.refresh();
+                  }}
+                  className="px-3 py-1 text-xs font-bold rounded-md bg-white text-slate-600 hover:bg-slate-100 border border-slate-200 shadow-xs transition-colors whitespace-nowrap cursor-pointer"
                 >
                   AUS
                 </button>
@@ -1879,6 +2015,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
               <col style={{ width: `${columnWidths.title || 250}px` }} />
               <col style={{ width: `${columnWidths.color || 110}px` }} />
               <col style={{ width: `${columnWidths.size || 90}px` }} />
+              <col style={{ width: `${columnWidths.isPreorder || 140}px` }} />
               <col style={{ width: `${columnWidths.currentStock || 110}px` }} />
               <col style={{ width: `${columnWidths.msrp || 100}px` }} />
               <col style={{ width: `${columnWidths.price || 130}px` }} />
@@ -1947,6 +2084,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                 >
                   Größe
                 </Th>
+                <Th column="isPreorder">Vorbestellung</Th>
                 <Th column="currentStock">Bestand</Th>
                 <Th column="msrp">UVP</Th>
                 <Th column="price">Standard Preis</Th>
@@ -1973,7 +2111,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
             <tbody className="divide-y divide-slate-100">
               {filteredAndSortedProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={13} className="px-6 py-12 text-center text-slate-500">
+                  <td colSpan={14} className="px-6 py-12 text-center text-slate-500">
                   <div className="flex flex-col items-center justify-center">
                     <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
                       <Package className="w-8 h-8 text-slate-300" />
@@ -2046,6 +2184,9 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                       </td>
                       <td className="px-6 py-4">
                         <SizeEditor product={product} onToast={showToast} />
+                      </td>
+                      <td className="px-6 py-4">
+                        <PreorderToggle product={product} onToast={showToast} />
                       </td>
                       <td className="px-6 py-4">
                         <StockEditor product={product} onToast={showToast} />
@@ -2145,7 +2286,7 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
                     </tr>
                     {isExpanded && (
                       <tr className="bg-slate-50/30 border-b border-slate-100">
-                        <td colSpan={13} className="p-0">
+                        <td colSpan={14} className="p-0">
                           <div className="px-14 py-6 animate-in slide-in-from-top-2 fade-in duration-200">
                             {/* Prominently display full title when expanded */}
                             <div className="mb-5 pb-4 border-b border-slate-200/80 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
@@ -2462,6 +2603,14 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
         onClose={() => setShowMergeModal(false)}
         productsToMerge={productsToMerge}
         onMerge={handleMerge}
+      />
+
+      {/* Preorder Setup Modal */}
+      <PreorderSetupModal
+        isOpen={showPreorderSetupModal}
+        onClose={() => setShowPreorderSetupModal(false)}
+        integrations={integrations}
+        onToast={showToast}
       />
 
       {/* Toast Notification */}

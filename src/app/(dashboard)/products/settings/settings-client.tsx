@@ -48,6 +48,7 @@ function IntegrationCard({ integration, showNotification }: { integration: any, 
     enabled: false,
     syncStock: true,
     syncPrice: false,
+    allowPreorder: false,
     priceModifierType: 'none',
     priceModifierValue: 0,
     priceBase: 'standard',
@@ -125,6 +126,31 @@ function IntegrationCard({ integration, showNotification }: { integration: any, 
                 onChange={(e) => setSettings({ ...settings, syncPrice: e.target.checked })}
               />
               <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"></div>
+            </label>
+          </div>
+
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between col-span-full">
+            <div>
+              <p className="font-bold text-slate-900 flex items-center gap-2">
+                Vorbestellungen unterstützen (Pre-Order)
+                {settings.allowPreorder && (
+                  <span className="text-[10px] font-bold uppercase bg-amber-100 text-amber-800 px-2 py-0.5 rounded border border-amber-200">
+                    Aktiv
+                  </span>
+                )}
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                Echten positiven Bestand an {getMarketplaceName(integration)} senden, wenn ein Produkt auf 'Vorbestellung' steht (Lieferzeit manuell im Marktplatz angepasst). Wenn deaktiviert, wird bei Vorbesteller-Artikeln Bestand 0 übertragen.
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer shrink-0 ml-4">
+              <input 
+                type="checkbox" 
+                className="sr-only peer" 
+                checked={!!settings.allowPreorder}
+                onChange={(e) => setSettings({ ...settings, allowPreorder: e.target.checked })}
+              />
+              <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
             </label>
           </div>
         </div>

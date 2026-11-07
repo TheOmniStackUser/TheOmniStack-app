@@ -32,30 +32,51 @@ export default async function ProductsPage() {
 
   const { marketplaceIntegrations } = await import('@/db/schema/integrations')
   
-  const allMappings = await db
-    .select({
-      productId: productMappings.productId,
-      marketplaceSku: productMappings.marketplaceSku,
-      ean: productMappings.ean,
-      syncStock: productMappings.syncStock,
-      syncPrice: productMappings.syncPrice,
-      marketplace: productMappings.marketplace,
-      integrationType: marketplaceIntegrations.type,
-      integrationMetadata: marketplaceIntegrations.metadata,
-    })
-    .from(productMappings)
-    .innerJoin(marketplaceIntegrations, eq(productMappings.integrationId, marketplaceIntegrations.id))
-    .where(
-      and(
-        eq(productMappings.companyId, auth.activeCompanyId),
-        eq(marketplaceIntegrations.isActive, true)
+  const [allMappings, activeIntegrations] = await Promise.all([
+    db
+      .select({
+        productId: productMappings.productId,
+        marketplaceSku: productMappings.marketplaceSku,
+        ean: productMappings.ean,
+        syncStock: productMappings.syncStock,
+        syncPrice: productMappings.syncPrice,
+        marketplace: productMappings.marketplace,
+        integrationType: marketplaceIntegrations.type,
+        integrationMetadata: marketplaceIntegrations.metadata,
+      })
+      .from(productMappings)
+      .innerJoin(marketplaceIntegrations, eq(productMappings.integrationId, marketplaceIntegrations.id))
+      .where(
+        and(
+          eq(productMappings.companyId, auth.activeCompanyId),
+          eq(marketplaceIntegrations.isActive, true)
+        )
+      ),
+    db
+      .select({
+        id: marketplaceIntegrations.id,
+        type: marketplaceIntegrations.type,
+        metadata: marketplaceIntegrations.metadata,
+      })
+      .from(marketplaceIntegrations)
+      .where(
+        and(
+          eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
+          eq(marketplaceIntegrations.isActive, true)
+        )
       )
-    )
+      .orderBy(marketplaceIntegrations.createdAt),
+  ])
+
+  const marketplaceOnlyIntegrations = activeIntegrations.filter(
+    (i) => i.type !== 'dhl' && i.type !== 'hermes'
+  )
 
   const productsWithMappings = productList.map(p => {
     const pMappings = allMappings.filter(m => m.productId === p.id)
     return {
       ...p,
+      isPreorder: p.isPreorder ?? false,
       mappingSkus: pMappings.map(m => m.marketplaceSku).join(' '),
       mappingEans: pMappings.map(m => m.ean).filter(Boolean).join(' '),
       hasSyncStockOn: pMappings.some(m => m.syncStock),
@@ -136,7 +157,7 @@ export default async function ProductsPage() {
         </div>
       </header>
 
-      <ProductsClient initialProducts={productsWithMappings} />
+      <ProductsClient initialProducts={productsWithMappings} integrations={marketplaceOnlyIntegrations} />
     </div>
   )
   } catch (error: any) {

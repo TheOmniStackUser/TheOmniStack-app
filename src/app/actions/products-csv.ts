@@ -35,6 +35,7 @@ export async function exportProductsCsv() {
       Beschreibung: p.description || '',
       EAN: p.ean || '',
       Bestand: p.currentStock?.toString() || '0',
+      Vorbestellung: p.isPreorder ? 'Ja' : 'Nein',
       Preis: p.price?.toString() || '0',
       UVP: p.msrp?.toString() || '',
       'Reduzierter Preis': p.reducedPrice?.toString() || '',
@@ -125,6 +126,9 @@ export async function importProductsCsvAction(csvString: string) {
       }
     }
 
+    const rawPreorder = (row['Vorbestellung'] || row['Preorder'] || row['Pre-Order'])?.trim().toLowerCase()
+    const isPreorder = rawPreorder ? ['ja', 'yes', '1', 'true', 'an'].includes(rawPreorder) : undefined
+
     const [insertedProduct] = await db.insert(products).values({
       companyId: auth.activeCompanyId,
       sku,
@@ -134,6 +138,7 @@ export async function importProductsCsvAction(csvString: string) {
       color,
       size,
       currentStock,
+      isPreorder: isPreorder ?? false,
       price,
       msrp,
       reducedPrice,
@@ -153,6 +158,7 @@ export async function importProductsCsvAction(csvString: string) {
         color,
         size,
         currentStock,
+        ...(isPreorder !== undefined ? { isPreorder } : {}),
         price,
         msrp,
         reducedPrice,

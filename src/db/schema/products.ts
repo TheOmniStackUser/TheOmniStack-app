@@ -42,6 +42,7 @@ export const products = pgTable('products', {
   
   // Inventory
   currentStock: numeric('current_stock', { precision: 10, scale: 0 }).notNull().default('0'),
+  isPreorder: boolean('is_preorder').notNull().default(false),
   
   // Pricing
   price: numeric('price', { precision: 12, scale: 2 }).notNull().default('0'),
@@ -77,6 +78,7 @@ export const products = pgTable('products', {
   unqCompanySku: unique('unq_company_sku').on(t.companyId, t.sku),
   companyProductsIdx: index('products_company_idx').on(t.companyId),
   parentIdx: index('products_parent_idx').on(t.parentId),
+  companyPreorderIdx: index('products_company_preorder_idx').on(t.companyId, t.isPreorder),
 }))
 
 // ─── Product Mappings ────────────────────────────────────────────────────────

@@ -10,7 +10,7 @@ import { eq, and } from 'drizzle-orm'
 import { ProductFormClient, SubmitButton } from './product-form-client'
 import { InlineCopyButton } from './copy-button'
 import Link from 'next/link'
-import { ArrowLeft, Save, Package, Link as LinkIcon, Settings2, Trash2 } from 'lucide-react'
+import { ArrowLeft, Save, Package, Link as LinkIcon, Settings2, Trash2, CalendarClock } from 'lucide-react'
 import { notFound } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { after } from 'next/server'
@@ -116,6 +116,8 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       }
     }
 
+    const isPreorder = formData.get('isPreorder') === 'on'
+
     await db.update(products).set({
       title: formData.get('title') as string,
       sku: formData.get('sku') as string,
@@ -133,6 +135,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       purchasePrice: (formData.get('purchasePrice') as string) || null,
       msrp: (formData.get('msrp') as string) || null,
       currentStock: Math.max(0, parseInt((formData.get('currentStock') as string) || '0', 10)).toString(),
+      isPreorder,
       weight: (formData.get('weight') as string) || null,
       storageLocation: (formData.get('storageLocation') as string) || null,
       hsCode: (formData.get('hsCode') as string) || null,
@@ -296,6 +299,35 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
               <h2 className="text-lg font-bold text-slate-900">Preise & Bestand</h2>
             </div>
             <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Vorbestellung (Pre-Order) Toggle Card */}
+              <div className="col-span-full p-4.5 bg-amber-50/70 border border-amber-200/90 rounded-2xl flex items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <CalendarClock className="w-4 h-4 text-amber-600" />
+                    <label className="text-sm font-bold text-slate-900 cursor-pointer">
+                      Vorbestellung (Pre-Order)
+                    </label>
+                    {product.isPreorder && (
+                      <span className="text-[10px] font-bold uppercase bg-amber-200/70 text-amber-900 px-2 py-0.5 rounded-md border border-amber-300">
+                        Aktiv
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-600 leading-relaxed max-w-2xl">
+                    Wenn dieser Haken aktiv ist, wird ein positiver Lagerbestand (z.&thinsp;B. {product.currentStock || '5'} Stück) <strong>nur noch an Marktplätze übertragen</strong>, die in den Vorbestellungs-Einstellungen freigegeben sind (wo die Lieferzeit manuell angepasst wurde). Alle anderen Marktplätze erhalten automatisch den <strong>Bestand 0</strong>.
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input 
+                    type="checkbox" 
+                    name="isPreorder"
+                    defaultChecked={product.isPreorder ?? false}
+                    className="sr-only peer" 
+                  />
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                </label>
+              </div>
+
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700">Standard Preis (€)</label>
                 <input type="number" name="price" step="0.01" defaultValue={Number(product.price)} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 placeholder:text-slate-500" />

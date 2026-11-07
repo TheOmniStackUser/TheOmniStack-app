@@ -253,11 +253,11 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
 
   // Find all mappings for these SKUs
   // First find central products
-  const centralProducts: { id: string, sku: string, price?: string | null, reducedPrice?: string | null, msrp?: string | null, saleStartDate?: Date | null, saleEndDate?: Date | null, gpsrDetails?: any }[] = []
+  const centralProducts: { id: string, sku: string, isPreorder?: boolean, price?: string | null, reducedPrice?: string | null, msrp?: string | null, saleStartDate?: Date | null, saleEndDate?: Date | null, gpsrDetails?: any }[] = []
   for (let i = 0; i < skus.length; i += 1000) {
     const chunkSkus = skus.slice(i, i + 1000)
     const chunkProducts = await db
-      .select({ id: products.id, sku: products.sku, reducedPrice: products.reducedPrice, price: products.price, msrp: products.msrp, saleStartDate: products.saleStartDate, saleEndDate: products.saleEndDate, gpsrDetails: products.gpsrDetails })
+      .select({ id: products.id, sku: products.sku, isPreorder: products.isPreorder, reducedPrice: products.reducedPrice, price: products.price, msrp: products.msrp, saleStartDate: products.saleStartDate, saleEndDate: products.saleEndDate, gpsrDetails: products.gpsrDetails })
       .from(products)
       .where(
         and(
@@ -364,7 +364,20 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
     const canSyncPrice = productSyncSettings ? productSyncSettings.syncPrice === true : false
 
     if (canSyncStock && mapping.syncStock && updateDef.stock !== undefined) {
-      mUpdate.stock = updateDef.stock
+      if (centralProduct.isPreorder) {
+        // Pre-order logic:
+        // When a product is set to pre-order, positive stock is only transferred to marketplaces
+        // where lead times can be adjusted manually (allowPreorder === true).
+        // All other marketplaces receive 0 stock.
+        const supportsPreorder = !!productSyncSettings?.allowPreorder
+        if (updateDef.stock > 0) {
+          mUpdate.stock = supportsPreorder ? updateDef.stock : 0
+        } else {
+          mUpdate.stock = updateDef.stock
+        }
+      } else {
+        mUpdate.stock = updateDef.stock
+      }
     }
 
     const hasPriceInUpdate = updateDef.price !== undefined || 

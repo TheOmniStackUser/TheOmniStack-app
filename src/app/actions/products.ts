@@ -13,6 +13,7 @@ export type MarketplaceSyncSettings = {
   enabled: boolean
   syncStock: boolean
   syncPrice: boolean
+  allowPreorder?: boolean
   priceModifierType: 'none' | 'percentage' | 'fixed'
   priceModifierValue: number
   priceBase?: 'standard' | 'msrp' | 'reduced' | 'all'
@@ -1671,4 +1672,172 @@ export async function restoreMarketplaceOfferPrices(integrationId: string) {
 
   return { success: true, count: updates.length }
 }
+
+export async function toggleProductPreorder(productId: string, isPreorder: boolean) {
+  const auth = await requireAuth()
+
+  const [product] = await db
+    .select({ id: products.id, sku: products.sku, currentStock: products.currentStock })
+    .from(products)
+    .where(and(eq(products.id, productId), eq(products.companyId, auth.activeCompanyId)))
+    .limit(1)
+
+  if (!product) {
+    throw new Error('Produkt nicht gefunden.')
+  }
+
+  await db
+    .update(products)
+    .set({ isPreorder, updatedAt: new Date() })
+    .where(eq(products.id, productId))
+
+  // Trigger sync in the background so all marketplaces get the adjusted stock immediately
+  const { pushUpdatesToMarketplaces } = await import('@/workers/product-sync')
+  import('next/server').then(({ after }) => {
+    after(async () => {
+      try {
+        await pushUpdatesToMarketplaces(auth.activeCompanyId, [{
+          sku: product.sku,
+          stock: Math.max(0, parseInt(product.currentStock || '0', 10))
+        }])
+      } catch (error) {
+        console.error('[toggleProductPreorder] Background sync failed:', error)
+      }
+    })
+  }).catch(console.error)
+
+  revalidatePath('/products')
+  revalidatePath(`/products/${productId}`)
+
+  return { success: true, isPreorder }
+}
+
+export async function bulkToggleProductPreorder(productIds: string[], isPreorder: boolean) {
+  const auth = await requireAuth()
+
+  if (!productIds || productIds.length === 0) {
+    return { success: true, count: 0 }
+  }
+
+  const affectedProducts = await db
+    .select({ id: products.id, sku: products.sku, currentStock: products.currentStock })
+    .from(products)
+    .where(and(eq(products.companyId, auth.activeCompanyId), inArray(products.id, productIds)))
+
+  if (affectedProducts.length === 0) {
+    return { success: true, count: 0 }
+  }
+
+  await db
+    .update(products)
+    .set({ isPreorder, updatedAt: new Date() })
+    .where(and(eq(products.companyId, auth.activeCompanyId), inArray(products.id, productIds)))
+
+  // Push updates for all affected products
+  const { pushUpdatesToMarketplaces } = await import('@/workers/product-sync')
+  import('next/server').then(({ after }) => {
+    after(async () => {
+      try {
+        const updates = affectedProducts.map(p => ({
+          sku: p.sku,
+          stock: Math.max(0, parseInt(p.currentStock || '0', 10))
+        }))
+        await pushUpdatesToMarketplaces(auth.activeCompanyId, updates)
+      } catch (error) {
+        console.error('[bulkToggleProductPreorder] Background sync failed:', error)
+      }
+    })
+  }).catch(console.error)
+
+  revalidatePath('/products')
+
+  return { success: true, count: affectedProducts.length }
+}
+
+export async function savePreorderMarketplaceConfig(
+  config: { integrationId: string; allowPreorder: boolean }[],
+  syncPreorderProducts: boolean = true
+) {
+  const auth = await requireAuth()
+
+  for (const item of config) {
+    const [integration] = await db
+      .select()
+      .from(marketplaceIntegrations)
+      .where(
+        and(
+          eq(marketplaceIntegrations.id, item.integrationId),
+          eq(marketplaceIntegrations.companyId, auth.activeCompanyId)
+        )
+      )
+      .limit(1)
+
+    if (!integration) continue
+
+    const existingMetadata = (integration.metadata as Record<string, any>) || {}
+    const existingProductSync = existingMetadata.productSync || {}
+
+    const updatedMetadata = {
+      ...existingMetadata,
+      productSync: {
+        ...existingProductSync,
+        allowPreorder: item.allowPreorder,
+      },
+    }
+
+    await db
+      .update(marketplaceIntegrations)
+      .set({ metadata: updatedMetadata, updatedAt: new Date() })
+      .where(eq(marketplaceIntegrations.id, item.integrationId))
+  }
+
+  if (syncPreorderProducts) {
+    // Sync all products currently on pre-order so that the new allowPreorder configuration takes effect
+    const preorderProducts = await db
+      .select({
+        sku: products.sku,
+        currentStock: products.currentStock,
+        price: products.price,
+        reducedPrice: products.reducedPrice,
+        msrp: products.msrp,
+        saleStartDate: products.saleStartDate,
+        saleEndDate: products.saleEndDate
+      })
+      .from(products)
+      .where(
+        and(
+          eq(products.companyId, auth.activeCompanyId),
+          eq(products.isPreorder, true)
+        )
+      )
+
+    if (preorderProducts.length > 0) {
+      const { pushUpdatesToMarketplaces } = await import('@/workers/product-sync')
+      import('next/server').then(({ after }) => {
+        after(async () => {
+          try {
+            const updates = preorderProducts.map(p => ({
+              sku: p.sku,
+              stock: Math.max(0, parseInt(p.currentStock || '0', 10)),
+              price: p.price ? parseFloat(p.price) : undefined,
+              reducedPrice: p.reducedPrice ? parseFloat(p.reducedPrice) : undefined,
+              msrp: p.msrp ? parseFloat(p.msrp) : undefined,
+              saleStartDate: p.saleStartDate,
+              saleEndDate: p.saleEndDate
+            }))
+            await pushUpdatesToMarketplaces(auth.activeCompanyId, updates)
+          } catch (error) {
+            console.error('[savePreorderMarketplaceConfig] Sync failed:', error)
+          }
+        })
+      }).catch(console.error)
+    }
+  }
+
+  revalidatePath('/products')
+  revalidatePath('/products/settings')
+
+  return { success: true }
+}
+
 
