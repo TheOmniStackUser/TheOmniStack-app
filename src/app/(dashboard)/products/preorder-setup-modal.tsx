@@ -126,10 +126,11 @@ export function PreorderSetupModal({
                 Funktionsweise der Vorbestellung (Pre-Order):
               </p>
               <p>
-                Wird bei einem Produkt der Haken <strong className="text-amber-800">Vorbestellung</strong> aktiviert,
-                überträgt TheOmniStack den echten Lagerbestand (z.&thinsp;B. 5 Stück) <strong>ausschließlich</strong> an
-                die hier aktivierten Marktplätze, bei denen Sie die Lieferzeit manuell im jeweiligen Verkäuferportal
-                verlängert haben.
+                Wird bei einem Produkt der Haken{' '}
+                <strong className="text-amber-800">Vorbestellung</strong>{' '}
+                aktiviert, überträgt TheOmniStack den echten Lagerbestand (z.&thinsp;B. 5 Stück){' '}
+                <strong>ausschließlich</strong> an die hier aktivierten Marktplätze, bei denen du
+                die Lieferzeit manuell im jeweiligen Verkäuferportal verlängert hast.
               </p>
               <p>
                 Alle anderen Marktplätze erhalten automatisch den <strong>Bestand 0</strong>, um Stornos durch
