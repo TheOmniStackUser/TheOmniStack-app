@@ -13,6 +13,7 @@ import type { DhlConfig } from '@/app/(dashboard)/integrations/dhl-form'
 import { OttoAdapter } from '@/adapters/marketplace/otto'
 import { AboutYouAdapter } from '@/adapters/marketplace/aboutyou'
 import { normalizePostalCode, splitStreet } from '@/lib/postal-codes'
+import { isAmazonSwitzerlandOrder } from '@/lib/orders'
 
 export async function generateHermesLabelsAction(orderIds?: string[], parcelClassMap?: string | Record<string, string>) {
   const auth = await requireAuth()
@@ -125,7 +126,7 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
               : new Date('2026-05-26T12:00:00Z') // Default threshold to today to prevent invoicing older orders
             const isOrderNew = order.createdAt >= thresholdDate
 
-            if (integration?.autoInvoice && isOrderNew) {
+            if (integration?.autoInvoice && isOrderNew && !isAmazonSwitzerlandOrder(order)) {
               console.log(`[Hermes-Action] Auto-generating invoice for order ${order.marketplaceOrderId} during label printing...`)
               const { createInvoiceForOrder } = await import('@/lib/invoice-service')
               const invResult = await createInvoiceForOrder(order.id, auth.activeCompanyId)
@@ -891,7 +892,7 @@ export async function generateDhlLabelsAction(
               : new Date('2026-05-26T12:00:00Z') // Default threshold to today to prevent invoicing older orders
             const isOrderNew = order.createdAt >= thresholdDate
 
-            if (integration?.autoInvoice && isOrderNew) {
+            if (integration?.autoInvoice && isOrderNew && !isAmazonSwitzerlandOrder(order)) {
               console.log(`[DHL-Action] Auto-generating invoice for order ${order.marketplaceOrderId} during label printing...`)
               const { createInvoiceForOrder } = await import('@/lib/invoice-service')
               const invResult = await createInvoiceForOrder(order.id, auth.activeCompanyId)

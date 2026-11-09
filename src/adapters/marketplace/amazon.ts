@@ -4,6 +4,7 @@ import { db } from '@/db/client'
 import { orders } from '@/db/schema/orders'
 import { eq, and } from 'drizzle-orm'
 import { normalizePostalCode } from '@/lib/postal-codes'
+import { get2LetterCountryCode } from '@/lib/countries'
 
 type AmazonAdapterConfig = {
   sellerId: string
@@ -630,6 +631,12 @@ export class AmazonAdapter implements MarketplaceAdapter {
         throw new Error(`Failed to fetch order details: ${orderRes.status}`)
       }
       const orderData = await orderRes.json()
+      
+      const destCountry = get2LetterCountryCode(orderData.payload?.ShippingAddress?.CountryCode || '')
+      if (destCountry === 'CH') {
+        console.warn(`[AmazonAdapter] Refusing to upload invoice for Swiss order ${marketplaceOrderId}: Invoices for Amazon Switzerland are handled by Amazon and prohibited for sellers.`)
+        return false
+      }
       
       const itemsRes = await fetch(`${this.baseUrl}/orders/v0/orders/${marketplaceOrderId}/orderItems`, {
         headers: { 'x-amz-access-token': accessToken } // Items don't need RDT unless buyer info is requested

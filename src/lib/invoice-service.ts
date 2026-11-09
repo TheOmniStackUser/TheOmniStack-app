@@ -7,6 +7,7 @@ import React from 'react'
 import { uploadDocument, buildInvoiceKey } from '@/lib/storage'
 import { resolveBillingAddress } from '@/lib/order-address'
 import { getOrderDisplayNumber } from '@/lib/order-number'
+import { isAmazonSwitzerlandOrder } from '@/lib/orders'
 
 function getCalendarWeek(d: Date): number {
   const target = new Date(d.valueOf())
@@ -160,6 +161,12 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
 
   if (!order) throw new Error('Order not found')
   if (order.invoiceId && documentType === 'invoice') return { skipped: true, reason: 'Invoice already exists' }
+
+  // Amazon Switzerland check: No invoices permitted for Amazon orders to Switzerland (all merchants)
+  if ((documentType === 'invoice' || !documentType) && isAmazonSwitzerlandOrder(order)) {
+    console.log(`[InvoiceService] Skipping invoice creation: Amazon Switzerland orders are exempt from seller invoicing (Order ${order.marketplaceOrderId})`)
+    return { skipped: true, reason: 'Für Amazon-Bestellungen in die Schweiz darf keine Rechnung erstellt werden.' }
+  }
 
   const [company] = await dbClient.select().from(companies).where(eq(companies.id, companyId)).limit(1)
   if (!company) throw new Error('Company not found')

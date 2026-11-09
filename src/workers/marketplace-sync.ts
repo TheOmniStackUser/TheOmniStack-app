@@ -32,6 +32,7 @@ import { ShopwareAdapter } from '@/adapters/marketplace/shopware'
 import { EtsyAdapter } from '@/adapters/marketplace/etsy'
 import type { NormalizedOrder, MarketplaceAdapter } from '@/adapters/marketplace/base'
 import { createInvoiceForOrder, formatDocumentNumber, getDefaultSettings, extractPaymentInfo } from '@/lib/invoice-service'
+import { isAmazonSwitzerlandOrder } from '@/lib/orders'
 import { get2LetterCountryCode } from '@/lib/countries'
 import { normalizePostalCode } from '@/lib/postal-codes'
 
@@ -750,7 +751,13 @@ export async function syncShippedOrdersInvoices(
         limit: 200
       })
 
-      if (candidateOrders.length === 0) {
+      // Amazon Switzerland: Sellers must never create or download invoices for Swiss orders
+      let effectiveCandidateOrders = candidateOrders
+      if (integration.type === 'amazon') {
+        effectiveCandidateOrders = candidateOrders.filter(o => !isAmazonSwitzerlandOrder(o))
+      }
+
+      if (effectiveCandidateOrders.length === 0) {
         // Log to help debug why there are no candidates
         const rawShippedOrdersCount = await db
           .select({ count: sql<number>`count(*)` })
@@ -770,21 +777,21 @@ export async function syncShippedOrdersInvoices(
         continue
       }
 
-      console.log(`[Worker] Found ${candidateOrders.length} shipped orders without invoice for marketplace ${integration.type}`)
+      console.log(`[Worker] Found ${effectiveCandidateOrders.length} shipped orders without invoice for marketplace ${integration.type}`)
 
       const adapter = getAdapterForIntegration(integration)
 
       // Bulk optimize: If adapter supports checking available receipts in bulk, filter candidate orders!
       // Only do this if we are NOT fetching for a specific order (to allow manual recovery to try anyway).
-      let filteredCandidateOrders = candidateOrders
+      let filteredCandidateOrders = effectiveCandidateOrders
       if (adapter && adapter.getAvailableReceipts && !specificOrderId) {
         try {
           // Fetch receipts starting from the oldest candidate order's createdAt
-          const oldestDate = new Date(Math.min(...candidateOrders.map(o => o.createdAt?.getTime() || Date.now())))
+          const oldestDate = new Date(Math.min(...effectiveCandidateOrders.map(o => o.createdAt?.getTime() || Date.now())))
           const availableReceipts = await adapter.getAvailableReceipts(oldestDate)
           const availableSalesOrderIds = new Set(availableReceipts.map(r => r.salesOrderId))
           
-          filteredCandidateOrders = candidateOrders.filter(order => availableSalesOrderIds.has(order.marketplaceOrderId))
+          filteredCandidateOrders = effectiveCandidateOrders.filter(order => availableSalesOrderIds.has(order.marketplaceOrderId))
           console.log(`[Worker] Bulk optimization: Filtered down to ${filteredCandidateOrders.length} orders that have receipts ready on the marketplace.`)
         } catch (err) {
           console.error(`[Worker] Bulk optimization failed, proceeding with all candidates:`, err)
@@ -792,6 +799,10 @@ export async function syncShippedOrdersInvoices(
       }
 
       for (const order of filteredCandidateOrders) {
+        if (isAmazonSwitzerlandOrder(order)) {
+          console.log(`[Worker] Skipping invoice for Amazon CH order ${order.marketplaceOrderId}`)
+          continue
+        }
         try {
           if (downloadInvoice) {
             if (adapter) {
@@ -2206,6 +2217,9 @@ export async function persistOrders(
         for (const item of order.items) {
           if (!item.sku || item.sku === 'N/A' || item.sku === 'UNKNOWN') continue;
           const candidates = normalizeMarketplaceSku(item.sku)
+          if ((item as any).asin && !candidates.includes((item as any).asin)) {
+            candidates.push((item as any).asin)
+          }
           
           await tx.execute(sql`
             UPDATE ${products}

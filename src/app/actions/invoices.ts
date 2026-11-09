@@ -11,6 +11,7 @@ import { generateZugferdXml } from '@/lib/e-invoice'
 import { companies } from '@/db/schema/companies'
 import { invoiceItems, invoiceLogs } from '@/db/schema/invoices'
 import { invoiceTextTemplates } from '@/db/schema/templates'
+import { isAmazonSwitzerlandOrder } from '@/lib/orders'
 
 export async function getInvoiceDownloadUrl(invoiceId: string) {
   const auth = await requireAuth()
@@ -162,6 +163,16 @@ export async function generateMissingInvoicesAction(options: { fetchMarketplace?
 
   for (const order of ordersWithoutInvoice) {
     try {
+      if (isAmazonSwitzerlandOrder(order)) {
+        failed++
+        errors.push({
+          orderId: order.id,
+          marketplaceOrderId: order.marketplaceOrderId || '',
+          message: 'Für Amazon-Bestellungen in die Schweiz darf keine Rechnung erstellt werden.'
+        })
+        continue
+      }
+
       const integration = activeIntegrations.find(i => 
         i.type === order.marketplace ||
         (i.type === 'mirakl_custom' && 

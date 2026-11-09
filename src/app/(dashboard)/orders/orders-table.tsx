@@ -19,6 +19,7 @@ import { resolveBillingAddress } from '@/lib/order-address'
 import { getMarketplaceShippingInfo } from '@/lib/order-dates'
 import { getOrderDisplayNumber } from '@/lib/order-number'
 import { calculateOrderRefundStats, allocateRefundsToOrderItems } from '@/lib/order-refunds'
+import { isAmazonSwitzerlandOrder } from '@/lib/orders'
 
 export type OrderWithItems = Order & { items: OrderItem[], returns?: any[], invoice?: (Invoice & { logs?: InvoiceLog[] }) | null }
 
@@ -352,11 +353,16 @@ const renderOrderProgress = (order: OrderWithItems, customMiraklIntegrations: an
     : (states.shipped ? `Versendet am ${shippedDateStr}` : "Noch nicht versendet")
 
   // 4. Invoice (Rechnung)
+  const isAmazonCH = isAmazonSwitzerlandOrder(order)
   const invoiceNumber = order.invoice?.invoiceNumber
   const invoiceDate = order.invoice?.issuedAt || order.invoice?.createdAt
   const invoiceDateStr = invoiceDate ? format(new Date(invoiceDate), 'dd.MM.yyyy', { locale: de }) : ''
-  const invoiceTooltipTitle = states.invoice ? "Rechnung erstellt" : "Rechnung ausstehend"
-  const invoiceTooltipSubtitle = states.invoice ? `Nr. ${invoiceNumber} vom ${invoiceDateStr}` : "Rechnung fehlt"
+  const invoiceTooltipTitle = states.invoice 
+    ? "Rechnung erstellt" 
+    : (isAmazonCH ? "Keine Rechnung erforderlich" : "Rechnung ausstehend")
+  const invoiceTooltipSubtitle = states.invoice 
+    ? `Nr. ${invoiceNumber} vom ${invoiceDateStr}` 
+    : (isAmazonCH ? "Amazon Schweiz (Amazon VCS / Facilitator)" : "Rechnung fehlt")
 
   // 5. Shipping Label (Versandlabel)
   const labelTooltipTitle = states.label ? "Versandlabel erstellt" : "Kein Versandlabel"

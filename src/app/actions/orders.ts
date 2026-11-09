@@ -8,6 +8,7 @@ import { companies } from '@/db/schema/companies'
 import { eq, and, inArray, sql, or, like } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { normalizePostalCode } from '@/lib/postal-codes'
+import { isAmazonSwitzerlandOrder } from '@/lib/orders'
 
 export async function archiveOrderAction(orderId: string) {
   try {
@@ -309,6 +310,12 @@ export async function generateOrDownloadInvoicesBulkAction(orderIds: string[]) {
       )
 
     for (const order of candidateOrders) {
+      if (isAmazonSwitzerlandOrder(order)) {
+        errorsList.push({ orderNumber: order.marketplaceOrderId, error: 'Für Amazon-Bestellungen in die Schweiz darf keine Rechnung erstellt werden.' })
+        errorCount++
+        continue
+      }
+
       const integration = integrations.find(i => 
         i.type === order.marketplace ||
         (i.type === 'mirakl_decathlon' && order.marketplace === 'Decathlon DE') ||
@@ -468,7 +475,7 @@ export async function markOrderAsShippedManuallyAction(
         : new Date('2026-05-26T12:00:00Z')
       const isOrderNew = order.createdAt >= thresholdDate
 
-      if (integration?.autoInvoice && isOrderNew && !order.invoiceId) {
+      if (integration?.autoInvoice && isOrderNew && !order.invoiceId && !isAmazonSwitzerlandOrder(order)) {
         console.log(`[Manual-Shipment-Action] Auto-generating invoice for order ${order.marketplaceOrderId} during manual shipment...`)
         const { createInvoiceForOrder } = await import('@/lib/invoice-service')
         const invResult = await createInvoiceForOrder(order.id, auth.activeCompanyId)

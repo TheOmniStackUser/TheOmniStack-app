@@ -156,24 +156,35 @@ export class KauflandAdapter implements MarketplaceAdapter {
       let totalAmount = 0
       let taxAmount = 0
       const items: any[] = []
-      const itemGroupMap: Record<string, { sku: string, title: string, quantity: number, unitPrice: number, taxRate: number }> = {}
+      const itemGroupMap: Record<string, { sku: string, asin?: string, title: string, quantity: number, unitPrice: number, taxRate: number }> = {}
       let totalShippingCharges = 0
 
       for (const unit of units) {
         const itemPrice = (unit.price || 0) / 100
-        const shippingCharge = (unit.shipping_charges || 0) / 100
+        const shippingCharge = (unit.shipping_rate ?? unit.shipping_charges ?? 0) / 100
 
         totalAmount += itemPrice + shippingCharge
 
-        const vatRate = 0.19 // Default to standard German VAT
+        const rawVat = (unit.vat !== undefined && unit.vat !== null) ? Number(unit.vat) : null
+        const vatRate = (rawVat !== null && !isNaN(rawVat)) ? rawVat / 100 : 0.19 // Default to standard German VAT
         const netPrice = itemPrice / (1 + vatRate)
         const netShipping = shippingCharge / (1 + vatRate)
         taxAmount += (itemPrice - netPrice) + (shippingCharge - netShipping)
 
         totalShippingCharges += shippingCharge
 
-        const sku = unit.id_offer || unit.ean || 'UNKNOWN'
-        const title = unit.item_title || unit.title || `Kaufland-Produkt ${unit.ean || ''}`
+        const offerSku = typeof unit.id_offer === 'string' && unit.id_offer.trim() ? unit.id_offer.trim() : null
+        const ean = (Array.isArray(unit.product?.eans) && unit.product.eans[0])
+          ? String(unit.product.eans[0]).trim()
+          : (unit.ean ? String(unit.ean).trim() : null)
+        const productId = unit.product?.id_product ? String(unit.product.id_product).trim() : null
+        const orderUnitId = unit.id_order_unit ? String(unit.id_order_unit).trim() : null
+
+        const sku = offerSku || ean || productId || orderUnitId || 'UNKNOWN'
+        const title = unit.product?.title?.trim()
+          || unit.item_title?.trim()
+          || unit.title?.trim()
+          || (ean ? `Kaufland-Produkt ${ean}` : (productId ? `Kaufland-Produkt ${productId}` : 'Kaufland-Produkt'))
         const key = `${sku}_${itemPrice}`
 
         if (itemGroupMap[key]) {
@@ -181,6 +192,7 @@ export class KauflandAdapter implements MarketplaceAdapter {
         } else {
           itemGroupMap[key] = {
             sku,
+            asin: ean || productId || undefined,
             title,
             quantity: unit.quantity || 1,
             unitPrice: itemPrice,
@@ -369,8 +381,20 @@ export class KauflandAdapter implements MarketplaceAdapter {
           continue
         }
 
-        const sku = unit.id_offer || unit.ean
-        const refundIndex = remainingRefundItems.findIndex(ri => ri.sku === sku)
+        const offerSku = typeof unit.id_offer === 'string' && unit.id_offer.trim() ? unit.id_offer.trim() : null
+        const ean = (Array.isArray(unit.product?.eans) && unit.product.eans[0])
+          ? String(unit.product.eans[0]).trim()
+          : (unit.ean ? String(unit.ean).trim() : null)
+        const productId = unit.product?.id_product ? String(unit.product.id_product).trim() : null
+        const orderUnitId = unit.id_order_unit ? String(unit.id_order_unit).trim() : null
+
+        const sku = offerSku || ean || productId || orderUnitId || 'UNKNOWN'
+        const refundIndex = remainingRefundItems.findIndex(ri =>
+          ri.sku === sku ||
+          (offerSku && ri.sku === offerSku) ||
+          (ean && ri.sku === ean) ||
+          (productId && ri.sku === productId)
+        )
         if (refundIndex !== -1) {
           // Trigger cancellation for full item refund
           const body = JSON.stringify({
@@ -434,14 +458,23 @@ export class KauflandAdapter implements MarketplaceAdapter {
 
       console.log(`[KauflandAdapter] Fetched ${allUnits.length} units total.`)
 
-      return allUnits.map(unit => ({
-        marketplaceProductId: String(unit.id_unit),
-        sku: unit.id_offer || String(unit.id_unit),
-        title: unit.item_title || unit.id_offer,
-        price: (unit.price || 0) / 100, // Price is in cents
-        stock: unit.amount || 0,
-        rawPayload: unit
-      }))
+      return allUnits.map(unit => {
+        const offerSku = typeof unit.id_offer === 'string' && unit.id_offer.trim() ? unit.id_offer.trim() : null
+        const ean = (Array.isArray(unit.product?.eans) && unit.product.eans[0])
+          ? String(unit.product.eans[0]).trim()
+          : (unit.ean ? String(unit.ean).trim() : null)
+        const sku = offerSku || ean || String(unit.id_unit)
+        const title = unit.product?.title?.trim() || unit.item_title?.trim() || unit.title?.trim() || offerSku || sku
+
+        return {
+          marketplaceProductId: String(unit.id_unit),
+          sku,
+          title,
+          price: (unit.price || 0) / 100, // Price is in cents
+          stock: unit.amount || 0,
+          rawPayload: unit
+        }
+      })
     } catch (error) {
       console.error(`[KauflandAdapter] Error fetching products:`, error)
       throw error
