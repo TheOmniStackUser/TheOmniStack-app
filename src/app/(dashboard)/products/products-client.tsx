@@ -1619,112 +1619,53 @@ export function ProductsClient({ initialProducts, integrations = [] }: { initial
   return (
     <div className="space-y-6">
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-        <div className="flex flex-wrap gap-3 items-center w-full">
-          <select
-            value={searchField}
-            onChange={(e) => setSearchField(e.target.value as any)}
-            className="w-36 px-3 py-2 pr-8 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all text-slate-900 font-medium"
+        {/* Row 1: Search & Action Buttons */}
+        <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+          <form 
+            onSubmit={(e) => e.preventDefault()}
+            className="flex items-center gap-2 flex-1 max-w-3xl"
           >
-            <option value="all">Alle Felder</option>
-            <option value="sku">SKU</option>
-            <option value="title">Titel</option>
-            <option value="color">Farbe</option>
-            <option value="size">Größe</option>
-            <option value="ean">EAN</option>
-          </select>
-          <select
-            value={syncFilter}
-            onChange={(e) => setSyncFilter(e.target.value as any)}
-            className="w-40 px-3 py-2 pr-8 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all text-slate-900 font-medium"
-          >
-            <option value="all">Alle Sync-Stati</option>
-            <option value="stock_on">Bestand Sync: AN</option>
-            <option value="stock_off">Bestand Sync: AUS</option>
-            <option value="price_on">Preis Sync: AN</option>
-            <option value="price_off">Preis Sync: AUS</option>
-          </select>
-          {availableMarketplaces.length > 0 && (
             <select
-              value={marketplaceFilter}
-              onChange={(e) => setMarketplaceFilter(e.target.value)}
-              className="w-40 px-3 py-2 pr-8 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all text-slate-900 font-medium"
+              value={searchField}
+              onChange={(e) => setSearchField(e.target.value as any)}
+              className="w-36 shrink-0 px-3 py-2 pr-8 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all text-slate-900 font-medium cursor-pointer"
             >
-              <option value="all">Alle Marktplätze</option>
-              {availableMarketplaces.map(m => (
-                <option key={m} value={m}>
-                  {formatMarketplaceName(m)}
-                </option>
-              ))}
+              <option value="all">Alle Felder</option>
+              <option value="sku">SKU</option>
+              <option value="title">Titel</option>
+              <option value="color">Farbe</option>
+              <option value="size">Größe</option>
+              <option value="ean">EAN</option>
             </select>
-          )}
-
-          <select
-            value={preorderFilter}
-            onChange={(e) => setPreorderFilter(e.target.value as any)}
-            className="w-44 px-3 py-2 pr-8 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all text-slate-900 font-medium"
-          >
-            <option value="all">Alle Artikel (Vorbestellung)</option>
-            <option value="preorder_only">Nur Vorbestellungen</option>
-            <option value="regular_only">Nur reguläre Artikel</option>
-          </select>
-
-          {/* Color Facet Filter */}
-          <MultiSelectFacetFilter
-            title="Farbe"
-            icon={<Palette className="w-3.5 h-3.5 text-purple-600" />}
-            items={availableColors}
-            selected={selectedColors}
-            onChange={setSelectedColors}
-            placeholderSearch="Farbe suchen..."
-            emptyLabel="Ohne Farbe"
-            isColor={true}
-            variant="toolbar"
-            isOpen={activeFacetFilter === 'toolbar_color'}
-            onToggle={() => setActiveFacetFilter(activeFacetFilter === 'toolbar_color' ? null : 'toolbar_color')}
-            onClose={() => setActiveFacetFilter(null)}
-          />
-
-          {/* Size Facet Filter */}
-          <MultiSelectFacetFilter
-            title="Größe"
-            icon={<Tag className="w-3.5 h-3.5 text-cyan-600" />}
-            items={availableSizes}
-            selected={selectedSizes}
-            onChange={setSelectedSizes}
-            placeholderSearch="Größe suchen..."
-            emptyLabel="Ohne Größe"
-            isColor={false}
-            variant="toolbar"
-            isOpen={activeFacetFilter === 'toolbar_size'}
-            onToggle={() => setActiveFacetFilter(activeFacetFilter === 'toolbar_size' ? null : 'toolbar_size')}
-            onClose={() => setActiveFacetFilter(null)}
-          />
-
-          <div className="relative flex-1 min-w-[200px] flex gap-2">
-            <div className="relative flex-1">
+            <div className="relative flex-1 min-w-[220px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input 
                 type="text"
                 placeholder={searchField === 'all' ? "SKU, Titel oder EAN suchen..." : `${searchField.toUpperCase()} suchen...`} 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all text-slate-900 placeholder:text-slate-500 font-medium"
+                className="w-full pl-9 pr-9 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all text-slate-900 placeholder:text-slate-500 font-medium"
               />
               {searchQuery && (
                 <button
+                  type="button"
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-0.5 rounded-full hover:bg-slate-200"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-0.5 rounded-full hover:bg-slate-200 cursor-pointer"
+                  title="Suche leeren"
                 >
                   <X className="w-4 h-4" />
                 </button>
               )}
             </div>
             <button 
-              className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm flex items-center gap-2 cursor-pointer"
-              onClick={(e) => e.preventDefault()}
+              type="submit"
+              className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm flex items-center gap-2 cursor-pointer shrink-0"
             >
               Suchen
             </button>
+          </form>
+
+          <div className="flex items-center gap-2 shrink-0 justify-end">
             <button
               type="button"
               onClick={() => setShowPreorderSetupModal(true)}
@@ -1736,6 +1677,7 @@ export function ProductsClient({ initialProducts, integrations = [] }: { initial
             </button>
             {isColumnsCustomized && (
               <button
+                type="button"
                 onClick={handleResetAllWidths}
                 className="px-3 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer"
                 title="Alle Spaltenbreiten auf Standard zurücksetzen"
@@ -1747,13 +1689,115 @@ export function ProductsClient({ initialProducts, integrations = [] }: { initial
           </div>
         </div>
 
+        {/* Row 2: Filters & Product count */}
+        <div className="flex flex-wrap gap-2.5 items-center justify-between pt-3 mt-3 border-t border-slate-100">
+          <div className="flex flex-wrap gap-2.5 items-center">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 mr-1">
+              <Filter className="w-3.5 h-3.5 text-slate-400" />
+              <span>Filter:</span>
+            </div>
+
+            <select
+              value={syncFilter}
+              onChange={(e) => setSyncFilter(e.target.value as any)}
+              className="w-36 px-3 py-1.5 pr-8 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all text-slate-900 font-medium cursor-pointer"
+            >
+              <option value="all">Alle Sync-Stati</option>
+              <option value="stock_on">Bestand Sync: AN</option>
+              <option value="stock_off">Bestand Sync: AUS</option>
+              <option value="price_on">Preis Sync: AN</option>
+              <option value="price_off">Preis Sync: AUS</option>
+            </select>
+
+            {availableMarketplaces.length > 0 && (
+              <select
+                value={marketplaceFilter}
+                onChange={(e) => setMarketplaceFilter(e.target.value)}
+                className="w-40 px-3 py-1.5 pr-8 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all text-slate-900 font-medium cursor-pointer"
+              >
+                <option value="all">Alle Marktplätze</option>
+                {availableMarketplaces.map(m => (
+                  <option key={m} value={m}>
+                    {formatMarketplaceName(m)}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            <select
+              value={preorderFilter}
+              onChange={(e) => setPreorderFilter(e.target.value as any)}
+              className="w-44 px-3 py-1.5 pr-8 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all text-slate-900 font-medium cursor-pointer"
+            >
+              <option value="all">Alle Artikel (Vorbestellung)</option>
+              <option value="preorder_only">Nur Vorbestellungen</option>
+              <option value="regular_only">Nur reguläre Artikel</option>
+            </select>
+
+            {/* Color Facet Filter */}
+            <MultiSelectFacetFilter
+              title="Farbe"
+              icon={<Palette className="w-3.5 h-3.5 text-purple-600" />}
+              items={availableColors}
+              selected={selectedColors}
+              onChange={setSelectedColors}
+              placeholderSearch="Farbe suchen..."
+              emptyLabel="Ohne Farbe"
+              isColor={true}
+              variant="toolbar"
+              isOpen={activeFacetFilter === 'toolbar_color'}
+              onToggle={() => setActiveFacetFilter(activeFacetFilter === 'toolbar_color' ? null : 'toolbar_color')}
+              onClose={() => setActiveFacetFilter(null)}
+            />
+
+            {/* Size Facet Filter */}
+            <MultiSelectFacetFilter
+              title="Größe"
+              icon={<Tag className="w-3.5 h-3.5 text-cyan-600" />}
+              items={availableSizes}
+              selected={selectedSizes}
+              onChange={setSelectedSizes}
+              placeholderSearch="Größe suchen..."
+              emptyLabel="Ohne Größe"
+              isColor={false}
+              variant="toolbar"
+              isOpen={activeFacetFilter === 'toolbar_size'}
+              onToggle={() => setActiveFacetFilter(activeFacetFilter === 'toolbar_size' ? null : 'toolbar_size')}
+              onClose={() => setActiveFacetFilter(null)}
+            />
+          </div>
+
+          <div className="text-xs text-slate-500 font-medium shrink-0 ml-auto py-1">
+            {filteredAndSortedProducts.length === initialProducts.length ? (
+              <span>{initialProducts.length} Produkte</span>
+            ) : (
+              <span>
+                <strong className="text-slate-800 font-semibold">{filteredAndSortedProducts.length}</strong> von {initialProducts.length} Produkten
+              </span>
+            )}
+          </div>
+        </div>
+
         {/* Active Filter Chips */}
-        {(selectedColors.size > 0 || selectedSizes.size > 0 || syncFilter !== 'all' || marketplaceFilter !== 'all' || preorderFilter !== 'all' || searchQuery) && (
-          <div className="flex flex-wrap items-center gap-2 pt-3 mt-3 border-t border-slate-100 text-xs">
+        {(selectedColors.size > 0 || selectedSizes.size > 0 || syncFilter !== 'all' || marketplaceFilter !== 'all' || preorderFilter !== 'all' || searchQuery.trim()) && (
+          <div className="flex flex-wrap items-center gap-2 pt-2.5 mt-2.5 border-t border-slate-100 text-xs">
             <span className="font-semibold text-slate-500 flex items-center gap-1">
               <Filter className="w-3.5 h-3.5 text-slate-400" />
               Aktive Filter:
             </span>
+            {searchQuery.trim() && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 font-semibold shadow-xs">
+                <span>Suche ({searchField === 'all' ? 'Alle Felder' : searchField.toUpperCase()}): &ldquo;{searchQuery}&rdquo;</span>
+                <button 
+                  type="button"
+                  onClick={() => setSearchQuery('')} 
+                  className="hover:text-blue-900 ml-0.5 font-bold cursor-pointer"
+                  title="Suche zurücksetzen"
+                >
+                  ✕
+                </button>
+              </span>
+            )}
             {Array.from(selectedColors).map(color => (
               <span key={color} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 font-semibold shadow-xs">
                 {getColorDot(color) && <span className="w-2 h-2 rounded-full border border-slate-300" style={{ backgroundColor: getColorDot(color)! }} />}
@@ -1839,9 +1883,6 @@ export function ProductsClient({ initialProducts, integrations = [] }: { initial
             >
               Alle Filter zurücksetzen
             </button>
-            <span className="text-slate-400 text-xs ml-auto font-medium">
-              {filteredAndSortedProducts.length} von {initialProducts.length} Produkten
-            </span>
           </div>
         )}
         
