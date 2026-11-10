@@ -1,6 +1,6 @@
 {
-  "id": "9d04ccf4-c8d1-4f54-902a-f2101eb4f489",
-  "prevId": "61652ce4-5bc8-42e9-a592-98e70c0dc0eb",
+  "id": "5d0e5e78-3ac6-488f-a1e7-e5945ead58c4",
+  "prevId": "9d04ccf4-c8d1-4f54-902a-f2101eb4f489",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -528,6 +528,13 @@
           "notNull": true,
           "default": "'1'"
         },
+        "tax_rate_source": {
+          "name": "tax_rate_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'product'"
+        },
         "document_number_settings": {
           "name": "document_number_settings",
           "type": "jsonb",
@@ -577,12 +584,47 @@
           "notNull": true,
           "default": false
         },
+        "fetch_orders_schedule_mode": {
+          "name": "fetch_orders_schedule_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'times'"
+        },
+        "fetch_orders_interval": {
+          "name": "fetch_orders_interval",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'60'"
+        },
+        "fetch_orders_business_hours_start": {
+          "name": "fetch_orders_business_hours_start",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'08:00'"
+        },
+        "fetch_orders_business_hours_end": {
+          "name": "fetch_orders_business_hours_end",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'18:00'"
+        },
         "fetch_orders_time": {
           "name": "fetch_orders_time",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "default": "'03:00'"
+        },
+        "fetch_orders_times": {
+          "name": "fetch_orders_times",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[\"03:00\"]'::jsonb"
         },
         "fetch_orders_marketplaces": {
           "name": "fetch_orders_marketplaces",
@@ -1110,6 +1152,24 @@
         },
         "scheduled_shipment_date": {
           "name": "scheduled_shipment_date",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "marketplace_confirmation_status": {
+          "name": "marketplace_confirmation_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "marketplace_confirmation_error": {
+          "name": "marketplace_confirmation_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "marketplace_confirmed_at": {
+          "name": "marketplace_confirmed_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
@@ -3157,6 +3217,13 @@
           "notNull": true,
           "default": "'0'"
         },
+        "is_preorder": {
+          "name": "is_preorder",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "price": {
           "name": "price",
           "type": "numeric(12, 2)",
@@ -3193,6 +3260,13 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
+        },
+        "tax_rate": {
+          "name": "tax_rate",
+          "type": "numeric(5, 4)",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'0.19'"
         },
         "weight": {
           "name": "weight",
@@ -3261,6 +3335,27 @@
           "columns": [
             {
               "expression": "parent_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "products_company_preorder_idx": {
+          "name": "products_company_preorder_idx",
+          "columns": [
+            {
+              "expression": "company_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "is_preorder",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -3845,6 +3940,292 @@
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
+    },
+    "public.marketplace_question_messages": {
+      "name": "marketplace_question_messages",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "question_id": {
+          "name": "question_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sender_type": {
+          "name": "sender_type",
+          "type": "marketplace_message_sender_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'customer'"
+        },
+        "sender_name": {
+          "name": "sender_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sender_email": {
+          "name": "sender_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "message_text": {
+          "name": "message_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'sent'"
+        },
+        "external_message_id": {
+          "name": "external_message_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "marketplace_question_messages_question_id_marketplace_questions_id_fk": {
+          "name": "marketplace_question_messages_question_id_marketplace_questions_id_fk",
+          "tableFrom": "marketplace_question_messages",
+          "tableTo": "marketplace_questions",
+          "columnsFrom": [
+            "question_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.marketplace_questions": {
+      "name": "marketplace_questions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "company_id": {
+          "name": "company_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "marketplace": {
+          "name": "marketplace",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'otto'"
+        },
+        "integration_id": {
+          "name": "integration_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "external_question_id": {
+          "name": "external_question_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "marketplace_question_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'open'"
+        },
+        "question_type": {
+          "name": "question_type",
+          "type": "marketplace_question_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'general'"
+        },
+        "customer_name": {
+          "name": "customer_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "customer_email": {
+          "name": "customer_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "product_sku": {
+          "name": "product_sku",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "product_title": {
+          "name": "product_title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "marketplace_product_id": {
+          "name": "marketplace_product_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "marketplace_order_id": {
+          "name": "marketplace_order_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "order_id": {
+          "name": "order_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "subject": {
+          "name": "subject",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "question_text": {
+          "name": "question_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "deadline_at": {
+          "name": "deadline_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sla_hours": {
+          "name": "sla_hours",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 48
+        },
+        "last_answer_text": {
+          "name": "last_answer_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "answered_at": {
+          "name": "answered_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "raw_payload": {
+          "name": "raw_payload",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "marketplace_questions_company_id_companies_id_fk": {
+          "name": "marketplace_questions_company_id_companies_id_fk",
+          "tableFrom": "marketplace_questions",
+          "tableTo": "companies",
+          "columnsFrom": [
+            "company_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "marketplace_questions_integration_id_marketplace_integrations_id_fk": {
+          "name": "marketplace_questions_integration_id_marketplace_integrations_id_fk",
+          "tableFrom": "marketplace_questions",
+          "tableTo": "marketplace_integrations",
+          "columnsFrom": [
+            "integration_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "marketplace_questions_order_id_orders_id_fk": {
+          "name": "marketplace_questions_order_id_orders_id_fk",
+          "tableFrom": "marketplace_questions",
+          "tableTo": "orders",
+          "columnsFrom": [
+            "order_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     }
   },
   "enums": {
@@ -3958,7 +4339,8 @@
         "kaufland",
         "ebay",
         "woocommerce",
-        "shopware"
+        "shopware",
+        "dpd"
       ]
     },
     "public.dunning_stage": {
@@ -4049,7 +4431,35 @@
         "kaufland",
         "ebay",
         "woocommerce",
-        "shopware"
+        "shopware",
+        "dpd"
+      ]
+    },
+    "public.marketplace_message_sender_type": {
+      "name": "marketplace_message_sender_type",
+      "schema": "public",
+      "values": [
+        "customer",
+        "seller",
+        "system"
+      ]
+    },
+    "public.marketplace_question_status": {
+      "name": "marketplace_question_status",
+      "schema": "public",
+      "values": [
+        "open",
+        "answered",
+        "closed"
+      ]
+    },
+    "public.marketplace_question_type": {
+      "name": "marketplace_question_type",
+      "schema": "public",
+      "values": [
+        "product",
+        "order",
+        "general"
       ]
     }
   },

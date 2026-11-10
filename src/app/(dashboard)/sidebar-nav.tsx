@@ -10,7 +10,8 @@ import {
   FileSignature, 
   Users, 
   RotateCcw, 
-  Box 
+  Box,
+  MessageSquareText
 } from 'lucide-react'
 
 export function SidebarNav({ 
@@ -27,6 +28,7 @@ export function SidebarNav({
   let links = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/orders', label: 'Bestellungen', icon: ShoppingCart },
+    { href: '/questions', label: 'Kundenfragen', icon: MessageSquareText },
     { href: '/invoices', label: 'Rechnungen', icon: FileText },
     { href: '/delivery-notes', label: 'Lieferscheine', icon: Package },
     { href: '/quotes', label: 'Angebote', icon: FileSignature },
@@ -42,7 +44,7 @@ export function SidebarNav({
   }
 
   if (isCraftVariant) {
-    links = links.filter(link => !['/orders', '/returns', '/products'].includes(link.href))
+    links = links.filter(link => !['/orders', '/returns', '/products', '/questions'].includes(link.href))
   }
 
   return (

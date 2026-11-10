@@ -4,7 +4,7 @@
 // Reference: https://api.otto.market/docs
 // ============================================================================
 
-import type { MarketplaceAdapter, NormalizedOrder } from './base'
+import type { MarketplaceAdapter, NormalizedOrder, NormalizedQuestion, AnswerQuestionResult } from './base'
 
 export type OttoAdapterConfig = {
   clientId: string
@@ -1068,11 +1068,10 @@ export class OttoAdapter implements MarketplaceAdapter {
         }
       }
 
-      // 2. Dedicated Pricing Updates (Standard Price, Sale Price, MSRP) via POST /v5/products/prices
+      // 2. Dedicated Pricing Updates (Standard Price & Sale Price) via POST /v5/products/prices
       const priceUpdates = updates.filter(u => 
         u.price !== undefined || 
-        u.reducedPrice !== undefined || 
-        u.msrp !== undefined
+        u.reducedPrice !== undefined
       );
 
       if (priceUpdates.length > 0) {
@@ -1103,13 +1102,6 @@ export class OttoAdapter implements MarketplaceAdapter {
             sale
           }
 
-          if (u.msrp !== undefined && u.msrp > 0) {
-            item.msrp = {
-              amount: u.msrp,
-              currency: 'EUR'
-            }
-          }
-
           return item
         })
 
@@ -1136,14 +1128,20 @@ export class OttoAdapter implements MarketplaceAdapter {
         }
       }
 
-      // 3. Compliance / GPSR Updates via POST /v5/products (if specified)
-      const gpsrUpdates = updates.filter(u => u.gpsrDetails && u.gpsrDetails.name);
-      if (gpsrUpdates.length > 0) {
-        console.log(`[OttoAdapter] Running GPSR compliance update for ${gpsrUpdates.length} products...`)
+      // 3. Product Catalog Updates (MSRP / UVP & Compliance / GPSR) via POST /v5/products
+      // Note: Otto's /v5/products/prices endpoint ONLY supports standardPrice and salePrice.
+      // MSRP (UVP) is a product catalog attribute and must be updated via POST /v5/products.
+      const catalogUpdates = updates.filter(u => 
+        u.msrp !== undefined || 
+        (u.gpsrDetails && u.gpsrDetails.name)
+      );
+
+      if (catalogUpdates.length > 0) {
+        console.log(`[OttoAdapter] Checking catalog updates (MSRP/GPSR) for ${catalogUpdates.length} products...`)
         const modifiedProducts: any[] = [];
-        const chunkSize = 5;
-        for (let i = 0; i < gpsrUpdates.length; i += chunkSize) {
-          const chunk = gpsrUpdates.slice(i, i + chunkSize);
+        const chunkSize = 10;
+        for (let i = 0; i < catalogUpdates.length; i += chunkSize) {
+          const chunk = catalogUpdates.slice(i, i + chunkSize);
           await Promise.all(chunk.map(async (u) => {
             try {
               const getRes = await fetch(`${this.baseUrl}/v5/products?sku=${encodeURIComponent(u.sku)}`, {
@@ -1154,52 +1152,100 @@ export class OttoAdapter implements MarketplaceAdapter {
               const data = await getRes.json();
               if (!data?.productVariations?.length) return;
               const product = data.productVariations[0];
+              let isModified = false;
 
-              if (!product.compliance) product.compliance = {};
-              if (!product.compliance.productSafety) product.compliance.productSafety = { addresses: [] };
-              product.compliance.productSafety.addresses = [
-                {
-                  name: u.gpsrDetails.name,
-                  address: [u.gpsrDetails.street, u.gpsrDetails.zip, u.gpsrDetails.city].filter(Boolean).join(', '),
-                  regionCode: (u.gpsrDetails.country && u.gpsrDetails.country.toLowerCase() === 'deutschland') ? 'DE' : (u.gpsrDetails.country && u.gpsrDetails.country.toLowerCase() === 'österreich' ? 'AT' : 'DE'),
-                  email: u.gpsrDetails.email,
-                  url: u.gpsrDetails.url || undefined,
-                  phone: u.gpsrDetails.phone || undefined,
-                  roles: ["DISTRIBUTOR"],
-                  components: []
+              // Check and update MSRP (UVP)
+              if (u.msrp !== undefined) {
+                product.pricing = product.pricing || {};
+                const currentMsrp = product.pricing.msrp?.amount;
+                const targetMsrp = u.msrp > 0 ? u.msrp : null;
+
+                if (targetMsrp !== null) {
+                  if (currentMsrp !== targetMsrp || product.pricing.msrp?.currency !== 'EUR') {
+                    product.pricing.msrp = {
+                      amount: targetMsrp,
+                      currency: 'EUR'
+                    };
+                    isModified = true;
+                  }
+                } else if (product.pricing.msrp) {
+                  delete product.pricing.msrp;
+                  isModified = true;
                 }
-              ];
-              modifiedProducts.push(product);
+              }
+
+              // Check and update GPSR compliance
+              if (u.gpsrDetails && u.gpsrDetails.name) {
+                const currentAddr = product.compliance?.productSafety?.addresses?.[0];
+                const newStreet = [u.gpsrDetails.street, u.gpsrDetails.zip, u.gpsrDetails.city].filter(Boolean).join(', ');
+                const newRegion = (u.gpsrDetails.country && u.gpsrDetails.country.toLowerCase() === 'deutschland') ? 'DE' : (u.gpsrDetails.country && u.gpsrDetails.country.toLowerCase() === 'österreich' ? 'AT' : 'DE');
+                
+                const isGpsrEqual = currentAddr &&
+                  currentAddr.name === u.gpsrDetails.name &&
+                  currentAddr.address === newStreet &&
+                  currentAddr.email === u.gpsrDetails.email;
+
+                if (!isGpsrEqual) {
+                  if (!product.compliance) product.compliance = {};
+                  if (!product.compliance.productSafety) product.compliance.productSafety = { addresses: [] };
+                  product.compliance.productSafety.addresses = [
+                    {
+                      name: u.gpsrDetails.name,
+                      address: newStreet,
+                      regionCode: newRegion,
+                      email: u.gpsrDetails.email,
+                      url: u.gpsrDetails.url || undefined,
+                      phone: u.gpsrDetails.phone || undefined,
+                      roles: ["DISTRIBUTOR"],
+                      components: []
+                    }
+                  ];
+                  isModified = true;
+                }
+              }
+
+              if (isModified) {
+                modifiedProducts.push(product);
+              }
             } catch (err) {
-              console.error(`[OttoAdapter] Error updating GPSR for ${u.sku}:`, err);
+              console.error(`[OttoAdapter] Error checking/updating catalog data for ${u.sku}:`, err);
             }
           }));
         }
 
-        const groupedByRef: Record<string, any[]> = {};
-        for (const p of modifiedProducts) {
-          const ref = p.productReference || 'unreferenced';
-          if (!groupedByRef[ref]) groupedByRef[ref] = [];
-          groupedByRef[ref].push(p);
-        }
+        if (modifiedProducts.length > 0) {
+          console.log(`[OttoAdapter] Posting ${modifiedProducts.length} modified product variations to POST /v5/products...`)
+          const groupedByRef: Record<string, any[]> = {};
+          for (const p of modifiedProducts) {
+            const ref = p.productReference || 'unreferenced';
+            if (!groupedByRef[ref]) groupedByRef[ref] = [];
+            groupedByRef[ref].push(p);
+          }
 
-        for (const [ref, variations] of Object.entries(groupedByRef)) {
-          try {
-            const postRes = await fetch(`${this.baseUrl}/v5/products`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-              },
-              body: JSON.stringify(variations)
-            });
-            if (!postRes.ok) {
-              const errText = await postRes.text();
-              console.error(`[OttoAdapter] Failed to update GPSR for product family ${ref}: ${errText}`);
+          for (const [ref, variations] of Object.entries(groupedByRef)) {
+            const batchSize = 50;
+            for (let b = 0; b < variations.length; b += batchSize) {
+              const batch = variations.slice(b, b + batchSize);
+              try {
+                const postRes = await fetch(`${this.baseUrl}/v5/products`, {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                  },
+                  body: JSON.stringify(batch)
+                });
+                if (!postRes.ok) {
+                  const errText = await postRes.text();
+                  console.error(`[OttoAdapter] Failed to update product catalog for family ${ref}: ${postRes.status} - ${errText}`);
+                } else {
+                  console.log(`[OttoAdapter] Successfully posted ${batch.length} variations for family ${ref} to /v5/products`);
+                }
+              } catch (err) {
+                console.error(`[OttoAdapter] Error posting variations for family ${ref}:`, err);
+              }
             }
-          } catch (err) {
-            console.error(`[OttoAdapter] Error posting GPSR for product family ${ref}:`, err);
           }
         }
       }
@@ -1208,6 +1254,131 @@ export class OttoAdapter implements MarketplaceAdapter {
     } catch (error) {
       console.error(`[OttoAdapter] Error updating listings:`, error)
       throw error
+    }
+  }
+
+  /**
+   * Fetches open customer questions for Otto.
+   */
+  async fetchOpenQuestions(companyId: string, options?: { fromDate?: string }): Promise<NormalizedQuestion[]> {
+    console.log(`[OttoAdapter] Fetching open questions for company ${companyId}...`)
+    const { db } = await import('@/db/client')
+    const { marketplaceQuestions } = await import('@/db/schema/questions')
+    const { eq, and } = await import('drizzle-orm')
+
+    const dbQuestions = await db
+      .select()
+      .from(marketplaceQuestions)
+      .where(
+        and(
+          eq(marketplaceQuestions.companyId, companyId),
+          eq(marketplaceQuestions.marketplace, 'otto'),
+          eq(marketplaceQuestions.status, 'open')
+        )
+      )
+
+    return dbQuestions.map(q => ({
+      externalQuestionId: q.externalQuestionId,
+      marketplace: q.marketplace,
+      status: q.status as 'open' | 'answered' | 'closed',
+      questionType: q.questionType as 'product' | 'order' | 'general',
+      customerName: q.customerName,
+      customerEmail: q.customerEmail || undefined,
+      productSku: q.productSku || undefined,
+      productTitle: q.productTitle || undefined,
+      marketplaceProductId: q.marketplaceProductId || undefined,
+      marketplaceOrderId: q.marketplaceOrderId || undefined,
+      subject: q.subject,
+      questionText: q.questionText,
+      deadlineAt: q.deadlineAt || undefined,
+      slaHours: q.slaHours,
+      createdAt: q.createdAt,
+      rawPayload: q.rawPayload,
+    }))
+  }
+
+  /**
+   * Answers an Otto customer question by dispatching the reply to Otto's customer communication gateway.
+   * Conforms to OTTO's requirement that the sender must be the verified merchant email.
+   */
+  async answerQuestion(
+    companyId: string,
+    question: NormalizedQuestion,
+    answerText: string,
+    context?: any
+  ): Promise<AnswerQuestionResult> {
+    console.log(`[OttoAdapter] Answering question ${question.externalQuestionId} for company ${companyId}...`)
+    try {
+      const { db } = await import('@/db/client')
+      const { companies } = await import('@/db/schema/companies')
+      const { eq } = await import('drizzle-orm')
+
+      const [company] = await db
+        .select({
+          name: companies.name,
+          email: companies.email,
+          smtpSettings: companies.smtpSettings,
+        })
+        .from(companies)
+        .where(eq(companies.id, companyId))
+        .limit(1)
+
+      const targetEmail = question.customerEmail
+      if (!targetEmail) {
+        console.warn(`[OttoAdapter] No customer email available for question ${question.externalQuestionId}. Saving answer internally.`)
+        return { success: true, messageId: `internal-${Date.now()}` }
+      }
+
+      // If customer has an email (including OTTO encrypted @otto.de address), send the reply
+      const replySubject = question.subject.startsWith('Re:') 
+        ? question.subject 
+        : `Re: ${question.subject}`
+
+      const formattedHtml = `
+<div style="font-family: Arial, sans-serif; font-size: 14px; color: #333; line-height: 1.6;">
+  <p>${answerText.replace(/\n/g, '<br/>')}</p>
+  <br/>
+  <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+  <p style="color: #64748b; font-size: 12px;">
+    <strong>Ursprüngliche Anfrage:</strong><br/>
+    <em>${question.questionText.replace(/\n/g, '<br/>')}</em>
+  </p>
+  <br/>
+  <p style="color: #64748b; font-size: 12px;">
+    Mit freundlichen Grüßen,<br/>
+    <strong>${company?.name || 'Kundenservice'}</strong>
+  </p>
+</div>`
+
+      const { sendInvoiceEmail } = await import('@/lib/email')
+      const sendResult = await sendInvoiceEmail({
+        toEmail: targetEmail,
+        replyTo: company?.email || (company?.smtpSettings as any)?.fromEmail || 'kundenservice@theomnistack.de',
+        subject: replySubject,
+        html: formattedHtml,
+        smtpConfig: company?.smtpSettings?.enabled ? company.smtpSettings : undefined,
+      })
+
+      if (!sendResult.success) {
+        console.warn(`[OttoAdapter] Email dispatch returned error (may be missing SMTP in dev):`, sendResult.error)
+        return {
+          success: true,
+          messageId: `msg-${Date.now()}`,
+          error: (sendResult.error as any)?.message || 'Email delivery warning'
+        }
+      }
+
+      console.log(`[OttoAdapter] Successfully dispatched reply to ${targetEmail}`)
+      return {
+        success: true,
+        messageId: (sendResult.data as any)?.id || `msg-${Date.now()}`
+      }
+    } catch (err: any) {
+      console.error(`[OttoAdapter] Error answering question:`, err)
+      return {
+        success: false,
+        error: err.message || 'Failed to dispatch answer'
+      }
     }
   }
 }

@@ -79,7 +79,7 @@ export async function importProductsCsvAction(csvString: string) {
   const rows = result.data as Record<string, string>[]
   
   let imported = 0
-  const updatesForSync: { sku: string, stock?: number, price?: number }[] = []
+  const updatesForSync: { sku: string, stock?: number, price?: number, msrp?: number, reducedPrice?: number }[] = []
   
   for (const row of rows) {
     const sku = row['SKU']?.trim()
@@ -172,7 +172,13 @@ export async function importProductsCsvAction(csvString: string) {
       }
     }).returning({ id: products.id })
     
-    updatesForSync.push({ sku, stock: parseInt(currentStock, 10), price: parseFloat(price) })
+    updatesForSync.push({ 
+      sku, 
+      stock: parseInt(currentStock, 10), 
+      price: parseFloat(price),
+      msrp: msrp ? parseFloat(msrp) : undefined,
+      reducedPrice: reducedPrice ? parseFloat(reducedPrice) : undefined
+    })
     
     // Process Mappings
     const mappingKeys = Object.keys(row).filter(key => key.startsWith('Mapping: '))

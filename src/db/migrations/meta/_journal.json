@@ -253,6 +253,13 @@
       "when": 1791358871060,
       "tag": "0035_keen_lord_hawal",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1794342591654,
+      "tag": "0036_serious_spot",
+      "breakpoints": true
     }
   ]
 }

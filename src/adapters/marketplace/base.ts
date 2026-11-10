@@ -51,6 +51,31 @@ export type NormalizedOrder = {
   rawPayload: unknown // preserved verbatim for audit trail
 }
 
+export type NormalizedQuestion = {
+  externalQuestionId: string
+  marketplace: string
+  status: 'open' | 'answered' | 'closed'
+  questionType: 'product' | 'order' | 'general'
+  customerName: string
+  customerEmail?: string
+  productSku?: string
+  productTitle?: string
+  marketplaceProductId?: string
+  marketplaceOrderId?: string
+  subject: string
+  questionText: string
+  deadlineAt?: Date
+  slaHours?: number
+  createdAt: Date
+  rawPayload?: unknown
+}
+
+export type AnswerQuestionResult = {
+  success: boolean
+  messageId?: string
+  error?: string
+}
+
 export interface MarketplaceAdapter {
   readonly marketplace: NormalizedOrder['marketplace']
   /**
@@ -155,4 +180,19 @@ export interface MarketplaceAdapter {
     refundItems: { sku: string; quantity: number }[],
     rawOrderPayload?: unknown
   ): Promise<boolean | 'ACCEPTED'>
+
+  /**
+   * Fetch open customer questions or inquiries from the marketplace.
+   */
+  fetchOpenQuestions?(companyId: string, options?: { fromDate?: string }): Promise<NormalizedQuestion[]>
+
+  /**
+   * Send an answer to a customer inquiry on the marketplace.
+   */
+  answerQuestion?(
+    companyId: string,
+    question: NormalizedQuestion,
+    answerText: string,
+    context?: any
+  ): Promise<AnswerQuestionResult>
 }
