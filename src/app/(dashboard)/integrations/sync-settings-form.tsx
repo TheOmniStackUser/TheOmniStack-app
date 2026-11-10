@@ -1,8 +1,9 @@
 'use client'
 
-import { useActionState, useState, useEffect } from 'react'
+import { useActionState, useState, useEffect, useMemo } from 'react'
 import { saveSyncSettingsAction } from '@/app/actions/integrations'
-import { HelpCircle, Clock, CheckCircle, Plus, Trash2 } from 'lucide-react'
+import { generateIntervalTimes } from '@/lib/sync-schedule'
+import { HelpCircle, Clock, CheckCircle, Plus, Trash2, Repeat, ListFilter, Calendar } from 'lucide-react'
 
 type MarketplaceOption = {
   value: string
@@ -12,6 +13,10 @@ type MarketplaceOption = {
 type SyncSettingsFormProps = {
   company: {
     fetchOrdersDaily: boolean
+    fetchOrdersScheduleMode?: string | null
+    fetchOrdersInterval?: string | null
+    fetchOrdersBusinessHoursStart?: string | null
+    fetchOrdersBusinessHoursEnd?: string | null
     fetchOrdersTime: string
     fetchOrdersTimes?: string[] | null
     fetchOrdersMarketplaces: string[]
@@ -20,9 +25,23 @@ type SyncSettingsFormProps = {
   activeMarketplaces: MarketplaceOption[]
 }
 
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => `${i.toString().padStart(2, '0')}:00`)
+
 export function SyncSettingsForm({ company, activeMarketplaces }: SyncSettingsFormProps) {
   const [state, action, pending] = useActionState(saveSyncSettingsAction, undefined)
   const [isEnabled, setIsEnabled] = useState(company.fetchOrdersDaily)
+  const [scheduleMode, setScheduleMode] = useState<'interval' | 'times'>(
+    (company.fetchOrdersScheduleMode as 'interval' | 'times') || 'interval'
+  )
+  const [interval, setInterval] = useState<'30' | '60' | '120'>(
+    (company.fetchOrdersInterval as '30' | '60' | '120') || '60'
+  )
+  const [businessHoursStart, setBusinessHoursStart] = useState<string>(
+    company.fetchOrdersBusinessHoursStart || '08:00'
+  )
+  const [businessHoursEnd, setBusinessHoursEnd] = useState<string>(
+    company.fetchOrdersBusinessHoursEnd || '18:00'
+  )
   const [syncTimes, setSyncTimes] = useState<string[]>(() => {
     if (company.fetchOrdersTimes && company.fetchOrdersTimes.length > 0) {
       return company.fetchOrdersTimes
@@ -34,16 +53,39 @@ export function SyncSettingsForm({ company, activeMarketplaces }: SyncSettingsFo
   )
 
   useEffect(() => {
+    if (company.fetchOrdersScheduleMode) {
+      setScheduleMode(company.fetchOrdersScheduleMode as 'interval' | 'times')
+    }
+    if (company.fetchOrdersInterval) {
+      setInterval(company.fetchOrdersInterval as '30' | '60' | '120')
+    }
+    if (company.fetchOrdersBusinessHoursStart) {
+      setBusinessHoursStart(company.fetchOrdersBusinessHoursStart)
+    }
+    if (company.fetchOrdersBusinessHoursEnd) {
+      setBusinessHoursEnd(company.fetchOrdersBusinessHoursEnd)
+    }
     if (company.fetchOrdersTimes && company.fetchOrdersTimes.length > 0) {
       setSyncTimes(company.fetchOrdersTimes)
     } else if (company.fetchOrdersTime) {
       setSyncTimes([company.fetchOrdersTime])
     }
-  }, [company.fetchOrdersTimes, company.fetchOrdersTime])
+  }, [
+    company.fetchOrdersScheduleMode,
+    company.fetchOrdersInterval,
+    company.fetchOrdersBusinessHoursStart,
+    company.fetchOrdersBusinessHoursEnd,
+    company.fetchOrdersTimes,
+    company.fetchOrdersTime
+  ])
 
   useEffect(() => {
     setSelectedMarketplaces(company.fetchOrdersMarketplaces || [])
   }, [company.fetchOrdersMarketplaces])
+
+  const calculatedIntervalTimes = useMemo(() => {
+    return generateIntervalTimes(parseInt(interval, 10), businessHoursStart, businessHoursEnd)
+  }, [interval, businessHoursStart, businessHoursEnd])
 
   const handleToggleMarketplace = (value: string) => {
     setSelectedMarketplaces((prev) =>
@@ -79,6 +121,8 @@ export function SyncSettingsForm({ company, activeMarketplaces }: SyncSettingsFo
     })
   }
 
+  const effectiveTimesToSave = scheduleMode === 'interval' ? calculatedIntervalTimes : syncTimes
+
   return (
     <form action={action} className="space-y-6 max-w-xl">
       {state?.success && (
@@ -94,23 +138,23 @@ export function SyncSettingsForm({ company, activeMarketplaces }: SyncSettingsFo
         </div>
       )}
 
-      {/* Daily Sync Activation Toggle */}
+      {/* Auto-Sync Activation Toggle */}
       <div className="flex items-center justify-between p-4 bg-white rounded-2xl border border-gray-150 shadow-sm transition-all hover:shadow-md">
         <div className="space-y-0.5">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-bold text-gray-900">Täglichen Bestellabruf aktivieren</span>
+            <span className="text-sm font-bold text-gray-900">Automatischen Bestellabruf aktivieren</span>
             <div className="group relative">
               <HelpCircle size={14} className="text-gray-400 cursor-help hover:text-blue-500 transition-colors" />
               <div className="absolute left-6 top-0 w-64 p-3 bg-slate-900 text-white text-xs rounded-xl shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 transform -translate-y-1/4">
                 <p className="leading-relaxed text-slate-300">
-                  Wenn aktiviert, ruft theomnistack zu den konfigurierten Uhrzeiten automatisch neue, unversandte Bestellungen von den ausgewählten Marktplätzen ab.
+                  Wenn aktiviert, ruft theomnistack automatisch neue Bestellungen im konfigurierten Intervall oder zu festgelegten Uhrzeiten von deinen Marktplätzen ab.
                 </p>
                 <div className="absolute left-0 top-3 -translate-x-full border-8 border-transparent border-r-slate-900"></div>
               </div>
             </div>
           </div>
           <p className="text-xs text-gray-500">
-            Automatischer Import deiner Bestellungen im Hintergrund.
+            Regelmäßiger Import deiner Bestellungen im Hintergrund.
           </p>
         </div>
         <label className="relative inline-flex items-center cursor-pointer select-none">
@@ -128,59 +172,201 @@ export function SyncSettingsForm({ company, activeMarketplaces }: SyncSettingsFo
 
       {isEnabled && (
         <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
-          {/* Multiple Times Configuration */}
+          {/* Schedule Mode Selector */}
           <div className="p-4 bg-white rounded-2xl border border-gray-150 shadow-sm space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
-              <div>
-                <label className="block text-sm font-semibold text-gray-800 flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-blue-600" />
-                  Abruf-Uhrzeiten (täglich)
-                </label>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  Füge bei Bedarf mehrere Uhrzeiten pro Tag für den automatischen Import hinzu.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={handleAddTime}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 hover:text-blue-700 rounded-xl transition-all cursor-pointer border border-blue-200 active:scale-95 select-none"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Weitere Uhrzeit
-              </button>
+            <div>
+              <label className="block text-sm font-semibold text-gray-800 flex items-center gap-1.5 mb-1">
+                <Repeat className="w-4 h-4 text-blue-600" />
+                Abruf-Modus
+              </label>
+              <p className="text-xs text-gray-500">
+                Wähle, ob der Abruf in festen Intervallen während der Arbeitszeit oder zu fixen Einzel-Uhrzeiten erfolgen soll.
+              </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {syncTimes.map((time, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center gap-2 p-2.5 bg-gray-50/70 border border-gray-200 rounded-xl shadow-xs transition-all hover:border-gray-300"
-                >
-                  <span className="text-xs font-semibold text-gray-500 min-w-[62px]">
-                    {idx + 1}. Abruf:
-                  </span>
-                  <input
-                    type="time"
-                    value={time}
-                    onChange={(e) => handleTimeChange(idx, e.target.value)}
-                    required
-                    aria-label={`Abruf-Uhrzeit ${idx + 1}`}
-                    className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg shadow-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all bg-white font-medium text-sm"
-                  />
-                  {syncTimes.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveTime(idx)}
-                      title="Uhrzeit entfernen"
-                      aria-label={`Uhrzeit ${idx + 1} entfernen`}
-                      className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
+              <button
+                type="button"
+                onClick={() => setScheduleMode('interval')}
+                className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+                  scheduleMode === 'interval'
+                    ? 'border-blue-600 bg-blue-50/60 ring-2 ring-blue-500/20'
+                    : 'border-gray-200 bg-white hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <Clock className={`w-4 h-4 ${scheduleMode === 'interval' ? 'text-blue-600' : 'text-gray-400'}`} />
+                  <span className="text-sm font-bold text-gray-900">Intervall während Geschäftszeiten</span>
                 </div>
-              ))}
+                <p className="text-xs text-gray-500">
+                  Alle 30 Min., 1 Std. oder 2 Std. innerhalb definierter Geschäftszeiten (z. B. 08:00 – 18:00).
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setScheduleMode('times')}
+                className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+                  scheduleMode === 'times'
+                    ? 'border-blue-600 bg-blue-50/60 ring-2 ring-blue-500/20'
+                    : 'border-gray-200 bg-white hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <ListFilter className={`w-4 h-4 ${scheduleMode === 'times' ? 'text-blue-600' : 'text-gray-400'}`} />
+                  <span className="text-sm font-bold text-gray-900">Feste Einzel-Uhrzeiten</span>
+                </div>
+                <p className="text-xs text-gray-500">
+                  Individuelle feste Uhrzeiten pro Tag (z. B. 03:00, 12:00, 18:00).
+                </p>
+              </button>
             </div>
+
+            {/* Mode 1: Interval during business hours */}
+            {scheduleMode === 'interval' && (
+              <div className="pt-3 border-t border-gray-100 space-y-4 animate-in fade-in duration-200">
+                {/* Interval Selection */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                    Wiederholungs-Intervall
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { value: '30', label: 'Alle 30 Minuten' },
+                      { value: '60', label: 'Jede Stunde' },
+                      { value: '120', label: 'Alle 2 Stunden' },
+                    ].map((opt) => {
+                      const isSelected = interval === opt.value
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setInterval(opt.value as any)}
+                          className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all cursor-pointer text-center ${
+                            isSelected
+                              ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                              : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Business Hours */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                    Geschäftszeiten (Zeitfenster)
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <span className="text-xs text-gray-500 font-medium">Von (Startzeit):</span>
+                      <select
+                        value={businessHoursStart}
+                        onChange={(e) => setBusinessHoursStart(e.target.value)}
+                        aria-label="Startzeit der Geschäftszeiten"
+                        className="block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-xs text-slate-900 bg-white font-medium text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      >
+                        {HOUR_OPTIONS.map((h) => (
+                          <option key={h} value={h}>
+                            {h} Uhr
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <span className="text-xs text-gray-500 font-medium">Bis (Endzeit):</span>
+                      <select
+                        value={businessHoursEnd}
+                        onChange={(e) => setBusinessHoursEnd(e.target.value)}
+                        aria-label="Endzeit der Geschäftszeiten"
+                        className="block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-xs text-slate-900 bg-white font-medium text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      >
+                        {HOUR_OPTIONS.map((h) => (
+                          <option key={h} value={h}>
+                            {h} Uhr
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Live Preview Summary */}
+                <div className="p-3.5 bg-blue-50/50 rounded-xl border border-blue-100 text-xs text-blue-900 space-y-2">
+                  <div className="flex items-center gap-2 font-bold">
+                    <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                    <span>
+                      {calculatedIntervalTimes.length} Abrufe täglich (alle {interval === '30' ? '30 Min.' : interval === '60' ? '1 Std.' : '2 Std.'} von {businessHoursStart} bis {businessHoursEnd} Uhr)
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 pt-1 max-h-24 overflow-y-auto">
+                    {calculatedIntervalTimes.map((t) => (
+                      <span
+                        key={t}
+                        className="px-2 py-0.5 bg-white text-blue-700 font-mono font-semibold rounded-md border border-blue-200 text-[11px] shadow-2xs"
+                      >
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Mode 2: Specific Times */}
+            {scheduleMode === 'times' && (
+              <div className="pt-3 border-t border-gray-100 space-y-3 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    Uhrzeitenliste
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleAddTime}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 hover:text-blue-700 rounded-xl transition-all cursor-pointer border border-blue-200 active:scale-95 select-none"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Weitere Uhrzeit
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {syncTimes.map((time, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-2 p-2.5 bg-gray-50/70 border border-gray-200 rounded-xl shadow-xs transition-all hover:border-gray-300"
+                    >
+                      <span className="text-xs font-semibold text-gray-500 min-w-[62px]">
+                        {idx + 1}. Abruf:
+                      </span>
+                      <input
+                        type="time"
+                        value={time}
+                        onChange={(e) => handleTimeChange(idx, e.target.value)}
+                        required
+                        aria-label={`Abruf-Uhrzeit ${idx + 1}`}
+                        className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg shadow-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all bg-white font-medium text-sm"
+                      />
+                      {syncTimes.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveTime(idx)}
+                          title="Uhrzeit entfernen"
+                          aria-label={`Uhrzeit ${idx + 1} entfernen`}
+                          className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Email Notification */}
@@ -269,16 +455,36 @@ export function SyncSettingsForm({ company, activeMarketplaces }: SyncSettingsFo
         </div>
       )}
 
-      {/* Hidden inputs to pass data */}
+      {/* Hidden inputs to pass schedule configuration */}
+      <input
+        type="hidden"
+        name="fetchOrdersScheduleMode"
+        value={scheduleMode}
+      />
+      <input
+        type="hidden"
+        name="fetchOrdersInterval"
+        value={interval}
+      />
+      <input
+        type="hidden"
+        name="fetchOrdersBusinessHoursStart"
+        value={businessHoursStart}
+      />
+      <input
+        type="hidden"
+        name="fetchOrdersBusinessHoursEnd"
+        value={businessHoursEnd}
+      />
       <input
         type="hidden"
         name="fetchOrdersTimes"
-        value={JSON.stringify(syncTimes)}
+        value={JSON.stringify(effectiveTimesToSave)}
       />
       <input
         type="hidden"
         name="fetchOrdersTime"
-        value={syncTimes[0] || '03:00'}
+        value={effectiveTimesToSave[0] || '08:00'}
       />
       <input
         type="hidden"

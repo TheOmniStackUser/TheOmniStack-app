@@ -37,6 +37,10 @@ export default async function IntegrationsPage(props: {
     db
       .select({
         fetchOrdersDaily: companies.fetchOrdersDaily,
+        fetchOrdersScheduleMode: companies.fetchOrdersScheduleMode,
+        fetchOrdersInterval: companies.fetchOrdersInterval,
+        fetchOrdersBusinessHoursStart: companies.fetchOrdersBusinessHoursStart,
+        fetchOrdersBusinessHoursEnd: companies.fetchOrdersBusinessHoursEnd,
         fetchOrdersTime: companies.fetchOrdersTime,
         fetchOrdersTimes: companies.fetchOrdersTimes,
         fetchOrdersMarketplaces: companies.fetchOrdersMarketplaces,

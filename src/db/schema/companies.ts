@@ -119,8 +119,12 @@ export const companies = pgTable('companies', {
     fromName?: string;
   }>(),
 
-  // Configurable daily automated order sync
+  // Configurable automated order sync
   fetchOrdersDaily: boolean('fetch_orders_daily').notNull().default(false),
+  fetchOrdersScheduleMode: text('fetch_orders_schedule_mode').notNull().default('times'), // 'times' | 'interval'
+  fetchOrdersInterval: text('fetch_orders_interval').default('60'), // '30' | '60' | '120'
+  fetchOrdersBusinessHoursStart: text('fetch_orders_business_hours_start').default('08:00'),
+  fetchOrdersBusinessHoursEnd: text('fetch_orders_business_hours_end').default('18:00'),
   fetchOrdersTime: text('fetch_orders_time').notNull().default('03:00'),
   fetchOrdersTimes: jsonb('fetch_orders_times').$type<string[]>().notNull().default(['03:00']),
   fetchOrdersMarketplaces: jsonb('fetch_orders_marketplaces').$type<string[]>().notNull().default([]),

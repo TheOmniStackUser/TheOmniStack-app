@@ -856,8 +856,14 @@ export async function saveShopwareIntegrationAction(
   return { success: true, message: 'Shopware 6 Verbindung erfolgreich getestet und gespeichert!' }
 }
 
+import { generateIntervalTimes } from '@/lib/sync-schedule'
+
 const SyncSettingsSchema = z.object({
   fetchOrdersDaily: z.boolean(),
+  fetchOrdersScheduleMode: z.enum(['times', 'interval']).default('times'),
+  fetchOrdersInterval: z.enum(['30', '60', '120']).default('60'),
+  fetchOrdersBusinessHoursStart: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default('08:00'),
+  fetchOrdersBusinessHoursEnd: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default('18:00'),
   fetchOrdersTimes: z
     .array(z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'Ungültiges Uhrzeitformat (HH:MM).' }))
     .min(1, { message: 'Mindestens eine Abrufzeit ist erforderlich.' }),
@@ -872,13 +878,23 @@ export async function saveSyncSettingsAction(
   const auth = await requireAuth()
 
   const fetchOrdersDaily = formData.get('fetchOrdersDaily') === 'true'
+  const fetchOrdersScheduleMode = ((formData.get('fetchOrdersScheduleMode') as string) || 'times') as 'times' | 'interval'
+  const fetchOrdersInterval = ((formData.get('fetchOrdersInterval') as string) || '60') as '30' | '60' | '120'
+  const fetchOrdersBusinessHoursStart = (formData.get('fetchOrdersBusinessHoursStart') as string) || '08:00'
+  const fetchOrdersBusinessHoursEnd = (formData.get('fetchOrdersBusinessHoursEnd') as string) || '18:00'
   const fetchOrdersTimesRaw = (formData.get('fetchOrdersTimes') as string) || ''
   const fallbackTime = (formData.get('fetchOrdersTime') as string) || '03:00'
   const marketplacesListRaw = (formData.get('marketplacesList') as string) || '[]'
   const syncNotificationEmail = formData.get('syncNotificationEmail') as string | null
 
   let parsedTimes: string[] = []
-  if (fetchOrdersTimesRaw) {
+  if (fetchOrdersScheduleMode === 'interval') {
+    parsedTimes = generateIntervalTimes(
+      parseInt(fetchOrdersInterval, 10),
+      fetchOrdersBusinessHoursStart,
+      fetchOrdersBusinessHoursEnd
+    )
+  } else if (fetchOrdersTimesRaw) {
     try {
       const parsed = JSON.parse(fetchOrdersTimesRaw)
       if (Array.isArray(parsed) && parsed.length > 0) {
@@ -905,6 +921,10 @@ export async function saveSyncSettingsAction(
 
   const validated = SyncSettingsSchema.safeParse({
     fetchOrdersDaily,
+    fetchOrdersScheduleMode,
+    fetchOrdersInterval,
+    fetchOrdersBusinessHoursStart,
+    fetchOrdersBusinessHoursEnd,
     fetchOrdersTimes,
     fetchOrdersMarketplaces,
     syncNotificationEmail,
@@ -922,6 +942,10 @@ export async function saveSyncSettingsAction(
     .update(companies)
     .set({
       fetchOrdersDaily: data.fetchOrdersDaily,
+      fetchOrdersScheduleMode: data.fetchOrdersScheduleMode,
+      fetchOrdersInterval: data.fetchOrdersInterval,
+      fetchOrdersBusinessHoursStart: data.fetchOrdersBusinessHoursStart,
+      fetchOrdersBusinessHoursEnd: data.fetchOrdersBusinessHoursEnd,
       fetchOrdersTime: primaryTime,
       fetchOrdersTimes: data.fetchOrdersTimes,
       fetchOrdersMarketplaces: data.fetchOrdersMarketplaces,
@@ -938,17 +962,47 @@ export async function saveSyncSettingsAction(
       const redisKey = `${marketplaceSyncQueue.toKey('repeat')}:${job.key}:${job.next}`
       const jobData = await client.hgetall(redisKey)
       let jobId: string | null = null
-      if (jobData && jobData.opts) {
-        try {
-          const opts = JSON.parse(jobData.opts)
-          jobId = opts.repeat?.jobId || opts.jobId || null
-        } catch (e) {}
+      let jobCompanyId: string | null = null
+      if (jobData) {
+        if (jobData.opts) {
+          try {
+            const opts = JSON.parse(jobData.opts)
+            jobId = opts.repeat?.jobId || opts.jobId || null
+          } catch (e) {}
+        }
+        if (jobData.data) {
+          try {
+            const d = JSON.parse(jobData.data)
+            jobCompanyId = d.companyId || null
+          } catch (e) {}
+        }
       }
 
-      if (jobId === `daily-sync-${auth.activeCompanyId}` || jobId?.startsWith(`daily-sync-${auth.activeCompanyId}-`)) {
+      const isForCompany =
+        jobCompanyId === auth.activeCompanyId ||
+        jobId === `daily-sync-${auth.activeCompanyId}` ||
+        jobId?.startsWith(`daily-sync-${auth.activeCompanyId}-`)
+
+      if (isForCompany) {
         await marketplaceSyncQueue.removeRepeatableByKey(job.key)
         console.log(`   - Cleared old repeatable sync job: ${jobId || job.key}`)
       }
+    }
+
+    // Also remove any existing delayed jobs created for this company's scheduled sync
+    try {
+      const delayedJobs = await marketplaceSyncQueue.getDelayed()
+      for (const delayedJob of delayedJobs) {
+        if (
+          delayedJob.name === 'daily-marketplace-sync' &&
+          delayedJob.data?.companyId === auth.activeCompanyId
+        ) {
+          await delayedJob.remove()
+          console.log(`   - Removed old delayed job: ${delayedJob.id}`)
+        }
+      }
+    } catch (e) {
+      console.warn('[SyncSettingsAction] Could not clear delayed jobs:', e)
     }
 
     // Schedule the new repeatable jobs if daily fetching is enabled and at least one marketplace is selected

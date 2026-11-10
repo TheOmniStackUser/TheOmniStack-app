@@ -69,6 +69,8 @@ export async function setupHourlyInvoiceSyncs() {
   console.log(`   - Scheduled 12-hourly invoice sync at minute 0 (Europe/Berlin)`)
 }
 
+import { generateIntervalTimes } from '@/lib/sync-schedule'
+
 /**
  * Sets up daily repeatable marketplace sync jobs for all companies where enabled.
  */
@@ -83,6 +85,7 @@ export async function setupScheduledSyncs() {
       const redisKey = `${marketplaceSyncQueue.toKey('repeat')}:${job.key}:${job.next}`
       const jobData = await client.hgetall(redisKey)
       let jobId: string | null = null
+      let jobName: string = job.name
       if (jobData && jobData.opts) {
         try {
           const opts = JSON.parse(jobData.opts)
@@ -90,10 +93,23 @@ export async function setupScheduledSyncs() {
         } catch (e) {}
       }
 
-      if (jobId?.startsWith('daily-sync-')) {
+      if (jobName === 'daily-marketplace-sync' || jobId?.startsWith('daily-sync-')) {
         await marketplaceSyncQueue.removeRepeatableByKey(job.key)
-        console.log(`   - Cleared old repeatable sync job: ${jobId}`)
+        console.log(`   - Cleared old repeatable sync job: ${jobId || job.key}`)
       }
+    }
+
+    // Also remove any existing delayed jobs created for daily sync
+    try {
+      const delayedJobs = await marketplaceSyncQueue.getDelayed()
+      for (const delayedJob of delayedJobs) {
+        if (delayedJob.name === 'daily-marketplace-sync') {
+          await delayedJob.remove()
+          console.log(`   - Removed old delayed sync job on scheduler startup: ${delayedJob.id}`)
+        }
+      }
+    } catch (e) {
+      console.warn('[Scheduler] Could not clear delayed jobs:', e)
     }
   } catch (err) {
     console.error('[Scheduler] Failed to clear old repeatable sync jobs:', err)
@@ -105,6 +121,10 @@ export async function setupScheduledSyncs() {
       id: companies.id,
       name: companies.name,
       fetchOrdersDaily: companies.fetchOrdersDaily,
+      fetchOrdersScheduleMode: companies.fetchOrdersScheduleMode,
+      fetchOrdersInterval: companies.fetchOrdersInterval,
+      fetchOrdersBusinessHoursStart: companies.fetchOrdersBusinessHoursStart,
+      fetchOrdersBusinessHoursEnd: companies.fetchOrdersBusinessHoursEnd,
       fetchOrdersTime: companies.fetchOrdersTime,
       fetchOrdersTimes: companies.fetchOrdersTimes,
       fetchOrdersMarketplaces: companies.fetchOrdersMarketplaces,
@@ -117,9 +137,18 @@ export async function setupScheduledSyncs() {
       continue
     }
 
-    const rawTimes: string[] = Array.isArray(company.fetchOrdersTimes) && company.fetchOrdersTimes.length > 0
-      ? company.fetchOrdersTimes
-      : [company.fetchOrdersTime || '03:00']
+    let rawTimes: string[] = []
+    if (company.fetchOrdersScheduleMode === 'interval') {
+      rawTimes = generateIntervalTimes(
+        parseInt(company.fetchOrdersInterval || '60', 10),
+        company.fetchOrdersBusinessHoursStart || '08:00',
+        company.fetchOrdersBusinessHoursEnd || '18:00'
+      )
+    } else {
+      rawTimes = Array.isArray(company.fetchOrdersTimes) && company.fetchOrdersTimes.length > 0
+        ? company.fetchOrdersTimes
+        : [company.fetchOrdersTime || '03:00']
+    }
 
     const validTimes = Array.from(
       new Set(rawTimes.filter((t) => typeof t === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(t.trim())))
