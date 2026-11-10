@@ -5,6 +5,7 @@ import { companies } from '@/db/schema/companies'
 import { eq } from 'drizzle-orm'
 import { OttoIntegrationForm } from './otto-form'
 import { HermesIntegrationForm } from './hermes-form'
+import { DpdIntegrationForm } from './dpd-form'
 import { MiraklIntegrationForm } from './mirakl-form'
 import { AmazonIntegrationForm } from './amazon-form'
 import { DhlIntegrationForm } from './dhl-form'
@@ -49,7 +50,7 @@ export default async function IntegrationsPage(props: {
   ])
 
   const activeMarketplaces = integrations
-    .filter((i) => i.isActive && i.type !== 'dhl' && i.type !== 'hermes')
+    .filter((i) => i.isActive && i.type !== 'dhl' && i.type !== 'hermes' && i.type !== 'dpd')
     .map((i) => {
       let label: string = i.type
       if (i.type === 'otto') label = 'Otto.de'
@@ -75,7 +76,7 @@ export default async function IntegrationsPage(props: {
     })
 
   const activeMarketplacesList = integrations
-    .filter((i) => i.isActive && i.type !== 'dhl' && i.type !== 'hermes')
+    .filter((i) => i.isActive && i.type !== 'dhl' && i.type !== 'hermes' && i.type !== 'dpd')
     .map((i) => {
       const key = i.type === 'mirakl_custom'
         ? ((i.metadata as any)?.customName || '').toLowerCase()
@@ -620,6 +621,35 @@ export default async function IntegrationsPage(props: {
                   initialClientId={integrations.find((i: any) => i.type === 'hermes' && i.isActive)?.clientId || ''}
                   initialConfig={(integrations.find((i: any) => i.type === 'hermes' && i.isActive)?.metadata as any) ?? undefined}
                   activeMarketplaces={activeMarketplacesList}
+                />
+              </div>
+            </CollapsibleSection>
+
+            {/* DPD Card */}
+            <CollapsibleSection
+              title="DPD Versand"
+              subtitle="B2B Web Services (LoginService & ShipmentService)"
+              icon={
+                <div className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform duration-200 hover:scale-105 shadow-sm">
+                  <span className="text-white font-black text-xs tracking-tight">DPD</span>
+                </div>
+              }
+              badge={integrations.find((i: any) => i.type === 'dpd' && i.isActive)?.clientId ? (
+                <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  Aktiv
+                </span>
+              ) : (
+                <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
+                  Nicht konfiguriert
+                </span>
+              )}
+            >
+              <div className="p-6 bg-gray-50 flex justify-center">
+                <DpdIntegrationForm
+                  initialDelisId={integrations.find((i: any) => i.type === 'dpd' && i.isActive)?.clientId || ''}
+                  initialConfig={(integrations.find((i: any) => i.type === 'dpd' && i.isActive)?.metadata as any) ?? undefined}
+                  isActive={Boolean(integrations.find((i: any) => i.type === 'dpd' && i.isActive)?.clientId)}
                 />
               </div>
             </CollapsibleSection>

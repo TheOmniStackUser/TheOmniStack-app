@@ -6,12 +6,13 @@ import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
 import { Package, Truck, CheckCircle2, Store, Clock, XCircle, RefreshCw, Copy, Check, Calendar, Scissors, RotateCcw, AlertTriangle } from 'lucide-react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { generateHermesLabelsAction, generateDhlLabelsAction, generateSingleDhlReturnLabelAction } from '@/app/actions/shipping'
+import { generateHermesLabelsAction, generateDhlLabelsAction, generateSingleDhlReturnLabelAction, generateDpdLabelsAction } from '@/app/actions/shipping'
 import { archiveOrderAction, archiveOrdersBulkAction, updateOrderStatusAction, updateOrderAddressAction, updateOrderBillingAddressAction, generateOrDownloadInvoicesBulkAction, markOrderAsShippedManuallyAction, getOrderLabelsAction, updateOrderNotesAction, refundOrderAction, refundOrderPartialAction, updateOrderScheduledShipmentDateAction, bulkScheduleLaterShipmentAction, retryMarketplaceConfirmationAction, markMarketplaceConfirmationAsConfirmedAction, markMarketplaceConfirmationsBulkAction } from '@/app/actions/orders'
 import { getInvoiceDownloadUrl } from '@/app/actions/invoices'
 import type { Order, OrderItem } from '@/db/schema/orders'
 import type { Invoice, InvoiceLog } from '@/db/schema/invoices'
 import type { DhlConfig } from '@/app/(dashboard)/integrations/dhl-form'
+import type { DpdConfig } from '@/adapters/shipping/dpd'
 import { OttoRefundModal } from '@/components/orders/OttoRefundModal'
 import { DecathlonRefundModal } from '@/components/orders/DecathlonRefundModal'
 import { SplitOrderModal } from '@/components/orders/SplitOrderModal'
@@ -439,6 +440,8 @@ export function OrdersTable({
   hermesDefaultParcelClass = 'XS',
   customMiraklIntegrations = [],
   dhlConfig = null,
+  dpdConfig = null,
+  hasDpdIntegration = false,
   hasKauflandIntegration = false,
   hasEbayIntegration = false,
   hasAboutYouIntegration = false,
@@ -458,6 +461,8 @@ export function OrdersTable({
   hermesDefaultParcelClass?: string
   customMiraklIntegrations?: any[]
   dhlConfig?: DhlConfig | null
+  dpdConfig?: Partial<DpdConfig> | null
+  hasDpdIntegration?: boolean
   hasKauflandIntegration?: boolean
   hasEbayIntegration?: boolean
   hasAboutYouIntegration?: boolean
@@ -565,6 +570,10 @@ export function OrdersTable({
   const [showDhlModal, setShowDhlModal] = useState(false)
   const [dhlSelections, setDhlSelections] = useState<Record<string, { productCode: string; weight: number; withReturnLabel: boolean }>>({})
   const [isGeneratingReturnLabelId, setIsGeneratingReturnLabelId] = useState<string | null>(null)
+
+  const [isDpdGenerating, setIsDpdGenerating] = useState(false)
+  const [showDpdModal, setShowDpdModal] = useState(false)
+  const [dpdSelections, setDpdSelections] = useState<Record<string, { weight: number }>>({})
 
   const [deleteModalConfig, setDeleteModalConfig] = useState<{ show: boolean, isBulk: boolean, orderId?: string }>({ show: false, isBulk: false })
   const [refundModalConfig, setRefundModalConfig] = useState<{ show: boolean, orderId?: string }>({ show: false })
@@ -762,6 +771,15 @@ export function OrdersTable({
     setDhlSelections({ [order.id]: { productCode, weight, withReturnLabel } })
     setSelectedIds(new Set([order.id]))
     setShowDhlModal(true)
+  }
+
+  const handleSingleOrderDpd = (order: OrderWithItems) => {
+    const defaultW = order.totalWeight && Number(order.totalWeight) > 0
+      ? Number(order.totalWeight)
+      : (dpdConfig?.defaultWeight ?? 1.0)
+    setDpdSelections({ [order.id]: { weight: defaultW } })
+    setSelectedIds(new Set([order.id]))
+    setShowDpdModal(true)
   }
 
   const handleSingleOrderInvoice = async (orderId: string) => {
@@ -1767,6 +1785,66 @@ const filteredOrders = orders;
     }
   }
 
+  const handleGenerateDpdLabels = async () => {
+    if (!hasDpdIntegration) {
+      showToast('DPD ist nicht konfiguriert. Bitte richte die DPD-Verbindung unter Integrationen ein.', 'error')
+      return
+    }
+
+    const visibleUnshipped = orders.filter(o => selectedIds.has(o.id) && o.status !== 'shipped')
+    if (visibleUnshipped.length === 0) {
+      showToast('Keine unversendeten Bestellungen ausgewählt.', 'error')
+      return
+    }
+
+    const initialSelections: Record<string, { weight: number }> = {}
+    visibleUnshipped.forEach(order => {
+      const weight = order.totalWeight && Number(order.totalWeight) > 0
+        ? Number(order.totalWeight)
+        : (dpdConfig?.defaultWeight ?? 1.0)
+      initialSelections[order.id] = { weight }
+    })
+
+    setDpdSelections(initialSelections)
+    setShowDpdModal(true)
+  }
+
+  const confirmGenerateDpdLabels = async () => {
+    setShowDpdModal(false)
+    setIsDpdGenerating(true)
+    const newTab = window.open('about:blank', '_blank')
+    try {
+      const ids = Object.keys(dpdSelections).filter(id => orders.some(o => o.id === id))
+      const result = await generateDpdLabelsAction(ids, dpdSelections)
+      if (result.error) {
+        showToast(result.error, 'error')
+        if (newTab) newTab.close()
+      } else {
+        if (result.warning) {
+          showToast(result.warning, 'error')
+        } else {
+          showToast(result.message || 'DPD-Labels erfolgreich generiert!', 'success')
+        }
+
+        if (result.generatedIds && result.generatedIds.length > 0) {
+          const url = `/api/orders/bulk/shipping-labels?ids=${ids.join(',')}`
+          if (newTab) {
+            newTab.location.href = url
+          } else {
+            window.open(url, '_blank') || (window.location.href = url)
+          }
+        } else {
+          if (newTab) newTab.close()
+        }
+      }
+    } catch (e) {
+      showToast('Fehler: ' + (e instanceof Error ? e.message : String(e)), 'error')
+      if (newTab) newTab.close()
+    } finally {
+      setIsDpdGenerating(false)
+    }
+  }
+
   const [retryingConfirmationOrderId, setRetryingConfirmationOrderId] = useState<string | null>(null)
 
   const handleRetryMarketplaceConfirmation = async (order: OrderWithItems) => {
@@ -2174,7 +2252,7 @@ const filteredOrders = orders;
 
           <button
             onClick={handleGenerateLabels}
-            disabled={selectedUnshippedCount === 0 || isGenerating || isDeletingBulk || isDhlGenerating}
+            disabled={selectedUnshippedCount === 0 || isGenerating || isDeletingBulk || isDhlGenerating || isDpdGenerating}
             className="flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-700 font-semibold py-2 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow-sm"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -2182,6 +2260,24 @@ const filteredOrders = orders;
             </svg>
             {selectedUnshippedCount > 0 ? `Hermes Labels generieren (${selectedUnshippedCount})` : 'Hermes Labels generieren'}
           </button>
+
+          {hasDpdIntegration && (
+            <button
+              onClick={handleGenerateDpdLabels}
+              disabled={selectedUnshippedCount === 0 || isDpdGenerating || isDeletingBulk || isGenerating || isDhlGenerating}
+              className="flex items-center gap-2 bg-red-600 text-white hover:bg-red-700 font-semibold py-2 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow-sm"
+            >
+              {isDpdGenerating ? (
+                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+              ) : (
+                <span className="font-black text-xs tracking-tight">DPD</span>
+              )}
+              {selectedUnshippedCount > 0 ? `DPD Labels (${selectedUnshippedCount})` : 'DPD Labels'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -3003,6 +3099,22 @@ const filteredOrders = orders;
                                 {order.status === 'shipped' ? 'Hermes-Ersatzlabel erstellen' : 'Hermes-Label erstellen'}
                               </button>
 
+                              {/* DPD-Label erstellen */}
+                              {hasDpdIntegration && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenMenuOrderId(null)
+                                    setMenuPosition(null)
+                                    handleSingleOrderDpd(order)
+                                  }}
+                                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors whitespace-nowrap"
+                                >
+                                  <span className="w-4 h-4 bg-red-600 text-white rounded flex items-center justify-center font-black text-[9px]">D</span>
+                                  {order.status === 'shipped' ? 'DPD-Ersatzlabel erstellen' : 'DPD-Label erstellen'}
+                                </button>
+                              )}
+
                               <button
                                 type="button"
                                 onClick={() => {
@@ -3489,6 +3601,19 @@ const filteredOrders = orders;
                                       <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
                                       {order.status === 'shipped' ? 'Hermes-Ersatzlabel' : 'Hermes-Label'}
                                     </button>
+
+                                    {hasDpdIntegration && (
+                                      <button 
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleSingleOrderDpd(order)
+                                        }}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1 bg-red-50 border border-red-200 rounded-lg text-xs font-bold text-red-700 hover:bg-red-100 transition-all shadow-sm"
+                                      >
+                                        <span className="w-3.5 h-3.5 bg-red-600 text-white rounded flex items-center justify-center font-black text-[8px]">D</span>
+                                        {order.status === 'shipped' ? 'DPD-Ersatzlabel' : 'DPD-Label'}
+                                      </button>
+                                    )}
 
                                     <button 
                                       onClick={(e) => {
@@ -4932,6 +5057,232 @@ const filteredOrders = orders;
                 </div>
               )
             })()}
+          </div>
+        </div>
+      )}
+
+      {/* DPD Parcel Weights Modal */}
+      {showDpdModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowDpdModal(false)}></div>
+          <div className="relative bg-white rounded-2xl p-6 shadow-2xl w-full max-w-xl border border-slate-200 flex flex-col max-h-[85vh]">
+            <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h3 className="text-2xl font-black text-slate-900 flex items-center gap-2">
+                  <span className="bg-red-600 text-white px-3 py-1 rounded-lg text-sm font-black tracking-wider uppercase">DPD</span>
+                  Paketgewicht & Versand
+                </h3>
+                <p className="text-slate-500 text-sm mt-1">Überprüfe das Paketgewicht (kg) für jede Sendung vor dem Erstellen der DPD-Labels.</p>
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar">
+              {orders.filter(o => o.id in dpdSelections).map((order) => {
+                const orderNum = getOrderDisplayNumber(order) || order.marketplaceOrderId || order.id
+                const selection = dpdSelections[order.id] || { weight: dpdConfig?.defaultWeight ?? 1.0 }
+                const skus = order.items?.map(item => item.sku).filter(Boolean) || []
+                
+                return (
+                  <div key={order.id} className="p-5 border border-slate-100 rounded-2xl bg-slate-50/50 hover:bg-slate-50 transition-colors">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <div className="text-xs font-bold text-red-600 uppercase tracking-wider">Bestellung</div>
+                        <div className="font-black text-slate-900">{orderNum}</div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          const newSelections = { ...dpdSelections }
+                          delete newSelections[order.id]
+                          setDpdSelections(newSelections)
+                          if (Object.keys(newSelections).length === 0) {
+                            setShowDpdModal(false)
+                          }
+                        }}
+                        className="text-[11px] text-red-500 hover:text-red-700 font-bold flex items-center gap-1 transition-colors"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        Entfernen
+                      </button>
+                    </div>
+
+                    <div className="mb-4 bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
+                      {editingAddressId === order.id ? (
+                        <div>
+                          <span className="font-medium text-sm">Lieferadresse bearbeiten:</span>
+                          <div className="mt-2 space-y-2">
+                            <div>
+                              <label className="block text-[10px] uppercase font-bold text-slate-400">Name</label>
+                              <input 
+                                type="text" 
+                                value={editName} 
+                                onChange={(e) => setEditName(e.target.value)}
+                                className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-1.5 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-red-500" 
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="block text-[10px] uppercase font-bold text-slate-400">Firma</label>
+                                <input 
+                                  type="text" 
+                                  value={editCompany} 
+                                  onChange={(e) => setEditCompany(e.target.value)}
+                                  className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-1.5 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-red-500" 
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] uppercase font-bold text-slate-400">Adresszusatz</label>
+                                <input 
+                                  type="text" 
+                                  value={editAddressAddition} 
+                                  onChange={(e) => setEditAddressAddition(e.target.value)}
+                                  className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-1.5 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-red-500" 
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-[10px] uppercase font-bold text-slate-400">Straße & Hausnummer</label>
+                              <input 
+                                type="text" 
+                                value={editStreet} 
+                                onChange={(e) => setEditStreet(e.target.value)}
+                                className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-1.5 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-red-500" 
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="block text-[10px] uppercase font-bold text-slate-400">PLZ</label>
+                                <input 
+                                  type="text" 
+                                  value={editZip} 
+                                  onChange={(e) => setEditZip(e.target.value)}
+                                  className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-1.5 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-red-500" 
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] uppercase font-bold text-slate-400">Stadt</label>
+                                <input 
+                                  type="text" 
+                                  value={editCity} 
+                                  onChange={(e) => setEditCity(e.target.value)}
+                                  className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-1.5 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-red-500" 
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-[10px] uppercase font-bold text-slate-400">Land (ISO 2)</label>
+                              <input 
+                                type="text" 
+                                value={editCountry} 
+                                onChange={(e) => setEditCountry(e.target.value)}
+                                maxLength={3}
+                                className="w-full text-sm !text-slate-900 placeholder:!text-slate-500 p-1.5 border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-red-500" 
+                              />
+                            </div>
+                            <div className="flex justify-end gap-2 pt-2">
+                              <button 
+                                onClick={() => setEditingAddressId(null)}
+                                disabled={isUpdatingAddress}
+                                className="text-xs px-2.5 py-1.5 border border-slate-300 hover:bg-slate-50 rounded-md transition-colors font-medium text-slate-600"
+                              >
+                                Abbrechen
+                              </button>
+                              <button 
+                                onClick={() => handleSaveAddress(order.id)}
+                                disabled={isUpdatingAddress}
+                                className="text-xs px-2.5 py-1.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-md transition-colors disabled:opacity-50"
+                              >
+                                {isUpdatingAddress ? 'Speichert...' : 'Speichern'}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Lieferadresse</span>
+                            <button 
+                              onClick={() => startEditingAddress(order)}
+                              className="text-[11px] text-red-600 hover:text-red-700 font-bold flex items-center gap-1 transition-colors"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                              </svg>
+                              Bearbeiten
+                            </button>
+                          </div>
+                          <div className="font-bold text-sm text-slate-900">{order.shippingName || order.shippingCompany || 'Kein Name'}</div>
+                          {order.shippingCompany && order.shippingName && (
+                            <div className="text-xs text-slate-600">{order.shippingName}</div>
+                          )}
+                          <div className="text-xs text-slate-600">{order.shippingStreet}</div>
+                          {order.shippingAddressAddition && (
+                            <div className="text-xs text-slate-500">{order.shippingAddressAddition}</div>
+                          )}
+                          <div className="text-xs text-slate-600">{order.shippingZip} {order.shippingCity}, {order.shippingCountry}</div>
+                          {skus.length > 0 && (
+                            <div className="mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-500">
+                              Artikel: <span className="font-semibold text-slate-700">{skus.join(', ')}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-sm">
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Paketgewicht (in kg)</label>
+                      <div className="flex">
+                        <input
+                          type="number"
+                          min="0.1"
+                          step="0.1"
+                          value={selection.weight}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value) || 0.1
+                            setDpdSelections(prev => ({
+                              ...prev,
+                              [order.id]: { weight: val }
+                            }))
+                          }}
+                          className="w-full px-3 py-2 text-sm border border-slate-300 rounded-l-xl focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 text-slate-900 placeholder:text-slate-500 font-bold bg-white"
+                          placeholder="z. B. 1.0"
+                        />
+                        <span className="px-3 py-2 bg-slate-100 border border-l-0 border-slate-300 rounded-r-xl text-slate-600 font-bold text-sm">
+                          kg
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="mt-6 flex gap-4 pt-4 border-t border-slate-100">
+              <button 
+                onClick={() => setShowDpdModal(false)} 
+                className="flex-1 py-3 border border-slate-200 rounded-xl font-bold text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors text-sm"
+              >
+                Abbrechen
+              </button>
+              <button 
+                onClick={confirmGenerateDpdLabels} 
+                disabled={isDpdGenerating || Object.keys(dpdSelections).length === 0}
+                className="flex-1 py-4 bg-red-600 text-white font-black rounded-2xl hover:bg-red-700 shadow-xl shadow-red-600/30 transition-all transform active:scale-[0.98] disabled:opacity-50 inline-flex items-center justify-center gap-2"
+              >
+                {isDpdGenerating ? (
+                  <>
+                    <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                    Labels werden erstellt...
+                  </>
+                ) : (
+                  `DPD Labels generieren (${Object.keys(dpdSelections).length})`
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -415,6 +415,14 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   const dhlIntegration = integrations.find(i => i.type === 'dhl')
   const dhlConfig = dhlIntegration?.metadata as DhlConfig | null
 
+  const dpdIntegration = integrations.find(i => i.type === 'dpd')
+  const dpdConfig = dpdIntegration ? {
+    delisId: dpdIntegration.clientId || undefined,
+    defaultWeight: (dpdIntegration.metadata as any)?.defaultWeight ?? 1.0,
+    labelFormat: (dpdIntegration.metadata as any)?.labelFormat ?? 'A6',
+  } : null
+  const hasDpdIntegration = Boolean(dpdIntegration && dpdIntegration.clientId)
+
   const hasOttoIntegration = integrations.some(i => i.type === 'otto' && i.clientId)
   const hasDecathlonIntegration = integrations.some(i => i.type === 'mirakl_decathlon' && i.clientId)
   const hasAmazonIntegration = integrations.some(i => i.type === 'amazon' && i.refreshToken)
@@ -530,6 +538,8 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         hermesDefaultParcelClass={defaultParcelClass} 
         customMiraklIntegrations={customMiraklIntegrations}
         dhlConfig={dhlConfig}
+        dpdConfig={dpdConfig}
+        hasDpdIntegration={hasDpdIntegration}
         hasKauflandIntegration={hasKauflandIntegration}
         hasEbayIntegration={hasEbayIntegration}
         hasAboutYouIntegration={hasAboutYouIntegration}

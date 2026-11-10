@@ -28,6 +28,7 @@ export const systemServicesEnum = pgEnum('system_service', [
   'ebay',
   'woocommerce',
   'shopware',
+  'dpd',
 ])
 
 export const serviceNamesMap: Record<string, string> = {
@@ -41,6 +42,7 @@ export const serviceNamesMap: Record<string, string> = {
   'aboutyou': 'About You',
   'dhl': 'DHL Geschäftskunden',
   'hermes': 'Hermes',
+  'dpd': 'DPD',
   'limango': 'Limango',
   'mirakl_decathlon': 'Decathlon (Mirakl)',
   'mirakl_decathlon_eu': 'Decathlon EU (Mirakl)',

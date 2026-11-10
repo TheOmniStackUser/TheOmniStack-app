@@ -18,6 +18,7 @@ export const integrationTypeEnum = pgEnum('integration_type', [
   'ebay',
   'woocommerce',
   'shopware',
+  'dpd',
 ])
 
 // Secure credential storage per company for marketplaces

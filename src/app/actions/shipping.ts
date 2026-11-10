@@ -2,6 +2,7 @@
 
 import { requireAuth } from '@/lib/session'
 import { HermesAdapter } from '@/adapters/shipping/hermes'
+import { DpdAdapter } from '@/adapters/shipping/dpd'
 import { db } from '@/db/client'
 import { orders, orderItems } from '@/db/schema/orders'
 import { products } from '@/db/schema/products'
@@ -1412,6 +1413,253 @@ export async function generateSingleDhlReturnLabelAction(orderId: string) {
   } catch (error) {
     console.error('[DHL Return Action] Error:', error)
     return { error: error instanceof Error ? error.message : 'Fehler bei der DHL Retourenlabel-Erstellung.' }
+  }
+}
+
+export async function generateDpdLabelsAction(
+  orderIds?: string[],
+  orderConfigMap?: Record<string, { weight: number }>
+) {
+  const auth = await requireAuth()
+
+  try {
+    const dpd = await DpdAdapter.initialize(auth.activeCompanyId)
+
+    // Find all 'pending' orders that need labels (or specific orders if orderIds is provided)
+    const pendingOrders = await db
+      .select()
+      .from(orders)
+      .where(
+        and(
+          eq(orders.companyId, auth.activeCompanyId),
+          orderIds && orderIds.length > 0 ? inArray(orders.id, orderIds) : ne(orders.status, 'shipped')
+        )
+      )
+
+    if (pendingOrders.length === 0) {
+      return { error: 'Es wurden keine passenden Bestellungen gefunden.' }
+    }
+
+    // Fetch company info for shipper address
+    const [company] = await db
+      .select()
+      .from(companies)
+      .where(eq(companies.id, auth.activeCompanyId))
+      .limit(1)
+
+    if (!company) {
+      return { error: 'Unternehmensdaten konnten nicht geladen werden.' }
+    }
+
+    if (!company.street || !company.zip || !company.city) {
+      return { error: 'Keine Rechnungsadresse hinterlegt. Bitte trage deine Rechnungsadresse in den Firmeinstellungen ein, bevor du Versandlabels erstellst.' }
+    }
+
+    // Fetch active integrations and initialize adapters dynamically
+    const activeIntegrations = await db
+      .select()
+      .from(marketplaceIntegrations)
+      .where(
+        and(
+          eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
+          eq(marketplaceIntegrations.isActive, true)
+        )
+      )
+
+    const dpdIntegration = activeIntegrations.find(i => i.type === 'dpd')
+
+    const { getAdapterForIntegration } = await import('@/workers/marketplace-sync')
+    const adaptersMap = new Map<string, any>()
+    for (const integration of activeIntegrations) {
+      const adapter = getAdapterForIntegration(integration)
+      if (adapter) {
+        adaptersMap.set(integration.type, adapter)
+        if (integration.type === 'mirakl_custom') {
+          const customName = (integration.metadata as any)?.customName
+          if (customName) {
+            adaptersMap.set(customName.toLowerCase(), adapter)
+            adaptersMap.set(customName, adapter)
+          }
+        } else if (integration.type === 'mirakl_decathlon') {
+          adaptersMap.set('Decathlon DE', adapter)
+        }
+      }
+    }
+
+    interface ShippingTaskResult {
+      success: boolean
+      orderId?: string
+      error?: string
+    }
+
+    const tasks = pendingOrders.map(order => async (): Promise<ShippingTaskResult> => {
+      try {
+        const customWeight = orderConfigMap?.[order.id]?.weight
+        const { labelUrl, trackingNumber } = await dpd.generateLabelForOrder(order, company, {
+          weight: customWeight,
+        })
+
+        // Update order status to shipped and save label
+        await db
+          .update(orders)
+          .set({
+            status: 'shipped',
+            trackingNumber,
+            labelUrl,
+            marketplaceConfirmationStatus: order.marketplace === 'manual' ? 'not_applicable' : 'pending',
+            updatedAt: new Date(),
+          })
+          .where(eq(orders.id, order.id))
+
+        const isReplacementLabel = order.status === 'shipped'
+
+        // Auto-generate invoice if enabled on DPD or marketplace
+        if (!isReplacementLabel) {
+          try {
+            const mpIntegration = activeIntegrations.find(i =>
+              i.type === order.marketplace ||
+              (i.type === 'mirakl_decathlon' && order.marketplace === 'Decathlon DE') ||
+              (i.type === 'mirakl_custom' &&
+                ((i.metadata as any)?.customName || '').toLowerCase() === order.marketplace.toLowerCase())
+            )
+
+            const autoInvoiceEnabled = dpdIntegration?.autoInvoice || mpIntegration?.autoInvoice
+            if (autoInvoiceEnabled && !isAmazonSwitzerlandOrder(order)) {
+              console.log(`[DPD-Action] Auto-generating invoice for order ${order.marketplaceOrderId} during label printing...`)
+              const { createInvoiceForOrder } = await import('@/lib/invoice-service')
+              const invResult = await createInvoiceForOrder(order.id, auth.activeCompanyId)
+
+              if (invResult && 'pdfBuffer' in invResult && (dpdIntegration?.uploadInvoice || mpIntegration?.uploadInvoice)) {
+                const adapter = mpIntegration ? getAdapterForIntegration(mpIntegration) : null
+                if (adapter?.uploadInvoice) {
+                  console.log(`[DPD-Action] Auto-uploading invoice for order ${order.marketplaceOrderId}...`)
+                  await adapter.uploadInvoice(
+                    order.marketplaceOrderId,
+                    invResult.pdfBuffer,
+                    `${invResult.invoiceNumber}.pdf`
+                  )
+                }
+              }
+            }
+          } catch (invError) {
+            console.error(`[DPD-Action] Failed to auto-generate/upload invoice for order ${order.marketplaceOrderId}:`, invError)
+          }
+        }
+
+        // Confirm shipment in marketplace
+        if (!isReplacementLabel) {
+          const adapter = adaptersMap.get(order.marketplace)
+          if (adapter && typeof adapter.confirmShipment === 'function' && order.marketplaceOrderId) {
+            console.log(`[DPD-Action] Triggering confirmation for ${order.marketplaceOrderId} on ${order.marketplace} with tracking ${trackingNumber}`)
+            try {
+              const isOtto = order.marketplace === 'otto'
+              const ottoIntegration = activeIntegrations.find(i => i.type === 'otto')
+              const ottoReturnAddressCarrierId = ottoIntegration ? (ottoIntegration.metadata as any)?.returnAddressCarrierId : undefined
+
+              const targetMarketplaceOrderId = (order.rawPayload as any)?.originalMarketplaceOrderId || order.marketplaceOrderId
+              await adapter.confirmShipment(
+                targetMarketplaceOrderId,
+                trackingNumber,
+                'DPD',
+                undefined,
+                order.rawPayload,
+                isOtto ? ottoReturnAddressCarrierId : undefined
+              )
+
+              await db
+                .update(orders)
+                .set({
+                  marketplaceConfirmationStatus: 'confirmed',
+                  marketplaceConfirmationError: null,
+                  marketplaceConfirmedAt: new Date(),
+                  updatedAt: new Date(),
+                })
+                .where(eq(orders.id, order.id))
+            } catch (confirmErr: any) {
+              const msg = confirmErr?.message ?? String(confirmErr)
+              console.error(`[${order.marketplace}] Failed to confirm DPD shipment for ${order.marketplaceOrderId}:`, msg)
+
+              const isAlreadyShipped =
+                msg.toLowerCase().includes('bereits auf otto als versendet') ||
+                msg.toLowerCase().includes('position_item_included_in_other_shipment') ||
+                msg.toLowerCase().includes('already shipped') ||
+                msg.toLowerCase().includes('already fulfilled') ||
+                msg.toLowerCase().includes('is already fulfilled')
+
+              if (isAlreadyShipped) {
+                await db
+                  .update(orders)
+                  .set({
+                    marketplaceConfirmationStatus: 'confirmed',
+                    marketplaceConfirmationError: null,
+                    marketplaceConfirmedAt: new Date(),
+                    updatedAt: new Date(),
+                  })
+                  .where(eq(orders.id, order.id))
+              } else {
+                await db
+                  .update(orders)
+                  .set({
+                    marketplaceConfirmationStatus: 'failed',
+                    marketplaceConfirmationError: msg.slice(0, 500),
+                    updatedAt: new Date(),
+                  })
+                  .where(eq(orders.id, order.id))
+              }
+            }
+          }
+        }
+
+        return { success: true, orderId: order.id }
+      } catch (err: any) {
+        console.error(`[DPD-Action] Error creating label for order ${order.id}:`, err)
+        return { success: false, orderId: order.id, error: err.message || 'DPD Labelerstellung fehlgeschlagen' }
+      }
+    })
+
+    const results = await runWithLimit(tasks, 3)
+
+    let successCount = 0
+    const generatedIds: string[] = []
+    const errors: string[] = []
+
+    for (const res of results) {
+      if (res.success) {
+        successCount++
+        if (res.orderId) {
+          generatedIds.push(res.orderId)
+        }
+      }
+      if (res.error) {
+        errors.push(res.error)
+      }
+    }
+
+    revalidatePath('/dashboard')
+    revalidatePath('/orders')
+
+    if (successCount === 0) {
+      const errorDetail = errors.length > 0 ? `\n\nDetails: ${errors[0]}` : ''
+      return { error: `Keine DPD-Labels konnten erstellt werden.${errorDetail}` }
+    }
+
+    if (errors.length > 0) {
+      return {
+        success: true,
+        message: `${successCount} Versandetiketten wurden über DPD generiert!`,
+        warning: `Erfolgreich: ${successCount} DPD-Etikett(en) erstellt.\n\nFolgende Bestellungen konnten nicht versendet werden:\n- ${errors.join('\n- ')}`,
+        generatedIds,
+      }
+    }
+
+    return {
+      success: true,
+      message: `${successCount} Versandetiketten wurden über DPD generiert!`,
+      generatedIds,
+    }
+  } catch (error) {
+    console.error('[DPD Action] Error:', error)
+    return { error: error instanceof Error ? error.message : 'Fehler bei der DPD API Kommunikation.' }
   }
 }
 
