@@ -4,6 +4,7 @@ import { marketplaceQuestions } from '@/db/schema/questions'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { eq, desc, and } from 'drizzle-orm'
 import { getSlaStatus } from '@/lib/sla'
+import { ensureQuestionsTablesExist } from '@/db/ensure-questions-tables'
 import { QuestionsClient } from './questions-client'
 
 export const dynamic = 'force-dynamic'
@@ -12,14 +13,25 @@ export const maxDuration = 60
 export default async function QuestionsPage() {
   const auth = await requireAuth()
 
-  // 1. Fetch initial questions and active integrations
-  const [questionsList, integrations] = await Promise.all([
-    db
+  // Ensure tables exist before querying (self-healing for production)
+  await ensureQuestionsTablesExist()
+
+  // 1. Fetch initial questions and active integrations with fallback safety
+  let questionsList: any[] = []
+  try {
+    questionsList = await db
       .select()
       .from(marketplaceQuestions)
       .where(eq(marketplaceQuestions.companyId, auth.activeCompanyId))
-      .orderBy(desc(marketplaceQuestions.createdAt)),
-    db
+      .orderBy(desc(marketplaceQuestions.createdAt))
+  } catch (err: any) {
+    console.error('Error fetching questions in QuestionsPage:', err?.message)
+    questionsList = []
+  }
+
+  let integrations: any[] = []
+  try {
+    integrations = await db
       .select({
         id: marketplaceIntegrations.id,
         type: marketplaceIntegrations.type,
@@ -32,8 +44,11 @@ export default async function QuestionsPage() {
           eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
           eq(marketplaceIntegrations.isActive, true)
         )
-      ),
-  ])
+      )
+  } catch (err: any) {
+    console.error('Error fetching marketplace integrations:', err?.message)
+    integrations = []
+  }
 
   // Attach computed SLA status to each question
   const initialQuestions = questionsList.map((q) => ({

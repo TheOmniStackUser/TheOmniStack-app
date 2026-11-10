@@ -11,6 +11,7 @@ import { revalidatePath } from 'next/cache'
 import { calculateSlaDeadline, getSlaStatus } from '@/lib/sla'
 import { getAdapterForIntegration } from '@/workers/marketplace-sync'
 import type { NormalizedQuestion } from '@/adapters/marketplace/base'
+import { ensureQuestionsTablesExist } from '@/db/ensure-questions-tables'
 
 export type QuestionFilterOptions = {
   marketplace?: string
@@ -21,6 +22,7 @@ export type QuestionFilterOptions = {
 
 export async function getQuestionsAction(filters: QuestionFilterOptions = {}) {
   const auth = await requireAuth()
+  await ensureQuestionsTablesExist()
 
   const conditions = [eq(marketplaceQuestions.companyId, auth.activeCompanyId)]
 
@@ -69,6 +71,7 @@ export async function getQuestionsAction(filters: QuestionFilterOptions = {}) {
 
 export async function getQuestionDetailsAction(questionId: string) {
   const auth = await requireAuth()
+  await ensureQuestionsTablesExist()
 
   const [question] = await db
     .select()
@@ -276,6 +279,7 @@ export async function updateQuestionStatusAction(
 
 export async function syncMarketplaceQuestionsAction() {
   const auth = await requireAuth()
+  await ensureQuestionsTablesExist()
 
   // Retrieve active integrations for company
   const activeIntegrations = await db
@@ -321,6 +325,7 @@ export type ManualQuestionInput = {
 
 export async function createManualQuestionAction(data: ManualQuestionInput) {
   const auth = await requireAuth()
+  await ensureQuestionsTablesExist()
 
   if (!data.customerName || !data.subject || !data.questionText) {
     return { success: false, error: 'Bitte fülle alle Pflichtfelder aus.' }

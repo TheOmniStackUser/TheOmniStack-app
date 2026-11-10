@@ -28,7 +28,6 @@ export function SidebarNav({
   let links = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/orders', label: 'Bestellungen', icon: ShoppingCart },
-    { href: '/questions', label: 'Kundenfragen', icon: MessageSquareText },
     { href: '/invoices', label: 'Rechnungen', icon: FileText },
     { href: '/delivery-notes', label: 'Lieferscheine', icon: Package },
     { href: '/quotes', label: 'Angebote', icon: FileSignature },
@@ -42,6 +41,8 @@ export function SidebarNav({
   if (features.products) {
     links.push({ href: '/products', label: 'Produkte', icon: Box })
   }
+
+  links.push({ href: '/questions', label: 'Kundenanfragen', icon: MessageSquareText })
 
   if (isCraftVariant) {
     links = links.filter(link => !['/orders', '/returns', '/products', '/questions'].includes(link.href))

@@ -536,7 +536,7 @@ export function QuestionsClient({
             </div>
             <div>
               <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">
-                Kundenfragen & Nachrichten
+                Kundenanfragen & Nachrichten
               </h1>
               <p className="text-sm text-slate-500 mt-0.5">
                 Marktplatz-Anfragen (OTTO u.a.) einsehen, Fristen überwachen und direkt beantworten.
@@ -726,7 +726,7 @@ export function QuestionsClient({
                 <p className="text-xs text-slate-500 max-w-xs mx-auto">
                   {searchQuery || statusFilter !== 'all' || selectedMarketplace !== 'all'
                     ? 'Versuche deine Filter zurückzusetzen.'
-                    : 'Es liegen derzeit keine offenen Kundenfragen vor.'}
+                    : 'Es liegen derzeit keine offenen Kundenanfragen vor.'}
                 </p>
                 <button
                   onClick={() => setIsModalOpen(true)}
@@ -1009,7 +1009,7 @@ export function QuestionsClient({
               </div>
               <h3 className="text-base font-bold text-slate-800">Keine Anfrage ausgewählt</h3>
               <p className="text-xs text-slate-500 max-w-sm mt-1">
-                Wähle eine Kundenfrage aus der linken Liste aus, um Details einzusehen und direkt zu antworten.
+                Wähle eine Kundenanfrage aus der linken Liste aus, um Details einzusehen und direkt zu antworten.
               </p>
             </div>
           )}

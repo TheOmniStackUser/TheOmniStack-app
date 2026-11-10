@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/db/client'
 import { sql } from 'drizzle-orm'
+import { ensureQuestionsTablesExist } from '@/db/ensure-questions-tables'
 
 export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization')
@@ -13,6 +14,7 @@ export async function GET(req: Request) {
       ALTER TABLE company_members ADD COLUMN IF NOT EXISTS api_key text UNIQUE;
       ALTER TABLE companies ADD COLUMN IF NOT EXISTS api_key text UNIQUE;
     `)
+    await ensureQuestionsTablesExist()
     return NextResponse.json({ success: true, message: 'Migration executed successfully' })
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
