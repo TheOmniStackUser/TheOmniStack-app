@@ -438,15 +438,84 @@ Always confirm destructive operations (cancelling an order, cancelling an invoic
         </div>
       </div>
 
+      {/* Grok Action Vault Setup Guide */}
+      <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-cyan-950 rounded-2xl p-6 text-white border border-cyan-500/30 shadow-md space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-cyan-500/20 flex items-center justify-center border border-cyan-400/30">
+              <ShieldCheck className="w-5 h-5 text-cyan-400" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-white">Sicheres Grok Action Vault Setup</h3>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                  Zero Secrets im Prompt
+                </span>
+              </div>
+              <p className="text-xs text-slate-300">
+                So verbindest du Grok sicher, ohne deinen geheimen API-Schlüssel im Chat-Prompt preiszugeben
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-1">
+          <div className="p-3.5 rounded-xl bg-slate-800/80 border border-slate-700/80 space-y-1.5">
+            <div className="flex items-center gap-2 text-cyan-400 text-xs font-bold">
+              <span className="w-5 h-5 rounded-full bg-cyan-500/20 flex items-center justify-center text-[11px] border border-cyan-500/30">1</span>
+              API-Key generieren
+            </div>
+            <p className="text-[11px] text-slate-300 leading-normal">
+              Erstelle oben deinen persönlichen Connector-Key. Der Schlüssel wird verschlüsselt gespeichert und gehört ausschließlich in den Grok-Tresor.
+            </p>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-slate-800/80 border border-slate-700/80 space-y-1.5">
+            <div className="flex items-center gap-2 text-cyan-400 text-xs font-bold">
+              <span className="w-5 h-5 rounded-full bg-cyan-500/20 flex items-center justify-center text-[11px] border border-cyan-500/30">2</span>
+              OpenAPI hinterlegen
+            </div>
+            <p className="text-[11px] text-slate-300 leading-normal">
+              Erstelle in Grok / xAI eine neue Action und füge die Schema-URL (<code className="text-cyan-300 font-mono text-[10px]">openapi.json</code> oder YAML) ein.
+            </p>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-slate-800/80 border border-slate-700/80 space-y-1.5">
+            <div className="flex items-center gap-2 text-cyan-400 text-xs font-bold">
+              <span className="w-5 h-5 rounded-full bg-cyan-500/20 flex items-center justify-center text-[11px] border border-cyan-500/30">3</span>
+              Im Vault speichern
+            </div>
+            <p className="text-[11px] text-slate-300 leading-normal">
+              Wähle bei <strong>Authentication</strong> den Typ <strong>API Key</strong> &rarr; <strong>Bearer Token</strong> und trage den Key dort ein. Niemals im Prompt!
+            </p>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-slate-800/80 border border-slate-700/80 space-y-1.5">
+            <div className="flex items-center gap-2 text-cyan-400 text-xs font-bold">
+              <span className="w-5 h-5 rounded-full bg-cyan-500/20 flex items-center justify-center text-[11px] border border-cyan-500/30">4</span>
+              Prompt einfügen
+            </div>
+            <p className="text-[11px] text-slate-300 leading-normal">
+              Kopiere den sauberen System-Prompt unten in die Anweisungen des Bots. Grok authentifiziert sich automatisch im Hintergrund über den Vault.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Grok Bot System Prompt Template */}
       <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center border border-amber-100">
               <Sparkles className="w-5 h-5 text-amber-600" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900">Grok Bot Anweisungen & Persona (Prompt)</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-slate-900">Grok Bot Anweisungen & Persona (Prompt)</h3>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  Zero Secrets (Vault-Ready)
+                </span>
+              </div>
               <p className="text-xs text-slate-500">
                 Diesen Prompt direkt in den Custom Grok Bot auf xAI einfügen, damit Grok seine Aufgaben versteht
               </p>
@@ -454,7 +523,7 @@ Always confirm destructive operations (cancelling an order, cancelling an invoic
           </div>
           <button
             onClick={() => handleCopy(grokSystemPrompt, 'prompt')}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-all cursor-pointer shadow-sm"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-all cursor-pointer shadow-sm self-start sm:self-auto"
           >
             {copiedPrompt ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
             {copiedPrompt ? 'Prompt kopiert!' : 'Prompt kopieren'}
