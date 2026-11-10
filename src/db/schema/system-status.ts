@@ -54,6 +54,96 @@ export const serviceNamesMap: Record<string, string> = {
   'shopware': 'Shopware',
 }
 
+export type ServiceCategory = 'platform' | 'marketplace' | 'shipping' | 'shop'
+
+export interface CategoryInfo {
+  id: ServiceCategory
+  title: string
+  shortTitle: string
+  description: string
+  iconName: 'Server' | 'Store' | 'Truck' | 'ShoppingCart'
+}
+
+export const serviceCategoryOrder: ServiceCategory[] = ['marketplace', 'shipping', 'shop', 'platform']
+
+export const serviceCategoryConfig: Record<ServiceCategory, CategoryInfo> = {
+  marketplace: {
+    id: 'marketplace',
+    title: 'Marktplätze',
+    shortTitle: 'Marktplätze',
+    description: 'Schnittstellen zu europäischen und globalen Verkaufsplattformen',
+    iconName: 'Store',
+  },
+  shipping: {
+    id: 'shipping',
+    title: 'Versanddienstleister',
+    shortTitle: 'Versanddienstleister',
+    description: 'Logistikpartner zur Label-Erstellung und Sendungsverfolgung',
+    iconName: 'Truck',
+  },
+  shop: {
+    id: 'shop',
+    title: 'Shopsysteme',
+    shortTitle: 'Shopsysteme',
+    description: 'Anbindungen an Webshop- und E-Commerce-Plattformen',
+    iconName: 'ShoppingCart',
+  },
+  platform: {
+    id: 'platform',
+    title: 'Plattform & Kernsysteme',
+    shortTitle: 'Plattform',
+    description: 'API- und Web-Infrastruktur von TheOmniStack',
+    iconName: 'Server',
+  },
+}
+
+export const serviceCategoryMap: Record<string, ServiceCategory> = {
+  core_api: 'platform',
+  theomnistack_app: 'platform',
+  profifaktura_app: 'platform',
+  amazon: 'marketplace',
+  otto: 'marketplace',
+  ebay: 'marketplace',
+  kaufland: 'marketplace',
+  etsy: 'marketplace',
+  aboutyou: 'marketplace',
+  limango: 'marketplace',
+  mirakl_decathlon: 'marketplace',
+  mirakl_decathlon_eu: 'marketplace',
+  mirakl_mediamarkt: 'marketplace',
+  mirakl_custom: 'marketplace',
+  shopify: 'shop',
+  shopware: 'shop',
+  woocommerce: 'shop',
+  dhl: 'shipping',
+  hermes: 'shipping',
+  dpd: 'shipping',
+}
+
+export const serviceBrandMap: Record<string, { badgeText: string; bgClass: string; textClass: string }> = {
+  core_api: { badgeText: 'API', bgClass: 'bg-cyan-50 border-cyan-200', textClass: 'text-cyan-700' },
+  theomnistack_app: { badgeText: 'APP', bgClass: 'bg-indigo-50 border-indigo-200', textClass: 'text-indigo-700' },
+  profifaktura_app: { badgeText: 'APP', bgClass: 'bg-indigo-50 border-indigo-200', textClass: 'text-indigo-700' },
+  amazon: { badgeText: 'AMZ', bgClass: 'bg-amber-500/10 border-amber-500/30', textClass: 'text-amber-800' },
+  otto: { badgeText: 'OTTO', bgClass: 'bg-red-500/10 border-red-500/30', textClass: 'text-red-700' },
+  ebay: { badgeText: 'eBay', bgClass: 'bg-blue-500/10 border-blue-500/30', textClass: 'text-blue-700' },
+  kaufland: { badgeText: 'Kaufland', bgClass: 'bg-rose-500/10 border-rose-500/30', textClass: 'text-rose-700' },
+  etsy: { badgeText: 'Etsy', bgClass: 'bg-orange-500/10 border-orange-500/30', textClass: 'text-orange-700' },
+  aboutyou: { badgeText: 'AY', bgClass: 'bg-slate-900/10 border-slate-900/30', textClass: 'text-slate-900' },
+  limango: { badgeText: 'Limango', bgClass: 'bg-emerald-500/10 border-emerald-500/30', textClass: 'text-emerald-700' },
+  mirakl_decathlon: { badgeText: 'Decathlon', bgClass: 'bg-sky-500/10 border-sky-500/30', textClass: 'text-sky-700' },
+  mirakl_decathlon_eu: { badgeText: 'Decathlon EU', bgClass: 'bg-sky-500/10 border-sky-500/30', textClass: 'text-sky-700' },
+  mirakl_mediamarkt: { badgeText: 'MediaMarkt', bgClass: 'bg-red-500/10 border-red-500/30', textClass: 'text-red-700' },
+  mirakl_custom: { badgeText: 'Mirakl', bgClass: 'bg-violet-500/10 border-violet-500/30', textClass: 'text-violet-700' },
+  shopify: { badgeText: 'Shopify', bgClass: 'bg-emerald-500/10 border-emerald-500/30', textClass: 'text-emerald-700' },
+  shopware: { badgeText: 'Shopware', bgClass: 'bg-blue-500/10 border-blue-500/30', textClass: 'text-blue-700' },
+  woocommerce: { badgeText: 'Woo', bgClass: 'bg-purple-500/10 border-purple-500/30', textClass: 'text-purple-700' },
+  dhl: { badgeText: 'DHL', bgClass: 'bg-amber-400/20 border-amber-400/40', textClass: 'text-amber-800' },
+  hermes: { badgeText: 'Hermes', bgClass: 'bg-sky-500/10 border-sky-500/30', textClass: 'text-[#005A9C]' },
+  dpd: { badgeText: 'DPD', bgClass: 'bg-rose-500/10 border-rose-500/30', textClass: 'text-rose-700' },
+}
+
+
 export const systemIncidents = pgTable('system_incidents', {
   id: uuid('id').primaryKey().defaultRandom(),
   service: systemServicesEnum('service').notNull(),

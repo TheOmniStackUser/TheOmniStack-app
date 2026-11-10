@@ -1,21 +1,21 @@
 import React from 'react'
 import { getSystemStatusData } from '@/app/actions/system-status'
-import { StatusBar } from '@/components/status-bar'
 import { AlertTriangle, CheckCircle2, Info, Activity, Wrench } from 'lucide-react'
-import { serviceNamesMap } from '@/db/schema/system-status'
+import { serviceNamesMap, serviceCategoryMap, serviceCategoryConfig } from '@/db/schema/system-status'
+import { StatusView } from './status-view'
 
 export default async function SystemStatusPage() {
-  const { incidents, uptimeData, usedServices, overrides } = await getSystemStatusData()
+  const { incidents, uptimeData, usedServices, overrides, connectedServices } = await getSystemStatusData()
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-16">
       <div>
         <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
           <Activity className="w-8 h-8 text-cyan-500" />
           System- & Schnittstellen-Status
         </h1>
         <p className="text-slate-500 mt-2 text-sm">
-          Hier findest du eine Übersicht der aktuellen Erreichbarkeit unserer Systeme sowie der von dir genutzten externen Schnittstellen.
+          Hier findest du eine strukturierte Übersicht der aktuellen Erreichbarkeit unserer Systeme, Marktplätze und Versanddienstleister.
         </p>
       </div>
 
@@ -23,14 +23,14 @@ export default async function SystemStatusPage() {
       <section className="bg-white rounded-2xl shadow-sm border border-slate-200/60 overflow-hidden">
         <div className="bg-amber-400/10 border-b border-amber-400/20 px-6 py-4 flex items-center gap-3">
           <AlertTriangle className="text-amber-500 w-5 h-5" />
-          <h2 className="font-semibold text-amber-700">Aktuelle Hinweise</h2>
+          <h2 className="font-semibold text-amber-700">Aktuelle Hinweise & Wartungen</h2>
         </div>
         <div className="p-6">
           {incidents.length === 0 ? (
             <div className="flex items-start gap-3 text-emerald-600 bg-emerald-50 rounded-xl p-4">
               <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />
               <div>
-                <p className="font-medium text-sm">Alle genutzten Systeme arbeiten fehlerfrei.</p>
+                <p className="font-medium text-sm">Alle genutzten Systeme und Schnittstellen arbeiten fehlerfrei.</p>
                 <p className="text-xs mt-1 text-emerald-600/80">
                   Aktuell liegen keine Meldungen über Störungen oder geplante Wartungsarbeiten vor.
                 </p>
@@ -40,6 +40,8 @@ export default async function SystemStatusPage() {
             <div className="space-y-4">
               {incidents.map(incident => {
                 const isMaintenance = incident.status === 'maintenance'
+                const categoryKey = serviceCategoryMap[incident.service]
+                const category = categoryKey ? serviceCategoryConfig[categoryKey] : null
                 
                 const containerClass = isMaintenance 
                   ? "flex items-start gap-3 text-slate-800 bg-blue-50/80 rounded-xl p-4 border border-blue-100"
@@ -55,8 +57,13 @@ export default async function SystemStatusPage() {
                   <div key={incident.id} className={containerClass}>
                     <Icon className={`w-5 h-5 shrink-0 mt-0.5 ${iconColor}`} />
                     <div className="flex-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-bold text-sm">{serviceNamesMap[incident.service] || incident.service}</p>
+                        {category && (
+                          <span className="text-[10px] font-semibold text-slate-600 bg-white/80 border border-slate-200/80 px-2 py-0.5 rounded-md">
+                            {category.shortTitle}
+                          </span>
+                        )}
                         <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${badgeClass}`}>
                           {incident.status}
                         </span>
@@ -86,56 +93,14 @@ export default async function SystemStatusPage() {
         </div>
       </section>
 
-      {/* Uptime Overview */}
-      <section className="bg-white rounded-2xl shadow-sm border border-slate-200/60 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-          <h2 className="font-semibold text-slate-800">Verfügbarkeit der letzten 90 Tage</h2>
-          <span className="text-xs font-medium text-slate-400 bg-slate-100 px-2.5 py-1 rounded-md">Live Status</span>
-        </div>
-        <div className="divide-y divide-slate-50">
-          {usedServices.map(service => {
-            const data = uptimeData[service] || Array(90).fill(null)
-            // Calculate a rough uptime percentage for the UI if we have data
-            const validDays = data.filter(d => d !== null)
-            const upDays = validDays.filter(d => d === 1)
-            const uptimePercent = validDays.length > 0 
-              ? ((upDays.length / validDays.length) * 100).toFixed(2)
-              : '100.00' // fallback if no data
-              
-            const override = overrides[service]
-            const isOperational = override === 'online' ? true 
-                               : override === 'offline' ? false 
-                               : data[data.length - 1] !== 0 // fallback to auto
-
-            return (
-              <div key={service} className="p-6 transition-colors hover:bg-slate-50/50">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-slate-800 text-sm">{serviceNamesMap[service] || service}</h3>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <span className="text-xs font-medium text-slate-500">
-                      {uptimePercent}% Uptime
-                    </span>
-                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                      isOperational ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
-                    }`}>
-                      {isOperational ? 'Operational' : 'Issues'}
-                    </span>
-                  </div>
-                </div>
-                
-                <StatusBar data={data} days={90} />
-                
-                <div className="flex justify-between items-center mt-2 text-[10px] text-slate-400 font-medium px-1">
-                  <span>Vor 90 Tagen</span>
-                  <span>Heute</span>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </section>
+      {/* Categorized Uptime and System Status */}
+      <StatusView 
+        usedServices={usedServices} 
+        connectedServices={connectedServices} 
+        uptimeData={uptimeData} 
+        overrides={overrides} 
+      />
     </div>
   )
 }
+

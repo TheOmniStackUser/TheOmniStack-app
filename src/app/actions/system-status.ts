@@ -47,6 +47,18 @@ export async function getSystemStatusData() {
     usedServices.add(service)
   }
 
+  // Determine which services are actively connected to this merchant's account
+  const connectedServices = new Set<string>()
+  if (usedServices.has('core_api')) connectedServices.add('core_api')
+  if (usedServices.has('theomnistack_app')) connectedServices.add('theomnistack_app')
+  if (usedServices.has('profifaktura_app')) connectedServices.add('profifaktura_app')
+
+  for (const integration of activeIntegrations) {
+    if (integration.isActive && usedServices.has(integration.type)) {
+      connectedServices.add(integration.type)
+    }
+  }
+
   // Fetch incidents from the last 30 days
   const thirtyDaysAgo = new Date()
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
@@ -137,6 +149,7 @@ export async function getSystemStatusData() {
 
   return {
     usedServices: Array.from(usedServices),
+    connectedServices: Array.from(connectedServices),
     incidents: relevantIncidents,
     uptimeData: serviceUptimeMap,
     overrides

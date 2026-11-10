@@ -2,7 +2,14 @@
 
 import React, { useState } from 'react'
 import { createIncident } from './actions'
-import { systemServicesEnum, incidentStatusEnum, serviceNamesMap } from '@/db/schema/system-status'
+import { 
+  systemServicesEnum, 
+  incidentStatusEnum, 
+  serviceNamesMap, 
+  serviceCategoryMap, 
+  serviceCategoryConfig, 
+  serviceCategoryOrder 
+} from '@/db/schema/system-status'
 
 export function CreateIncidentForm() {
   const [status, setStatus] = useState<typeof incidentStatusEnum.enumValues[number]>('investigating')
@@ -30,9 +37,19 @@ export function CreateIncidentForm() {
       <div>
         <label className="block text-xs font-medium text-slate-700 mb-1">Betroffener Service</label>
         <select name="service" required className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900">
-          {systemServicesEnum.enumValues.map(s => (
-            <option key={s} value={s}>{serviceNamesMap[s] || s}</option>
-          ))}
+          {serviceCategoryOrder.map(catKey => {
+            const config = serviceCategoryConfig[catKey]
+            const servicesInCat = systemServicesEnum.enumValues.filter(s => serviceCategoryMap[s] === catKey)
+            if (servicesInCat.length === 0) return null
+
+            return (
+              <optgroup key={catKey} label={config.title}>
+                {servicesInCat.map(s => (
+                  <option key={s} value={s}>{serviceNamesMap[s] || s}</option>
+                ))}
+              </optgroup>
+            )
+          })}
         </select>
       </div>
       
