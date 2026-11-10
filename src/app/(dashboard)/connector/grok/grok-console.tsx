@@ -19,6 +19,8 @@ import {
   ShieldCheck,
   Layers,
   ArrowRight,
+  Lock,
+  KeyRound,
 } from 'lucide-react'
 
 interface GrokConsoleProps {
@@ -116,10 +118,10 @@ Your capabilities include:
 5. LOGISTICS & CARRIERS: Generating shipping labels for DHL, Hermes, and DPD, and retrieving live tracking numbers.
 6. REAL-TIME INTELLIGENCE: Providing instant analytics on sales revenue, pending fulfillment counts, return rates, and low-stock alerts.
 
-When executing actions, authenticate with:
-Authorization: Bearer ${apiKey || '<YOUR_OMNISTACK_API_KEY>'}
-Base URL: ${baseUrl}
-Connector endpoint: ${baseUrl}/api/connector/grok/execute
+Operating Guidelines:
+- Base URL: ${baseUrl}
+- Connector endpoint: ${baseUrl}/api/connector/grok/execute
+- Authentication: Handled securely via the Grok Action Vault (Bearer Auth). Never output, request, or expose raw API keys in conversation prompts.
 
 Always confirm destructive operations (cancelling an order, cancelling an invoice, or issuing a refund) before execution, and provide clear structured summaries of any actions performed.`
 
@@ -293,59 +295,71 @@ Always confirm destructive operations (cancelling an order, cancelling an invoic
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="w-9 h-9 rounded-xl bg-cyan-50 flex items-center justify-center border border-cyan-100">
-                <ShieldCheck className="w-5 h-5 text-cyan-600" />
+                <KeyRound className="w-5 h-5 text-cyan-600" />
               </div>
               <div>
                 <h3 className="text-sm font-bold text-slate-900">Grok Connector API-Key</h3>
-                <p className="text-xs text-slate-500">Authentifizierung für Grok</p>
+                <p className="text-xs text-slate-500">Für den Grok Action Vault</p>
               </div>
             </div>
-            <button
-              onClick={() => setConfirmRegenOpen(true)}
-              className="text-xs font-semibold text-cyan-600 hover:text-cyan-700 cursor-pointer"
-            >
-              {apiKey ? 'Erneuern' : 'Generieren'}
-            </button>
+            {apiKey && (
+              <button
+                onClick={() => setConfirmRegenOpen(true)}
+                className="text-xs font-semibold text-cyan-600 hover:text-cyan-700 cursor-pointer"
+              >
+                Erneuern
+              </button>
+            )}
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Dein API-Token</label>
-            <div className="flex gap-2">
-              <input
-                type={!apiKey || showKey ? 'text' : 'password'}
-                value={apiKey || 'Kein Key generiert'}
-                readOnly
-                className="flex-1 px-3.5 py-2 rounded-xl border border-slate-300 bg-slate-50 font-mono text-xs text-slate-900 placeholder:text-slate-500 focus:outline-none select-all"
-              />
-              {apiKey && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setShowKey(!showKey)}
-                    className="p-2 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 cursor-pointer transition-colors"
-                    title={showKey ? 'Verbergen' : 'Anzeigen'}
-                  >
-                    {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleCopy(apiKey, 'key')}
-                    className="p-2 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 cursor-pointer transition-colors"
-                    title="Kopieren"
-                  >
-                    {copiedKey ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
-                  </button>
-                </>
-              )}
+          {apiKey ? (
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Dein API-Token (für den Vault)</label>
+              <div className="flex gap-2">
+                <input
+                  type={showKey ? 'text' : 'password'}
+                  value={apiKey}
+                  readOnly
+                  className="flex-1 px-3.5 py-2 rounded-xl border border-slate-300 bg-slate-50 font-mono text-xs text-slate-900 placeholder:text-slate-500 focus:outline-none select-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowKey(!showKey)}
+                  className="p-2 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 cursor-pointer transition-colors"
+                  title={showKey ? 'Verbergen' : 'Anzeigen'}
+                >
+                  {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleCopy(apiKey, 'key')}
+                  className="p-2 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 cursor-pointer transition-colors"
+                  title="Kopieren"
+                >
+                  {copiedKey ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+                </button>
+              </div>
+              <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200/80 text-[11px] text-amber-800 flex items-start gap-2">
+                <Lock className="w-3.5 h-3.5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <span>
+                  <strong>Wichtig:</strong> Dieser Key gehört <u>nicht</u> in den Prompt! Trage ihn in xAI / Grok im geschützten <strong>Action Auth Vault</strong> als Bearer Token ein.
+                </span>
+              </div>
             </div>
-            <p className="text-[11px] text-slate-500 leading-normal">
-              Header:{' '}
-              <code className="text-slate-800 bg-slate-100 px-1 py-0.5 rounded font-mono">
-                Authorization: Bearer &lt;key&gt;
-              </code>{' '}
-              oder <code className="text-slate-800 bg-slate-100 px-1 py-0.5 rounded font-mono">x-api-key: &lt;key&gt;</code>
-            </p>
-          </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Es wurde noch kein persönlicher API-Key für diesen Account generiert. Klicke unten, um deinen Key für den Grok Action Vault zu erstellen.
+              </p>
+              <button
+                onClick={handleGenerateKey}
+                className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <KeyRound className="w-4 h-4 text-cyan-400" />
+                API-Key jetzt generieren
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Protocol Endpoints Box */}
