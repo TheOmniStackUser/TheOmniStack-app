@@ -41,7 +41,7 @@ export function MarketplaceAutomation({ integrations }: { integrations: Integrat
 
   // Filter out shipping providers and sort (Otto & About You at the bottom)
   const marketplaceIntegrations = localIntegrations
-    .filter(i => !['dhl', 'hermes'].includes(i.type))
+    .filter(i => !['dhl', 'hermes', 'dpd'].includes(i.type))
     .sort((a, b) => {
       if (['otto', 'aboutyou'].includes(a.type) && !['otto', 'aboutyou'].includes(b.type)) return 1
       if (!['otto', 'aboutyou'].includes(a.type) && ['otto', 'aboutyou'].includes(b.type)) return -1

@@ -13,8 +13,6 @@ export interface DpdConfig {
   environment?: 'production' | 'stage'
   defaultWeight?: number
   labelFormat?: 'A6' | 'A4'
-  autoInvoice?: boolean
-  uploadInvoice?: boolean
 }
 
 export class DpdAdapter {
@@ -66,8 +64,6 @@ export class DpdAdapter {
       environment: (integration.environment as 'production' | 'stage') || metadata.environment || 'production',
       defaultWeight: metadata.defaultWeight ?? 1.0,
       labelFormat: metadata.labelFormat ?? 'A6',
-      autoInvoice: integration.autoInvoice ?? metadata.autoInvoice ?? false,
-      uploadInvoice: integration.uploadInvoice ?? metadata.uploadInvoice ?? false,
     }
 
     return new DpdAdapter(integration.id, config)

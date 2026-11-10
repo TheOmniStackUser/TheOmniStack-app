@@ -16,7 +16,6 @@ const DpdIntegrationSchema = z.object({
   environment: z.enum(['production', 'stage']).default('production'),
   defaultWeight: z.coerce.number().min(0.01).default(1.0),
   labelFormat: z.enum(['A6', 'A4']).default('A6'),
-  autoInvoice: z.boolean().default(false),
 })
 
 export type DpdActionState = {
@@ -39,7 +38,6 @@ export async function saveDpdIntegrationAction(
     environment: formData.get('environment') || 'production',
     defaultWeight: formData.get('defaultWeight') || 1.0,
     labelFormat: formData.get('labelFormat') || 'A6',
-    autoInvoice: formData.get('autoInvoice') === 'true' || formData.get('autoInvoice') === 'on',
   }
 
   const validated = DpdIntegrationSchema.safeParse(raw)
@@ -47,7 +45,7 @@ export async function saveDpdIntegrationAction(
     return { errors: validated.error.flatten().fieldErrors }
   }
 
-  const { delisId, password, depot, customerNumber, environment, defaultWeight, labelFormat, autoInvoice } = validated.data
+  const { delisId, password, depot, customerNumber, environment, defaultWeight, labelFormat } = validated.data
 
   const [existing] = await db
     .select({
@@ -78,8 +76,9 @@ export async function saveDpdIntegrationAction(
     environment,
     defaultWeight,
     labelFormat,
-    autoInvoice,
   }
+  // Clean up any legacy autoInvoice property in metadata
+  delete (metadata as any).autoInvoice
 
   if (existing) {
     await db
@@ -88,7 +87,7 @@ export async function saveDpdIntegrationAction(
         clientId: delisId.trim(),
         clientSecret: finalPassword,
         environment,
-        autoInvoice,
+        autoInvoice: false,
         metadata,
         isActive: true,
         updatedAt: new Date(),
@@ -103,7 +102,7 @@ export async function saveDpdIntegrationAction(
         clientId: delisId.trim(),
         clientSecret: finalPassword,
         environment,
-        autoInvoice,
+        autoInvoice: false,
         metadata,
         isActive: true,
       })

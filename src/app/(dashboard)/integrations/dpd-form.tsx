@@ -23,7 +23,6 @@ export function DpdIntegrationForm({
   const [environment, setEnvironment] = useState<'production' | 'stage'>(initialConfig?.environment || 'production')
   const [defaultWeight, setDefaultWeight] = useState<number>(initialConfig?.defaultWeight ?? 1.0)
   const [labelFormat, setLabelFormat] = useState<'A6' | 'A4'>(initialConfig?.labelFormat || 'A6')
-  const [autoInvoice, setAutoInvoice] = useState<boolean>(initialConfig?.autoInvoice ?? false)
 
   const [testStatus, setTestStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle')
   const [testMessage, setTestMessage] = useState('')
@@ -229,26 +228,6 @@ export function DpdIntegrationForm({
               </select>
               <p className="text-[11px] text-slate-500 mt-1">A6 eignet sich für Thermo- und Etikettendrucker.</p>
             </div>
-          </div>
-
-          <div className="pt-2">
-            <label className="flex items-start gap-3 cursor-pointer group">
-              <input
-                type="checkbox"
-                name="autoInvoice"
-                checked={autoInvoice}
-                onChange={(e) => setAutoInvoice(e.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
-              />
-              <div>
-                <span className="text-sm font-bold text-slate-900 group-hover:text-red-700 transition-colors">
-                  Automatische Rechnungserstellung beim DPD Label-Druck
-                </span>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Erzeugt beim Drucken eines DPD-Versandlabels automatisch eine passende Rechnung und lädt diese (falls im Marktplatz aktiviert) direkt hoch.
-                </p>
-              </div>
-            </label>
           </div>
         </div>
 

@@ -1466,8 +1466,6 @@ export async function generateDpdLabelsAction(
         )
       )
 
-    const dpdIntegration = activeIntegrations.find(i => i.type === 'dpd')
-
     const { getAdapterForIntegration } = await import('@/workers/marketplace-sync')
     const adaptersMap = new Map<string, any>()
     for (const integration of activeIntegrations) {
@@ -1513,24 +1511,30 @@ export async function generateDpdLabelsAction(
 
         const isReplacementLabel = order.status === 'shipped'
 
-        // Auto-generate invoice if enabled on DPD or marketplace
+        // Auto-generate invoice if enabled for this marketplace (e.g. Decathlon, Shopify, Amazon)
         if (!isReplacementLabel) {
           try {
-            const mpIntegration = activeIntegrations.find(i =>
+            const integration = activeIntegrations.find(i =>
               i.type === order.marketplace ||
               (i.type === 'mirakl_decathlon' && order.marketplace === 'Decathlon DE') ||
               (i.type === 'mirakl_custom' &&
                 ((i.metadata as any)?.customName || '').toLowerCase() === order.marketplace.toLowerCase())
             )
 
-            const autoInvoiceEnabled = dpdIntegration?.autoInvoice || mpIntegration?.autoInvoice
-            if (autoInvoiceEnabled && !isAmazonSwitzerlandOrder(order)) {
+            const autoInvoiceEnabledAt = (integration?.metadata as any)?.autoInvoiceEnabledAt
+            const thresholdDate = autoInvoiceEnabledAt
+              ? new Date(autoInvoiceEnabledAt)
+              : new Date('2026-05-26T12:00:00Z') // Default threshold to today to prevent invoicing older orders
+            const isOrderNew = order.createdAt >= thresholdDate
+
+            if (integration?.autoInvoice && isOrderNew && !isAmazonSwitzerlandOrder(order)) {
               console.log(`[DPD-Action] Auto-generating invoice for order ${order.marketplaceOrderId} during label printing...`)
               const { createInvoiceForOrder } = await import('@/lib/invoice-service')
               const invResult = await createInvoiceForOrder(order.id, auth.activeCompanyId)
 
-              if (invResult && 'pdfBuffer' in invResult && (dpdIntegration?.uploadInvoice || mpIntegration?.uploadInvoice)) {
-                const adapter = mpIntegration ? getAdapterForIntegration(mpIntegration) : null
+              // Upload if enabled
+              if (invResult && 'pdfBuffer' in invResult && integration.uploadInvoice) {
+                const adapter = getAdapterForIntegration(integration)
                 if (adapter?.uploadInvoice) {
                   console.log(`[DPD-Action] Auto-uploading invoice for order ${order.marketplaceOrderId}...`)
                   await adapter.uploadInvoice(
