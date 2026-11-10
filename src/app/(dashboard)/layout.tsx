@@ -10,7 +10,7 @@ import { eq } from 'drizzle-orm'
 import { AutoRefresh } from '@/components/auto-refresh'
 import { SidebarProvider } from './sidebar-context'
 import { SidebarWrapper, MobileHeader } from './sidebar-wrapper'
-import { Settings, Blocks, Smartphone, Users as UsersIcon, LifeBuoy, ShieldAlert, LogOut, Bot } from 'lucide-react'
+import { Settings, Blocks, Smartphone, Users as UsersIcon, LifeBuoy, ShieldAlert, LogOut } from 'lucide-react'
 
 export default async function DashboardLayout({
   children,
@@ -139,14 +139,9 @@ export default async function DashboardLayout({
                 </>
               )}
 
-              <Link href="/mobile-app" title="Mobile App & API" className="flex items-center px-3 py-2 text-sm font-medium rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all group-[.collapsed]/sidebar:justify-center group-[.collapsed]/sidebar:px-0">
+              <Link href="/mobile-app" title="Mobile App, API & KI" className="flex items-center px-3 py-2 text-sm font-medium rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all group-[.collapsed]/sidebar:justify-center group-[.collapsed]/sidebar:px-0">
                 <Smartphone size={18} className="mr-3 group-[.collapsed]/sidebar:mr-0" />
-                <span className="group-[.collapsed]/sidebar:hidden">Mobile App & API</span>
-              </Link>
-
-              <Link href="/connector/grok" title="Grok Bot Connector" className="flex items-center px-3 py-2 text-sm font-medium rounded-lg text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10 transition-all group-[.collapsed]/sidebar:justify-center group-[.collapsed]/sidebar:px-0">
-                <Bot size={18} className="mr-3 group-[.collapsed]/sidebar:mr-0 text-cyan-400" />
-                <span className="group-[.collapsed]/sidebar:hidden font-semibold">Grok Connector</span>
+                <span className="group-[.collapsed]/sidebar:hidden">Mobile App, API & KI</span>
               </Link>
               
               <Link href="/status" title="System Status" className="flex items-center px-3 py-2 text-sm font-medium rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all group-[.collapsed]/sidebar:justify-center group-[.collapsed]/sidebar:px-0">
