@@ -22,8 +22,63 @@ export class MiraklAdapter implements MarketplaceAdapter {
   readonly marketplace: MiraklInstance
   public hasPendingAcceptances?: boolean = false
 
+  private supportedCarriersCache: { code: string; label: string }[] | null = null
+  private supportedCarriersCacheTime = 0
+
   constructor(private readonly config: MiraklAdapterConfig) {
     this.marketplace = config.instance
+  }
+
+  async getSupportedCarriers(): Promise<{ code: string; label: string }[]> {
+    if (this.supportedCarriersCache && Date.now() - this.supportedCarriersCacheTime < 3600000) {
+      return this.supportedCarriersCache
+    }
+
+    try {
+      const token = await this.getAccessToken()
+      const headers: Record<string, string> = {
+        'Accept': 'application/json'
+      }
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      } else {
+        const apiKey = this.config.clientSecret === '' || !this.config.clientSecret 
+          ? this.config.clientId 
+          : this.config.apiKey
+        
+        if (apiKey) {
+          headers['Authorization'] = apiKey
+          headers['X-Mirakl-Api-Key'] = apiKey
+        }
+      }
+
+      const baseUrl = this.config.baseUrl.replace(/\/$/, '')
+      let carriersUrl = ''
+      if (baseUrl.includes('miraklconnect.com')) {
+        carriersUrl = baseUrl.endsWith('/v1') 
+          ? `${baseUrl}/shipping/carriers` 
+          : `${baseUrl}/api/v1/shipping/carriers`
+      } else {
+        carriersUrl = baseUrl.endsWith('/api')
+          ? `${baseUrl}/shipping/carriers`
+          : `${baseUrl}/api/shipping/carriers`
+      }
+
+      const res = await fetch(carriersUrl, { headers })
+      if (res.ok) {
+        const data = await res.json()
+        if (Array.isArray(data.carriers)) {
+          this.supportedCarriersCache = data.carriers
+          this.supportedCarriersCacheTime = Date.now()
+          return data.carriers
+        }
+      }
+    } catch (e) {
+      console.warn(`[MiraklAdapter:${this.marketplace}] Failed to fetch carriers list:`, e)
+    }
+
+    return this.supportedCarriersCache ?? []
   }
 
   private async getAccessToken(): Promise<string | null> {
@@ -621,54 +676,128 @@ export class MiraklAdapter implements MarketplaceAdapter {
       const isRo = ['RO', 'ROU'].includes(upperCountry)
       const isGb = ['GB', 'GBR'].includes(upperCountry)
 
+      const supportedCarriers = await this.getSupportedCarriers()
+
       const isSecretSales = this.marketplace.toLowerCase().includes('secret sales') || baseUrl.includes('miraklconnect.com')
       const isLimango = this.marketplace.toLowerCase().includes('limango') || baseUrl.includes('limango.mirakl.net')
+      const isShopApotheke = this.marketplace.toLowerCase().includes('shop-apotheke') || this.marketplace.toLowerCase().includes('shop_apotheke') || baseUrl.includes('shopapotheke')
+      const isDecathlon = this.marketplace.toLowerCase().includes('decathlon') || baseUrl.includes('decathlon')
 
       let resolvedCarrier = carrier
-      if (carrier.toLowerCase() === 'dhl') {
-        if (isSecretSales) {
-          if (isDe) resolvedCarrier = 'DHL_DE'
-          else if (isNl) resolvedCarrier = 'DHL_NL'
-          else if (isGb) resolvedCarrier = 'DHL_UK'
-          else if (isEs) resolvedCarrier = 'DHL_SP'
-          else resolvedCarrier = 'dhl'
-        } else if (isLimango) {
-          resolvedCarrier = 'dhl'
+
+      if (supportedCarriers.length > 0) {
+        const cLower = carrier.toLowerCase()
+        if (cLower === 'dhl') {
+          let preferredCode = ''
+          if (isDe) preferredCode = isSecretSales ? 'DHL_DE' : 'DHLDE'
+          else if (isNl) preferredCode = isSecretSales ? 'DHL_NL' : 'DHL (NL)'
+          else if (isGb) preferredCode = isSecretSales ? 'DHL_UK' : 'dhlUK'
+          else if (isEs) preferredCode = isSecretSales ? 'DHL_SP' : 'DHLESP'
+          else if (isFr) preferredCode = 'DHLFR'
+          else if (isBe) preferredCode = 'DHLBE'
+          else if (isCh) preferredCode = 'DHL-CH'
+          else if (isPl) preferredCode = 'DHL PL'
+          else if (isIt) preferredCode = 'DHL ITA'
+          else if (isCz) preferredCode = 'DHL-CZ'
+          else if (isHu) preferredCode = 'DHLHU'
+          else if (isRo) preferredCode = 'DHL RO'
+
+          const matchedPreferred = preferredCode ? supportedCarriers.find(c => c.code.toLowerCase() === preferredCode.toLowerCase()) : null
+          const matchedExact = supportedCarriers.find(c => c.code.toLowerCase() === 'dhl')
+          const matchedContains = supportedCarriers.find(c => c.code.toLowerCase().includes('dhl') || (c.label && c.label.toLowerCase().includes('dhl')))
+
+          if (matchedPreferred) {
+            resolvedCarrier = matchedPreferred.code
+          } else if (matchedExact) {
+            resolvedCarrier = matchedExact.code
+          } else if (matchedContains) {
+            resolvedCarrier = matchedContains.code
+          }
+        } else if (cLower === 'hermes') {
+          let preferredCode = isDe ? (isSecretSales ? 'hermes-de' : 'HermesGER') : (isGb ? 'HermesUK' : '')
+          const matchedPreferred = preferredCode ? supportedCarriers.find(c => c.code.toLowerCase() === preferredCode.toLowerCase()) : null
+          const matchedExact = supportedCarriers.find(c => c.code.toLowerCase() === 'hermes')
+          const matchedContains = supportedCarriers.find(c => c.code.toLowerCase().includes('hermes') || (c.label && c.label.toLowerCase().includes('hermes')))
+
+          if (matchedPreferred) {
+            resolvedCarrier = matchedPreferred.code
+          } else if (matchedExact) {
+            resolvedCarrier = matchedExact.code
+          } else if (matchedContains) {
+            resolvedCarrier = matchedContains.code
+          }
+        } else if (cLower === 'dpd') {
+          let preferredCode = isSecretSales ? (isDe ? 'dpdGermany' : (isGb ? 'DPD_UK' : (isNl ? 'dpd_nl' : (isBe ? 'dpd_be' : '')))) : ''
+          const matchedPreferred = preferredCode ? supportedCarriers.find(c => c.code.toLowerCase() === preferredCode.toLowerCase()) : null
+          const matchedExact = supportedCarriers.find(c => c.code.toLowerCase() === 'dpd')
+          const matchedContains = supportedCarriers.find(c => c.code.toLowerCase().includes('dpd') || (c.label && c.label.toLowerCase().includes('dpd')))
+
+          if (matchedPreferred) {
+            resolvedCarrier = matchedPreferred.code
+          } else if (matchedExact) {
+            resolvedCarrier = matchedExact.code
+          } else if (matchedContains) {
+            resolvedCarrier = matchedContains.code
+          }
         } else {
-          if (isDe) resolvedCarrier = 'DHLDE'
-          else if (isNl) resolvedCarrier = 'DHL (NL)'
-          else if (isEs) resolvedCarrier = 'DHLESP'
-          else if (isBe) resolvedCarrier = 'DHLBE'
-          else if (isCh) resolvedCarrier = 'DHL-CH'
-          else if (isFr) resolvedCarrier = 'DHLFR'
-          else if (isPl) resolvedCarrier = 'DHL PL'
-          else if (isIt) resolvedCarrier = 'DHL ITA'
-          else if (isCz) resolvedCarrier = 'DHL-CZ'
-          else if (isHu) resolvedCarrier = 'DHLHU'
-          else if (isRo) resolvedCarrier = 'DHL RO'
-          else if (isGb) resolvedCarrier = 'dhlUK'
-          else resolvedCarrier = 'DHLDE' // Default to Germany DHL
+          const matched = supportedCarriers.find(c => c.code.toLowerCase() === cLower || (c.label && c.label.toLowerCase() === cLower))
+          if (matched) {
+            resolvedCarrier = matched.code
+          }
         }
-      } else if (carrier.toLowerCase() === 'hermes') {
-        if (isSecretSales) {
-          if (isDe) resolvedCarrier = 'hermes-de'
-          else if (isGb) resolvedCarrier = 'Hermes'
-          else resolvedCarrier = 'Hermes'
-        } else if (isLimango) {
-          resolvedCarrier = 'hermes'
-        } else {
-          if (isGb) resolvedCarrier = 'HermesUK'
-          else resolvedCarrier = 'HermesGER' // Default to Germany Hermes
-        }
-      } else if (carrier.toLowerCase() === 'dpd') {
-        if (isSecretSales) {
-          if (isDe) resolvedCarrier = 'dpdGermany'
-          else if (isGb) resolvedCarrier = 'DPD_UK'
-          else if (isNl) resolvedCarrier = 'dpd_nl'
-          else if (isBe) resolvedCarrier = 'dpd_be'
-          else resolvedCarrier = 'DPD'
-        } else if (isLimango) {
-          resolvedCarrier = 'dpd'
+      } else {
+        // Fallback when carriers cannot be retrieved
+        if (carrier.toLowerCase() === 'dhl') {
+          if (isSecretSales) {
+            if (isDe) resolvedCarrier = 'DHL_DE'
+            else if (isNl) resolvedCarrier = 'DHL_NL'
+            else if (isGb) resolvedCarrier = 'DHL_UK'
+            else if (isEs) resolvedCarrier = 'DHL_SP'
+            else resolvedCarrier = 'dhl'
+          } else if (isLimango || isShopApotheke) {
+            resolvedCarrier = 'dhl'
+          } else if (isDecathlon) {
+            if (isDe) resolvedCarrier = 'DHLDE'
+            else if (isNl) resolvedCarrier = 'DHL (NL)'
+            else if (isEs) resolvedCarrier = 'DHLESP'
+            else if (isBe) resolvedCarrier = 'DHLBE'
+            else if (isCh) resolvedCarrier = 'DHL-CH'
+            else if (isFr) resolvedCarrier = 'DHLFR'
+            else if (isPl) resolvedCarrier = 'DHL PL'
+            else if (isIt) resolvedCarrier = 'DHL ITA'
+            else if (isCz) resolvedCarrier = 'DHL-CZ'
+            else if (isHu) resolvedCarrier = 'DHLHU'
+            else if (isRo) resolvedCarrier = 'DHL RO'
+            else if (isGb) resolvedCarrier = 'dhlUK'
+            else resolvedCarrier = 'DHLDE'
+          } else {
+            resolvedCarrier = 'dhl'
+          }
+        } else if (carrier.toLowerCase() === 'hermes') {
+          if (isSecretSales) {
+            if (isDe) resolvedCarrier = 'hermes-de'
+            else if (isGb) resolvedCarrier = 'Hermes'
+            else resolvedCarrier = 'Hermes'
+          } else if (isLimango || isShopApotheke) {
+            resolvedCarrier = 'hermes'
+          } else if (isDecathlon) {
+            if (isGb) resolvedCarrier = 'HermesUK'
+            else resolvedCarrier = 'HermesGER'
+          } else {
+            resolvedCarrier = 'hermes'
+          }
+        } else if (carrier.toLowerCase() === 'dpd') {
+          if (isSecretSales) {
+            if (isDe) resolvedCarrier = 'dpdGermany'
+            else if (isGb) resolvedCarrier = 'DPD_UK'
+            else if (isNl) resolvedCarrier = 'dpd_nl'
+            else if (isBe) resolvedCarrier = 'dpd_be'
+            else resolvedCarrier = 'DPD'
+          } else if (isLimango || isShopApotheke) {
+            resolvedCarrier = 'dpd'
+          } else {
+            resolvedCarrier = 'dpd'
+          }
         }
       }
 
@@ -691,7 +820,7 @@ export class MiraklAdapter implements MarketplaceAdapter {
         trackingPayload.tracking_url = packageTrackingUrl
       }
 
-      console.log(`[MiraklAdapter:${this.marketplace}] Updating tracking info for order ${marketplaceOrderId} via PUT ${trackingUrl}...`)
+      console.log(`[MiraklAdapter:${this.marketplace}] Updating tracking info for order ${marketplaceOrderId} with carrier ${resolvedCarrier} via PUT ${trackingUrl}...`)
       
       const trackingRes = await fetch(trackingUrl, {
         method: 'PUT',
@@ -701,7 +830,15 @@ export class MiraklAdapter implements MarketplaceAdapter {
 
       if (!trackingRes.ok) {
         const trackingErrText = await trackingRes.text()
-        console.warn(`[MiraklAdapter:${this.marketplace}] Update Tracking failed (${trackingRes.status}): ${trackingErrText}`)
+        const isAlreadyShipped = 
+          trackingErrText.includes("Current status is 'SHIPPED'") ||
+          trackingErrText.toLowerCase().includes('already shipped')
+        if (isAlreadyShipped) {
+          console.warn(`[MiraklAdapter:${this.marketplace}] Order ${marketplaceOrderId} already marked as shipped on marketplace. Tracking updated/skipped.`)
+        } else {
+          console.error(`[MiraklAdapter:${this.marketplace}] Update Tracking failed (${trackingRes.status}): ${trackingErrText}`)
+          throw new Error(`Update Tracking failed (${trackingRes.status}): ${trackingErrText}`)
+        }
       } else {
         console.log(`[MiraklAdapter:${this.marketplace}] Tracking info successfully updated for order ${marketplaceOrderId}`)
       }
@@ -762,9 +899,13 @@ export class MiraklAdapter implements MarketplaceAdapter {
 
       if (!shipRes.ok) {
         const shipErrText = await shipRes.text()
-        // 404 means the order is already shipped or not found in SHIPPING state — treat as success
-        if (shipRes.status === 404) {
-          console.warn(`[MiraklAdapter:${this.marketplace}] Order ${marketplaceOrderId} not found for /ship (404) — likely already shipped or accepted by marketplace. Treating as success.`)
+        const isAlreadyShipped = 
+          shipRes.status === 404 ||
+          shipErrText.includes("Current status is 'SHIPPED'") ||
+          shipErrText.toLowerCase().includes('already shipped') ||
+          shipErrText.toLowerCase().includes('already_shipped')
+        if (isAlreadyShipped) {
+          console.warn(`[MiraklAdapter:${this.marketplace}] Order ${marketplaceOrderId} not found for /ship or already marked as shipped. Treating as success.`)
           return
         }
         console.error(`[MiraklAdapter:${this.marketplace}] Confirm Shipment failed (${shipRes.status}): ${shipErrText}`)

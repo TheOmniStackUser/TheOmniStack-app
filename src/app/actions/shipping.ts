@@ -233,7 +233,9 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
                 msg.toLowerCase().includes('position_item_included_in_other_shipment') ||
                 msg.toLowerCase().includes('already shipped') ||
                 msg.toLowerCase().includes('already fulfilled') ||
-                msg.toLowerCase().includes('is already fulfilled')
+                msg.toLowerCase().includes('is already fulfilled') ||
+                msg.toLowerCase().includes("current status is 'shipped'") ||
+                msg.toLowerCase().includes('current status is "shipped"')
 
               if (isAlreadyShipped) {
                 console.log(`[${order.marketplace}] Order was already marked as shipped on marketplace. Treating as confirmed.`)
@@ -281,7 +283,8 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
 
     let successCount = 0
     const generatedIds: string[] = []
-    const errors: string[] = []
+    const shippingErrors: string[] = []
+    const confirmErrors: string[] = []
 
     for (const res of results) {
       if (res.success) {
@@ -289,9 +292,11 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
         if (res.orderId) {
           generatedIds.push(res.orderId)
         }
-      }
-      if (res.error) {
-        errors.push(res.error)
+        if (res.error) {
+          confirmErrors.push(res.error)
+        }
+      } else if (res.error) {
+        shippingErrors.push(res.error)
       }
     }
 
@@ -299,15 +304,23 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
     revalidatePath('/orders')
     
     if (successCount === 0) {
-      const errorDetail = errors.length > 0 ? `\n\nDetails: ${errors[0]}` : ''
+      const errorDetail = shippingErrors.length > 0 ? `\n\nDetails: ${shippingErrors[0]}` : ''
       return { error: `Keine Labels konnten erstellt werden.${errorDetail}` }
     }
 
-    if (errors.length > 0) {
+    if (shippingErrors.length > 0 || confirmErrors.length > 0) {
+      const warningParts: string[] = [`Erfolgreich: ${successCount} Hermes-Etikett(en) erstellt.`]
+      if (shippingErrors.length > 0) {
+        warningParts.push(`Folgende Bestellungen konnten nicht versendet werden. Bitte die Lieferadresse prüfen:\n- ${shippingErrors.join('\n- ')}`)
+      }
+      if (confirmErrors.length > 0) {
+        warningParts.push(`Hinweis: Bei folgenden Bestellungen konnte die Versandbestätigung auf dem Marktplatz nicht automatisch abgeschlossen werden:\n- ${confirmErrors.join('\n- ')}`)
+      }
+
       return {
         success: true,
         message: `${successCount} Versandetiketten wurden über Hermes generiert!`,
-        warning: `Erfolgreich: ${successCount} Hermes-Etikett(en) erstellt.\n\nFolgende Bestellungen konnten nicht versendet werden. Bitte die Lieferadresse prüfen:\n- ${errors.join('\n- ')}`,
+        warning: warningParts.join('\n\n'),
         generatedIds
       }
     }
@@ -995,7 +1008,9 @@ export async function generateDhlLabelsAction(
                 msg.toLowerCase().includes('position_item_included_in_other_shipment') ||
                 msg.toLowerCase().includes('already shipped') ||
                 msg.toLowerCase().includes('already fulfilled') ||
-                msg.toLowerCase().includes('is already fulfilled')
+                msg.toLowerCase().includes('is already fulfilled') ||
+                msg.toLowerCase().includes("current status is 'shipped'") ||
+                msg.toLowerCase().includes('current status is "shipped"')
 
               if (isAlreadyShipped) {
                 console.log(`[${order.marketplace}] Order was already marked as shipped on marketplace. Treating as confirmed.`)
@@ -1045,7 +1060,8 @@ export async function generateDhlLabelsAction(
 
     let successCount = 0
     const generatedIds: string[] = []
-    const errors: string[] = []
+    const shippingErrors: string[] = []
+    const confirmErrors: string[] = []
     const allLabels: string[] = []
 
     for (const res of results) {
@@ -1057,9 +1073,11 @@ export async function generateDhlLabelsAction(
         if (res.labels && res.labels.length > 0) {
           allLabels.push(...res.labels)
         }
-      }
-      if (res.error) {
-        errors.push(res.error)
+        if (res.error) {
+          confirmErrors.push(res.error)
+        }
+      } else if (res.error) {
+        shippingErrors.push(res.error)
       }
     }
 
@@ -1068,15 +1086,23 @@ export async function generateDhlLabelsAction(
 
     if (successCount === 0) {
       // Return the actual API error to the user
-      const errorDetail = errors.length > 0 ? `\n\nDetails: ${errors[0]}` : ''
+      const errorDetail = shippingErrors.length > 0 ? `\n\nDetails: ${shippingErrors[0]}` : ''
       return { error: `Keine Labels konnten erstellt werden.${errorDetail}` }
     }
 
-    if (errors.length > 0) {
+    if (shippingErrors.length > 0 || confirmErrors.length > 0) {
+      const warningParts: string[] = [`Erfolgreich: ${successCount} DHL-Etikett(en) erstellt.`]
+      if (shippingErrors.length > 0) {
+        warningParts.push(`Folgende Bestellungen konnten nicht versendet werden. Bitte die Lieferadresse prüfen:\n- ${shippingErrors.join('\n- ')}`)
+      }
+      if (confirmErrors.length > 0) {
+        warningParts.push(`Hinweis: Bei folgenden Bestellungen konnte die Versandbestätigung auf dem Marktplatz nicht automatisch abgeschlossen werden:\n- ${confirmErrors.join('\n- ')}`)
+      }
+
       return {
         success: true,
         message: `${successCount} DHL-Versandetikett${successCount === 1 ? '' : 'en'} erstellt!`,
-        warning: `Erfolgreich: ${successCount} DHL-Etikett(en) erstellt.\n\nFolgende Bestellungen konnten nicht versendet werden. Bitte die Lieferadresse prüfen:\n- ${errors.join('\n- ')}`,
+        warning: warningParts.join('\n\n'),
         generatedIds,
         labels: allLabels,
       }
@@ -1384,7 +1410,9 @@ export async function generateSingleDhlReturnLabelAction(orderId: string) {
           msg.toLowerCase().includes('position_item_included_in_other_shipment') ||
           msg.toLowerCase().includes('already shipped') ||
           msg.toLowerCase().includes('already fulfilled') ||
-          msg.toLowerCase().includes('is already fulfilled')
+          msg.toLowerCase().includes('is already fulfilled') ||
+          msg.toLowerCase().includes("current status is 'shipped'") ||
+          msg.toLowerCase().includes('current status is "shipped"')
 
         if (isAlreadyShipped) {
           await db
@@ -1550,6 +1578,8 @@ export async function generateDpdLabelsAction(
           }
         }
 
+        let confirmError: string | undefined = undefined
+
         // Confirm shipment in marketplace
         if (!isReplacementLabel) {
           const adapter = adaptersMap.get(order.marketplace)
@@ -1588,7 +1618,9 @@ export async function generateDpdLabelsAction(
                 msg.toLowerCase().includes('position_item_included_in_other_shipment') ||
                 msg.toLowerCase().includes('already shipped') ||
                 msg.toLowerCase().includes('already fulfilled') ||
-                msg.toLowerCase().includes('is already fulfilled')
+                msg.toLowerCase().includes('is already fulfilled') ||
+                msg.toLowerCase().includes("current status is 'shipped'") ||
+                msg.toLowerCase().includes('current status is "shipped"')
 
               if (isAlreadyShipped) {
                 await db
@@ -1601,6 +1633,7 @@ export async function generateDpdLabelsAction(
                   })
                   .where(eq(orders.id, order.id))
               } else {
+                confirmError = `Bestätigung für ${order.marketplace} fehlgeschlagen (${order.marketplaceOrderId}): ${msg}`
                 await db
                   .update(orders)
                   .set({
@@ -1614,7 +1647,7 @@ export async function generateDpdLabelsAction(
           }
         }
 
-        return { success: true, orderId: order.id }
+        return { success: true, orderId: order.id, error: confirmError }
       } catch (err: any) {
         console.error(`[DPD-Action] Error creating label for order ${order.id}:`, err)
         return { success: false, orderId: order.id, error: err.message || 'DPD Labelerstellung fehlgeschlagen' }
@@ -1625,7 +1658,8 @@ export async function generateDpdLabelsAction(
 
     let successCount = 0
     const generatedIds: string[] = []
-    const errors: string[] = []
+    const shippingErrors: string[] = []
+    const confirmErrors: string[] = []
 
     for (const res of results) {
       if (res.success) {
@@ -1633,9 +1667,11 @@ export async function generateDpdLabelsAction(
         if (res.orderId) {
           generatedIds.push(res.orderId)
         }
-      }
-      if (res.error) {
-        errors.push(res.error)
+        if (res.error) {
+          confirmErrors.push(res.error)
+        }
+      } else if (res.error) {
+        shippingErrors.push(res.error)
       }
     }
 
@@ -1643,15 +1679,23 @@ export async function generateDpdLabelsAction(
     revalidatePath('/orders')
 
     if (successCount === 0) {
-      const errorDetail = errors.length > 0 ? `\n\nDetails: ${errors[0]}` : ''
+      const errorDetail = shippingErrors.length > 0 ? `\n\nDetails: ${shippingErrors[0]}` : ''
       return { error: `Keine DPD-Labels konnten erstellt werden.${errorDetail}` }
     }
 
-    if (errors.length > 0) {
+    if (shippingErrors.length > 0 || confirmErrors.length > 0) {
+      const warningParts: string[] = [`Erfolgreich: ${successCount} DPD-Etikett(en) erstellt.`]
+      if (shippingErrors.length > 0) {
+        warningParts.push(`Folgende Bestellungen konnten nicht versendet werden:\n- ${shippingErrors.join('\n- ')}`)
+      }
+      if (confirmErrors.length > 0) {
+        warningParts.push(`Hinweis: Bei folgenden Bestellungen konnte die Versandbestätigung auf dem Marktplatz nicht automatisch abgeschlossen werden:\n- ${confirmErrors.join('\n- ')}`)
+      }
+
       return {
         success: true,
         message: `${successCount} Versandetiketten wurden über DPD generiert!`,
-        warning: `Erfolgreich: ${successCount} DPD-Etikett(en) erstellt.\n\nFolgende Bestellungen konnten nicht versendet werden:\n- ${errors.join('\n- ')}`,
+        warning: warningParts.join('\n\n'),
         generatedIds,
       }
     }

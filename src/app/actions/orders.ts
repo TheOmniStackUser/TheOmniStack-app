@@ -595,7 +595,9 @@ export async function markOrderAsShippedManuallyAction(
           msg.toLowerCase().includes('position_item_included_in_other_shipment') ||
           msg.toLowerCase().includes('already shipped') ||
           msg.toLowerCase().includes('already fulfilled') ||
-          msg.toLowerCase().includes('is already fulfilled')
+          msg.toLowerCase().includes('is already fulfilled') ||
+          msg.toLowerCase().includes("current status is 'shipped'") ||
+          msg.toLowerCase().includes('current status is "shipped"')
 
         if (isAlreadyShipped) {
           console.log(`[Manual-Shipment-Action] Order ${order.marketplaceOrderId} was already marked as shipped on ${order.marketplace}. Treating as confirmed.`)
@@ -1382,7 +1384,9 @@ export async function retryMarketplaceConfirmationAction(orderId: string) {
       msg.toLowerCase().includes('position_item_included_in_other_shipment') ||
       msg.toLowerCase().includes('already shipped') ||
       msg.toLowerCase().includes('already fulfilled') ||
-      msg.toLowerCase().includes('is already fulfilled')
+      msg.toLowerCase().includes('is already fulfilled') ||
+      msg.toLowerCase().includes("current status is 'shipped'") ||
+      msg.toLowerCase().includes('current status is "shipped"')
 
     if (isAlreadyShipped) {
       console.log(`[Retry-Marketplace-Action] Order was already marked as shipped on marketplace. Treating as confirmed.`)
