@@ -459,6 +459,174 @@ export function getOpenApiSpec(baseUrl: string = 'https://theomnistack.de') {
           },
         },
       },
+      '/api/connector/grok/products/unmapped': {
+        get: {
+          summary: 'List Unmapped Marketplace Listings',
+          description: 'List listings from Otto, Amazon, Shopify, Mirakl, or eBay that are not yet mapped to a central product.',
+          operationId: 'listUnmappedListings',
+          parameters: [
+            { name: 'marketplace', in: 'query', schema: { type: 'string' } },
+            { name: 'query', in: 'query', schema: { type: 'string' } },
+            { name: 'isBlocked', in: 'query', schema: { type: 'boolean' } },
+            { name: 'limit', in: 'query', schema: { type: 'integer', default: 25 } },
+            { name: 'offset', in: 'query', schema: { type: 'integer', default: 0 } },
+          ],
+          responses: {
+            '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/StandardSuccessResponse' } } } },
+          },
+        },
+      },
+      '/api/connector/grok/products/unmapped/{id}': {
+        get: {
+          summary: 'Get Unmapped Listing Details',
+          description: 'Get raw payload, extracted EAN, and auto-mapping suggestions for an unmapped listing.',
+          operationId: 'getUnmappedListingDetails',
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+          responses: {
+            '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/StandardSuccessResponse' } } } },
+          },
+        },
+      },
+      '/api/connector/grok/products/unmapped/{id}/map': {
+        post: {
+          summary: 'Map Unmapped Listing to Product',
+          description: 'Connect an unmapped listing to an existing central OmniStack product by ID or SKU.',
+          operationId: 'mapUnmappedListing',
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['productId'],
+                  properties: {
+                    productId: { type: 'string', description: 'Central product UUID or SKU' },
+                    syncStock: { type: 'boolean', default: true },
+                    syncPrice: { type: 'boolean', default: false },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/StandardSuccessResponse' } } } },
+          },
+        },
+      },
+      '/api/connector/grok/products/unmapped/{id}/create-and-map': {
+        post: {
+          summary: 'Create Product and Map',
+          description: 'Create a central product directly from an unmapped listing and establish mapping.',
+          operationId: 'createAndMapProduct',
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+          requestBody: {
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    sku: { type: 'string' },
+                    title: { type: 'string' },
+                    price: { type: 'number' },
+                    currentStock: { type: 'number' },
+                    ean: { type: 'string' },
+                    brand: { type: 'string' },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/StandardSuccessResponse' } } } },
+          },
+        },
+      },
+      '/api/connector/grok/products/unmapped/auto-map': {
+        post: {
+          summary: 'Auto-Map Unmapped Listings',
+          description: 'Automatically match and map all unmapped listings matching central products by SKU or EAN.',
+          operationId: 'autoMapUnmappedListings',
+          requestBody: {
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    dryRun: { type: 'boolean', default: false },
+                    marketplace: { type: 'string' },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/StandardSuccessResponse' } } } },
+          },
+        },
+      },
+      '/api/connector/grok/products/mappings': {
+        get: {
+          summary: 'List Product Mappings',
+          description: 'List active marketplace product mappings connecting central products to sales channels.',
+          operationId: 'listProductMappings',
+          parameters: [
+            { name: 'productId', in: 'query', schema: { type: 'string' } },
+            { name: 'marketplace', in: 'query', schema: { type: 'string' } },
+            { name: 'query', in: 'query', schema: { type: 'string' } },
+            { name: 'limit', in: 'query', schema: { type: 'integer', default: 50 } },
+            { name: 'offset', in: 'query', schema: { type: 'integer', default: 0 } },
+          ],
+          responses: {
+            '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/StandardSuccessResponse' } } } },
+          },
+        },
+        post: {
+          summary: 'Set / Update Product Mapping',
+          description: 'Create or update a manual mapping linking a central product to a marketplace listing.',
+          operationId: 'setProductMapping',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['productId', 'marketplace', 'marketplaceSku'],
+                  properties: {
+                    productId: { type: 'string' },
+                    marketplace: { type: 'string' },
+                    marketplaceSku: { type: 'string' },
+                    marketplaceProductId: { type: 'string' },
+                    integrationId: { type: 'string' },
+                    ean: { type: 'string' },
+                    syncStock: { type: 'boolean', default: true },
+                    syncPrice: { type: 'boolean', default: false },
+                    priceModifierType: { type: 'string', enum: ['none', 'percentage', 'fixed'] },
+                    priceModifierValue: { type: 'number' },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/StandardSuccessResponse' } } } },
+          },
+        },
+      },
+      '/api/connector/grok/products/mappings/{id}': {
+        delete: {
+          summary: 'Delete Product Mapping',
+          description: 'Unlink a marketplace product mapping and optionally restore to unmapped listings.',
+          operationId: 'deleteProductMapping',
+          parameters: [
+            { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+            { name: 'restoreToUnmapped', in: 'query', schema: { type: 'boolean', default: true } },
+          ],
+          responses: {
+            '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/StandardSuccessResponse' } } } },
+          },
+        },
+      },
       '/api/connector/grok/returns': {
         get: {
           summary: 'List Returns',

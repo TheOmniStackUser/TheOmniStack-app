@@ -1,7 +1,7 @@
 import { db } from '@/db/client'
 import { orders, orderItems, orderStatusEnum } from '@/db/schema/orders'
 import { invoices, invoiceItems } from '@/db/schema/invoices'
-import { products, productMappings } from '@/db/schema/products'
+import { products, productMappings, unmappedMarketplaceProducts } from '@/db/schema/products'
 import { returnsLog, returnedItems } from '@/db/schema/returns'
 import { customers } from '@/db/schema/customers'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
@@ -10,6 +10,25 @@ import { eq, and, or, desc, sql, ilike, inArray, gte, lte, ne } from 'drizzle-or
 import { createInvoiceForOrder, getDefaultSettings, formatDocumentNumber } from '@/lib/invoice-service'
 import { executeRefund } from '@/lib/refund-service'
 import type { GrokAuthContext } from './auth'
+
+function getEanFromPayload(payload: any): string | null {
+  if (!payload || typeof payload !== 'object') return null
+  if (Array.isArray(payload.product_references)) {
+    const eanRef = payload.product_references.find(
+      (r: any) => r.reference_type === 'UC_EAN' || r.reference_type === 'EAN' || r.reference_type === 'UPC'
+    )
+    if (eanRef && eanRef.reference) return eanRef.reference
+  }
+  if (payload.barcode) return payload.barcode
+  if (payload.variants && Array.isArray(payload.variants) && payload.variants.length > 0 && payload.variants[0].barcode) {
+    return payload.variants[0].barcode
+  }
+  if (payload.ean) return payload.ean
+  if (payload.EAN) return payload.EAN
+  if (payload.gtin) return payload.gtin
+  if (payload.GTIN) return payload.GTIN
+  return null
+}
 
 export interface ToolDefinition {
   name: string
@@ -377,6 +396,136 @@ export const TOOLS_MANIFEST: ToolDefinition[] = [
           description: 'Optional list of specific product IDs. If empty, triggers global sync.',
         },
       },
+    },
+  },
+  {
+    name: 'list_unmapped_listings',
+    category: 'products',
+    description: 'List and search unmapped marketplace listings (Otto, Amazon, Shopify, Mirakl, eBay) that have not yet been linked to a central OmniStack product.',
+    parameters: {
+      type: 'object',
+      properties: {
+        marketplace: {
+          type: 'string',
+          description: 'Filter by sales channel (e.g. otto, amazon, shopify, mirakl_decathlon, ebay)',
+        },
+        query: {
+          type: 'string',
+          description: 'Search by title, marketplace SKU, or brand',
+        },
+        isBlocked: {
+          type: 'boolean',
+          description: 'Filter by blocked status (default: false)',
+        },
+        limit: { type: 'integer', description: 'Max items to return (default: 25, max: 100)' },
+        offset: { type: 'integer', description: 'Pagination offset (default: 0)' },
+      },
+    },
+  },
+  {
+    name: 'get_unmapped_listing_details',
+    category: 'products',
+    description: 'Get complete details of a specific unmapped marketplace listing by ID or SKU, including raw marketplace payload, extracted EAN, and auto-mapping suggestion if a matching central product exists.',
+    parameters: {
+      type: 'object',
+      properties: {
+        identifier: { type: 'string', description: 'Unmapped listing ID (UUID) or marketplace SKU' },
+      },
+      required: ['identifier'],
+    },
+  },
+  {
+    name: 'map_unmapped_listing',
+    category: 'products',
+    description: 'Map an unmapped marketplace listing to an existing central OmniStack product. Automatically moves the listing into product_mappings, connects inventory sync, and removes it from unmapped listings.',
+    parameters: {
+      type: 'object',
+      properties: {
+        unmappedId: { type: 'string', description: 'UUID of the unmapped listing' },
+        productId: { type: 'string', description: 'UUID or SKU of the target central OmniStack product' },
+        syncStock: { type: 'boolean', description: 'Enable stock synchronization (default: true)' },
+        syncPrice: { type: 'boolean', description: 'Enable price synchronization (default: false)' },
+      },
+      required: ['unmappedId', 'productId'],
+    },
+  },
+  {
+    name: 'create_and_map_product',
+    category: 'products',
+    description: 'Create a new central product directly from an unmapped marketplace listing and automatically establish the product mapping. Perfect when a marketplace item does not exist in OmniStack yet.',
+    parameters: {
+      type: 'object',
+      properties: {
+        unmappedId: { type: 'string', description: 'UUID of the unmapped marketplace listing' },
+        sku: { type: 'string', description: 'Optional custom central SKU (defaults to marketplace SKU)' },
+        title: { type: 'string', description: 'Optional custom title (defaults to listing title)' },
+        price: { type: 'number', description: 'Optional custom selling price in EUR (defaults to listing price)' },
+        currentStock: { type: 'number', description: 'Optional initial stock (defaults to listing stock)' },
+        ean: { type: 'string', description: 'Optional barcode / EAN (defaults to listing EAN)' },
+        brand: { type: 'string', description: 'Optional brand name' },
+      },
+      required: ['unmappedId'],
+    },
+  },
+  {
+    name: 'auto_map_unmapped_listings',
+    category: 'products',
+    description: 'Automatically search and map all unmapped listings where the marketplace SKU or EAN matches an existing central product in OmniStack.',
+    parameters: {
+      type: 'object',
+      properties: {
+        dryRun: { type: 'boolean', description: 'If true, only finds and returns matches without applying mappings (default: false)' },
+        marketplace: { type: 'string', description: 'Optional marketplace filter (e.g. otto, amazon, shopify, ebay)' },
+      },
+    },
+  },
+  {
+    name: 'list_product_mappings',
+    category: 'products',
+    description: 'List active marketplace product mappings connecting central OmniStack products to marketplace listings (Otto, Amazon, Shopify, Mirakl, eBay).',
+    parameters: {
+      type: 'object',
+      properties: {
+        productId: { type: 'string', description: 'Filter by central product UUID or SKU' },
+        marketplace: { type: 'string', description: 'Filter by marketplace channel' },
+        query: { type: 'string', description: 'Search query for marketplace SKU, central SKU, or EAN' },
+        limit: { type: 'integer', description: 'Default: 50, max: 100' },
+        offset: { type: 'integer', description: 'Default: 0' },
+      },
+    },
+  },
+  {
+    name: 'set_product_mapping',
+    category: 'products',
+    description: 'Create or update a manual mapping linking a central product to a marketplace listing (by integration ID or marketplace channel and marketplace SKU).',
+    parameters: {
+      type: 'object',
+      properties: {
+        productId: { type: 'string', description: 'Central product UUID or SKU' },
+        marketplace: { type: 'string', description: 'Marketplace channel (e.g. otto, amazon, shopify, mirakl_decathlon, ebay)' },
+        marketplaceSku: { type: 'string', description: 'SKU on the marketplace' },
+        marketplaceProductId: { type: 'string', description: 'Optional internal ID on marketplace (e.g. Shopify Item ID)' },
+        integrationId: { type: 'string', description: 'Optional UUID of the marketplace integration' },
+        ean: { type: 'string', description: 'Optional EAN/barcode for this mapping' },
+        syncStock: { type: 'boolean', description: 'Synchronize stock (default: true)' },
+        syncPrice: { type: 'boolean', description: 'Synchronize price (default: false)' },
+        priceModifierType: { type: 'string', enum: ['none', 'percentage', 'fixed'], description: 'Price modifier type (default: none)' },
+        priceModifierValue: { type: 'number', description: 'Price modifier value (e.g. 10 for 10% or 5.00 for EUR 5)' },
+      },
+      required: ['productId', 'marketplace', 'marketplaceSku'],
+    },
+  },
+  {
+    name: 'delete_product_mapping',
+    category: 'products',
+    description: 'Remove a marketplace product mapping. Unlinks the marketplace listing from the central product and restores it to unmapped listings for re-mapping.',
+    parameters: {
+      type: 'object',
+      properties: {
+        mappingId: { type: 'string', description: 'UUID of the product mapping to delete' },
+        restoreToUnmapped: { type: 'boolean', description: 'Restore to unmapped listings table (default: true)' },
+      },
+      required: ['mappingId'],
     },
   },
 
@@ -1435,6 +1584,794 @@ export async function executeTool(
             success: true,
             data: { message: 'Inventory sync request queued.', note: err?.message },
           }
+        }
+      }
+
+      // ── Unmapped Listings & Product Mappings ────────────────
+      case 'list_unmapped_listings': {
+        const companyId = ctx.companyId
+        const limit = Math.min(Math.max(params.limit || 25, 1), 100)
+        const offset = Math.max(params.offset || 0, 0)
+        const isBlocked = params.isBlocked !== undefined ? Boolean(params.isBlocked) : false
+
+        const conditions: any[] = [
+          eq(unmappedMarketplaceProducts.companyId, companyId),
+          eq(unmappedMarketplaceProducts.isBlocked, isBlocked),
+        ]
+
+        if (params.marketplace) {
+          conditions.push(eq(unmappedMarketplaceProducts.marketplace, params.marketplace as any))
+        }
+
+        if (params.query) {
+          const q = `%${params.query.trim()}%`
+          conditions.push(
+            or(
+              ilike(unmappedMarketplaceProducts.title, q),
+              ilike(unmappedMarketplaceProducts.marketplaceSku, q),
+              ilike(unmappedMarketplaceProducts.brand, q)
+            )
+          )
+        }
+
+        const items = await db
+          .select()
+          .from(unmappedMarketplaceProducts)
+          .where(and(...conditions))
+          .orderBy(desc(unmappedMarketplaceProducts.updatedAt))
+          .limit(limit)
+          .offset(offset)
+
+        const [totalCount] = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(unmappedMarketplaceProducts)
+          .where(and(...conditions))
+
+        const formatted = items.map((item) => ({
+          id: item.id,
+          marketplace: item.marketplace,
+          integrationId: item.integrationId,
+          marketplaceSku: item.marketplaceSku,
+          marketplaceProductId: item.marketplaceProductId,
+          title: item.title,
+          brand: item.brand,
+          price: item.price ? Number(item.price) : null,
+          stock: item.stock ? Number(item.stock) : null,
+          ean: getEanFromPayload(item.rawPayload),
+          isBlocked: item.isBlocked,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+        }))
+
+        return {
+          success: true,
+          data: {
+            unmappedListings: formatted,
+            pagination: {
+              total: totalCount?.count || 0,
+              limit,
+              offset,
+              hasMore: offset + items.length < (totalCount?.count || 0),
+            },
+          },
+        }
+      }
+
+      case 'get_unmapped_listing_details': {
+        const companyId = ctx.companyId
+        const ident = params.identifier?.trim()
+        if (!ident) return { success: false, error: 'Parameter identifier is required.' }
+
+        const [item] = await db
+          .select()
+          .from(unmappedMarketplaceProducts)
+          .where(
+            and(
+              eq(unmappedMarketplaceProducts.companyId, companyId),
+              or(
+                eq(unmappedMarketplaceProducts.id, ident),
+                eq(unmappedMarketplaceProducts.marketplaceSku, ident)
+              )
+            )
+          )
+          .limit(1)
+
+        if (!item) return { success: false, error: `Unmapped listing '${ident}' not found.` }
+
+        const extractedEan = getEanFromPayload(item.rawPayload)
+
+        // Find automatic suggestions in products
+        const matchConditions: any[] = [eq(products.sku, item.marketplaceSku)]
+        if (extractedEan) {
+          matchConditions.push(ilike(products.ean, `%${extractedEan}%`))
+        }
+
+        const [suggested] = await db
+          .select({
+            id: products.id,
+            sku: products.sku,
+            title: products.title,
+            ean: products.ean,
+            price: products.price,
+            currentStock: products.currentStock,
+          })
+          .from(products)
+          .where(and(eq(products.companyId, companyId), or(...matchConditions)))
+          .limit(1)
+
+        let matchReason: string | null = null
+        if (suggested) {
+          const skuMatch = suggested.sku.toLowerCase() === item.marketplaceSku.toLowerCase()
+          const eanMatch = extractedEan && suggested.ean?.includes(extractedEan)
+          if (skuMatch && eanMatch) matchReason = 'SKU & EAN'
+          else if (skuMatch) matchReason = 'SKU'
+          else if (eanMatch) matchReason = 'EAN'
+        }
+
+        return {
+          success: true,
+          data: {
+            listing: {
+              ...item,
+              extractedEan,
+            },
+            suggestedProduct: suggested
+              ? {
+                  ...suggested,
+                  matchReason,
+                }
+              : null,
+          },
+        }
+      }
+
+      case 'map_unmapped_listing': {
+        const companyId = ctx.companyId
+        const unmappedId = params.unmappedId?.trim()
+        const productId = params.productId?.trim()
+
+        if (!unmappedId || !productId) {
+          return { success: false, error: 'unmappedId and productId are required.' }
+        }
+
+        const [unmapped] = await db
+          .select()
+          .from(unmappedMarketplaceProducts)
+          .where(
+            and(
+              eq(unmappedMarketplaceProducts.companyId, companyId),
+              eq(unmappedMarketplaceProducts.id, unmappedId)
+            )
+          )
+          .limit(1)
+
+        if (!unmapped) return { success: false, error: `Unmapped listing '${unmappedId}' not found.` }
+
+        const [central] = await db
+          .select()
+          .from(products)
+          .where(
+            and(
+              eq(products.companyId, companyId),
+              or(eq(products.id, productId), eq(products.sku, productId))
+            )
+          )
+          .limit(1)
+
+        if (!central) return { success: false, error: `Central product '${productId}' not found.` }
+
+        const unmappedEan = getEanFromPayload(unmapped.rawPayload)
+
+        // Check for existing mapping
+        const [existingMapping] = await db
+          .select()
+          .from(productMappings)
+          .where(
+            and(
+              eq(productMappings.companyId, companyId),
+              eq(productMappings.marketplace, unmapped.marketplace),
+              eq(productMappings.marketplaceSku, unmapped.marketplaceSku)
+            )
+          )
+          .limit(1)
+
+        let targetMapping: any = null
+        if (existingMapping) {
+          const [updated] = await db
+            .update(productMappings)
+            .set({
+              productId: central.id,
+              integrationId: unmapped.integrationId || existingMapping.integrationId,
+              marketplaceProductId: unmapped.marketplaceProductId || existingMapping.marketplaceProductId,
+              ean: unmappedEan || existingMapping.ean,
+              syncStock: params.syncStock !== undefined ? Boolean(params.syncStock) : true,
+              syncPrice: params.syncPrice !== undefined ? Boolean(params.syncPrice) : false,
+              updatedAt: new Date(),
+            })
+            .where(eq(productMappings.id, existingMapping.id))
+            .returning()
+          targetMapping = updated
+        } else {
+          const [inserted] = await db
+            .insert(productMappings)
+            .values({
+              companyId,
+              productId: central.id,
+              marketplace: unmapped.marketplace,
+              integrationId: unmapped.integrationId,
+              marketplaceSku: unmapped.marketplaceSku,
+              marketplaceProductId: unmapped.marketplaceProductId,
+              syncStock: params.syncStock !== undefined ? Boolean(params.syncStock) : true,
+              syncPrice: params.syncPrice !== undefined ? Boolean(params.syncPrice) : false,
+              ean: unmappedEan || null,
+            })
+            .returning()
+          targetMapping = inserted
+        }
+
+        // Update central product EAN if new
+        if (unmappedEan) {
+          const existingEans = central.ean ? central.ean.split(',').map((s: string) => s.trim()) : []
+          if (!existingEans.includes(unmappedEan)) {
+            existingEans.push(unmappedEan)
+            await db
+              .update(products)
+              .set({ ean: existingEans.join(', '), updatedAt: new Date() })
+              .where(eq(products.id, central.id))
+          }
+        }
+
+        // Delete from unmapped listings
+        await db
+          .delete(unmappedMarketplaceProducts)
+          .where(eq(unmappedMarketplaceProducts.id, unmapped.id))
+
+        // Trigger stock push to marketplaces in background
+        if (central.currentStock !== null && central.currentStock !== undefined) {
+          import('@/workers/product-sync')
+            .then(({ pushUpdatesToMarketplaces }) => {
+              pushUpdatesToMarketplaces(companyId, [
+                { sku: central.sku, stock: parseInt(central.currentStock?.toString() || '0', 10) },
+              ]).catch(console.error)
+            })
+            .catch(console.error)
+        }
+
+        return {
+          success: true,
+          data: {
+            mapping: targetMapping,
+            centralProduct: {
+              id: central.id,
+              sku: central.sku,
+              title: central.title,
+            },
+            unmappedSku: unmapped.marketplaceSku,
+            marketplace: unmapped.marketplace,
+          },
+        }
+      }
+
+      case 'create_and_map_product': {
+        const companyId = ctx.companyId
+        const unmappedId = params.unmappedId?.trim()
+        if (!unmappedId) return { success: false, error: 'unmappedId is required.' }
+
+        const [unmapped] = await db
+          .select()
+          .from(unmappedMarketplaceProducts)
+          .where(
+            and(
+              eq(unmappedMarketplaceProducts.companyId, companyId),
+              eq(unmappedMarketplaceProducts.id, unmappedId)
+            )
+          )
+          .limit(1)
+
+        if (!unmapped) return { success: false, error: `Unmapped listing '${unmappedId}' not found.` }
+
+        const extractedEan = getEanFromPayload(unmapped.rawPayload)
+        const targetSku = (params.sku || unmapped.marketplaceSku).trim()
+        const targetTitle = (params.title || unmapped.title || targetSku).trim()
+        const targetPrice = params.price !== undefined ? Number(params.price).toFixed(2) : (unmapped.price ? Number(unmapped.price).toFixed(2) : '0.00')
+        const targetStock = params.currentStock !== undefined ? params.currentStock.toString() : (unmapped.stock ? unmapped.stock.toString() : '0')
+        const targetEan = params.ean?.trim() || extractedEan || null
+        const targetBrand = params.brand?.trim() || unmapped.brand || null
+
+        // Check if product with targetSku already exists
+        const [existing] = await db
+          .select()
+          .from(products)
+          .where(and(eq(products.companyId, companyId), eq(products.sku, targetSku)))
+          .limit(1)
+
+        let centralProduct = existing
+        if (!centralProduct) {
+          const [created] = await db
+            .insert(products)
+            .values({
+              companyId,
+              sku: targetSku,
+              title: targetTitle,
+              price: targetPrice,
+              currentStock: targetStock,
+              ean: targetEan,
+              brand: targetBrand,
+            })
+            .returning()
+          centralProduct = created
+        }
+
+        // Upsert mapping
+        const [existingMapping] = await db
+          .select()
+          .from(productMappings)
+          .where(
+            and(
+              eq(productMappings.companyId, companyId),
+              eq(productMappings.marketplace, unmapped.marketplace),
+              eq(productMappings.marketplaceSku, unmapped.marketplaceSku)
+            )
+          )
+          .limit(1)
+
+        let mapping: any = null
+        if (existingMapping) {
+          const [updated] = await db
+            .update(productMappings)
+            .set({
+              productId: centralProduct.id,
+              integrationId: unmapped.integrationId || existingMapping.integrationId,
+              marketplaceProductId: unmapped.marketplaceProductId || existingMapping.marketplaceProductId,
+              ean: targetEan || existingMapping.ean,
+              updatedAt: new Date(),
+            })
+            .where(eq(productMappings.id, existingMapping.id))
+            .returning()
+          mapping = updated
+        } else {
+          const [inserted] = await db
+            .insert(productMappings)
+            .values({
+              companyId,
+              productId: centralProduct.id,
+              marketplace: unmapped.marketplace,
+              integrationId: unmapped.integrationId,
+              marketplaceSku: unmapped.marketplaceSku,
+              marketplaceProductId: unmapped.marketplaceProductId,
+              syncStock: true,
+              syncPrice: false,
+              ean: targetEan,
+            })
+            .returning()
+          mapping = inserted
+        }
+
+        // Delete from unmapped
+        await db
+          .delete(unmappedMarketplaceProducts)
+          .where(eq(unmappedMarketplaceProducts.id, unmapped.id))
+
+        return {
+          success: true,
+          data: {
+            createdProduct: centralProduct,
+            mapping,
+          },
+        }
+      }
+
+      case 'auto_map_unmapped_listings': {
+        const companyId = ctx.companyId
+        const isDryRun = Boolean(params.dryRun)
+
+        const conditions: any[] = [
+          eq(unmappedMarketplaceProducts.companyId, companyId),
+          eq(unmappedMarketplaceProducts.isBlocked, false),
+        ]
+        if (params.marketplace) {
+          conditions.push(eq(unmappedMarketplaceProducts.marketplace, params.marketplace as any))
+        }
+
+        const unmappedList = await db
+          .select()
+          .from(unmappedMarketplaceProducts)
+          .where(and(...conditions))
+
+        if (unmappedList.length === 0) {
+          return {
+            success: true,
+            data: { matchesFound: 0, mappedCount: 0, dryRun: isDryRun, mappings: [] },
+          }
+        }
+
+        const unmappedWithKeys = unmappedList.map((p) => ({
+          ...p,
+          ean: getEanFromPayload(p.rawPayload),
+        }))
+
+        const eans = [...new Set(unmappedWithKeys.filter((p) => !!p.ean).map((p) => p.ean as string))]
+        const skus = [...new Set(unmappedWithKeys.map((p) => p.marketplaceSku))]
+
+        const matchOrConditions: any[] = []
+        if (eans.length > 0) matchOrConditions.push(or(...eans.map((e) => ilike(products.ean, `%${e}%`))))
+        if (skus.length > 0) matchOrConditions.push(inArray(products.sku, skus))
+
+        if (matchOrConditions.length === 0) {
+          return {
+            success: true,
+            data: { matchesFound: 0, mappedCount: 0, dryRun: isDryRun, mappings: [] },
+          }
+        }
+
+        const existingProducts = await db
+          .select({
+            id: products.id,
+            sku: products.sku,
+            title: products.title,
+            ean: products.ean,
+            currentStock: products.currentStock,
+          })
+          .from(products)
+          .where(and(eq(products.companyId, companyId), or(...matchOrConditions)))
+
+        const eanMap = new Map<string, typeof existingProducts[0]>()
+        const skuMap = new Map<string, typeof existingProducts[0]>()
+        for (const prod of existingProducts) {
+          if (prod.ean) {
+            for (const e of prod.ean.split(',').map((s) => s.trim())) {
+              if (!eanMap.has(e)) eanMap.set(e, prod)
+            }
+          }
+          if (prod.sku && !skuMap.has(prod.sku)) {
+            skuMap.set(prod.sku, prod)
+          }
+        }
+
+        const matchedList: Array<{
+          unmappedId: string
+          unmappedSku: string
+          unmappedTitle: string
+          unmappedMarketplace: string
+          ean: string | null
+          matchedProductId: string
+          matchedProductSku: string
+          matchedProductTitle: string
+          matchReason: string
+        }> = []
+
+        for (const u of unmappedWithKeys) {
+          const skuMatch = skuMap.get(u.marketplaceSku)
+          const eanMatch = u.ean ? eanMap.get(u.ean) : null
+          const match = skuMatch || eanMatch
+          if (match) {
+            const isSku = skuMatch && skuMatch.id === match.id
+            const isEan = eanMatch && eanMatch.id === match.id
+            const matchReason = isSku && isEan ? 'SKU & EAN' : isSku ? 'SKU' : 'EAN'
+            matchedList.push({
+              unmappedId: u.id,
+              unmappedSku: u.marketplaceSku,
+              unmappedTitle: u.title,
+              unmappedMarketplace: u.marketplace,
+              ean: u.ean,
+              matchedProductId: match.id,
+              matchedProductSku: match.sku,
+              matchedProductTitle: match.title,
+              matchReason,
+            })
+          }
+        }
+
+        if (isDryRun || matchedList.length === 0) {
+          return {
+            success: true,
+            data: {
+              matchesFound: matchedList.length,
+              mappedCount: 0,
+              dryRun: isDryRun,
+              mappings: matchedList,
+            },
+          }
+        }
+
+        // Apply mappings
+        const unmappedById = new Map(unmappedList.map((u) => [u.id, u]))
+        const mappingsToInsert: any[] = []
+        const unmappedIdsToDelete: string[] = []
+
+        for (const m of matchedList) {
+          const unmapped = unmappedById.get(m.unmappedId)
+          if (unmapped) {
+            mappingsToInsert.push({
+              companyId,
+              productId: m.matchedProductId,
+              marketplace: unmapped.marketplace as any,
+              integrationId: unmapped.integrationId,
+              marketplaceSku: unmapped.marketplaceSku,
+              marketplaceProductId: unmapped.marketplaceProductId,
+              syncStock: true,
+              syncPrice: false,
+              ean: m.ean || null,
+            })
+            unmappedIdsToDelete.push(unmapped.id)
+          }
+        }
+
+        let createdCount = 0
+        if (mappingsToInsert.length > 0) {
+          const inserted = await db
+            .insert(productMappings)
+            .values(mappingsToInsert)
+            .onConflictDoNothing()
+            .returning({ id: productMappings.id })
+          createdCount = inserted.length
+        }
+
+        if (unmappedIdsToDelete.length > 0) {
+          await db
+            .delete(unmappedMarketplaceProducts)
+            .where(
+              and(
+                eq(unmappedMarketplaceProducts.companyId, companyId),
+                inArray(unmappedMarketplaceProducts.id, unmappedIdsToDelete)
+              )
+            )
+        }
+
+        return {
+          success: true,
+          data: {
+            matchesFound: matchedList.length,
+            mappedCount: createdCount,
+            dryRun: false,
+            mappings: matchedList,
+          },
+        }
+      }
+
+      case 'list_product_mappings': {
+        const companyId = ctx.companyId
+        const limit = Math.min(Math.max(params.limit || 50, 1), 100)
+        const offset = Math.max(params.offset || 0, 0)
+
+        const conditions: any[] = [eq(productMappings.companyId, companyId)]
+
+        if (params.productId) {
+          const prodIdent = params.productId.trim()
+          conditions.push(
+            or(
+              eq(productMappings.productId, prodIdent),
+              eq(products.sku, prodIdent)
+            )
+          )
+        }
+
+        if (params.marketplace) {
+          conditions.push(eq(productMappings.marketplace, params.marketplace as any))
+        }
+
+        if (params.query) {
+          const q = `%${params.query.trim()}%`
+          conditions.push(
+            or(
+              ilike(productMappings.marketplaceSku, q),
+              ilike(products.sku, q),
+              ilike(products.title, q),
+              ilike(productMappings.ean, q)
+            )
+          )
+        }
+
+        const items = await db
+          .select({
+            id: productMappings.id,
+            productId: productMappings.productId,
+            marketplace: productMappings.marketplace,
+            integrationId: productMappings.integrationId,
+            marketplaceSku: productMappings.marketplaceSku,
+            marketplaceProductId: productMappings.marketplaceProductId,
+            ean: productMappings.ean,
+            syncStock: productMappings.syncStock,
+            syncPrice: productMappings.syncPrice,
+            priceModifierType: productMappings.priceModifierType,
+            priceModifierValue: productMappings.priceModifierValue,
+            createdAt: productMappings.createdAt,
+            updatedAt: productMappings.updatedAt,
+            product: {
+              sku: products.sku,
+              title: products.title,
+              currentStock: products.currentStock,
+              price: products.price,
+            },
+          })
+          .from(productMappings)
+          .innerJoin(products, eq(productMappings.productId, products.id))
+          .where(and(...conditions))
+          .orderBy(desc(productMappings.updatedAt))
+          .limit(limit)
+          .offset(offset)
+
+        const [totalCount] = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(productMappings)
+          .innerJoin(products, eq(productMappings.productId, products.id))
+          .where(and(...conditions))
+
+        return {
+          success: true,
+          data: {
+            mappings: items,
+            pagination: {
+              total: totalCount?.count || 0,
+              limit,
+              offset,
+              hasMore: offset + items.length < (totalCount?.count || 0),
+            },
+          },
+        }
+      }
+
+      case 'set_product_mapping': {
+        const companyId = ctx.companyId
+        const prodIdent = params.productId?.trim()
+        const marketplace = params.marketplace?.trim()
+        const marketplaceSku = params.marketplaceSku?.trim()
+
+        if (!prodIdent || !marketplace || !marketplaceSku) {
+          return { success: false, error: 'productId, marketplace, and marketplaceSku are required.' }
+        }
+
+        const [central] = await db
+          .select()
+          .from(products)
+          .where(
+            and(
+              eq(products.companyId, companyId),
+              or(eq(products.id, prodIdent), eq(products.sku, prodIdent))
+            )
+          )
+          .limit(1)
+
+        if (!central) return { success: false, error: `Central product '${prodIdent}' not found.` }
+
+        // Find integrationId if not passed
+        let integrationId = params.integrationId
+        if (!integrationId) {
+          const [intg] = await db
+            .select({ id: marketplaceIntegrations.id })
+            .from(marketplaceIntegrations)
+            .where(
+              and(
+                eq(marketplaceIntegrations.companyId, companyId),
+                eq(marketplaceIntegrations.type, marketplace as any),
+                eq(marketplaceIntegrations.isActive, true)
+              )
+            )
+            .limit(1)
+          if (intg) integrationId = intg.id
+        }
+
+        const targetEan = params.ean?.trim() || central.ean?.split(',')[0]?.trim() || null
+
+        // Check for existing mapping
+        const [existing] = await db
+          .select()
+          .from(productMappings)
+          .where(
+            and(
+              eq(productMappings.companyId, companyId),
+              eq(productMappings.marketplace, marketplace as any),
+              eq(productMappings.marketplaceSku, marketplaceSku)
+            )
+          )
+          .limit(1)
+
+        let mapping: any = null
+        if (existing) {
+          const [updated] = await db
+            .update(productMappings)
+            .set({
+              productId: central.id,
+              integrationId: integrationId || existing.integrationId,
+              marketplaceProductId: params.marketplaceProductId || existing.marketplaceProductId,
+              ean: targetEan || existing.ean,
+              syncStock: params.syncStock !== undefined ? Boolean(params.syncStock) : true,
+              syncPrice: params.syncPrice !== undefined ? Boolean(params.syncPrice) : false,
+              priceModifierType: (params.priceModifierType as any) || existing.priceModifierType,
+              priceModifierValue: params.priceModifierValue !== undefined ? Number(params.priceModifierValue).toFixed(4) : existing.priceModifierValue,
+              updatedAt: new Date(),
+            })
+            .where(eq(productMappings.id, existing.id))
+            .returning()
+          mapping = updated
+        } else {
+          const [inserted] = await db
+            .insert(productMappings)
+            .values({
+              companyId,
+              productId: central.id,
+              marketplace: marketplace as any,
+              integrationId: integrationId || null,
+              marketplaceSku,
+              marketplaceProductId: params.marketplaceProductId || null,
+              ean: targetEan,
+              syncStock: params.syncStock !== undefined ? Boolean(params.syncStock) : true,
+              syncPrice: params.syncPrice !== undefined ? Boolean(params.syncPrice) : false,
+              priceModifierType: (params.priceModifierType as any) || 'none',
+              priceModifierValue: params.priceModifierValue !== undefined ? Number(params.priceModifierValue).toFixed(4) : '0',
+            })
+            .returning()
+          mapping = inserted
+        }
+
+        // Remove from unmapped if it existed
+        await db
+          .delete(unmappedMarketplaceProducts)
+          .where(
+            and(
+              eq(unmappedMarketplaceProducts.companyId, companyId),
+              eq(unmappedMarketplaceProducts.marketplaceSku, marketplaceSku)
+            )
+          )
+
+        return {
+          success: true,
+          data: {
+            mapping,
+            product: { id: central.id, sku: central.sku, title: central.title },
+          },
+        }
+      }
+
+      case 'delete_product_mapping': {
+        const companyId = ctx.companyId
+        const mappingId = params.mappingId?.trim()
+        if (!mappingId) return { success: false, error: 'mappingId is required.' }
+
+        const [mapping] = await db
+          .select()
+          .from(productMappings)
+          .where(and(eq(productMappings.companyId, companyId), eq(productMappings.id, mappingId)))
+          .limit(1)
+
+        if (!mapping) return { success: false, error: `Product mapping '${mappingId}' not found.` }
+
+        const restoreToUnmapped = params.restoreToUnmapped !== undefined ? Boolean(params.restoreToUnmapped) : true
+
+        if (restoreToUnmapped) {
+          await db
+            .insert(unmappedMarketplaceProducts)
+            .values({
+              companyId,
+              marketplace: mapping.marketplace,
+              integrationId: mapping.integrationId,
+              marketplaceSku: mapping.marketplaceSku,
+              marketplaceProductId: mapping.marketplaceProductId,
+              title: mapping.marketplaceSku,
+              updatedAt: new Date(),
+            })
+            .onConflictDoUpdate({
+              target: [
+                unmappedMarketplaceProducts.companyId,
+                unmappedMarketplaceProducts.integrationId,
+                unmappedMarketplaceProducts.marketplaceSku,
+              ],
+              set: { updatedAt: new Date() },
+            })
+        }
+
+        await db
+          .delete(productMappings)
+          .where(eq(productMappings.id, mapping.id))
+
+        return {
+          success: true,
+          data: {
+            deletedMappingId: mapping.id,
+            marketplaceSku: mapping.marketplaceSku,
+            marketplace: mapping.marketplace,
+            restoredToUnmapped: restoreToUnmapped,
+          },
         }
       }
 
