@@ -18,6 +18,8 @@ export async function GET(req: Request) {
   if (searchParams.has('toDate')) params.toDate = searchParams.get('toDate')
   if (searchParams.has('limit')) params.limit = parseInt(searchParams.get('limit') || '25', 10)
   if (searchParams.has('offset')) params.offset = parseInt(searchParams.get('offset') || '0', 10)
+  if (searchParams.has('archived')) params.archived = searchParams.get('archived') === 'true'
+  if (searchParams.has('isArchived')) params.isArchived = searchParams.get('isArchived') === 'true'
 
   const result = await executeTool('list_orders', params, authResult.auth)
   return NextResponse.json(result, { status: result.success ? 200 : 400 })

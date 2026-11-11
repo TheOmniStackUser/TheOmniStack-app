@@ -1,4 +1,5 @@
 import { requireAuth } from '@/lib/session'
+import { extractApiKey, authenticateGrokRequest } from '@/lib/grok-connector/auth'
 
 export const dynamic = 'force-dynamic'
 import { db } from '@/db/client'
@@ -20,11 +21,21 @@ async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const auth = await requireAuth()
     const { id } = await context.params
 
+    let companyId: string
+    const apiKey = extractApiKey(request)
+    if (apiKey) {
+      const authResult = await authenticateGrokRequest(request)
+      if (!authResult.success) return authResult.response
+      companyId = authResult.auth.companyId
+    } else {
+      const auth = await requireAuth()
+      companyId = auth.activeCompanyId
+    }
+
     // 1. Check cache first (Measure 4: PDF Caching)
-    const cacheKey = buildDeliveryNoteKey(auth.activeCompanyId, id)
+    const cacheKey = buildDeliveryNoteKey(companyId, id)
     try {
       const cached = await documentExists(cacheKey)
       if (cached) {
@@ -45,7 +56,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const [order] = await db
       .select()
       .from(orders)
-      .where(and(eq(orders.id, id), eq(orders.companyId, auth.activeCompanyId)))
+      .where(and(eq(orders.id, id), eq(orders.companyId, companyId)))
       .limit(1)
 
     if (!order) {
@@ -64,7 +75,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const [company] = await db
       .select()
       .from(companies)
-      .where(eq(companies.id, auth.activeCompanyId))
+      .where(eq(companies.id, companyId))
       .limit(1)
 
     if (!company) {
@@ -80,7 +91,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
         .select()
         .from(marketplaceIntegrations)
         .where(and(
-          eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
+          eq(marketplaceIntegrations.companyId, companyId),
           eq(marketplaceIntegrations.isActive, true)
         ))
 
@@ -160,7 +171,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
         const allOrdersForEmail = await db
           .select({ customerNumber: orders.customerNumber })
           .from(orders)
-          .where(and(eq(orders.companyId, auth.activeCompanyId), eq(orders.buyerEmail, order.buyerEmail)))
+          .where(and(eq(orders.companyId, companyId), eq(orders.buyerEmail, order.buyerEmail)))
         
         const withNum = allOrdersForEmail.find(o => o.customerNumber !== null)
         if (withNum) existingCustomerNumber = withNum.customerNumber

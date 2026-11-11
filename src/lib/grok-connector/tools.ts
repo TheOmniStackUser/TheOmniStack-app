@@ -10,6 +10,11 @@ import { eq, and, or, desc, sql, ilike, inArray, gte, lte, ne } from 'drizzle-or
 import { createInvoiceForOrder, getDefaultSettings, formatDocumentNumber } from '@/lib/invoice-service'
 import { executeRefund } from '@/lib/refund-service'
 import type { GrokAuthContext } from './auth'
+import {
+  getOrGenerateDeliveryNotePdf,
+  getMergedDeliveryNotesPdf,
+  getMergedShippingLabelsPdf,
+} from './delivery-notes'
 
 function getEanFromPayload(payload: any): string | null {
   if (!payload || typeof payload !== 'object') return null
@@ -99,6 +104,14 @@ export const TOOLS_MANIFEST: ToolDefinition[] = [
           type: 'integer',
           description: 'Offset for pagination (default: 0)',
         },
+        archived: {
+          type: 'boolean',
+          description: 'Filter by archived status (e.g. false to retrieve only active open orders)',
+        },
+        isArchived: {
+          type: 'boolean',
+          description: 'Alias for archived filter (e.g. false for open orders)',
+        },
       },
     },
   },
@@ -182,13 +195,57 @@ export const TOOLS_MANIFEST: ToolDefinition[] = [
   {
     name: 'generate_order_delivery_note',
     category: 'orders',
-    description: 'Assign a sequential delivery note number to the order and retrieve the delivery note document URL.',
+    description: 'Assign or reuse a delivery note number and generate/retrieve the delivery note PDF (returns pdfBase64, pdfUrl, and downloadUrl). Reuses existing delivery note numbers idempotently.',
     parameters: {
       type: 'object',
       properties: {
         orderId: { type: 'string', description: 'Internal order ID (UUID)' },
       },
       required: ['orderId'],
+    },
+  },
+  {
+    name: 'get_delivery_note_pdf',
+    category: 'orders',
+    description: 'Retrieve the delivery note PDF for an order as base64 and data URL, plus direct PDF download link.',
+    parameters: {
+      type: 'object',
+      properties: {
+        orderId: { type: 'string', description: 'Internal order ID (UUID)' },
+      },
+      required: ['orderId'],
+    },
+  },
+  {
+    name: 'generate_bulk_delivery_notes',
+    category: 'orders',
+    description: 'Generate or retrieve merged delivery notes for multiple orders in one single combined PDF document (Lieferscheine_Sammel_Batch).',
+    parameters: {
+      type: 'object',
+      properties: {
+        orderIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of order IDs to include in the merged delivery note batch PDF',
+        },
+      },
+      required: ['orderIds'],
+    },
+  },
+  {
+    name: 'generate_bulk_shipping_labels',
+    category: 'shipping',
+    description: 'Merge existing shipping labels (outbound and return) for multiple orders into a single batch PDF (Versandlabels_Sammel).',
+    parameters: {
+      type: 'object',
+      properties: {
+        orderIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of order IDs whose shipping labels to merge',
+        },
+      },
+      required: ['orderIds'],
     },
   },
   {
@@ -697,12 +754,13 @@ export const TOOLS_MANIFEST: ToolDefinition[] = [
   {
     name: 'generate_shipping_label',
     category: 'shipping',
-    description: 'Generate a carrier shipping label (DHL, Hermes, or DPD) for an order, record the tracking code, and mark the order ready for transit.',
+    description: 'Generate a carrier shipping label (Hermes, DHL, or DPD) for an order, record the tracking code, and mark the order ready for transit. Idempotent: If the order already has a tracking number or label URL, returns the existing label immediately to prevent duplicate carrier charges.',
     parameters: {
       type: 'object',
       properties: {
         orderId: { type: 'string', description: 'Order ID (UUID)' },
-        carrier: { type: 'string', enum: ['dhl', 'hermes', 'dpd'], description: 'Shipping carrier' },
+        carrier: { type: 'string', enum: ['dhl', 'hermes', 'dpd'], description: 'Shipping carrier (default: hermes)' },
+        parcelClass: { type: 'string', description: 'Parcel class for Hermes (XS, S, M, L, XL), default: S' },
         weightKg: { type: 'number', description: 'Total parcel weight in kg' },
       },
       required: ['orderId'],
@@ -840,6 +898,17 @@ export async function executeTool(
           )
         }
 
+        const archivedFilter =
+          typeof params.archived === 'boolean'
+            ? params.archived
+            : typeof params.isArchived === 'boolean'
+            ? params.isArchived
+            : undefined
+
+        if (archivedFilter !== undefined) {
+          conditions.push(eq(orders.isArchived, archivedFilter))
+        }
+
         const orderRecords = await db
           .select({
             id: orders.id,
@@ -847,6 +916,8 @@ export async function executeTool(
             marketplaceOrderId: orders.marketplaceOrderId,
             status: orders.status,
             shippingStatus: orders.shippingStatus,
+            isArchived: orders.isArchived,
+            deliveryNoteNumber: orders.deliveryNoteNumber,
             buyerName: orders.buyerName,
             buyerEmail: orders.buyerEmail,
             shippingName: orders.shippingName,
@@ -855,6 +926,7 @@ export async function executeTool(
             currency: orders.currency,
             totalAmount: orders.totalAmount,
             trackingNumber: orders.trackingNumber,
+            labelUrl: orders.labelUrl,
             invoiceId: orders.invoiceId,
             createdAt: orders.createdAt,
           })
@@ -1025,49 +1097,99 @@ export async function executeTool(
 
       case 'generate_order_delivery_note': {
         const companyId = ctx.companyId
-        const [order] = await db
-          .select()
-          .from(orders)
-          .where(and(eq(orders.companyId, companyId), eq(orders.id, params.orderId)))
-          .limit(1)
+        const orderId = params.orderId
 
-        if (!order) {
-          return { success: false, error: `Order '${params.orderId}' not found.` }
-        }
-
-        let deliveryNoteNum = order.deliveryNoteNumber
-        if (!deliveryNoteNum) {
-          const [company] = await db.select().from(companies).where(eq(companies.id, companyId)).limit(1)
-          const settings = company?.documentNumberSettings?.deliveryNote || getDefaultSettings('deliveryNote', company || {})
-          const nextVal = parseInt(settings.next || '1', 10)
-          deliveryNoteNum = formatDocumentNumber(settings.format || '%jahr%%nummer%', nextVal, settings.padding || 5)
-
-          // Increment sequence
-          await db
-            .update(companies)
-            .set({
-              documentNumberSettings: {
-                ...company?.documentNumberSettings,
-                deliveryNote: {
-                  ...settings,
-                  next: (nextVal + 1).toString(),
-                },
-              },
-            })
-            .where(eq(companies.id, companyId))
-
-          await db
-            .update(orders)
-            .set({ deliveryNoteNumber: deliveryNoteNum, updatedAt: new Date() })
-            .where(eq(orders.id, order.id))
-        }
+        const { pdfBuffer, deliveryNoteNumber } = await getOrGenerateDeliveryNotePdf(orderId, companyId)
+        const pdfBase64 = pdfBuffer.toString('base64')
+        const pdfUrl = `data:application/pdf;base64,${pdfBase64}`
 
         return {
           success: true,
           data: {
-            orderId: order.id,
-            deliveryNoteNumber: deliveryNoteNum,
-            downloadUrl: `/api/orders/${order.id}/delivery-note`,
+            orderId,
+            deliveryNoteNumber,
+            downloadUrl: `/api/orders/${orderId}/delivery-note`,
+            pdfBase64,
+            pdfUrl,
+          },
+        }
+      }
+
+      case 'get_delivery_note_pdf': {
+        const companyId = ctx.companyId
+        const orderId = params.orderId
+
+        const { pdfBuffer, deliveryNoteNumber, filename } = await getOrGenerateDeliveryNotePdf(orderId, companyId)
+        const pdfBase64 = pdfBuffer.toString('base64')
+        const pdfUrl = `data:application/pdf;base64,${pdfBase64}`
+
+        return {
+          success: true,
+          data: {
+            orderId,
+            deliveryNoteNumber,
+            filename,
+            downloadUrl: `/api/connector/grok/orders/${orderId}/delivery-note/pdf`,
+            pdfBase64,
+            pdfUrl,
+          },
+        }
+      }
+
+      case 'generate_bulk_delivery_notes': {
+        const companyId = ctx.companyId
+        const orderIds: string[] = Array.isArray(params.orderIds)
+          ? params.orderIds
+          : typeof params.ids === 'string'
+          ? params.ids.split(',').map((s: string) => s.trim()).filter(Boolean)
+          : []
+
+        if (orderIds.length === 0) {
+          return { success: false, error: 'orderIds array cannot be empty.' }
+        }
+
+        const result = await getMergedDeliveryNotesPdf(orderIds, companyId)
+        const pdfBase64 = result.pdfBuffer.toString('base64')
+        const downloadUrl = `/api/connector/grok/orders/delivery-notes/batch?ids=${encodeURIComponent(orderIds.join(','))}&format=pdf`
+
+        return {
+          success: true,
+          data: {
+            filename: result.filename,
+            processedCount: result.processedCount,
+            totalCount: result.totalCount,
+            downloadUrl,
+            pdfBase64,
+            pdfUrl: `data:application/pdf;base64,${pdfBase64}`,
+          },
+        }
+      }
+
+      case 'generate_bulk_shipping_labels': {
+        const companyId = ctx.companyId
+        const orderIds: string[] = Array.isArray(params.orderIds)
+          ? params.orderIds
+          : typeof params.ids === 'string'
+          ? params.ids.split(',').map((s: string) => s.trim()).filter(Boolean)
+          : []
+
+        if (orderIds.length === 0) {
+          return { success: false, error: 'orderIds array cannot be empty.' }
+        }
+
+        const result = await getMergedShippingLabelsPdf(orderIds, companyId)
+        const pdfBase64 = result.pdfBuffer.toString('base64')
+        const downloadUrl = `/api/connector/grok/orders/shipping-labels/batch?ids=${encodeURIComponent(orderIds.join(','))}&format=pdf`
+
+        return {
+          success: true,
+          data: {
+            filename: result.filename,
+            processedCount: result.processedCount,
+            totalCount: result.totalCount,
+            downloadUrl,
+            pdfBase64,
+            pdfUrl: `data:application/pdf;base64,${pdfBase64}`,
           },
         }
       }
@@ -2706,8 +2828,73 @@ export async function executeTool(
 
         if (!order) return { success: false, error: `Order '${params.orderId}' not found.` }
 
-        // Generate synthetic tracking if testing, or update order
-        const trackingNum = order.trackingNumber || `TRACK-${Date.now().toString().slice(-8)}`
+        // SAFETY / IDEMPOTENCY: Check if the order already has trackingNumber or labelUrl
+        if (order.trackingNumber || order.labelUrl) {
+          return {
+            success: true,
+            data: {
+              orderId: order.id,
+              trackingNumber: order.trackingNumber,
+              labelUrl: order.labelUrl,
+              carrier: params.carrier || 'hermes',
+              status: order.status,
+              isExisting: true,
+              message: 'Shipping label already exists for this order. Reusing existing label to prevent duplicate carrier charges.',
+            },
+          }
+        }
+
+        const requestedCarrier = (params.carrier || 'hermes').toLowerCase()
+
+        if (requestedCarrier === 'hermes') {
+          try {
+            const { HermesAdapter } = await import('@/adapters/shipping/hermes')
+            const hermes = await HermesAdapter.initialize(companyId)
+            const [company] = await db.select().from(companies).where(eq(companies.id, companyId)).limit(1)
+            if (!company || !company.street || !company.zip || !company.city) {
+              return { success: false, error: 'Company address is missing in settings. Please configure billing/shipping address first.' }
+            }
+
+            const parcelClass = params.parcelClass || 'S'
+            const { labelUrl, returnLabelUrl, trackingNumber, returnTrackingNumber } = await hermes.generateLabelForOrder(order, company, parcelClass)
+
+            await db
+              .update(orders)
+              .set({
+                status: 'shipped',
+                shippingStatus: 'in_transit',
+                trackingNumber,
+                labelUrl,
+                returnTrackingNumber,
+                returnLabelUrl: returnLabelUrl ?? null,
+                marketplaceConfirmationStatus: order.marketplace === 'manual' ? 'not_applicable' : 'pending',
+                totalWeight: params.weightKg ? Number(params.weightKg).toFixed(3) : order.totalWeight,
+                updatedAt: new Date(),
+              })
+              .where(eq(orders.id, order.id))
+
+            return {
+              success: true,
+              data: {
+                orderId: order.id,
+                trackingNumber,
+                labelUrl,
+                carrier: 'hermes',
+                status: 'shipped',
+                isExisting: false,
+              },
+            }
+          } catch (hermesErr: any) {
+            console.error('[generate_shipping_label] Hermes label generation error:', hermesErr)
+            return {
+              success: false,
+              error: `Hermes label generation failed: ${hermesErr.message}`,
+            }
+          }
+        }
+
+        // Fallback for non-Hermes carrier (or test tracking)
+        const trackingNum = `TRACK-${Date.now().toString().slice(-8)}`
         const [updated] = await db
           .update(orders)
           .set({
@@ -2732,6 +2919,7 @@ export async function executeTool(
             trackingNumber: updated.trackingNumber,
             carrier: params.carrier || 'dhl',
             status: updated.status,
+            isExisting: false,
           },
         }
       }

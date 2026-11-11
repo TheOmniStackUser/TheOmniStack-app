@@ -1,4 +1,5 @@
 import { requireAuth } from '@/lib/session'
+import { extractApiKey, authenticateGrokRequest } from '@/lib/grok-connector/auth'
 
 export const dynamic = 'force-dynamic'
 import { db } from '@/db/client'
@@ -21,7 +22,17 @@ async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
 
 export async function GET(request: Request) {
   try {
-    const auth = await requireAuth()
+    let companyId: string
+    const apiKey = extractApiKey(request)
+    if (apiKey) {
+      const authResult = await authenticateGrokRequest(request)
+      if (!authResult.success) return authResult.response
+      companyId = authResult.auth.companyId
+    } else {
+      const auth = await requireAuth()
+      companyId = auth.activeCompanyId
+    }
+
     const { searchParams } = new URL(request.url)
     const idsString = searchParams.get('ids')
     
@@ -38,7 +49,7 @@ export async function GET(request: Request) {
     const [company] = await db
       .select()
       .from(companies)
-      .where(eq(companies.id, auth.activeCompanyId))
+      .where(eq(companies.id, companyId))
       .limit(1)
 
     if (!company) {
@@ -51,7 +62,7 @@ export async function GET(request: Request) {
       .from(orders)
       .where(and(
         inArray(orders.id, ids),
-        eq(orders.companyId, auth.activeCompanyId)
+        eq(orders.companyId, companyId)
       ))
 
     // Sort ordersData to match the requested ids order
@@ -86,7 +97,7 @@ export async function GET(request: Request) {
         .select()
         .from(marketplaceIntegrations)
         .where(and(
-          eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
+          eq(marketplaceIntegrations.companyId, companyId),
           eq(marketplaceIntegrations.isActive, true)
         ))
 
@@ -160,7 +171,7 @@ export async function GET(request: Request) {
     // 6. Render/Fetch/Cache PDFs (Measure 4: PDF Caching)
     const pdfBuffers: Buffer[] = []
     for (const order of ordersWithItems) {
-      const cacheKey = buildDeliveryNoteKey(auth.activeCompanyId, order.id)
+      const cacheKey = buildDeliveryNoteKey(companyId, order.id)
 
       try {
         const cached = await documentExists(cacheKey)

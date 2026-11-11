@@ -147,6 +147,8 @@ export function getOpenApiSpec(baseUrl: string = 'https://theomnistack.de') {
             { name: 'query', in: 'query', schema: { type: 'string' } },
             { name: 'limit', in: 'query', schema: { type: 'integer', default: 25 } },
             { name: 'offset', in: 'query', schema: { type: 'integer', default: 0 } },
+            { name: 'archived', in: 'query', schema: { type: 'boolean' }, description: 'Filter by archived status (e.g. false for open orders)' },
+            { name: 'isArchived', in: 'query', schema: { type: 'boolean' }, description: 'Alias for archived (e.g. false for open orders)' },
           ],
           responses: {
             '200': {
@@ -220,9 +222,18 @@ export function getOpenApiSpec(baseUrl: string = 'https://theomnistack.de') {
         },
       },
       '/api/connector/grok/orders/{id}/delivery-note': {
+        get: {
+          summary: 'Get Delivery Note Info & Base64',
+          description: 'Retrieve delivery note metadata, base64 payload, and download URL for an order.',
+          operationId: 'getDeliveryNote',
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+          responses: {
+            '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/StandardSuccessResponse' } } } },
+          },
+        },
         post: {
           summary: 'Generate Delivery Note',
-          description: 'Creates a delivery note number and retrieves download path for the order delivery slip.',
+          description: 'Creates or reuses a delivery note number and retrieves download path, base64 PDF, and data URL. Reuses existing delivery note numbers idempotently.',
           operationId: 'generateDeliveryNote',
           parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
           responses: {
@@ -230,10 +241,72 @@ export function getOpenApiSpec(baseUrl: string = 'https://theomnistack.de') {
           },
         },
       },
+      '/api/connector/grok/orders/{id}/delivery-note/pdf': {
+        get: {
+          summary: 'Download Delivery Note PDF',
+          description: 'Stream the official GoBD delivery note as raw application/pdf using the Bearer API key.',
+          operationId: 'downloadDeliveryNotePdf',
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+          responses: {
+            '200': {
+              description: 'Binary PDF file',
+              content: { 'application/pdf': { schema: { type: 'string', format: 'binary' } } },
+            },
+            '401': { description: 'Unauthorized' },
+            '404': { description: 'Order not found' },
+          },
+        },
+      },
+      '/api/connector/grok/orders/delivery-notes/batch': {
+        post: {
+          summary: 'Batch Merged Delivery Notes PDF',
+          description: 'Generate or merge delivery notes for multiple orders into a single combined batch PDF (Lieferscheine_Sammel_Batch). Accepts orderIds array or query param ?ids=id1,id2. If format=pdf or Accept: application/pdf is specified, streams the binary PDF file directly.',
+          operationId: 'generateBatchDeliveryNotes',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['orderIds'],
+                  properties: {
+                    orderIds: { type: 'array', items: { type: 'string' } },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            '200': {
+              content: {
+                'application/json': { schema: { $ref: '#/components/schemas/StandardSuccessResponse' } },
+                'application/pdf': { schema: { type: 'string', format: 'binary' } },
+              },
+            },
+          },
+        },
+        get: {
+          summary: 'Download Batch Merged Delivery Notes PDF',
+          description: 'Download combined batch delivery notes PDF for given comma-separated order IDs (?ids=id1,id2&format=pdf).',
+          operationId: 'downloadBatchDeliveryNotes',
+          parameters: [
+            { name: 'ids', in: 'query', required: true, schema: { type: 'string' }, description: 'Comma-separated order IDs' },
+            { name: 'format', in: 'query', schema: { type: 'string', enum: ['pdf', 'json'] } },
+          ],
+          responses: {
+            '200': {
+              content: {
+                'application/pdf': { schema: { type: 'string', format: 'binary' } },
+                'application/json': { schema: { $ref: '#/components/schemas/StandardSuccessResponse' } },
+              },
+            },
+          },
+        },
+      },
       '/api/connector/grok/orders/{id}/shipping-label': {
         post: {
           summary: 'Create Shipping Label',
-          description: 'Creates a shipping label with DHL, Hermes, or DPD and assigns tracking number.',
+          description: 'Creates a shipping label with Hermes, DHL, or DPD and assigns tracking number. Idempotent: If the order already has a tracking number or label URL, returns the existing label immediately without duplicate carrier charges.',
           operationId: 'generateShippingLabel',
           parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
           requestBody: {
@@ -243,6 +316,7 @@ export function getOpenApiSpec(baseUrl: string = 'https://theomnistack.de') {
                   type: 'object',
                   properties: {
                     carrier: { type: 'string', enum: ['dhl', 'hermes', 'dpd'] },
+                    parcelClass: { type: 'string', description: 'Hermes parcel class (XS, S, M, L, XL)' },
                     weightKg: { type: 'number' },
                   },
                 },
@@ -251,6 +325,52 @@ export function getOpenApiSpec(baseUrl: string = 'https://theomnistack.de') {
           },
           responses: {
             '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/StandardSuccessResponse' } } } },
+          },
+        },
+      },
+      '/api/connector/grok/orders/shipping-labels/batch': {
+        post: {
+          summary: 'Batch Merged Shipping Labels PDF',
+          description: 'Merge existing shipping labels (outbound and return) for multiple orders into a single printable batch PDF (Versandlabels_Sammel). If format=pdf or Accept: application/pdf is specified, streams the binary PDF directly.',
+          operationId: 'generateBatchShippingLabels',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['orderIds'],
+                  properties: {
+                    orderIds: { type: 'array', items: { type: 'string' } },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            '200': {
+              content: {
+                'application/json': { schema: { $ref: '#/components/schemas/StandardSuccessResponse' } },
+                'application/pdf': { schema: { type: 'string', format: 'binary' } },
+              },
+            },
+          },
+        },
+        get: {
+          summary: 'Download Batch Merged Shipping Labels PDF',
+          description: 'Download combined batch shipping labels PDF for given comma-separated order IDs (?ids=id1,id2&format=pdf).',
+          operationId: 'downloadBatchShippingLabels',
+          parameters: [
+            { name: 'ids', in: 'query', required: true, schema: { type: 'string' }, description: 'Comma-separated order IDs' },
+            { name: 'format', in: 'query', schema: { type: 'string', enum: ['pdf', 'json'] } },
+          ],
+          responses: {
+            '200': {
+              content: {
+                'application/pdf': { schema: { type: 'string', format: 'binary' } },
+                'application/json': { schema: { $ref: '#/components/schemas/StandardSuccessResponse' } },
+              },
+            },
           },
         },
       },

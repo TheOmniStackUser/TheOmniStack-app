@@ -1,4 +1,5 @@
 import { requireAuth } from '@/lib/session'
+import { extractApiKey, authenticateGrokRequest } from '@/lib/grok-connector/auth'
 
 export const dynamic = 'force-dynamic'
 import { db } from '@/db/client'
@@ -8,7 +9,17 @@ import { PDFDocument } from 'pdf-lib'
 
 export async function GET(request: Request) {
   try {
-    const auth = await requireAuth()
+    let companyId: string
+    const apiKey = extractApiKey(request)
+    if (apiKey) {
+      const authResult = await authenticateGrokRequest(request)
+      if (!authResult.success) return authResult.response
+      companyId = authResult.auth.companyId
+    } else {
+      const auth = await requireAuth()
+      companyId = auth.activeCompanyId
+    }
+
     const { searchParams } = new URL(request.url)
     const idsString = searchParams.get('ids')
 
@@ -28,7 +39,7 @@ export async function GET(request: Request) {
       .where(
         and(
           inArray(orders.id, ids),
-          eq(orders.companyId, auth.activeCompanyId)
+          eq(orders.companyId, companyId)
         )
       )
 
