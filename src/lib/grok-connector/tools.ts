@@ -6,7 +6,7 @@ import { returnsLog, returnedItems } from '@/db/schema/returns'
 import { customers } from '@/db/schema/customers'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { companies } from '@/db/schema/companies'
-import { eq, and, or, desc, sql, ilike, inArray, gte, lte, ne } from 'drizzle-orm'
+import { eq, and, or, desc, sql, ilike, inArray, gte, lte, ne, isNotNull } from 'drizzle-orm'
 import { createInvoiceForOrder, getDefaultSettings, formatDocumentNumber } from '@/lib/invoice-service'
 import { executeRefund } from '@/lib/refund-service'
 import type { GrokAuthContext } from './auth'
@@ -754,7 +754,7 @@ export const TOOLS_MANIFEST: ToolDefinition[] = [
   {
     name: 'generate_shipping_label',
     category: 'shipping',
-    description: 'Generate a carrier shipping label (Hermes, DHL, or DPD) for an order, record the tracking code, and mark the order ready for transit. Idempotent: If the order already has a tracking number or label URL, returns the existing label immediately to prevent duplicate carrier charges.',
+    description: 'Generate a carrier shipping label (Hermes, DHL, or DPD) for an order, record the tracking code, mark the order as shipped, and automatically confirm the shipment and tracking code to the connected marketplace (Otto, About You, Decathlon, Amazon, etc.). Idempotent: If the order already has a tracking number or label URL, returns the existing label immediately to prevent duplicate carrier charges and ensures marketplace confirmation.',
     parameters: {
       type: 'object',
       properties: {
@@ -764,6 +764,30 @@ export const TOOLS_MANIFEST: ToolDefinition[] = [
         weightKg: { type: 'number', description: 'Total parcel weight in kg' },
       },
       required: ['orderId'],
+    },
+  },
+  {
+    name: 'confirm_order_shipment',
+    category: 'shipping',
+    description: 'Explicitly transmit tracking code and confirm shipment on the connected marketplace (Otto, About You, Decathlon, Amazon, etc.) for an order that is already marked as shipped.',
+    parameters: {
+      type: 'object',
+      properties: {
+        orderId: { type: 'string', description: 'Order ID (UUID)' },
+        carrier: { type: 'string', description: 'Carrier name (e.g. HERMES, DHL, DPD), default: HERMES' },
+      },
+      required: ['orderId'],
+    },
+  },
+  {
+    name: 'retry_pending_shipment_confirmations',
+    category: 'shipping',
+    description: 'Batch retry transmitting tracking numbers to marketplaces for all orders where shipment confirmation is currently pending or failed.',
+    parameters: {
+      type: 'object',
+      properties: {
+        limit: { type: 'integer', description: 'Maximum number of orders to confirm (default: 50)' },
+      },
     },
   },
 ]
@@ -2830,6 +2854,26 @@ export async function executeTool(
 
         // SAFETY / IDEMPOTENCY: Check if the order already has trackingNumber or labelUrl
         if (order.trackingNumber || order.labelUrl) {
+          // If confirmation was pending or failed, retry marketplace confirmation now!
+          if (order.marketplace !== 'manual' && order.marketplaceConfirmationStatus !== 'confirmed') {
+            try {
+              const { confirmMarketplaceShipment } = await import('@/lib/marketplace-confirmation')
+              await confirmMarketplaceShipment(order.id, companyId, (params.carrier || 'HERMES').toUpperCase())
+            } catch (err: any) {
+              console.warn('[generate_shipping_label] Retrying confirmation on existing label failed:', err.message)
+            }
+          }
+
+          const [refreshed] = await db
+            .select({
+              marketplaceConfirmationStatus: orders.marketplaceConfirmationStatus,
+              marketplaceConfirmationError: orders.marketplaceConfirmationError,
+              marketplaceConfirmedAt: orders.marketplaceConfirmedAt,
+            })
+            .from(orders)
+            .where(eq(orders.id, order.id))
+            .limit(1)
+
           return {
             success: true,
             data: {
@@ -2838,6 +2882,8 @@ export async function executeTool(
               labelUrl: order.labelUrl,
               carrier: params.carrier || 'hermes',
               status: order.status,
+              marketplaceConfirmationStatus: refreshed?.marketplaceConfirmationStatus || order.marketplaceConfirmationStatus,
+              marketplaceConfirmationError: refreshed?.marketplaceConfirmationError || order.marketplaceConfirmationError,
               isExisting: true,
               message: 'Shipping label already exists for this order. Reusing existing label to prevent duplicate carrier charges.',
             },
@@ -2873,6 +2919,25 @@ export async function executeTool(
               })
               .where(eq(orders.id, order.id))
 
+            // Auto-confirm shipment on marketplace immediately
+            let marketplaceConfirmed = false
+            let confirmationError: string | null = null
+            if (order.marketplace !== 'manual') {
+              try {
+                const { confirmMarketplaceShipment } = await import('@/lib/marketplace-confirmation')
+                const confResult = await confirmMarketplaceShipment(order.id, companyId, 'HERMES')
+                marketplaceConfirmed = confResult.success
+                if (!confResult.success) {
+                  confirmationError = confResult.error || null
+                }
+              } catch (confErr: any) {
+                console.warn('[generate_shipping_label] Background marketplace confirmation failed:', confErr.message)
+                confirmationError = confErr.message
+              }
+            } else {
+              marketplaceConfirmed = true
+            }
+
             return {
               success: true,
               data: {
@@ -2881,6 +2946,8 @@ export async function executeTool(
                 labelUrl,
                 carrier: 'hermes',
                 status: 'shipped',
+                marketplaceConfirmationStatus: marketplaceConfirmed ? 'confirmed' : 'failed',
+                marketplaceConfirmationError: confirmationError,
                 isExisting: false,
               },
             }
@@ -2912,6 +2979,25 @@ export async function executeTool(
             shippingStatus: orders.shippingStatus,
           })
 
+        // Auto-confirm shipment on marketplace immediately if not manual
+        let marketplaceConfirmed = false
+        let confirmationError: string | null = null
+        if (order.marketplace !== 'manual') {
+          try {
+            const { confirmMarketplaceShipment } = await import('@/lib/marketplace-confirmation')
+            const confResult = await confirmMarketplaceShipment(order.id, companyId, (params.carrier || 'DHL').toUpperCase())
+            marketplaceConfirmed = confResult.success
+            if (!confResult.success) {
+              confirmationError = confResult.error || null
+            }
+          } catch (confErr: any) {
+            console.warn('[generate_shipping_label] Auto-confirmation on marketplace failed:', confErr.message)
+            confirmationError = confErr.message
+          }
+        } else {
+          marketplaceConfirmed = true
+        }
+
         return {
           success: true,
           data: {
@@ -2919,7 +3005,103 @@ export async function executeTool(
             trackingNumber: updated.trackingNumber,
             carrier: params.carrier || 'dhl',
             status: updated.status,
+            marketplaceConfirmationStatus: marketplaceConfirmed ? 'confirmed' : 'failed',
+            marketplaceConfirmationError: confirmationError,
             isExisting: false,
+          },
+        }
+      }
+
+      case 'confirm_order_shipment': {
+        const companyId = ctx.companyId
+        const orderId = params.orderId
+        const carrier = (params.carrier || 'HERMES').toUpperCase()
+
+        const { confirmMarketplaceShipment } = await import('@/lib/marketplace-confirmation')
+        const result = await confirmMarketplaceShipment(orderId, companyId, carrier)
+
+        const [updatedOrder] = await db
+          .select({
+            id: orders.id,
+            marketplace: orders.marketplace,
+            marketplaceOrderId: orders.marketplaceOrderId,
+            trackingNumber: orders.trackingNumber,
+            status: orders.status,
+            marketplaceConfirmationStatus: orders.marketplaceConfirmationStatus,
+            marketplaceConfirmationError: orders.marketplaceConfirmationError,
+            marketplaceConfirmedAt: orders.marketplaceConfirmedAt,
+          })
+          .from(orders)
+          .where(and(eq(orders.id, orderId), eq(orders.companyId, companyId)))
+          .limit(1)
+
+        if (!result.success) {
+          return {
+            success: false,
+            error: result.error || 'Failed to confirm shipment on marketplace.',
+            data: updatedOrder,
+          }
+        }
+
+        return {
+          success: true,
+          data: updatedOrder,
+        }
+      }
+
+      case 'retry_pending_shipment_confirmations': {
+        const companyId = ctx.companyId
+        const limit = Math.min(Math.max(params.limit || 50, 1), 100)
+
+        const pendingOrders = await db
+          .select({
+            id: orders.id,
+            marketplace: orders.marketplace,
+            marketplaceOrderId: orders.marketplaceOrderId,
+            trackingNumber: orders.trackingNumber,
+          })
+          .from(orders)
+          .where(
+            and(
+              eq(orders.companyId, companyId),
+              or(
+                eq(orders.marketplaceConfirmationStatus, 'pending'),
+                eq(orders.marketplaceConfirmationStatus, 'failed')
+              ),
+              isNotNull(orders.trackingNumber),
+              ne(orders.marketplace, 'manual')
+            )
+          )
+          .limit(limit)
+
+        const { confirmMarketplaceShipment } = await import('@/lib/marketplace-confirmation')
+        let confirmedCount = 0
+        let failedCount = 0
+        const results: any[] = []
+
+        for (const o of pendingOrders) {
+          const res = await confirmMarketplaceShipment(o.id, companyId, 'HERMES')
+          if (res.success) {
+            confirmedCount++
+          } else {
+            failedCount++
+          }
+          results.push({
+            orderId: o.id,
+            marketplace: o.marketplace,
+            marketplaceOrderId: o.marketplaceOrderId,
+            success: res.success,
+            error: res.error,
+          })
+        }
+
+        return {
+          success: true,
+          data: {
+            totalFound: pendingOrders.length,
+            confirmedCount,
+            failedCount,
+            results,
           },
         }
       }

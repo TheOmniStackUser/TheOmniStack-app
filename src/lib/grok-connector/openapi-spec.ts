@@ -305,8 +305,8 @@ export function getOpenApiSpec(baseUrl: string = 'https://theomnistack.de') {
       },
       '/api/connector/grok/orders/{id}/shipping-label': {
         post: {
-          summary: 'Create Shipping Label',
-          description: 'Creates a shipping label with Hermes, DHL, or DPD and assigns tracking number. Idempotent: If the order already has a tracking number or label URL, returns the existing label immediately without duplicate carrier charges.',
+          summary: 'Create Shipping Label & Auto-Confirm Marketplace',
+          description: 'Creates a shipping label with Hermes, DHL, or DPD, assigns tracking number, and automatically confirms the shipment with the tracking number on the marketplace. Idempotent: If the order already has a tracking number or label URL, returns the existing label immediately without duplicate carrier charges and ensures marketplace confirmation is synced.',
           operationId: 'generateShippingLabel',
           parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
           requestBody: {
@@ -318,6 +318,29 @@ export function getOpenApiSpec(baseUrl: string = 'https://theomnistack.de') {
                     carrier: { type: 'string', enum: ['dhl', 'hermes', 'dpd'] },
                     parcelClass: { type: 'string', description: 'Hermes parcel class (XS, S, M, L, XL)' },
                     weightKg: { type: 'number' },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/StandardSuccessResponse' } } } },
+          },
+        },
+      },
+      '/api/connector/grok/orders/{id}/confirm-shipment': {
+        post: {
+          summary: 'Confirm Shipment on Marketplace',
+          description: 'Transmit tracking number and mark order as shipped on the connected marketplace (Otto, About You, Decathlon, Amazon, etc.).',
+          operationId: 'confirmOrderShipment',
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+          requestBody: {
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    carrier: { type: 'string', default: 'HERMES' },
                   },
                 },
               },

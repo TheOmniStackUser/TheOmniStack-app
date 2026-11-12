@@ -96,9 +96,42 @@ export async function GET(request: Request) {
       }
     }
 
+    // 4. Automatically retry pending marketplace confirmations
+    let confirmationsCount = 0
+    try {
+      const pendingConfirmationOrders = await db
+        .select({
+          id: orders.id,
+          companyId: orders.companyId,
+          trackingNumber: orders.trackingNumber,
+        })
+        .from(orders)
+        .where(
+          and(
+            eq(orders.status, 'shipped'),
+            isNotNull(orders.trackingNumber),
+            eq(orders.marketplaceConfirmationStatus, 'pending'),
+            ne(orders.marketplace, 'manual')
+          )
+        )
+        .limit(50)
+
+      if (pendingConfirmationOrders.length > 0) {
+        const { confirmMarketplaceShipment } = await import('@/lib/marketplace-confirmation')
+        for (const pOrder of pendingConfirmationOrders) {
+          const res = await confirmMarketplaceShipment(pOrder.id, pOrder.companyId, 'HERMES')
+          if (res.success) {
+            confirmationsCount++
+          }
+        }
+      }
+    } catch (confCronErr: any) {
+      console.warn('[Tracking Cron] Marketplace confirmation retry warning:', confCronErr.message)
+    }
+
     return NextResponse.json({ 
       success: true, 
-      message: `Checked ${activeOrders.length} orders. Updated ${updatedCount}.`, 
+      message: `Checked ${activeOrders.length} orders. Updated ${updatedCount}. Auto-confirmed ${confirmationsCount} marketplace shipments.`, 
       errors: errors.length > 0 ? errors : undefined,
       timestamp: new Date() 
     })

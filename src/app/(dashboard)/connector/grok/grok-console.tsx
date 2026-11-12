@@ -48,6 +48,8 @@ const SAMPLE_PAYLOADS: Record<string, any> = {
   generate_bulk_shipping_labels: { orderIds: ['ORDER_ID_1', 'ORDER_ID_2'] },
   generate_order_invoice: { orderId: 'REPLACE_WITH_ORDER_ID', customText: 'Thank you for your business!' },
   generate_shipping_label: { orderId: 'REPLACE_WITH_ORDER_ID', carrier: 'hermes', parcelClass: 'S' },
+  confirm_order_shipment: { orderId: 'REPLACE_WITH_ORDER_ID', carrier: 'HERMES' },
+  retry_pending_shipment_confirmations: { limit: 50 },
   cancel_order: { orderId: 'REPLACE_WITH_ORDER_ID', reason: 'Customer requested cancellation' },
   list_invoices: { limit: 10 },
   get_invoice_details: { invoiceId: 'REPLACE_WITH_INVOICE_ID' },
