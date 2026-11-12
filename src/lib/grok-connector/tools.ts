@@ -35,6 +35,10 @@ function getEanFromPayload(payload: any): string | null {
   return null
 }
 
+function isUuid(val: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val)
+}
+
 export interface ToolDefinition {
   name: string
   description: string
@@ -534,6 +538,48 @@ export const TOOLS_MANIFEST: ToolDefinition[] = [
         dryRun: { type: 'boolean', description: 'If true, only finds and returns matches without applying mappings (default: false)' },
         marketplace: { type: 'string', description: 'Optional marketplace filter (e.g. otto, amazon, shopify, ebay)' },
       },
+    },
+  },
+  {
+    name: 'block_unmapped_listing',
+    category: 'products',
+    description: 'Block an unmapped marketplace listing so it is excluded from default unmapped listings and auto-mapping (e.g. parent variation listings without inventory).',
+    parameters: {
+      type: 'object',
+      properties: {
+        unmappedId: { type: 'string', description: 'UUID of the unmapped listing to block' },
+        reason: { type: 'string', description: 'Optional reason or note for blocking this listing (e.g. "Amazon parent listing")' },
+      },
+      required: ['unmappedId'],
+    },
+  },
+  {
+    name: 'unblock_unmapped_listing',
+    category: 'products',
+    description: 'Unblock a previously blocked unmapped marketplace listing so it reappears in unmapped listings and auto-mapping.',
+    parameters: {
+      type: 'object',
+      properties: {
+        unmappedId: { type: 'string', description: 'UUID of the unmapped listing to unblock' },
+      },
+      required: ['unmappedId'],
+    },
+  },
+  {
+    name: 'block_unmapped_listings',
+    category: 'products',
+    description: 'Batch block multiple unmapped marketplace listings in a single request. Returns per-ID success/failure status.',
+    parameters: {
+      type: 'object',
+      properties: {
+        unmappedIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of unmapped listing UUIDs to block',
+        },
+        reason: { type: 'string', description: 'Optional reason or note for blocking these listings' },
+      },
+      required: ['unmappedIds'],
     },
   },
   {
@@ -1540,7 +1586,7 @@ export async function executeTool(
           .select()
           .from(products)
           .where(and(...conditions))
-          .orderBy(desc(products.updatedAt))
+          .orderBy(desc(products.createdAt), desc(products.id))
           .limit(limit)
           .offset(offset)
 
@@ -1764,7 +1810,7 @@ export async function executeTool(
           .select()
           .from(unmappedMarketplaceProducts)
           .where(and(...conditions))
-          .orderBy(desc(unmappedMarketplaceProducts.updatedAt))
+          .orderBy(desc(unmappedMarketplaceProducts.createdAt), desc(unmappedMarketplaceProducts.id))
           .limit(limit)
           .offset(offset)
 
@@ -1785,6 +1831,8 @@ export async function executeTool(
           stock: item.stock ? Number(item.stock) : null,
           ean: getEanFromPayload(item.rawPayload),
           isBlocked: item.isBlocked,
+          blockedAt: item.blockedAt,
+          blockedReason: item.blockedReason,
           createdAt: item.createdAt,
           updatedAt: item.updatedAt,
         }))
@@ -2271,6 +2319,178 @@ export async function executeTool(
             mappedCount: createdCount,
             dryRun: false,
             mappings: matchedList,
+          },
+        }
+      }
+
+      case 'block_unmapped_listing': {
+        const companyId = ctx.companyId
+        const unmappedId = params.unmappedId?.trim()
+        if (!unmappedId) return { success: false, error: 'unmappedId is required.' }
+        if (!isUuid(unmappedId)) return { success: false, error: `Invalid listing ID format '${unmappedId}' (UUID expected).` }
+
+        const [existing] = await db
+          .select()
+          .from(unmappedMarketplaceProducts)
+          .where(and(eq(unmappedMarketplaceProducts.companyId, companyId), eq(unmappedMarketplaceProducts.id, unmappedId)))
+          .limit(1)
+
+        if (!existing) {
+          return { success: false, error: `Unmapped listing '${unmappedId}' not found.` }
+        }
+
+        const blockedAt = new Date()
+        const [updated] = await db
+          .update(unmappedMarketplaceProducts)
+          .set({
+            isBlocked: true,
+            blockedAt,
+            blockedReason: params.reason?.trim() || null,
+            updatedAt: new Date(),
+          })
+          .where(and(eq(unmappedMarketplaceProducts.companyId, companyId), eq(unmappedMarketplaceProducts.id, unmappedId)))
+          .returning()
+
+        return {
+          success: true,
+          data: {
+            unmappedId: updated.id,
+            marketplaceSku: updated.marketplaceSku,
+            marketplace: updated.marketplace,
+            title: updated.title,
+            isBlocked: updated.isBlocked,
+            blockedAt: updated.blockedAt,
+            blockedReason: updated.blockedReason,
+          },
+        }
+      }
+
+      case 'unblock_unmapped_listing': {
+        const companyId = ctx.companyId
+        const unmappedId = params.unmappedId?.trim()
+        if (!unmappedId) return { success: false, error: 'unmappedId is required.' }
+        if (!isUuid(unmappedId)) return { success: false, error: `Invalid listing ID format '${unmappedId}' (UUID expected).` }
+
+        const [existing] = await db
+          .select()
+          .from(unmappedMarketplaceProducts)
+          .where(and(eq(unmappedMarketplaceProducts.companyId, companyId), eq(unmappedMarketplaceProducts.id, unmappedId)))
+          .limit(1)
+
+        if (!existing) {
+          return { success: false, error: `Unmapped listing '${unmappedId}' not found.` }
+        }
+
+        const [updated] = await db
+          .update(unmappedMarketplaceProducts)
+          .set({
+            isBlocked: false,
+            blockedAt: null,
+            blockedReason: null,
+            updatedAt: new Date(),
+          })
+          .where(and(eq(unmappedMarketplaceProducts.companyId, companyId), eq(unmappedMarketplaceProducts.id, unmappedId)))
+          .returning()
+
+        return {
+          success: true,
+          data: {
+            unmappedId: updated.id,
+            marketplaceSku: updated.marketplaceSku,
+            marketplace: updated.marketplace,
+            title: updated.title,
+            isBlocked: updated.isBlocked,
+            blockedAt: updated.blockedAt,
+            blockedReason: updated.blockedReason,
+          },
+        }
+      }
+
+      case 'block_unmapped_listings': {
+        const companyId = ctx.companyId
+        const rawIds: unknown[] = Array.isArray(params.unmappedIds) ? params.unmappedIds : []
+        const unmappedIds = rawIds
+          .filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
+          .map((id) => id.trim())
+
+        if (unmappedIds.length === 0) {
+          return { success: false, error: 'unmappedIds array must contain at least one listing ID.' }
+        }
+
+        const reason = params.reason?.trim() || null
+        const validUuids = unmappedIds.filter(isUuid)
+
+        // Fetch matching unmapped rows for this company using valid UUIDs only
+        const existingRows = validUuids.length > 0
+          ? await db
+              .select()
+              .from(unmappedMarketplaceProducts)
+              .where(
+                and(
+                  eq(unmappedMarketplaceProducts.companyId, companyId),
+                  inArray(unmappedMarketplaceProducts.id, validUuids)
+                )
+              )
+          : []
+
+        const existingMap = new Map(existingRows.map((r) => [r.id, r]))
+        const blockedAt = new Date()
+
+        if (existingRows.length > 0) {
+          await db
+            .update(unmappedMarketplaceProducts)
+            .set({
+              isBlocked: true,
+              blockedAt,
+              blockedReason: reason,
+              updatedAt: new Date(),
+            })
+            .where(
+              and(
+                eq(unmappedMarketplaceProducts.companyId, companyId),
+                inArray(unmappedMarketplaceProducts.id, existingRows.map((r) => r.id))
+              )
+            )
+        }
+
+        const results = unmappedIds.map((id) => {
+          if (!isUuid(id)) {
+            return {
+              unmappedId: id,
+              success: false,
+              error: 'Invalid UUID format',
+            }
+          }
+          const row = existingMap.get(id)
+          if (!row) {
+            return {
+              unmappedId: id,
+              success: false,
+              error: 'Not found or unauthorized',
+            }
+          }
+          return {
+            unmappedId: id,
+            marketplaceSku: row.marketplaceSku,
+            marketplace: row.marketplace,
+            title: row.title,
+            success: true,
+            isBlocked: true,
+            blockedAt,
+            blockedReason: reason,
+          }
+        })
+
+        const successfulCount = results.filter((r) => r.success).length
+        const failedCount = results.length - successfulCount
+
+        return {
+          success: true,
+          data: {
+            totalRequested: unmappedIds.length,
+            successfulCount,
+            failedCount,
+            results,
           },
         }
       }

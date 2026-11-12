@@ -148,6 +148,7 @@ export const unmappedMarketplaceProducts = pgTable('unmapped_marketplace_product
   
   isBlocked: boolean('is_blocked').notNull().default(false),
   blockedAt: timestamp('blocked_at', { withTimezone: true }),
+  blockedReason: text('blocked_reason'),
   
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

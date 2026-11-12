@@ -420,7 +420,7 @@ export async function bulkDeleteProducts(productIds: string[]) {
   return { success: true }
 }
 
-export async function blockUnmappedProducts(unmappedProductIds: string[]) {
+export async function blockUnmappedProducts(unmappedProductIds: string[], reason?: string) {
   const auth = await requireAuth()
 
   if (!unmappedProductIds || unmappedProductIds.length === 0) return { success: true, blockedUnmapped: [] }
@@ -430,6 +430,7 @@ export async function blockUnmappedProducts(unmappedProductIds: string[]) {
     .set({
       isBlocked: true,
       blockedAt: new Date(),
+      blockedReason: reason || null,
       updatedAt: new Date(),
     })
     .where(
@@ -454,6 +455,7 @@ export async function unblockMarketplaceProducts(unmappedProductIds: string[]) {
     .set({
       isBlocked: false,
       blockedAt: null,
+      blockedReason: null,
       updatedAt: new Date(),
     })
     .where(

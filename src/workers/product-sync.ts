@@ -185,6 +185,7 @@ export async function syncProductsForCompany(companyId: string, integrationId?: 
       if (toUpsertUnmapped.length > 0) {
         for (let i = 0; i < toUpsertUnmapped.length; i += 100) {
           const chunk = toUpsertUnmapped.slice(i, i + 100)
+          // Preserve isBlocked, blockedAt, and blockedReason so blocked listings stay blocked across syncs
           await db.insert(unmappedMarketplaceProducts).values(chunk).onConflictDoUpdate({
             target: [
               unmappedMarketplaceProducts.companyId,

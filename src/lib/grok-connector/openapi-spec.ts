@@ -708,6 +708,69 @@ export function getOpenApiSpec(baseUrl: string = 'https://theomnistack.de') {
           },
         },
       },
+      '/api/connector/grok/products/unmapped/{id}/block': {
+        post: {
+          summary: 'Block Unmapped Listing',
+          description: 'Set an unmapped listing to blocked so it is excluded from default unmapped listings and auto-mapping.',
+          operationId: 'blockUnmappedListing',
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+          requestBody: {
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    reason: { type: 'string', description: 'Optional reason or note for blocking this listing' },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/StandardSuccessResponse' } } } },
+          },
+        },
+      },
+      '/api/connector/grok/products/unmapped/{id}/unblock': {
+        post: {
+          summary: 'Unblock Unmapped Listing',
+          description: 'Reverse the blocked status of an unmapped listing so it reappears in unmapped listings and auto-mapping.',
+          operationId: 'unblockUnmappedListing',
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+          responses: {
+            '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/StandardSuccessResponse' } } } },
+          },
+        },
+      },
+      '/api/connector/grok/products/unmapped/block-batch': {
+        post: {
+          summary: 'Batch Block Unmapped Listings',
+          description: 'Block multiple unmapped listings at once with per-ID status reporting.',
+          operationId: 'blockUnmappedListingsBatch',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['unmappedIds'],
+                  properties: {
+                    unmappedIds: {
+                      type: 'array',
+                      items: { type: 'string' },
+                      description: 'List of unmapped listing IDs to block',
+                    },
+                    reason: { type: 'string', description: 'Optional reason or note for blocking these listings' },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/StandardSuccessResponse' } } } },
+          },
+        },
+      },
       '/api/connector/grok/products/mappings': {
         get: {
           summary: 'List Product Mappings',

@@ -66,6 +66,9 @@ const SAMPLE_PAYLOADS: Record<string, any> = {
   map_unmapped_listing: { unmappedId: 'REPLACE_WITH_UNMAPPED_ID', productId: 'REPLACE_WITH_PRODUCT_ID_OR_SKU', syncStock: true },
   create_and_map_product: { unmappedId: 'REPLACE_WITH_UNMAPPED_ID' },
   auto_map_unmapped_listings: { dryRun: true },
+  block_unmapped_listing: { unmappedId: 'REPLACE_WITH_UNMAPPED_ID', reason: 'Amazon variation parent without inventory' },
+  unblock_unmapped_listing: { unmappedId: 'REPLACE_WITH_UNMAPPED_ID' },
+  block_unmapped_listings: { unmappedIds: ['UNMAPPED_ID_1', 'UNMAPPED_ID_2'], reason: 'Amazon variation parent listings' },
   list_product_mappings: { limit: 10 },
   set_product_mapping: { productId: 'REPLACE_WITH_PRODUCT_ID_OR_SKU', marketplace: 'otto', marketplaceSku: 'SKU-123', syncStock: true },
   delete_product_mapping: { mappingId: 'REPLACE_WITH_MAPPING_ID', restoreToUnmapped: true },
@@ -126,7 +129,7 @@ You have access to the complete TheOmniStack Grok Bot Connector API.
 Your capabilities include:
 1. ORDER MANAGEMENT: Searching orders, checking status, fetching shipping details, updating order status, cancelling orders, and assigning delivery notes.
 2. BILLING & INVOICING: Issuing GoBD-compliant PDF invoices, retrieving invoice lines, cancelling invoices via credit notes (Storno), recording payments, and batch generating missing invoices.
-3. WAREHOUSE, INVENTORY (WAWI) & MAPPINGS: Listing products, checking inventory, adjusting warehouse stock, listing unmapped marketplace listings (Otto, Amazon, Shopify, Mirakl, eBay), creating central products directly from unmapped listings, mapping listings to central products, running automated batch mapping via SKU/EAN, and managing product mappings.
+3. WAREHOUSE, INVENTORY (WAWI) & MAPPINGS: Listing products, checking inventory, adjusting warehouse stock, listing unmapped marketplace listings (Otto, Amazon, Shopify, Mirakl, eBay), blocking/unblocking unmapped listings (e.g. parent variation listings), creating central products directly from unmapped listings, mapping listings to central products, running automated batch mapping via SKU/EAN, and managing product mappings.
 4. RETURNS MANAGEMENT: Scanning incoming returns, inspecting item condition (new, used, damaged, defect), and executing automated refunds through marketplace channels.
 5. LOGISTICS & CARRIERS: Generating shipping labels for DHL, Hermes, and DPD, and retrieving live tracking numbers.
 6. REAL-TIME INTELLIGENCE: Providing instant analytics on sales revenue, pending fulfillment counts, return rates, and low-stock alerts.
