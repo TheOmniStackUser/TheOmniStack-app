@@ -33,6 +33,7 @@ import { EtsyAdapter } from '@/adapters/marketplace/etsy'
 import type { NormalizedOrder, MarketplaceAdapter } from '@/adapters/marketplace/base'
 import { createInvoiceForOrder, formatDocumentNumber, getDefaultSettings, extractPaymentInfo } from '@/lib/invoice-service'
 import { isAmazonSwitzerlandOrder } from '@/lib/orders'
+import { formatMarketplaceName } from '@/lib/marketplaces'
 import { get2LetterCountryCode } from '@/lib/countries'
 import { normalizePostalCode } from '@/lib/postal-codes'
 
@@ -196,25 +197,7 @@ export function createMarketplaceSyncWorker() {
           const groupKey = `sync-group:${companyId}:${syncGroupId}`
           await redis.set(`${groupKey}:total`, toSync.length, 'EX', 86400) // 24h expire
 
-          const getMarketplaceDisplayName = (integ: any) => {
-            if ((integ.metadata as any)?.customName) return (integ.metadata as any).customName
-            const names: Record<string, string> = {
-              'otto': 'Otto',
-              'amazon': 'Amazon',
-              'shopify': 'Shopify',
-              'aboutyou': 'About You',
-              'kaufland': 'Kaufland',
-              'ebay': 'eBay',
-              'etsy': 'Etsy',
-              'woocommerce': 'WooCommerce',
-              'shopware': 'Shopware',
-              'mirakl_decathlon': 'Decathlon',
-              'mirakl_decathlon_eu': 'Decathlon EU',
-              'mirakl_mediamarkt': 'MediaMarkt',
-              'mirakl_custom': 'Marktplatz',
-            }
-            return names[integ.type] || (integ.type.charAt(0).toUpperCase() + integ.type.slice(1))
-          }
+          const getMarketplaceDisplayName = (integ: any) => formatMarketplaceName(integ, toSync)
 
           for (const integration of toSync) {
             await marketplaceSyncQueue.add(
@@ -233,25 +216,7 @@ export function createMarketplaceSyncWorker() {
             )
           }
         } else {
-          const getMarketplaceDisplayName = (integ: any) => {
-            if ((integ.metadata as any)?.customName) return (integ.metadata as any).customName
-            const names: Record<string, string> = {
-              'otto': 'Otto',
-              'amazon': 'Amazon',
-              'shopify': 'Shopify',
-              'aboutyou': 'About You',
-              'kaufland': 'Kaufland',
-              'ebay': 'eBay',
-              'etsy': 'Etsy',
-              'woocommerce': 'WooCommerce',
-              'shopware': 'Shopware',
-              'mirakl_decathlon': 'Decathlon',
-              'mirakl_decathlon_eu': 'Decathlon EU',
-              'mirakl_mediamarkt': 'MediaMarkt',
-              'mirakl_custom': 'Marktplatz',
-            }
-            return names[integ.type] || (integ.type.charAt(0).toUpperCase() + integ.type.slice(1))
-          }
+          const getMarketplaceDisplayName = (integ: any) => formatMarketplaceName(integ, toSync)
 
           for (const integration of toSync) {
             await marketplaceSyncQueue.add(

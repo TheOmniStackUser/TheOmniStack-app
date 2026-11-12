@@ -426,7 +426,8 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   const hasOttoIntegration = integrations.some(i => i.type === 'otto' && i.clientId)
   const hasDecathlonIntegration = integrations.some(i => i.type === 'mirakl_decathlon' && i.clientId)
   const hasAmazonIntegration = integrations.some(i => i.type === 'amazon' && i.refreshToken)
-  const hasShopifyIntegration = integrations.some(i => i.type === 'shopify' && i.accessToken)
+  const shopifyIntegrations = integrations.filter(i => i.type === 'shopify' && i.accessToken)
+  const hasShopifyIntegration = shopifyIntegrations.length > 0
   const hasKauflandIntegration = integrations.some(i => i.type === 'kaufland' && i.clientId && i.clientSecret)
   const hasEbayIntegration = integrations.some(i => i.type === 'ebay' && i.refreshToken)
   const hasAboutYouIntegration = integrations.some(i => i.type === 'aboutyou' && i.apiKey)
@@ -517,6 +518,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
 
       <ManualImport 
         customMiraklIntegrations={customMiraklIntegrations} 
+        shopifyIntegrations={shopifyIntegrations}
         hasKauflandIntegration={hasKauflandIntegration}
         hasEbayIntegration={hasEbayIntegration}
         hasOttoIntegration={hasOttoIntegration}

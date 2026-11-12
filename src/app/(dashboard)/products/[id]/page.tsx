@@ -15,6 +15,7 @@ import { notFound } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { after } from 'next/server'
 import { SyncButton } from './sync-button'
+import { resolveMarketplaceDisplayName } from '@/lib/marketplaces'
 
 export const metadata = {
   title: 'Produkt bearbeiten - TheOmniStack',
@@ -71,28 +72,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
     .where(eq(marketplaceIntegrations.companyId, auth.activeCompanyId))
 
   const getMarketplaceName = (mapping: typeof mappings[0]) => {
-    const lower = mapping.marketplace.toLowerCase()
-    if (lower === 'mirakl_custom') {
-      const customInt = integrations.find(i => i.id === mapping.integrationId)
-      if (customInt?.metadata && typeof customInt.metadata === 'object' && 'customName' in customInt.metadata) {
-        return customInt.metadata.customName as string
-      }
-      return 'Mirakl Custom'
-    }
-    const map: Record<string, string> = {
-      amazon: 'Amazon',
-      otto: 'Otto',
-      mirakl_decathlon: 'Decathlon',
-      mirakl_decathlon_eu: 'Decathlon EU',
-      mirakl_mediamarkt: 'MediaMarkt',
-      shopify: 'Shopify',
-      aboutyou: 'About You',
-      kaufland: 'Kaufland',
-      ebay: 'eBay',
-      woocommerce: 'WooCommerce',
-      shopware: 'Shopware',
-    }
-    return map[lower] || mapping.marketplace
+    return resolveMarketplaceDisplayName(mapping.marketplace, mapping.integrationId, integrations)
   }
 
   const saveProduct = async (formData: FormData) => {

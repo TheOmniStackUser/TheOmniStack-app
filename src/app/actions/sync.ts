@@ -13,12 +13,18 @@ import { AmazonAdapter } from '@/adapters/marketplace/amazon'
 import { AboutYouAdapter } from '@/adapters/marketplace/aboutyou'
 import { persistOrders } from '@/workers/marketplace-sync'
 import type { NormalizedOrder } from '@/adapters/marketplace/base'
+import { formatMarketplaceName } from '@/lib/marketplaces'
 
 export async function getActiveIntegrationsList() {
   const auth = await requireAuth()
 
   const activeIntegrations = await db
-    .select({ id: marketplaceIntegrations.id, type: marketplaceIntegrations.type, metadata: marketplaceIntegrations.metadata })
+    .select({
+      id: marketplaceIntegrations.id,
+      type: marketplaceIntegrations.type,
+      metadata: marketplaceIntegrations.metadata,
+      environment: marketplaceIntegrations.environment,
+    })
     .from(marketplaceIntegrations)
     .where(
       and(
@@ -48,8 +54,7 @@ export async function getActiveIntegrationsList() {
     } else if (integration.type === 'amazon') {
       label = 'Amazon'
     } else if (integration.type === 'shopify') {
-      const shopName = (integration.metadata as any)?.shop?.name || (integration.metadata as any)?.shop?.domain || 'Shopify'
-      label = activeIntegrations.filter(i => i.type === 'shopify').length > 1 ? `Shopify (${shopName})` : 'Shopify'
+      label = formatMarketplaceName(integration, activeIntegrations)
       value = `shopify_${integration.id}`
     } else if (integration.type === 'etsy') {
       label = 'Etsy'

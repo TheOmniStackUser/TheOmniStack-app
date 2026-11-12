@@ -17,6 +17,7 @@ import {
 import { useRouter } from 'next/navigation'
 import { UnmappedMarketplaceProduct } from '@/db/schema/products'
 import { AlertModal } from '@/components/alert-modal'
+import { resolveMarketplaceDisplayName } from '@/lib/marketplaces'
 
 interface UnmappedClientProps {
   unmappedProducts: UnmappedMarketplaceProduct[]
@@ -231,27 +232,7 @@ export function UnmappedClient({ unmappedProducts, marketplaces }: UnmappedClien
   }
 
   const getMarketplaceDisplayName = (type: string, integrationId?: string) => {
-    if (integrationId) {
-      const integration = marketplaces.find(m => m.id === integrationId)
-      if (integration?.metadata?.customName) {
-        return integration.metadata.customName
-      }
-    }
-    const displayMap: Record<string, string> = {
-      mirakl_decathlon: 'Decathlon',
-      mirakl_decathlon_eu: 'Decathlon EU',
-      mirakl_mediamarkt: 'MediaMarkt',
-      mirakl_custom: 'Custom Mirakl',
-      aboutyou: 'About You',
-      kaufland: 'Kaufland',
-      otto: 'OTTO',
-      amazon: 'Amazon',
-      shopify: 'Shopify',
-      woocommerce: 'WooCommerce',
-      shopware: 'Shopware',
-      ebay: 'eBay',
-    }
-    return displayMap[type] || type
+    return resolveMarketplaceDisplayName(type, integrationId, marketplaces)
   }
 
   const activeUnmappedProducts = useMemo(() => {

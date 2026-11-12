@@ -7,26 +7,7 @@ import { useRouter } from 'next/navigation'
 import { triggerProductImport, getImportSyncStatus } from '@/app/actions/products'
 import { importAmazonCsvAction } from '@/app/actions/amazon-csv'
 
-function getMarketplaceName(integration: any) {
-  if (integration.type === 'mirakl_custom' && integration.metadata?.customName) {
-    return integration.metadata.customName
-  }
-  const names: Record<string, string> = {
-    amazon: 'Amazon',
-    otto: 'Otto Market',
-    shopify: 'Shopify',
-    aboutyou: 'About You',
-    kaufland: 'Kaufland',
-    ebay: 'eBay',
-    woocommerce: 'WooCommerce',
-    shopware: 'Shopware',
-    mirakl_decathlon: 'Decathlon',
-    mirakl_decathlon_eu: 'Decathlon EU',
-    mirakl_mediamarkt: 'MediaMarkt',
-    mirakl_custom: 'Custom Mirakl',
-  }
-  return names[integration.type] || integration.type.charAt(0).toUpperCase() + integration.type.slice(1).replace('_', ' ')
-}
+import { formatMarketplaceName } from '@/lib/marketplaces'
 
 export function ImportClient({ marketplaces }: { marketplaces: any[] }) {
   const router = useRouter()
@@ -99,7 +80,7 @@ export function ImportClient({ marketplaces }: { marketplaces: any[] }) {
     setIsImporting(true)
     
     const selected = marketplaces.find(m => m.id === selectedMarketplace)
-    showNotification('Import gestartet', `Produkte werden im Hintergrund von ${selected ? getMarketplaceName(selected) : 'dem Marktplatz'} abgerufen.`, 'info')
+    showNotification('Import gestartet', `Produkte werden im Hintergrund von ${selected ? formatMarketplaceName(selected, marketplaces) : 'dem Marktplatz'} abgerufen.`, 'info')
     
     try {
       await triggerProductImport(selectedMarketplace)
@@ -153,14 +134,16 @@ export function ImportClient({ marketplaces }: { marketplaces: any[] }) {
         <select
           value={selectedMarketplace}
           onChange={(e) => setSelectedMarketplace(e.target.value)}
-          className={`bg-white border border-slate-200 rounded-lg px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/50 outline-none w-48 ${!selectedMarketplace ? 'text-slate-500' : 'text-slate-900'}`}
+          className={`bg-white border border-slate-200 rounded-lg px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/50 outline-none min-w-[14rem] ${!selectedMarketplace ? 'text-slate-500' : 'text-slate-900'}`}
         >
-          <option value="" disabled>Marktplatz wählen...</option>
-          {[...marketplaces].sort((a, b) => getMarketplaceName(a).localeCompare(getMarketplaceName(b))).map(m => (
-            <option key={m.id} value={m.id}>
-              {getMarketplaceName(m)}
-            </option>
-          ))}
+          <option value="" disabled className="text-slate-500">Marktplatz wählen...</option>
+          {[...marketplaces]
+            .sort((a, b) => formatMarketplaceName(a, marketplaces).localeCompare(formatMarketplaceName(b, marketplaces), 'de'))
+            .map(m => (
+              <option key={m.id} value={m.id} className="text-slate-900">
+                {formatMarketplaceName(m, marketplaces)}
+              </option>
+            ))}
         </select>
 
         <button 

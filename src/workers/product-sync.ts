@@ -6,6 +6,7 @@ import { eq, and, inArray, sql, lte } from 'drizzle-orm'
 import { Worker, Queue, type Job } from 'bullmq'
 import IORedis from 'ioredis'
 import { getAdapterForIntegration } from '@/workers/marketplace-sync'
+import { getShopifyStoreName } from '@/lib/marketplaces'
 
 export const QUEUE_PRODUCT_SYNC = process.env.NODE_ENV === 'production' ? 'product-sync' : 'product-sync-dev'
 
@@ -221,7 +222,8 @@ export async function syncProductsForCompany(companyId: string, integrationId?: 
         'shopware': 'Shopware',
         'mirakl_custom': 'Marktplatz'
       }
-      const displayName = meta?.customName || fallbackNames[integration.type] || integration.type
+      const shopifyName = integration.type === 'shopify' ? getShopifyStoreName(integration) : null
+      const displayName = (shopifyName ? `Shopify (${shopifyName})` : null) || meta?.customName || fallbackNames[integration.type] || integration.type
 
       let doneMessage = `Import abgeschlossen: ${totalCount} Produkte gefunden.`
       if (toUpsertUnmapped.length === 0) {
@@ -572,7 +574,8 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
       'shopware': 'Shopware',
       'mirakl_custom': 'Limango'
     }
-    const displayName = meta?.customName || fallbackNames[marketplace] || marketplace
+    const shopifyName = marketplace === 'shopify' ? getShopifyStoreName(integration) : null
+    const displayName = (shopifyName ? `Shopify (${shopifyName})` : null) || meta?.customName || fallbackNames[marketplace] || marketplace
 
     if (job) {
       await job.updateProgress({

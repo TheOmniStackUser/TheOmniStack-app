@@ -1,13 +1,15 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Plus, X, Loader2 } from 'lucide-react'
+import { Plus, X, Loader2, AlertCircle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { addManualMapping } from '@/app/actions/products'
+import { formatMarketplaceName } from '@/lib/marketplaces'
 
 export function AddMappingClient({ productId, activeIntegrations }: { productId: string, activeIntegrations: any[] }) {
   const [isOpen, setIsOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const router = useRouter()
 
   const [integrationId, setIntegrationId] = useState(activeIntegrations[0]?.id || '')
@@ -18,15 +20,16 @@ export function AddMappingClient({ productId, activeIntegrations }: { productId:
     e.preventDefault()
     if (!sku.trim()) return
     setIsSubmitting(true)
+    setErrorMessage(null)
     try {
       await addManualMapping(productId, integrationId, sku, ean)
       setIsOpen(false)
       setSku('')
       setEan('')
       router.refresh()
-    } catch (e) {
-      console.error(e)
-      alert('Fehler beim Hinzufügen des Mappings.')
+    } catch (err: any) {
+      console.error(err)
+      setErrorMessage(err?.message || 'Fehler beim Hinzufügen des Mappings.')
     } finally {
       setIsSubmitting(false)
     }
@@ -54,6 +57,13 @@ export function AddMappingClient({ productId, activeIntegrations }: { productId:
         </button>
       </div>
 
+      {errorMessage && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-xs text-red-700">
+          <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+          <span>{errorMessage}</span>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-1.5">
           <label className="text-xs font-semibold text-slate-700">Marktplatz</label>
@@ -62,11 +72,13 @@ export function AddMappingClient({ productId, activeIntegrations }: { productId:
             onChange={e => setIntegrationId(e.target.value)}
             className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 text-slate-900"
           >
-            {activeIntegrations.map(int => (
-              <option key={int.id} value={int.id}>
-                {int.type === 'mirakl_custom' && int.metadata?.customName ? int.metadata.customName : int.type}
-              </option>
-            ))}
+            {[...activeIntegrations]
+              .sort((a, b) => formatMarketplaceName(a, activeIntegrations).localeCompare(formatMarketplaceName(b, activeIntegrations), 'de'))
+              .map(int => (
+                <option key={int.id} value={int.id} className="text-slate-900">
+                  {formatMarketplaceName(int, activeIntegrations)}
+                </option>
+              ))}
           </select>
         </div>
 

@@ -3,9 +3,11 @@
 import { useState, useEffect } from 'react'
 import { triggerManualSyncAction } from '@/app/actions/sync'
 import { useRouter } from 'next/navigation'
+import { formatMarketplaceName } from '@/lib/marketplaces'
 
 export function ManualImport({ 
   customMiraklIntegrations = [],
+  shopifyIntegrations = [],
   hasKauflandIntegration = false,
   hasEbayIntegration = false,
   hasOttoIntegration = false,
@@ -16,6 +18,7 @@ export function ManualImport({
   hasAmazonIntegration = false,
 }: { 
   customMiraklIntegrations?: any[]
+  shopifyIntegrations?: any[]
   hasKauflandIntegration?: boolean
   hasEbayIntegration?: boolean
   hasOttoIntegration?: boolean
@@ -59,7 +62,21 @@ export function ManualImport({
     // Core / direct integrations
     if (hasOttoIntegration) direct.push({ value: 'otto', label: 'Otto' })
     if (hasAboutYouIntegration) direct.push({ value: 'aboutyou', label: 'About You' })
-    if (hasShopifyIntegration) direct.push({ value: 'shopify', label: 'Shopify' })
+    if (shopifyIntegrations.length > 1) {
+      shopifyIntegrations.forEach((integration) => {
+        direct.push({
+          value: `shopify_${integration.id}`,
+          label: formatMarketplaceName(integration, shopifyIntegrations),
+        })
+      })
+    } else if (shopifyIntegrations.length === 1) {
+      direct.push({
+        value: `shopify_${shopifyIntegrations[0].id}`,
+        label: formatMarketplaceName(shopifyIntegrations[0], shopifyIntegrations),
+      })
+    } else if (hasShopifyIntegration) {
+      direct.push({ value: 'shopify', label: 'Shopify' })
+    }
     if (hasKauflandIntegration) direct.push({ value: 'kaufland', label: 'Kaufland' })
     if (hasEbayIntegration) direct.push({ value: 'ebay', label: 'eBay' })
     if (hasEtsyIntegration) direct.push({ value: 'etsy', label: 'Etsy' })

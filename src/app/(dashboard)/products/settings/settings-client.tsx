@@ -4,29 +4,17 @@ import { useState } from 'react'
 import { updateMarketplaceSyncSettings } from '@/app/actions/products'
 import type { MarketplaceSyncSettings } from '@/app/actions/products'
 import { Save, Check, ServerCrash, CheckCircle2, AlertCircle, X } from 'lucide-react'
+import { formatMarketplaceName } from '@/lib/marketplaces'
 
-function getMarketplaceName(integration: any) {
-  if (integration.type === 'mirakl_custom' && integration.metadata?.customName) {
-    return integration.metadata.customName
-  }
-  const names: Record<string, string> = {
-    amazon: 'Amazon',
-    otto: 'Otto Market',
-    shopify: 'Shopify',
-    aboutyou: 'About You',
-    kaufland: 'Kaufland',
-    ebay: 'eBay',
-    woocommerce: 'WooCommerce',
-    shopware: 'Shopware',
-    mirakl_decathlon: 'Decathlon',
-    mirakl_decathlon_eu: 'Decathlon EU',
-    mirakl_mediamarkt: 'MediaMarkt',
-    mirakl_custom: 'Custom Mirakl',
-  }
-  return names[integration.type] || integration.type
-}
-
-function IntegrationCard({ integration, showNotification }: { integration: any, showNotification: any }) {
+function IntegrationCard({ 
+  integration, 
+  allIntegrations,
+  showNotification 
+}: { 
+  integration: any
+  allIntegrations?: any[]
+  showNotification: any 
+}) {
   const metadata = (integration.metadata as any) || {}
   const customNameLower = (metadata?.customName || '').toLowerCase()
   const isSekMarketplace = customNameLower.includes('se') || metadata?.shopId === '4362'
@@ -64,10 +52,11 @@ function IntegrationCard({ integration, showNotification }: { integration: any, 
   const [isSaving, setIsSaving] = useState(false)
 
   const handleSave = async () => {
+    const displayName = formatMarketplaceName(integration, allIntegrations)
     setIsSaving(true)
     try {
       await updateMarketplaceSyncSettings(integration.id, settings)
-      showNotification(`${getMarketplaceName(integration)} Einstellungen gespeichert.`, undefined, 'success')
+      showNotification(`${displayName} Einstellungen gespeichert.`, undefined, 'success')
     } catch (err: any) {
       showNotification('Fehler beim Speichern', err.message, 'error')
     } finally {
@@ -75,10 +64,12 @@ function IntegrationCard({ integration, showNotification }: { integration: any, 
     }
   }
 
+  const displayName = formatMarketplaceName(integration, allIntegrations)
+
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col">
       <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-        <h2 className="text-xl font-bold text-slate-900">{getMarketplaceName(integration)}</h2>
+        <h2 className="text-xl font-bold text-slate-900">{displayName}</h2>
         
         <label className="flex items-center cursor-pointer gap-3">
           <span className="text-sm font-semibold text-slate-700">Sync Aktiv</span>
@@ -100,7 +91,7 @@ function IntegrationCard({ integration, showNotification }: { integration: any, 
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between">
             <div>
               <p className="font-bold text-slate-900">Bestandsabgleich</p>
-              <p className="text-xs text-slate-500 mt-1">Automatisch Lagerbestände an {getMarketplaceName(integration)} senden.</p>
+              <p className="text-xs text-slate-500 mt-1">Automatisch Lagerbestände an {displayName} senden.</p>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
               <input 
@@ -116,7 +107,7 @@ function IntegrationCard({ integration, showNotification }: { integration: any, 
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between">
             <div>
               <p className="font-bold text-slate-900">Preisabgleich</p>
-              <p className="text-xs text-slate-500 mt-1">Automatisch Preise an {getMarketplaceName(integration)} senden.</p>
+              <p className="text-xs text-slate-500 mt-1">Automatisch Preise an {displayName} senden.</p>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
               <input 
@@ -140,7 +131,7 @@ function IntegrationCard({ integration, showNotification }: { integration: any, 
                 )}
               </p>
               <p className="text-xs text-slate-500 mt-1">
-                Echten positiven Bestand an {getMarketplaceName(integration)} senden, wenn ein Produkt auf 'Vorbestellung' steht (Lieferzeit manuell im Marktplatz angepasst). Wenn deaktiviert, wird bei Vorbesteller-Artikeln Bestand 0 übertragen.
+                Echten positiven Bestand an {displayName} senden, wenn ein Produkt auf 'Vorbestellung' steht (Lieferzeit manuell im Marktplatz angepasst). Wenn deaktiviert, wird bei Vorbesteller-Artikeln Bestand 0 übertragen.
               </p>
             </div>
             <label className="relative inline-flex items-center cursor-pointer shrink-0 ml-4">
@@ -158,7 +149,7 @@ function IntegrationCard({ integration, showNotification }: { integration: any, 
         <div className={`pt-4 border-t border-slate-100 transition-all ${!settings.syncPrice ? 'opacity-50 pointer-events-none' : ''}`}>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-4">
             <h3 className="text-sm font-bold text-slate-900">Preisaufschlag / Discount</h3>
-            <span className="text-xs text-slate-500">Regeln für Preisübertragung an {getMarketplaceName(integration)}</span>
+            <span className="text-xs text-slate-500">Regeln für Preisübertragung an {displayName}</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -441,7 +432,7 @@ export function SyncSettingsClient({ integrations }: { integrations: any[] }) {
       )}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {integrations.map((integration) => (
-          <IntegrationCard key={integration.id} integration={integration} showNotification={showNotification} />
+          <IntegrationCard key={integration.id} integration={integration} allIntegrations={integrations} showNotification={showNotification} />
         ))}
       </div>
     </>

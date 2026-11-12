@@ -3,7 +3,7 @@
 import { useActionState, useState } from 'react'
 import { saveDpdIntegrationAction, testDpdConnectionAction, disconnectDpdAction, type DpdActionState } from '@/app/actions/dpd'
 import type { DpdConfig } from '@/adapters/shipping/dpd'
-import { Eye, EyeOff, CheckCircle, XCircle, Loader, Settings, ShieldCheck, Trash2, AlertTriangle } from 'lucide-react'
+import { Eye, EyeOff, CheckCircle, XCircle, Loader, Settings, ShieldCheck, Trash2, AlertTriangle, HelpCircle, Info, X, Copy, Check } from 'lucide-react'
 
 export function DpdIntegrationForm({
   initialDelisId = '',
@@ -26,6 +26,17 @@ export function DpdIntegrationForm({
 
   const [testStatus, setTestStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle')
   const [testMessage, setTestMessage] = useState('')
+
+  // DelisID Help Modal
+  const [showDelisIdHelpModal, setShowDelisIdHelpModal] = useState(false)
+  const [copiedTemplate, setCopiedTemplate] = useState(false)
+
+  const copyTemplateToClipboard = () => {
+    const text = `Sehr geehrte Damen und Herren,\n\nbitte schalten Sie für unsere DPD-Kundennummer [Hier DPD-Kundennummer eintragen] die DPD B2B Web Services (LoginService & ShipmentService) für die Direktanbindung unseres Versand- und Rechnungssystems frei und senden Sie uns die DelisID sowie das dazugehörige Passwort zu.\n\nVielen Dank!\nMit freundlichen Grüßen`
+    navigator.clipboard.writeText(text)
+    setCopiedTemplate(true)
+    setTimeout(() => setCopiedTemplate(false), 2500)
+  }
 
   // Custom disconnect confirmation modal
   const [showDisconnectModal, setShowDisconnectModal] = useState(false)
@@ -98,11 +109,40 @@ export function DpdIntegrationForm({
             )}
           </div>
 
+          {/* Quick DelisID Info Banner */}
+          <div className="bg-red-50/70 border border-red-100 rounded-xl p-3.5 flex items-start justify-between gap-3 text-xs">
+            <div className="flex items-start gap-2.5">
+              <Info className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+              <p className="text-slate-700 leading-relaxed">
+                <strong className="text-slate-900 font-semibold">Was ist die DelisID?</strong> Das ist dein technischer API-Benutzername für die DPD-Schnittstelle – nicht deine gewohnte E-Mail-Adresse.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowDelisIdHelpModal(true)}
+              className="text-red-600 hover:text-red-700 font-bold whitespace-nowrap inline-flex items-center gap-1 hover:underline cursor-pointer"
+            >
+              <HelpCircle className="w-3.5 h-3.5" />
+              <span>Hilfe & Anleitung</span>
+            </button>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                DelisID (Benutzername) <span className="text-red-500">*</span>
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  DelisID (Benutzername) <span className="text-red-500">*</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowDelisIdHelpModal(true)}
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-600 hover:text-red-700 transition-colors cursor-pointer"
+                  title="Hilfe zur DelisID anzeigen"
+                >
+                  <HelpCircle className="w-3.5 h-3.5" />
+                  <span>Was ist das?</span>
+                </button>
+              </div>
               <input
                 type="text"
                 name="delisId"
@@ -112,6 +152,16 @@ export function DpdIntegrationForm({
                 placeholder="z. B. de_itbisco_dpd"
                 className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 placeholder:text-slate-500 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all"
               />
+              <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-slate-500">
+                <span>API-Benutzername laut DPD (z. B. <code className="text-slate-700 font-mono bg-slate-100 px-1 py-0.5 rounded">de_...</code>)</span>
+                <button
+                  type="button"
+                  onClick={() => setShowDelisIdHelpModal(true)}
+                  className="text-red-600 hover:text-red-700 hover:underline font-medium whitespace-nowrap cursor-pointer"
+                >
+                  Wo finde ich sie?
+                </button>
+              </div>
               {state?.errors?.delisId && (
                 <p className="mt-1 text-xs text-red-600">{state.errors.delisId[0]}</p>
               )}
@@ -133,7 +183,7 @@ export function DpdIntegrationForm({
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -143,33 +193,47 @@ export function DpdIntegrationForm({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                Depot-Nummer
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Depot-Nummer
+                </label>
+                <span className="text-[10px] font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                  optional
+                </span>
+              </div>
               <input
                 type="text"
                 name="depot"
                 value={depot}
                 onChange={(e) => setDepot(e.target.value)}
-                placeholder="z. B. 0150 (optional, wird autom. ermittelt)"
+                placeholder="z. B. 0150 (optional – autom. ermittelt)"
                 className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 placeholder:text-slate-500 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all"
               />
-              <p className="text-[11px] text-slate-500 mt-1">DPD Standort-Depot. Bleibt es leer, wird es automatisch beim Login ausgelesen.</p>
+              <p className="text-[11px] text-slate-500 mt-1 leading-snug">
+                Dein 4-stelliges DPD-Standort-Depot. Bleibt es leer, wird es automatisch beim Login ausgelesen.
+              </p>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                Kundennummer
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Kundennummer
+                </label>
+                <span className="text-[10px] font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                  optional
+                </span>
+              </div>
               <input
                 type="text"
                 name="customerNumber"
                 value={customerNumber}
                 onChange={(e) => setCustomerNumber(e.target.value)}
-                placeholder="z. B. 12345678 (optional)"
+                placeholder="z. B. 12345678 (optional – autom. ermittelt)"
                 className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 placeholder:text-slate-500 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all"
               />
-              <p className="text-[11px] text-slate-500 mt-1">Deine DPD Kundennummer für Rechnungsstellung und Berichte.</p>
+              <p className="text-[11px] text-slate-500 mt-1 leading-snug">
+                Deine kaufmännische DPD-Vertragsnummer (aus DPD-Vertrag / Rechnung). Bleibt das Feld leer, wird sie beim Login automatisch über deine DelisID ermittelt.
+              </p>
             </div>
           </div>
 
@@ -321,7 +385,7 @@ export function DpdIntegrationForm({
                 type="button"
                 disabled={isDisconnecting}
                 onClick={() => setShowDisconnectModal(false)}
-                className="px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
+                className="px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
               >
                 Abbrechen
               </button>
@@ -329,10 +393,150 @@ export function DpdIntegrationForm({
                 type="button"
                 disabled={isDisconnecting}
                 onClick={handleDisconnect}
-                className="px-4 py-2 text-sm font-bold bg-red-600 hover:bg-red-700 text-white rounded-xl transition-colors inline-flex items-center gap-2"
+                className="px-4 py-2 text-sm font-bold bg-red-600 hover:bg-red-700 text-white rounded-xl transition-colors inline-flex items-center gap-2 cursor-pointer"
               >
                 {isDisconnecting && <Loader className="w-4 h-4 animate-spin text-white" />}
                 Verbindung trennen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom DelisID Help Modal */}
+      {showDelisIdHelpModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 overflow-y-auto">
+          <div
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
+            onClick={() => setShowDelisIdHelpModal(false)}
+          />
+          <div className="relative bg-white rounded-2xl p-6 sm:p-7 shadow-2xl w-full max-w-xl border border-slate-200 text-left my-8 z-10 max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-start justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-900">DPD Zugangsdaten: Was ist die DelisID?</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Schnelle Übersicht und Hilfe zur DPD-Schnittstelle</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDelisIdHelpModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                title="Schließen"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-5 py-4 text-sm text-slate-600">
+              {/* 1. Was ist die DelisID? */}
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80">
+                <h4 className="font-bold text-slate-900 text-sm mb-1.5 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                  1. Was ist die DelisID?
+                </h4>
+                <p className="text-xs leading-relaxed text-slate-700">
+                  Die <strong>DelisID</strong> ist deine technische Benutzerkennung für die <strong>DPD B2B Web Services</strong> (die Schnittstelle zur automatisierten Erstellung von DPD-Versandetiketten).
+                </p>
+                <div className="mt-2.5 text-xs bg-amber-50 text-amber-900 border border-amber-200 rounded-lg p-2.5 font-medium leading-relaxed">
+                  ⚠️ <strong>Wichtig:</strong> Die DelisID ist <u>nicht</u> deine E-Mail-Adresse für das MyDPD-Kundenportal! Sie beginnt typischerweise mit <code className="bg-amber-100/90 px-1.5 py-0.5 rounded font-mono text-slate-900 font-semibold">de_...</code> (z. B. <code className="bg-amber-100/90 px-1.5 py-0.5 rounded font-mono text-slate-900">de_itbisco_dpd</code>) oder <code className="bg-amber-100/90 px-1.5 py-0.5 rounded font-mono text-slate-900 font-semibold">delis_...</code>.
+                </div>
+              </div>
+
+              {/* 2. Woher bekomme ich meine DelisID? */}
+              <div>
+                <h4 className="font-bold text-slate-900 text-sm mb-2 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                  2. Wo finde ich meine DelisID?
+                </h4>
+                <div className="space-y-2 text-xs text-slate-700">
+                  <div className="p-3 bg-white border border-slate-200 rounded-xl leading-relaxed">
+                    <span className="font-bold text-slate-900 block mb-0.5">📄 DPD Zugangsdaten-Schreiben / E-Mail:</span>
+                    Nach Freischaltung der DPD Web Services sendet dir DPD ein Datenblatt oder eine E-Mail mit dem Betreff <em>„Zugangsdaten DPD Web Services“</em>, worin DelisID und das zugehörige Passwort aufgeführt sind.
+                  </div>
+                  <div className="p-3 bg-white border border-slate-200 rounded-xl leading-relaxed">
+                    <span className="font-bold text-slate-900 block mb-0.5">📞 Über deinen DPD Kundenbetreuer / Depot:</span>
+                    Hast du noch keine Web-Services-Zugangsdaten? Kontaktiere einfach deinen persönlichen DPD-Vertriebsansprechpartner oder den IT-Support deines DPD-Depots.
+                  </div>
+                </div>
+
+                {/* Email Template */}
+                <div className="mt-3 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="font-semibold text-slate-800">Vorlage für deine Anfrage bei DPD:</span>
+                    <button
+                      type="button"
+                      onClick={copyTemplateToClipboard}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-[11px] font-bold text-slate-700 transition-colors cursor-pointer shadow-sm"
+                    >
+                      {copiedTemplate ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          <span className="text-emerald-700">Kopiert!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5 text-slate-500" />
+                          <span>Vorlage kopieren</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-[11px] font-mono text-slate-600 bg-white p-2.5 rounded-lg border border-slate-200 whitespace-pre-line leading-relaxed">
+                    „Sehr geehrte Damen und Herren,{'\n'}
+                    bitte schalten Sie für unsere DPD-Kundennummer [Hier DPD-Kundennummer eintragen] die DPD B2B Web Services (LoginService & ShipmentService) frei und senden Sie uns die DelisID sowie das dazugehörige Passwort zu.{'\n'}
+                    Vielen Dank!“
+                  </p>
+                </div>
+              </div>
+
+              {/* 3. Unterschied der Felder */}
+              <div>
+                <h4 className="font-bold text-slate-900 text-sm mb-2 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                  3. Unterschied der Felder auf einen Blick
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50">
+                    <span className="font-bold text-slate-900 block">DelisID (Benutzername):</span>
+                    <span className="text-slate-600">Technischer Schnittstellen-Login (Pflichtfeld, z. B. <code className="text-slate-800 font-mono">de_itbisco_dpd</code>).</span>
+                  </div>
+                  <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50">
+                    <span className="font-bold text-slate-900 block">Passwort:</span>
+                    <span className="text-slate-600">Das zugehörige API-Passwort von DPD (Pflichtfeld).</span>
+                  </div>
+                  <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50">
+                    <span className="font-bold text-slate-900 block">Kundennummer:</span>
+                    <span className="text-slate-600">Deine DPD-Vertragsnummer. <strong>Optional:</strong> Wird beim Login automatisch aus der DelisID ausgelesen!</span>
+                  </div>
+                  <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50">
+                    <span className="font-bold text-slate-900 block">Depot-Nummer:</span>
+                    <span className="text-slate-600">Dein 4-stelliges Betreuungsdepot (z. B. 0150). <strong>Optional:</strong> Wird ebenfalls automatisch ermittelt.</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 4. Tipp: Verbindung testen */}
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-start gap-2.5">
+                <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                <p className="leading-relaxed">
+                  <strong>Tipp:</strong> Sobald du DelisID und Passwort eingetragen hast, klicke unten einfach auf <strong>„Verbindung testen“</strong>. Unser System verbindet sich mit DPD und liest dein Depot und deine Kundennummer automatisch aus.
+                </p>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowDelisIdHelpModal(false)}
+                className="px-5 py-2 text-sm font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-xl transition-colors cursor-pointer"
+              >
+                Alles klar, schließen
               </button>
             </div>
           </div>
