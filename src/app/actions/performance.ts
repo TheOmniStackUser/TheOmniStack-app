@@ -80,6 +80,8 @@ function calculateDateRange(preset: TimeRangePreset, customFrom?: string, custom
     fromDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 89, 0, 0, 0, 0)
   } else if (preset === 'this_year') {
     fromDate = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0)
+  } else if (preset === '365d') {
+    fromDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 364, 0, 0, 0, 0)
   } else if (preset === 'all_time') {
     fromDate = new Date(now.getFullYear() - 5, 0, 1, 0, 0, 0, 0)
   } else if (preset === 'custom' && customFrom) {
@@ -218,20 +220,76 @@ export async function getPerformanceAnalytics(filters: PerformanceFilterOptions)
     .from(products)
     .where(eq(products.companyId, companyId))
 
+  // 6. Fetch previous year (N-1) orders for YoY comparison
+  const prevYearFromDate = new Date(fromDate.getFullYear() - 1, fromDate.getMonth(), fromDate.getDate(), 0, 0, 0, 0)
+  const prevYearToDate = new Date(toDate.getFullYear() - 1, toDate.getMonth(), toDate.getDate(), 23, 59, 59, 999)
+
+  const prevYearOrdersWhere = [
+    eq(orders.companyId, companyId),
+    eq(orders.isArchived, false),
+    ne(orders.status, 'draft'),
+    ne(orders.status, 'cancelled'),
+    sql`coalesce(${orders.marketplacePurchaseDate}, ${orders.createdAt}) >= ${prevYearFromDate.toISOString()}`,
+    sql`coalesce(${orders.marketplacePurchaseDate}, ${orders.createdAt}) <= ${prevYearToDate.toISOString()}`,
+  ]
+  if (selectedMarketplace !== 'all') {
+    prevYearOrdersWhere.push(eq(orders.marketplace, selectedMarketplace))
+  }
+
+  const prevYearOrdersPromise = db
+    .select({
+      id: orders.id,
+      totalAmount: orders.totalAmount,
+      currency: orders.currency,
+      date: sql<string>`coalesce(${orders.marketplacePurchaseDate}, ${orders.createdAt})`,
+    })
+    .from(orders)
+    .where(and(...prevYearOrdersWhere))
+
+  // 7. Fetch previous 2nd year (N-2) orders for multi-year comparison
+  const prevYear2FromDate = new Date(fromDate.getFullYear() - 2, fromDate.getMonth(), fromDate.getDate(), 0, 0, 0, 0)
+  const prevYear2ToDate = new Date(toDate.getFullYear() - 2, toDate.getMonth(), toDate.getDate(), 23, 59, 59, 999)
+
+  const prevYear2OrdersWhere = [
+    eq(orders.companyId, companyId),
+    eq(orders.isArchived, false),
+    ne(orders.status, 'draft'),
+    ne(orders.status, 'cancelled'),
+    sql`coalesce(${orders.marketplacePurchaseDate}, ${orders.createdAt}) >= ${prevYear2FromDate.toISOString()}`,
+    sql`coalesce(${orders.marketplacePurchaseDate}, ${orders.createdAt}) <= ${prevYear2ToDate.toISOString()}`,
+  ]
+  if (selectedMarketplace !== 'all') {
+    prevYear2OrdersWhere.push(eq(orders.marketplace, selectedMarketplace))
+  }
+
+  const prevYear2OrdersPromise = db
+    .select({
+      id: orders.id,
+      totalAmount: orders.totalAmount,
+      currency: orders.currency,
+      date: sql<string>`coalesce(${orders.marketplacePurchaseDate}, ${orders.createdAt})`,
+    })
+    .from(orders)
+    .where(and(...prevYear2OrdersWhere))
+
   const [
     integrations,
     currentOrders,
     previousOrders,
     returnsList,
     returnedItemsList,
-    productsList
+    productsList,
+    prevYearOrders,
+    prevYear2Orders
   ] = await Promise.all([
     integrationsPromise,
     currentOrdersPromise,
     previousOrdersPromise,
     returnsPromise,
     returnedItemsPromise,
-    productsPromise
+    productsPromise,
+    prevYearOrdersPromise,
+    prevYear2OrdersPromise
   ])
 
   // Get order IDs from current period to fetch item details
@@ -369,18 +427,55 @@ export async function getPerformanceAnalytics(filters: PerformanceFilterOptions)
     }
   }
 
+  // Aggregate previous year (N-1) daily values
+  const prevYearDailyMap: Record<string, { revenue: number; orders: number }> = {}
+  for (const o of prevYearOrders) {
+    const dayKey = new Date(o.date).toISOString().split('T')[0]
+    if (!prevYearDailyMap[dayKey]) prevYearDailyMap[dayKey] = { revenue: 0, orders: 0 }
+    prevYearDailyMap[dayKey].revenue += (parseFloat(o.totalAmount || '0') || 0) * getEurRate(o.currency)
+    prevYearDailyMap[dayKey].orders += 1
+  }
+
+  // Aggregate previous 2nd year (N-2) daily values
+  const prevYear2DailyMap: Record<string, { revenue: number; orders: number }> = {}
+  for (const o of prevYear2Orders) {
+    const dayKey = new Date(o.date).toISOString().split('T')[0]
+    if (!prevYear2DailyMap[dayKey]) prevYear2DailyMap[dayKey] = { revenue: 0, orders: 0 }
+    prevYear2DailyMap[dayKey].revenue += (parseFloat(o.totalAmount || '0') || 0) * getEurRate(o.currency)
+    prevYear2DailyMap[dayKey].orders += 1
+  }
+
   const timeline: TimelineDataPoint[] = Object.keys(dailyMap)
     .sort()
     .map(key => {
       const parts = key.split('-')
-      const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
+      const y = parseInt(parts[0], 10)
+      const m = parseInt(parts[1], 10)
+      const dNum = parseInt(parts[2], 10)
+      const d = new Date(y, m - 1, dNum)
       const label = d.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })
+
+      // Exact date minus 1 year and 2 years (handling Feb 29 for leap years)
+      let prevDay = dNum
+      if (m === 2 && dNum === 29) prevDay = 28
+      const prevYearKey = `${y - 1}-${String(m).padStart(2, '0')}-${String(prevDay).padStart(2, '0')}`
+      const prevYear2Key = `${y - 2}-${String(m).padStart(2, '0')}-${String(prevDay).padStart(2, '0')}`
+
+      const py = prevYearDailyMap[prevYearKey]
+      const py2 = prevYear2DailyMap[prevYear2Key]
+
       return {
         date: key,
         label,
         revenue: Number(dailyMap[key].revenue.toFixed(2)),
         orders: dailyMap[key].orders,
-        units: Math.round(dailyMap[key].units)
+        units: Math.round(dailyMap[key].units),
+        prevYearDate: prevYearKey,
+        prevYearRevenue: py ? Number(py.revenue.toFixed(2)) : 0,
+        prevYearOrders: py ? py.orders : 0,
+        prevYear2Date: prevYear2Key,
+        prevYear2Revenue: py2 ? Number(py2.revenue.toFixed(2)) : 0,
+        prevYear2Orders: py2 ? py2.orders : 0
       }
     })
 
@@ -534,6 +629,32 @@ export async function getPerformanceAnalytics(filters: PerformanceFilterOptions)
     name: getMarketplaceName(id)
   }))
 
+  // Calculate totals for previous years
+  let pyTotalRev = 0
+  for (const o of prevYearOrders) {
+    pyTotalRev += (parseFloat(o.totalAmount || '0') || 0) * getEurRate(o.currency)
+  }
+  let py2TotalRev = 0
+  for (const o of prevYear2Orders) {
+    py2TotalRev += (parseFloat(o.totalAmount || '0') || 0) * getEurRate(o.currency)
+  }
+
+  const previousYearSummary = {
+    year: fromDate.getFullYear() - 1,
+    totalRevenue: Number(pyTotalRev.toFixed(2)),
+    totalOrders: prevYearOrders.length,
+    growthPercentRevenue: calculatePercentChange(currentTotalRev, pyTotalRev),
+    growthPercentOrders: calculatePercentChange(currentOrdersCount, prevYearOrders.length)
+  }
+
+  const previousYear2Summary = {
+    year: fromDate.getFullYear() - 2,
+    totalRevenue: Number(py2TotalRev.toFixed(2)),
+    totalOrders: prevYear2Orders.length,
+    growthPercentRevenue: calculatePercentChange(currentTotalRev, py2TotalRev),
+    growthPercentOrders: calculatePercentChange(currentOrdersCount, prevYear2Orders.length)
+  }
+
   return {
     timeRange: {
       preset: filters.timeRange,
@@ -581,7 +702,9 @@ export async function getPerformanceAnalytics(filters: PerformanceFilterOptions)
     },
     timeline,
     marketplaces,
-    products: productsData
+    products: productsData,
+    previousYearSummary,
+    previousYear2Summary
   }
 }
 

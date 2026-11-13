@@ -5,6 +5,7 @@ import {
   ResponsiveContainer,
   AreaChart,
   Area,
+  Line,
   BarChart,
   Bar,
   PieChart,
@@ -43,34 +44,114 @@ function formatCurrencyFull(val: number): string {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2 }).format(val)
 }
 
-// Custom Glassmorphic Dark Tooltip
-function CustomTimelineTooltip({ active, payload, label }: any) {
+// Custom Glassmorphic Dark Tooltip with YoY Comparison
+function CustomTimelineTooltip({ active, payload, label, showPrevYear, showPrevYear2 }: any) {
   if (active && payload && payload.length) {
     const data: TimelineDataPoint = payload[0].payload
+    const pyRev = data.prevYearRevenue ?? 0
+    const pyOrd = data.prevYearOrders ?? 0
+    const revDiff = pyRev > 0 ? Number((((data.revenue - pyRev) / pyRev) * 100).toFixed(1)) : null
+
+    const py2Rev = data.prevYear2Revenue ?? 0
+    const py2Ord = data.prevYear2Orders ?? 0
+    const rev2Diff = py2Rev > 0 ? Number((((data.revenue - py2Rev) / py2Rev) * 100).toFixed(1)) : null
+
     return (
-      <div className="bg-slate-900/95 backdrop-blur-md text-white p-3.5 rounded-xl shadow-xl border border-slate-700/80 text-xs space-y-1.5 min-w-[170px]">
-        <p className="font-semibold text-slate-300 border-b border-slate-700/80 pb-1">{data.label} ({data.date})</p>
-        <div className="flex justify-between items-center text-cyan-400 font-medium">
-          <span>Umsatz:</span>
-          <span className="font-bold">{formatCurrencyFull(data.revenue)}</span>
+      <div className="bg-slate-900/95 backdrop-blur-md text-white p-3.5 rounded-xl shadow-xl border border-slate-700/80 text-xs space-y-2 min-w-[210px]">
+        <p className="font-semibold text-slate-300 border-b border-slate-700/80 pb-1">
+          {data.label} ({data.date})
+        </p>
+
+        {/* Current values */}
+        <div className="space-y-1">
+          <div className="flex justify-between items-center text-cyan-400 font-medium">
+            <span>Umsatz:</span>
+            <span className="font-bold">{formatCurrencyFull(data.revenue)}</span>
+          </div>
+          <div className="flex justify-between items-center text-blue-300">
+            <span>Bestellungen:</span>
+            <span className="font-bold text-white">{data.orders}</span>
+          </div>
+          <div className="flex justify-between items-center text-indigo-300">
+            <span>Einheiten:</span>
+            <span className="font-bold text-white">{data.units}</span>
+          </div>
         </div>
-        <div className="flex justify-between items-center text-blue-300">
-          <span>Bestellungen:</span>
-          <span className="font-bold text-white">{data.orders}</span>
-        </div>
-        <div className="flex justify-between items-center text-indigo-300">
-          <span>Einheiten:</span>
-          <span className="font-bold text-white">{data.units}</span>
-        </div>
+
+        {/* Vorjahr N-1 */}
+        {showPrevYear && (
+          <div className="pt-1.5 border-t border-slate-700/80 space-y-1 text-amber-300">
+            <div className="flex justify-between items-center font-medium">
+              <span>Vorjahr ({data.prevYearDate}):</span>
+              <span className="font-bold">{formatCurrencyFull(pyRev)}</span>
+            </div>
+            {revDiff !== null && (
+              <div className="flex justify-between items-center text-[11px] text-slate-300">
+                <span>YoY Veränderung:</span>
+                <span className={revDiff >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                  {revDiff >= 0 ? `+${revDiff}%` : `${revDiff}%`}
+                </span>
+              </div>
+            )}
+            <div className="flex justify-between items-center text-[11px] text-slate-300">
+              <span>Vorjahr Bestellungen:</span>
+              <span className="font-semibold text-white">{pyOrd}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Vor-Vorjahr N-2 */}
+        {showPrevYear2 && (
+          <div className="pt-1.5 border-t border-slate-700/80 space-y-1 text-purple-300">
+            <div className="flex justify-between items-center font-medium">
+              <span>Vor-Vorjahr ({data.prevYear2Date}):</span>
+              <span className="font-bold">{formatCurrencyFull(py2Rev)}</span>
+            </div>
+            {rev2Diff !== null && (
+              <div className="flex justify-between items-center text-[11px] text-slate-300">
+                <span>YoY Veränderung:</span>
+                <span className={rev2Diff >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                  {rev2Diff >= 0 ? `+${rev2Diff}%` : `${rev2Diff}%`}
+                </span>
+              </div>
+            )}
+            <div className="flex justify-between items-center text-[11px] text-slate-300">
+              <span>Vor-Vorjahr Bestellungen:</span>
+              <span className="font-semibold text-white">{py2Ord}</span>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
   return null
 }
 
-export function RevenueOrdersTimelineChart({ data }: { data: TimelineDataPoint[] }) {
+export function RevenueOrdersTimelineChart({ 
+  data,
+  previousYearSummary,
+  previousYear2Summary
+}: { 
+  data: TimelineDataPoint[]
+  previousYearSummary?: {
+    year: number
+    totalRevenue: number
+    totalOrders: number
+    growthPercentRevenue: number
+    growthPercentOrders: number
+  }
+  previousYear2Summary?: {
+    year: number
+    totalRevenue: number
+    totalOrders: number
+    growthPercentRevenue: number
+    growthPercentOrders: number
+  }
+}) {
   const [mounted, setMounted] = useState(false)
   const [viewMetric, setViewMetric] = useState<'both' | 'revenue' | 'orders'>('both')
+  const [showPrevYear, setShowPrevYear] = useState(false)
+  const [showPrevYear2, setShowPrevYear2] = useState(false)
 
   useEffect(() => {
     setMounted(true)
@@ -90,38 +171,107 @@ export function RevenueOrdersTimelineChart({ data }: { data: TimelineDataPoint[]
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         <div>
           <h4 className="text-sm font-semibold text-slate-900">Umsatz & Bestellverlauf</h4>
           <p className="text-xs text-slate-500">Tägliche Entwicklung im ausgewählten Zeitraum</p>
         </div>
-        <div className="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs font-medium">
-          <button
-            onClick={() => setViewMetric('both')}
-            className={`px-3 py-1 rounded-md transition-all ${
-              viewMetric === 'both' ? 'bg-white text-slate-900 shadow-sm font-semibold' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Kombiniert
-          </button>
-          <button
-            onClick={() => setViewMetric('revenue')}
-            className={`px-3 py-1 rounded-md transition-all ${
-              viewMetric === 'revenue' ? 'bg-white text-cyan-600 shadow-sm font-semibold' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Nur Umsatz
-          </button>
-          <button
-            onClick={() => setViewMetric('orders')}
-            className={`px-3 py-1 rounded-md transition-all ${
-              viewMetric === 'orders' ? 'bg-white text-blue-600 shadow-sm font-semibold' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Nur Bestellungen
-          </button>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Vorjahres-Vergleich Toggles */}
+          <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-xl border border-slate-200">
+            <span className="text-[10px] font-bold text-slate-400 uppercase px-1">Vergleich:</span>
+            <button
+              onClick={() => setShowPrevYear(!showPrevYear)}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                showPrevYear
+                  ? 'bg-amber-500 text-white shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+              }`}
+              title="Vorjahr (-1 Jahr) einblenden"
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${showPrevYear ? 'bg-white' : 'bg-amber-500'}`} />
+              Vorjahr {previousYearSummary ? `(${previousYearSummary.year})` : '(-1J)'}
+            </button>
+            <button
+              onClick={() => setShowPrevYear2(!showPrevYear2)}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                showPrevYear2
+                  ? 'bg-violet-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+              }`}
+              title="Vor-Vorjahr (-2 Jahre) einblenden"
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${showPrevYear2 ? 'bg-white' : 'bg-violet-500'}`} />
+              Vor-Vorjahr {previousYear2Summary ? `(${previousYear2Summary.year})` : '(-2J)'}
+            </button>
+          </div>
+
+          {/* Metric View Mode */}
+          <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-medium">
+            <button
+              onClick={() => setViewMetric('both')}
+              className={`px-3 py-1 rounded-lg transition-all ${
+                viewMetric === 'both' ? 'bg-white text-slate-900 shadow-sm font-semibold' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Kombiniert
+            </button>
+            <button
+              onClick={() => setViewMetric('revenue')}
+              className={`px-3 py-1 rounded-lg transition-all ${
+                viewMetric === 'revenue' ? 'bg-white text-cyan-600 shadow-sm font-semibold' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Nur Umsatz
+            </button>
+            <button
+              onClick={() => setViewMetric('orders')}
+              className={`px-3 py-1 rounded-lg transition-all ${
+                viewMetric === 'orders' ? 'bg-white text-blue-600 shadow-sm font-semibold' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Nur Bestellungen
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Comparison Highlights Banner */}
+      {(showPrevYear || showPrevYear2) && (
+        <div className="flex flex-wrap items-center gap-3 pt-1">
+          {showPrevYear && previousYearSummary && (
+            <div className="flex items-center gap-2 text-xs bg-amber-50 border border-amber-200 rounded-xl px-3 py-1.5 text-amber-900">
+              <span className="w-2 h-2 rounded-full bg-amber-500" />
+              <span className="font-bold">Vorjahr ({previousYearSummary.year}):</span>
+              <span>Gesamt: <strong>{formatCurrencyFull(previousYearSummary.totalRevenue)}</strong></span>
+              <span>
+                YoY:{' '}
+                <strong className={previousYearSummary.growthPercentRevenue >= 0 ? 'text-emerald-700' : 'text-rose-700'}>
+                  {previousYearSummary.growthPercentRevenue >= 0 ? '+' : ''}{previousYearSummary.growthPercentRevenue}%
+                </strong>
+              </span>
+              <span className="text-amber-300">|</span>
+              <span>{previousYearSummary.totalOrders} Bestellungen</span>
+            </div>
+          )}
+          {showPrevYear2 && previousYear2Summary && (
+            <div className="flex items-center gap-2 text-xs bg-violet-50 border border-violet-200 rounded-xl px-3 py-1.5 text-violet-900">
+              <span className="w-2 h-2 rounded-full bg-violet-600" />
+              <span className="font-bold">Vor-Vorjahr ({previousYear2Summary.year}):</span>
+              <span>Gesamt: <strong>{formatCurrencyFull(previousYear2Summary.totalRevenue)}</strong></span>
+              <span>
+                YoY:{' '}
+                <strong className={previousYear2Summary.growthPercentRevenue >= 0 ? 'text-emerald-700' : 'text-rose-700'}>
+                  {previousYear2Summary.growthPercentRevenue >= 0 ? '+' : ''}{previousYear2Summary.growthPercentRevenue}%
+                </strong>
+              </span>
+              <span className="text-violet-300">|</span>
+              <span>{previousYear2Summary.totalOrders} Bestellungen</span>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="h-[320px] w-full">
         <ResponsiveContainer width="100%" height="100%">
@@ -167,7 +317,7 @@ export function RevenueOrdersTimelineChart({ data }: { data: TimelineDataPoint[]
                 tickFormatter={(val) => `${val}`}
               />
             )}
-            <Tooltip content={<CustomTimelineTooltip />} />
+            <Tooltip content={<CustomTimelineTooltip showPrevYear={showPrevYear} showPrevYear2={showPrevYear2} />} />
             
             {(viewMetric === 'both' || viewMetric === 'revenue') && (
               <Area
@@ -192,6 +342,58 @@ export function RevenueOrdersTimelineChart({ data }: { data: TimelineDataPoint[]
                 strokeWidth={2}
                 fillOpacity={1}
                 fill="url(#ordersGradient)"
+              />
+            )}
+
+            {/* Vorjahr (N-1) Comparison Lines */}
+            {showPrevYear && (viewMetric === 'both' || viewMetric === 'revenue') && (
+              <Line
+                yAxisId="left"
+                type="monotone"
+                dataKey="prevYearRevenue"
+                name={`Vorjahr ${previousYearSummary ? previousYearSummary.year : ''} (Umsatz)`}
+                stroke="#F59E0B"
+                strokeWidth={2}
+                strokeDasharray="4 4"
+                dot={false}
+              />
+            )}
+            {showPrevYear && (viewMetric === 'both' || viewMetric === 'orders') && (
+              <Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="prevYearOrders"
+                name={`Vorjahr ${previousYearSummary ? previousYearSummary.year : ''} (Bestellungen)`}
+                stroke="#F97316"
+                strokeWidth={2}
+                strokeDasharray="3 3"
+                dot={false}
+              />
+            )}
+
+            {/* Vor-Vorjahr (N-2) Comparison Lines */}
+            {showPrevYear2 && (viewMetric === 'both' || viewMetric === 'revenue') && (
+              <Line
+                yAxisId="left"
+                type="monotone"
+                dataKey="prevYear2Revenue"
+                name={`Vor-Vorjahr ${previousYear2Summary ? previousYear2Summary.year : ''} (Umsatz)`}
+                stroke="#8B5CF6"
+                strokeWidth={2}
+                strokeDasharray="2 2"
+                dot={false}
+              />
+            )}
+            {showPrevYear2 && (viewMetric === 'both' || viewMetric === 'orders') && (
+              <Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="prevYear2Orders"
+                name={`Vor-Vorjahr ${previousYear2Summary ? previousYear2Summary.year : ''} (Bestellungen)`}
+                stroke="#A855F7"
+                strokeWidth={2}
+                strokeDasharray="2 2"
+                dot={false}
               />
             )}
           </AreaChart>

@@ -186,6 +186,7 @@ export function PerformanceClient({ initialData }: { initialData: PerformanceAna
     { id: 'last_month', label: 'Letzter Monat' },
     { id: '90d', label: '90 Tage' },
     { id: 'this_year', label: 'Dieses Jahr' },
+    { id: '365d', label: '365 Tage' },
     { id: 'custom', label: 'Benutzerdefiniert' },
   ]
 
@@ -400,7 +401,11 @@ export function PerformanceClient({ initialData }: { initialData: PerformanceAna
 
           {/* Main Timeline Chart */}
           <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
-            <RevenueOrdersTimelineChart data={data.timeline} />
+            <RevenueOrdersTimelineChart
+              data={data.timeline}
+              previousYearSummary={data.previousYearSummary}
+              previousYear2Summary={data.previousYear2Summary}
+            />
           </div>
 
           {/* Secondary Stats: Operational & Quality Rates */}
