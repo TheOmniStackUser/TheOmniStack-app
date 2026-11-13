@@ -124,8 +124,9 @@ export function QuestionsClient({
   const [isAnswering, startAnswering] = useTransition()
   const [isSyncing, startSyncing] = useTransition()
 
-  // Modal State for Manual / Test Question creation
+  // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [showHelpModal, setShowHelpModal] = useState(false)
   const [modalForm, setModalForm] = useState<ManualQuestionInput>({
     marketplace: 'otto',
     customerName: '',
@@ -580,12 +581,28 @@ export function QuestionsClient({
               <MessageSquareText size={24} />
             </div>
             <div>
-              <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">
-                Kundenanfragen & Nachrichten
-              </h1>
-              <p className="text-sm text-slate-500 mt-0.5">
-                Marktplatz-Anfragen (OTTO u.a.) einsehen, Fristen überwachen und direkt beantworten.
-              </p>
+              <div className="flex items-center gap-2.5">
+                <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">
+                  Kundenanfragen & Nachrichten
+                </h1>
+                <button
+                  type="button"
+                  onClick={() => setShowHelpModal(true)}
+                  className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-100 hover:bg-cyan-100 text-slate-500 hover:text-cyan-700 transition-colors cursor-pointer border border-slate-200 hover:border-cyan-300 shadow-sm"
+                  title="Hilfe & Marktplatz-Informationen öffnen"
+                >
+                  <HelpCircle size={16} />
+                </button>
+              </div>
+              <div className="flex items-center gap-2.5 mt-1 flex-wrap">
+                <p className="text-sm text-slate-500">
+                  Marktplatz-Anfragen einsehen, Fristen überwachen und direkt beantworten.
+                </p>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-900 border border-amber-200 shadow-xs">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                  Derzeit aktiv: Exklusiv für OTTO Market (weitere Marktplätze folgen)
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -746,10 +763,10 @@ export function QuestionsClient({
               onChange={(e) => setSelectedMarketplace(e.target.value)}
               className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
             >
-              <option value="all">Alle Marktplätze</option>
+              <option value="all">Alle Marktplätze (aktuell: OTTO)</option>
               {activeMarketplaces.map((m) => (
                 <option key={m.id} value={m.id}>
-                  {m.name}
+                  {m.name} {m.id.toLowerCase() !== 'otto' ? '(in Kürze)' : ''}
                 </option>
               ))}
             </select>
@@ -1307,6 +1324,114 @@ export function QuestionsClient({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Help & Info Modal */}
+      {showHelpModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 overflow-y-auto">
+          <div
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
+            onClick={() => setShowHelpModal(false)}
+          />
+          <div className="relative bg-white rounded-2xl p-6 sm:p-7 shadow-2xl w-full max-w-2xl border border-slate-200 text-left my-8 z-10 max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-start justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-cyan-100 text-cyan-600 flex items-center justify-center flex-shrink-0">
+                  <HelpCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-900">Kundenanfragen & Marktplatz-Schnittstelle</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Übersicht zu Funktionen, Fristen und Marktplatz-Anbindung</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowHelpModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                title="Schließen"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content Body */}
+            <div className="space-y-4 py-4 text-sm text-slate-600">
+              {/* Notice: Exclusively for OTTO currently */}
+              <div className="bg-amber-50 p-4 rounded-xl border border-amber-200 text-amber-900">
+                <div className="flex items-start gap-3">
+                  <div className="p-1 rounded-lg bg-amber-100 text-amber-700 flex-shrink-0 mt-0.5">
+                    <AlertTriangle size={18} />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-amber-900 text-sm">
+                      Aktuell exklusiv für OTTO Market verfügbar
+                    </h4>
+                    <p className="text-xs leading-relaxed text-amber-800 mt-1">
+                      Die automatische Synchronisation und Beantwortung von Kundenanfragen ist derzeit <strong>ausschließlich für OTTO Market</strong> angebunden. 
+                      Weitere Marktplätze wie <strong>Amazon</strong> (Buyer-Seller Messaging), <strong>Kaufland</strong> und <strong>eBay</strong> befinden sich in der Entwicklung und werden schrittweise freigeschaltet.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 1. Synchronisation & Auto-Abruf */}
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80">
+                <h4 className="font-bold text-slate-900 text-sm mb-1.5 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-cyan-500"></span>
+                  1. Automatischer Abruf & Klärfälle
+                </h4>
+                <p className="text-xs leading-relaxed text-slate-700">
+                  TheOmniStack synchronisiert offene Kundenklärfälle (z. B. Fragen zu Lieferung, Retouren oder Reklamationen) <strong>automatisch alle 30 Minuten</strong> im Hintergrund. 
+                  Über den Button <strong>„Fragen abrufen“</strong> kannst du jederzeit sofort eine manuelle Aktualisierung anstoßen.
+                </p>
+                <p className="text-xs leading-relaxed text-slate-700 mt-2">
+                  Anfragen werden automatisch mit deinen Aufträgen anhand der OTTO-Bestellnummer (z. B. <code className="bg-slate-200/80 px-1 py-0.5 rounded font-mono text-slate-900">cbn...</code>) abgeglichen, sodass Kundenname, Artikel und Sendungsdaten sofort verknüpft sind.
+                </p>
+              </div>
+
+              {/* 2. SLA & Fristenüberwachung (48h Werktage) */}
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80">
+                <h4 className="font-bold text-slate-900 text-sm mb-1.5 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  2. SLA & Fristen-Countdown (48h an Werktagen)
+                </h4>
+                <p className="text-xs leading-relaxed text-slate-700">
+                  OTTO schreibt eine verbindliche Beantwortungsfrist von <strong>48 Geschäftsstunden</strong> (Montag bis Freitag) vor. 
+                  Die integrierte Fristuhr berechnet die verbleibende Zeit unter Berücksichtigung von Wochenenden minutengenau.
+                </p>
+                <ul className="mt-2 text-xs space-y-1.5 text-slate-700 list-disc list-inside">
+                  <li><strong>Neue Anfragen (Offen):</strong> Die Fristuhr läuft live herunter und warnt bei &lt; 24h Restzeit gelb bzw. rot vor drohenden SLA-Strafen oder Performance-Abzügen.</li>
+                  <li><strong>In Bearbeitung:</strong> Fälle, die aktuell in Prüfung oder Klärung sind, pausieren die Frist und haben keine aktive Strafandrohung.</li>
+                  <li><strong>Beantwortet / Erledigt:</strong> Nach dem Absenden der Antwort gilt der Klärfall als fristgerecht erledigt.</li>
+                </ul>
+              </div>
+
+              {/* 3. Beantwortung & Vorlagen */}
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80">
+                <h4 className="font-bold text-slate-900 text-sm mb-1.5 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                  3. Beantwortung & Schnellvorlagen
+                </h4>
+                <p className="text-xs leading-relaxed text-slate-700">
+                  Antworten werden direkt im Nachrichtenfenster formuliert und über das OTTO-Gateway an die geschützte Kundenadresse übermittelt. 
+                  Über die <strong>Schnellvorlagen</strong> (z. B. Sendungsverfolgung übermitteln, Retourenhilfe, Kulanz/Teilerstattung) sparst du wertvolle Zeit bei Routineanfragen.
+                </p>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="pt-4 border-t border-slate-100 flex items-center justify-end">
+              <button
+                type="button"
+                onClick={() => setShowHelpModal(false)}
+                className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold shadow-md transition-all cursor-pointer"
+              >
+                Verstanden
+              </button>
+            </div>
           </div>
         </div>
       )}
