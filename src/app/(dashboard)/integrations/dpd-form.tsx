@@ -149,7 +149,7 @@ export function DpdIntegrationForm({
                 value={delisId}
                 onChange={(e) => setDelisId(e.target.value)}
                 required
-                placeholder="z. B. de_itbisco_dpd"
+                placeholder="z. B. de_ihrefirma_dpd"
                 className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 placeholder:text-slate-500 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all"
               />
               <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-slate-500">
@@ -443,7 +443,7 @@ export function DpdIntegrationForm({
                   Die <strong>DelisID</strong> ist deine technische Benutzerkennung für die <strong>DPD B2B Web Services</strong> (die Schnittstelle zur automatisierten Erstellung von DPD-Versandetiketten).
                 </p>
                 <div className="mt-2.5 text-xs bg-amber-50 text-amber-900 border border-amber-200 rounded-lg p-2.5 font-medium leading-relaxed">
-                  ⚠️ <strong>Wichtig:</strong> Die DelisID ist <u>nicht</u> deine E-Mail-Adresse für das MyDPD-Kundenportal! Sie beginnt typischerweise mit <code className="bg-amber-100/90 px-1.5 py-0.5 rounded font-mono text-slate-900 font-semibold">de_...</code> (z. B. <code className="bg-amber-100/90 px-1.5 py-0.5 rounded font-mono text-slate-900">de_itbisco_dpd</code>) oder <code className="bg-amber-100/90 px-1.5 py-0.5 rounded font-mono text-slate-900 font-semibold">delis_...</code>.
+                  ⚠️ <strong>Wichtig:</strong> Die DelisID ist <u>nicht</u> deine E-Mail-Adresse für das MyDPD-Kundenportal! Sie beginnt typischerweise mit <code className="bg-amber-100/90 px-1.5 py-0.5 rounded font-mono text-slate-900 font-semibold">de_...</code> (z. B. <code className="bg-amber-100/90 px-1.5 py-0.5 rounded font-mono text-slate-900">de_ihrefirma_dpd</code>) oder <code className="bg-amber-100/90 px-1.5 py-0.5 rounded font-mono text-slate-900 font-semibold">delis_...</code>.
                 </div>
               </div>
 
@@ -503,7 +503,7 @@ export function DpdIntegrationForm({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                   <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50">
                     <span className="font-bold text-slate-900 block">DelisID (Benutzername):</span>
-                    <span className="text-slate-600">Technischer Schnittstellen-Login (Pflichtfeld, z. B. <code className="text-slate-800 font-mono">de_itbisco_dpd</code>).</span>
+                    <span className="text-slate-600">Technischer Schnittstellen-Login (Pflichtfeld, z. B. <code className="text-slate-800 font-mono">de_ihrefirma_dpd</code>).</span>
                   </div>
                   <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50">
                     <span className="font-bold text-slate-900 block">Passwort:</span>
