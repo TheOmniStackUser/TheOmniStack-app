@@ -24,6 +24,7 @@ import {
   ArrowUpDown
 } from 'lucide-react'
 import {
+  getQuestionsAction,
   answerQuestionAction,
   updateQuestionStatusAction,
   syncMarketplaceQuestionsAction,

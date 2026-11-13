@@ -62,6 +62,7 @@ export type NormalizedQuestion = {
   productTitle?: string
   marketplaceProductId?: string
   marketplaceOrderId?: string
+  orderId?: string
   subject: string
   questionText: string
   deadlineAt?: Date
