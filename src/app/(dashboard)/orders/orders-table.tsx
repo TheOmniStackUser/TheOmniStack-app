@@ -615,7 +615,7 @@ export function OrdersTable({
 
   // Dropdown actions states & helpers
   const [openMenuOrderId, setOpenMenuOrderId] = useState<string | null>(null)
-  const [menuPosition, setMenuPosition] = useState<{ top?: number; bottom?: number; left: number } | null>(null)
+  const [menuPosition, setMenuPosition] = useState<{ top?: number; bottom?: number; left: number; maxHeight?: number } | null>(null)
 
   // Build and sort marketplace categories
   const groupedMarketplaces = (() => {
@@ -701,7 +701,12 @@ export function OrdersTable({
   }, [])
 
   useEffect(() => {
-    const handleScrollOrResize = () => {
+    const handleScrollOrResize = (e: Event) => {
+      const target = e.target as HTMLElement | null
+      // Do not close menu if the scroll event occurred inside the menu itself
+      if (e.type === 'scroll' && target?.closest?.('.order-row-menu-dropdown')) {
+        return
+      }
       setOpenMenuOrderId(null)
       setMenuPosition(null)
     }
@@ -719,18 +724,23 @@ export function OrdersTable({
       setMenuPosition(null)
     } else {
       const rect = buttonElement.getBoundingClientRect()
-      const spaceBelow = window.innerHeight - rect.bottom
-      const estimatedMenuHeight = 420
+      const spaceBelow = window.innerHeight - rect.bottom - 12
+      const spaceAbove = rect.top - 12
+      const estimatedMenuHeight = 560
+      const left = Math.max(12, Math.min(window.innerWidth - 300, rect.right - 288))
 
-      if (spaceBelow < estimatedMenuHeight && rect.top > spaceBelow) {
+      // Prefer opening in the direction with more space if it doesn't fit downwards
+      if (spaceBelow < estimatedMenuHeight && spaceAbove > spaceBelow) {
         setMenuPosition({
-          bottom: Math.max(8, window.innerHeight - rect.top + 6),
-          left: Math.max(8, Math.min(window.innerWidth - 296, rect.right - 288)),
+          bottom: Math.max(12, window.innerHeight - rect.top + 6),
+          left,
+          maxHeight: Math.max(160, spaceAbove - 6),
         })
       } else {
         setMenuPosition({
-          top: Math.max(8, rect.bottom + 6),
-          left: Math.max(8, Math.min(window.innerWidth - 296, rect.right - 288)),
+          top: Math.max(12, rect.bottom + 6),
+          left,
+          maxHeight: Math.max(160, spaceBelow - 6),
         })
       }
       setOpenMenuOrderId(orderId)
@@ -3062,13 +3072,14 @@ const filteredOrders = orders;
                           {/* Dropdown Menu Portal */}
                           {openMenuOrderId === order.id && menuPosition && typeof document !== 'undefined' && createPortal(
                             <div
-                              className={`order-row-menu-dropdown fixed w-72 max-h-[calc(100vh-32px)] overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-2xl z-[9999] flex flex-col py-1 animate-in fade-in duration-150 ${
+                              className={`order-row-menu-dropdown fixed w-72 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-2xl z-[9999] flex flex-col py-1 animate-in fade-in duration-150 custom-scrollbar ${
                                 menuPosition.bottom !== undefined ? 'slide-in-from-bottom-2' : 'slide-in-from-top-2'
                               }`}
                               style={{
                                 top: menuPosition.top !== undefined ? `${menuPosition.top}px` : undefined,
                                 bottom: menuPosition.bottom !== undefined ? `${menuPosition.bottom}px` : undefined,
                                 left: `${menuPosition.left}px`,
+                                maxHeight: menuPosition.maxHeight !== undefined ? `${menuPosition.maxHeight}px` : 'calc(100vh - 24px)',
                               }}
                               onClick={(e) => e.stopPropagation()}
                             >

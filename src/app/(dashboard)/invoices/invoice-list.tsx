@@ -300,7 +300,7 @@ export function InvoiceList({
     return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)))
   }
 
-  const [menuPosition, setMenuPosition] = useState<{ top?: number; bottom?: number; left: number } | null>(null)
+  const [menuPosition, setMenuPosition] = useState<{ top?: number; bottom?: number; left: number; maxHeight?: number } | null>(null)
 
   // Row menu toggle
   const toggleRowMenu = (invoiceId: string, buttonElement: HTMLButtonElement) => {
@@ -309,18 +309,22 @@ export function InvoiceList({
       setMenuPosition(null)
     } else {
       const rect = buttonElement.getBoundingClientRect()
-      const spaceBelow = window.innerHeight - rect.bottom
-      const estimatedMenuHeight = 400
+      const spaceBelow = window.innerHeight - rect.bottom - 12
+      const spaceAbove = rect.top - 12
+      const estimatedMenuHeight = 450
+      const left = Math.max(12, Math.min(window.innerWidth - 300, rect.right - 288))
 
-      if (spaceBelow < estimatedMenuHeight && rect.top > spaceBelow) {
+      if (spaceBelow < estimatedMenuHeight && spaceAbove > spaceBelow) {
         setMenuPosition({
-          bottom: window.innerHeight - rect.top + 6,
-          left: Math.max(8, rect.right - 288)
+          bottom: Math.max(12, window.innerHeight - rect.top + 6),
+          left,
+          maxHeight: Math.max(160, spaceAbove - 6),
         })
       } else {
         setMenuPosition({
-          top: rect.bottom + 6,
-          left: Math.max(8, rect.right - 288)
+          top: Math.max(12, rect.bottom + 6),
+          left,
+          maxHeight: Math.max(160, spaceBelow - 6),
         })
       }
       setActiveRowMenuId(invoiceId)
@@ -329,14 +333,18 @@ export function InvoiceList({
 
   // Handle scroll or resize to close/reposition the active menu
   useEffect(() => {
-    const handleScrollOrResize = () => {
+    const handleScrollOrResize = (e: Event) => {
+      const target = e.target as HTMLElement | null
+      if (e.type === 'scroll' && target?.closest?.('.row-menu-dropdown')) {
+        return
+      }
       setActiveRowMenuId(null)
       setMenuPosition(null)
     }
-    window.addEventListener('scroll', handleScrollOrResize, { passive: true })
+    window.addEventListener('scroll', handleScrollOrResize, { passive: true, capture: true })
     window.addEventListener('resize', handleScrollOrResize)
     return () => {
-      window.removeEventListener('scroll', handleScrollOrResize)
+      window.removeEventListener('scroll', handleScrollOrResize, { capture: true })
       window.removeEventListener('resize', handleScrollOrResize)
     }
   }, [])
@@ -1892,11 +1900,12 @@ export function InvoiceList({
 
                       {activeRowMenuId === invoice.id && menuPosition && createPortal(
                         <div
-                          className={`row-menu-dropdown fixed w-72 bg-white border border-slate-200 rounded-xl shadow-2xl z-[999] flex flex-col py-1 animate-in fade-in duration-150 text-sm text-slate-700 font-medium ${menuPosition.bottom !== undefined ? 'slide-in-from-bottom-2' : 'slide-in-from-top-2'}`}
+                          className={`row-menu-dropdown fixed w-72 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-2xl z-[999] flex flex-col py-1 animate-in fade-in duration-150 text-sm text-slate-700 font-medium custom-scrollbar ${menuPosition.bottom !== undefined ? 'slide-in-from-bottom-2' : 'slide-in-from-top-2'}`}
                           style={{
                             top: menuPosition.top !== undefined ? `${menuPosition.top}px` : undefined,
                             bottom: menuPosition.bottom !== undefined ? `${menuPosition.bottom}px` : undefined,
                             left: `${menuPosition.left}px`,
+                            maxHeight: menuPosition.maxHeight !== undefined ? `${menuPosition.maxHeight}px` : 'calc(100vh - 24px)',
                           }}
                           onClick={(e) => e.stopPropagation()}
                         >
