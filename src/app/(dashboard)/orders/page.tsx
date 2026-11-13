@@ -34,10 +34,12 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   const fromDateParam = (params.fromDate as string) || null
   const toDateParam = (params.toDate as string) || null
 
+  const isArchivedView = status === 'archived'
+
   // Base where clause
   const whereConditions = [
     eq(orders.companyId, auth.activeCompanyId),
-    eq(orders.isArchived, false),
+    eq(orders.isArchived, isArchivedView),
     ne(orders.status, 'draft')
   ]
 
@@ -191,7 +193,9 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   }
 
   if (status !== 'all') {
-    if (status === 'refunded' && refunds) {
+    if (status === 'archived') {
+      // Handled in whereConditions via isArchivedView
+    } else if (status === 'refunded' && refunds) {
       if (refunds.fullyRefundedIds.length > 0) {
         whereConditions.push(inArray(orders.id, refunds.fullyRefundedIds))
       } else {
@@ -267,14 +271,25 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   }
 
   // Calculate top-level stats
-  const statsRows = await db.select({
-    status: orders.status,
-    count: sql<number>`count(*)`
-  }).from(orders).where(and(...[
-    eq(orders.companyId, auth.activeCompanyId),
-    eq(orders.isArchived, false),
-    ne(orders.status, 'draft')
-  ])).groupBy(orders.status)
+  const [statsRows, archivedCountRow] = await Promise.all([
+    db.select({
+      status: orders.status,
+      count: sql<number>`count(*)`
+    }).from(orders).where(and(...[
+      eq(orders.companyId, auth.activeCompanyId),
+      eq(orders.isArchived, false),
+      ne(orders.status, 'draft')
+    ])).groupBy(orders.status),
+    db.select({ count: sql<number>`count(*)` })
+      .from(orders)
+      .where(and(
+        eq(orders.companyId, auth.activeCompanyId),
+        eq(orders.isArchived, true),
+        ne(orders.status, 'draft')
+      ))
+  ])
+
+  const archivedCount = Number(archivedCountRow[0]?.count || 0)
 
   const stats = {
     total: statsRows.reduce((sum, r) => sum + Number(r.count), 0),
@@ -283,6 +298,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     laterShipment: statsRows.find(r => r.status === 'later_shipment')?.count || 0,
     shipped: statsRows.find(r => r.status === 'shipped')?.count || 0,
     cancelled: statsRows.find(r => r.status === 'cancelled')?.count || 0,
+    archived: archivedCount,
   }
 
   // Total count for pagination
@@ -480,38 +496,42 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
           <ManufacturerCsvDialog />
         </div>
         
-        <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
-          <Link href="/orders" className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all">
+        <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 xl:grid-cols-9 gap-3">
+          <Link href="/orders" className={`bg-white border rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all ${status === 'all' && !isArchivedView ? 'border-blue-500 ring-2 ring-blue-100 bg-blue-50/20' : 'border-gray-200'}`}>
             <span className="text-sm font-medium text-gray-500">Gesamt</span>
             <span className="text-2xl font-bold text-gray-900">{stats.total}</span>
           </Link>
-          <Link href="/orders?status=pending" className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all">
+          <Link href="/orders?status=pending" className={`bg-white border rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all ${status === 'pending' ? 'border-amber-500 ring-2 ring-amber-100 bg-amber-50/20' : 'border-gray-200'}`}>
             <span className="text-sm font-medium text-gray-500">Pending</span>
             <span className="text-2xl font-bold text-amber-600">{stats.pending}</span>
           </Link>
-          <Link href="/orders?status=processing" className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all">
+          <Link href="/orders?status=processing" className={`bg-white border rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all ${status === 'processing' ? 'border-blue-500 ring-2 ring-blue-100 bg-blue-50/20' : 'border-gray-200'}`}>
             <span className="text-sm font-medium text-gray-500">Processing</span>
             <span className="text-2xl font-bold text-blue-600">{stats.processing}</span>
           </Link>
-          <Link href="/orders?status=later_shipment" className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all">
+          <Link href="/orders?status=later_shipment" className={`bg-white border rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all ${status === 'later_shipment' ? 'border-purple-500 ring-2 ring-purple-100 bg-purple-50/20' : 'border-gray-200'}`}>
             <span className="text-sm font-medium text-gray-500">Späterer Versand</span>
             <span className="text-2xl font-bold text-purple-600">{stats.laterShipment}</span>
           </Link>
-          <Link href="/orders?status=shipped" className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all">
+          <Link href="/orders?status=shipped" className={`bg-white border rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all ${status === 'shipped' ? 'border-emerald-500 ring-2 ring-emerald-100 bg-emerald-50/20' : 'border-gray-200'}`}>
             <span className="text-sm font-medium text-gray-500">Versendet</span>
             <span className="text-2xl font-bold text-emerald-600">{stats.shipped}</span>
           </Link>
-          <Link href="/orders?status=cancelled" className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all">
+          <Link href="/orders?status=cancelled" className={`bg-white border rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all ${status === 'cancelled' ? 'border-red-500 ring-2 ring-red-100 bg-red-50/20' : 'border-gray-200'}`}>
             <span className="text-sm font-medium text-gray-500">Storniert</span>
             <span className="text-2xl font-bold text-red-600">{stats.cancelled}</span>
           </Link>
-          <Link href="/orders?status=refunded" className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all">
+          <Link href="/orders?status=refunded" className={`bg-white border rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all ${status === 'refunded' ? 'border-rose-500 ring-2 ring-rose-100 bg-rose-50/20' : 'border-gray-200'}`}>
             <span className="text-sm font-medium text-gray-500">Erstattet</span>
-            <span className="text-2xl font-bold text-red-600">{refunds.fullyRefundedIds.length}</span>
+            <span className="text-2xl font-bold text-rose-600">{refunds.fullyRefundedIds.length}</span>
           </Link>
-          <Link href="/orders?status=partially_refunded" className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all">
+          <Link href="/orders?status=partially_refunded" className={`bg-white border rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all ${status === 'partially_refunded' ? 'border-orange-500 ring-2 ring-orange-100 bg-orange-50/20' : 'border-gray-200'}`}>
             <span className="text-sm font-medium text-gray-500">Teilerstattet</span>
-            <span className="text-2xl font-bold text-red-600">{refunds.partiallyRefundedIds.length}</span>
+            <span className="text-2xl font-bold text-orange-600">{refunds.partiallyRefundedIds.length}</span>
+          </Link>
+          <Link href="/orders?status=archived" className={`bg-white border rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:border-gray-300 hover:shadow-md transition-all ${isArchivedView ? 'border-slate-700 ring-2 ring-slate-200 bg-slate-100/60' : 'border-gray-200'}`}>
+            <span className="text-sm font-medium text-gray-500">Archiviert</span>
+            <span className="text-2xl font-bold text-slate-700">{stats.archived}</span>
           </Link>
         </div>
       </header>

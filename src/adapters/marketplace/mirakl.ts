@@ -29,6 +29,45 @@ export class MiraklAdapter implements MarketplaceAdapter {
     this.marketplace = config.instance
   }
 
+  /**
+   * Calculates delay in milliseconds to wait before retrying when receiving HTTP 429.
+   * Parses 'Retry-After' (seconds or HTTP-date) and 'X-RateLimit-Reset', falling back
+   * to exponential backoff with random jitter.
+   */
+  private parseRetryDelayMs(response: Response, attempt: number, defaultDelayMs = 4000): number {
+    const retryAfterHeader = response.headers.get('retry-after')
+    if (retryAfterHeader) {
+      const seconds = parseInt(retryAfterHeader, 10)
+      if (!isNaN(seconds) && seconds >= 0) {
+        return seconds * 1000 + Math.floor(Math.random() * 1000) + 500
+      }
+      const dateMs = Date.parse(retryAfterHeader)
+      if (!isNaN(dateMs)) {
+        const diff = dateMs - Date.now()
+        if (diff > 0) {
+          return diff + Math.floor(Math.random() * 1000) + 500
+        }
+      }
+    }
+
+    const resetHeader = response.headers.get('x-ratelimit-reset')
+    if (resetHeader) {
+      const resetVal = parseInt(resetHeader, 10)
+      if (!isNaN(resetVal) && resetVal > 0) {
+        const nowSec = Math.floor(Date.now() / 1000)
+        if (resetVal > nowSec) {
+          return (resetVal - nowSec + 1) * 1000 + Math.floor(Math.random() * 1000)
+        } else if (resetVal < 3600) {
+          return resetVal * 1000 + Math.floor(Math.random() * 1000)
+        }
+      }
+    }
+
+    const exponential = Math.min(60000, defaultDelayMs * Math.pow(2, attempt))
+    const jitter = Math.floor(Math.random() * 1000)
+    return exponential + jitter
+  }
+
   async getSupportedCarriers(): Promise<{ code: string; label: string }[]> {
     if (this.supportedCarriersCache && Date.now() - this.supportedCarriersCacheTime < 3600000) {
       return this.supportedCarriersCache
@@ -167,10 +206,29 @@ export class MiraklAdapter implements MarketplaceAdapter {
       if (this.config.shopId) url += `&shop_id=${this.config.shopId}`
 
       const fetchAndFilterOrders = async () => {
-        const response = await fetch(url, {
-          method: 'GET',
-          headers
-        })
+        let orderRetryCount = 0
+        const maxOrderRetries = 4
+        let response: Response | null = null
+
+        while (orderRetryCount < maxOrderRetries) {
+          response = await fetch(url, {
+            method: 'GET',
+            headers
+          })
+
+          if (response.status === 429 && orderRetryCount < maxOrderRetries - 1) {
+            const delayMs = this.parseRetryDelayMs(response, orderRetryCount, 4000)
+            console.warn(`[MiraklAdapter:${this.marketplace}] Rate limited (429) fetching orders. Retrying in ${Math.ceil(delayMs / 1000)}s...`)
+            await new Promise(r => setTimeout(r, delayMs))
+            orderRetryCount++
+            continue
+          }
+          break
+        }
+
+        if (!response) {
+          throw new Error('Failed to fetch orders from Mirakl')
+        }
 
         const bodyText = await response.text()
         if (!response.ok) {
@@ -1714,7 +1772,10 @@ export class MiraklAdapter implements MarketplaceAdapter {
    * Fetch products/offers from the marketplace for inventory mapping.
    * Uses OF21 endpoint: GET /api/offers
    */
-  async fetchProducts(companyId: string): Promise<import('./base').MarketplaceProduct[]> {
+  async fetchProducts(
+    companyId: string,
+    onProgress?: (progress: number, total: number, message: string) => Promise<void> | void
+  ): Promise<import('./base').MarketplaceProduct[]> {
     try {
       const token = await this.getAccessToken()
       const headers: Record<string, string> = {
@@ -1735,27 +1796,56 @@ export class MiraklAdapter implements MarketplaceAdapter {
       }
 
       const baseUrl = this.config.baseUrl.replace(/\/$/, '')
-      let url = `${baseUrl}/api/offers?max=100`
+      const cleanBaseUrl = baseUrl.endsWith('/api') ? baseUrl : `${baseUrl}/api`
+      let url = `${cleanBaseUrl}/offers?max=100`
       if (this.config.shopId) {
         url += `&shop_id=${this.config.shopId}`
       }
 
+      const displayName = this.marketplace.toLowerCase().includes('decathlon') ? 'Decathlon' : this.marketplace
       console.log(`[MiraklAdapter:${this.marketplace}] Fetching offers via GET ${url}...`)
       
       let allOffers: any[] = []
       let offset = 0
       let hasMore = true
       let retryCount = 0
+      const maxRetries = 6
+      let totalCount: number | null = null
+      let interPageDelayMs = 1200 // Start with 1.2s delay to prevent rapid-fire requests
+
+      if (onProgress) {
+        await onProgress(0, 0, `Verbinde mit ${displayName}...`)
+      }
 
       while (hasMore) {
         const pagedUrl = `${url}&offset=${offset}`
         const response = await fetch(pagedUrl, { method: 'GET', headers })
 
-        if (response.status === 429 && retryCount < 3) {
-          console.warn(`[MiraklAdapter:${this.marketplace}] Rate limited (429). Retrying after 2s...`)
-          await new Promise(resolve => setTimeout(resolve, 2000))
-          retryCount++
-          continue
+        if (response.status === 429) {
+          if (retryCount < maxRetries) {
+            const delayMs = this.parseRetryDelayMs(response, retryCount, 4000)
+            const waitSec = Math.ceil(delayMs / 1000)
+            const errBody = await response.text().catch(() => '')
+            console.warn(`[MiraklAdapter:${this.marketplace}] Rate limited (429). Response body: "${errBody.slice(0, 200)}". Waiting ${waitSec}s before retry (attempt ${retryCount + 1}/${maxRetries})...`)
+            
+            if (onProgress) {
+              await onProgress(
+                allOffers.length, 
+                totalCount || 0, 
+                `${displayName} Rate-Limit (429) erreicht. Warte ${waitSec}s vor erneutem Versuch (Versuch ${retryCount + 1}/${maxRetries})...`
+              )
+            }
+
+            await new Promise(resolve => setTimeout(resolve, delayMs))
+            retryCount++
+            // Adaptive delay: slow down future inter-page requests if rate limit was hit
+            interPageDelayMs = Math.max(interPageDelayMs, 2500)
+            continue
+          } else {
+            const errBody = await response.text().catch(() => '')
+            console.error(`[MiraklAdapter:${this.marketplace}] Rate limit (429) exceeded after ${maxRetries} retries: ${errBody}`)
+            throw new Error(`Mirakl API Rate-Limit (429) nach ${maxRetries} Versuchen überschritten. Bitte warten Sie einige Minuten, bevor Sie den Import erneut starten.`)
+          }
         }
 
         if (!response.ok) {
@@ -1768,24 +1858,37 @@ export class MiraklAdapter implements MarketplaceAdapter {
         const offers = data.offers || []
         allOffers = allOffers.concat(offers)
 
-        if (offers.length < 100) {
+        if (typeof data.total_count === 'number') {
+          totalCount = data.total_count
+        }
+
+        if (onProgress) {
+          const currentTotal = totalCount || (hasMore ? allOffers.length + 100 : allOffers.length)
+          await onProgress(
+            allOffers.length,
+            currentTotal,
+            `Lade Angebote von ${displayName}... (${allOffers.length}${totalCount ? ` von ${totalCount}` : ''})`
+          )
+        }
+
+        if (offers.length === 0 || offers.length < 100 || (totalCount !== null && allOffers.length >= totalCount)) {
           hasMore = false
         } else {
           offset += 100
           retryCount = 0 // Reset retry count for next page
           // Small delay to prevent rapid-fire requests
-          await new Promise(resolve => setTimeout(resolve, 500))
+          await new Promise(resolve => setTimeout(resolve, interPageDelayMs))
         }
       }
 
       console.log(`[MiraklAdapter:${this.marketplace}] Fetched ${allOffers.length} offers total.`)
 
       return allOffers.map(offer => ({
-        marketplaceProductId: offer.offer_id,
-        sku: offer.shop_sku,
-        title: offer.product_title || offer.shop_sku,
-        price: offer.price,
-        stock: offer.quantity,
+        marketplaceProductId: String(offer.offer_id ?? offer.id ?? offer.shop_sku ?? ''),
+        sku: String(offer.shop_sku ?? offer.sku ?? offer.offer_id ?? ''),
+        title: offer.product_title || offer.product_name || offer.title || offer.shop_sku || 'Unbenanntes Produkt',
+        price: typeof offer.price === 'number' ? offer.price : (parseFloat(offer.price) || 0),
+        stock: typeof offer.quantity === 'number' ? offer.quantity : (offer.quantity ? parseInt(offer.quantity, 10) : 0),
         rawPayload: offer
       }))
     } catch (error) {
@@ -1857,7 +1960,7 @@ export class MiraklAdapter implements MarketplaceAdapter {
 
           let retryCount = 0
           let success = false
-          while (!success && retryCount < 3) {
+          while (!success && retryCount < 5) {
             const response = await fetch(stockUrl, {
               method: 'POST',
               headers: stockAuthHeaders,
@@ -1865,8 +1968,9 @@ export class MiraklAdapter implements MarketplaceAdapter {
             })
 
             if (response.status === 429) {
-              console.warn(`[MiraklAdapter:${this.marketplace}] Rate limited (429) during STO01 stock import. Retrying after 5s...`)
-              await new Promise(r => setTimeout(r, 5000))
+              const delayMs = this.parseRetryDelayMs(response, retryCount, 5000)
+              console.warn(`[MiraklAdapter:${this.marketplace}] Rate limited (429) during STO01 stock import. Retrying after ${Math.ceil(delayMs / 1000)}s...`)
+              await new Promise(r => setTimeout(r, delayMs))
               retryCount++
               continue
             }
@@ -2026,7 +2130,7 @@ export class MiraklAdapter implements MarketplaceAdapter {
           let retryCount = 0
           let success = false
           
-          while (!success && retryCount < 3) {
+          while (!success && retryCount < 5) {
             const response = await fetch(url, {
               method: 'POST',
               headers,
@@ -2034,8 +2138,9 @@ export class MiraklAdapter implements MarketplaceAdapter {
             })
 
             if (response.status === 429) {
-              console.warn(`[MiraklAdapter:${this.marketplace}] Rate limited (429) during offer update chunk (${i}-${i + chunk.length}). Retrying after 5s...`)
-              await new Promise(r => setTimeout(r, 5000))
+              const delayMs = this.parseRetryDelayMs(response, retryCount, 5000)
+              console.warn(`[MiraklAdapter:${this.marketplace}] Rate limited (429) during offer update chunk (${i}-${i + chunk.length}). Retrying after ${Math.ceil(delayMs / 1000)}s...`)
+              await new Promise(r => setTimeout(r, delayMs))
               retryCount++
               continue
             }

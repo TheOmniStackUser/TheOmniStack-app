@@ -25,10 +25,10 @@ export async function archiveOrderAction(orderId: string) {
       )
 
     revalidatePath('/orders')
-    return { success: true, message: 'Bestellung wurde erfolgreich gelöscht.' }
+    return { success: true, message: 'Bestellung wurde erfolgreich archiviert.' }
   } catch (error) {
     console.error('Error archiving order:', error)
-    return { error: 'Fehler beim Löschen der Bestellung.' }
+    return { error: 'Fehler beim Archivieren der Bestellung.' }
   }
 }
 
@@ -51,10 +51,58 @@ export async function archiveOrdersBulkAction(orderIds: string[]) {
       )
 
     revalidatePath('/orders')
-    return { success: true, message: `${orderIds.length} Bestellungen wurden erfolgreich gelöscht.` }
+    return { success: true, message: `${orderIds.length} Bestellung(en) wurden erfolgreich archiviert.` }
   } catch (error) {
     console.error('Error archiving orders:', error)
-    return { error: 'Fehler beim Löschen der Bestellungen.' }
+    return { error: 'Fehler beim Archivieren der Bestellungen.' }
+  }
+}
+
+export async function unarchiveOrderAction(orderId: string) {
+  try {
+    const auth = await requireAuth()
+
+    await db
+      .update(orders)
+      .set({ isArchived: false })
+      .where(
+        and(
+          eq(orders.id, orderId),
+          eq(orders.companyId, auth.activeCompanyId)
+        )
+      )
+
+    revalidatePath('/orders')
+    return { success: true, message: 'Bestellung wurde erfolgreich aus dem Archiv wiederhergestellt.' }
+  } catch (error) {
+    console.error('Error unarchiving order:', error)
+    return { error: 'Fehler beim Wiederherstellen der Bestellung.' }
+  }
+}
+
+export async function unarchiveOrdersBulkAction(orderIds: string[]) {
+  try {
+    const auth = await requireAuth()
+
+    if (!orderIds || orderIds.length === 0) {
+      return { error: 'Keine Bestellungen ausgewählt.' }
+    }
+
+    await db
+      .update(orders)
+      .set({ isArchived: false })
+      .where(
+        and(
+          inArray(orders.id, orderIds),
+          eq(orders.companyId, auth.activeCompanyId)
+        )
+      )
+
+    revalidatePath('/orders')
+    return { success: true, message: `${orderIds.length} Bestellung(en) wurden erfolgreich wiederhergestellt.` }
+  } catch (error) {
+    console.error('Error unarchiving orders:', error)
+    return { error: 'Fehler beim Wiederherstellen der Bestellungen.' }
   }
 }
 

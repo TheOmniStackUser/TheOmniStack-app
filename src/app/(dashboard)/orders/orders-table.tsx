@@ -4,10 +4,10 @@ import { useState, Fragment, ReactNode, useEffect, useMemo, useTransition, useRe
 import { createPortal } from 'react-dom'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
-import { Package, Truck, CheckCircle2, Store, Clock, XCircle, RefreshCw, Copy, Check, Calendar, Scissors, RotateCcw, AlertTriangle } from 'lucide-react'
+import { Package, Truck, CheckCircle2, Store, Clock, XCircle, RefreshCw, Copy, Check, Calendar, Scissors, RotateCcw, AlertTriangle, Archive, ArchiveRestore } from 'lucide-react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { generateHermesLabelsAction, generateDhlLabelsAction, generateSingleDhlReturnLabelAction, generateDpdLabelsAction } from '@/app/actions/shipping'
-import { archiveOrderAction, archiveOrdersBulkAction, updateOrderStatusAction, updateOrderAddressAction, updateOrderBillingAddressAction, generateOrDownloadInvoicesBulkAction, markOrderAsShippedManuallyAction, getOrderLabelsAction, updateOrderNotesAction, refundOrderAction, refundOrderPartialAction, updateOrderScheduledShipmentDateAction, bulkScheduleLaterShipmentAction, retryMarketplaceConfirmationAction, markMarketplaceConfirmationAsConfirmedAction, markMarketplaceConfirmationsBulkAction } from '@/app/actions/orders'
+import { archiveOrderAction, archiveOrdersBulkAction, unarchiveOrderAction, unarchiveOrdersBulkAction, updateOrderStatusAction, updateOrderAddressAction, updateOrderBillingAddressAction, generateOrDownloadInvoicesBulkAction, markOrderAsShippedManuallyAction, getOrderLabelsAction, updateOrderNotesAction, refundOrderAction, refundOrderPartialAction, updateOrderScheduledShipmentDateAction, bulkScheduleLaterShipmentAction, retryMarketplaceConfirmationAction, markMarketplaceConfirmationAsConfirmedAction, markMarketplaceConfirmationsBulkAction } from '@/app/actions/orders'
 import { getInvoiceDownloadUrl } from '@/app/actions/invoices'
 import type { Order, OrderItem } from '@/db/schema/orders'
 import type { Invoice, InvoiceLog } from '@/db/schema/invoices'
@@ -576,6 +576,10 @@ export function OrdersTable({
   const [dpdSelections, setDpdSelections] = useState<Record<string, { weight: number }>>({})
 
   const [deleteModalConfig, setDeleteModalConfig] = useState<{ show: boolean, isBulk: boolean, orderId?: string }>({ show: false, isBulk: false })
+  const [archiveModalConfig, setArchiveModalConfig] = useState<{ show: boolean, isBulk: boolean, orderId?: string }>({ show: false, isBulk: false })
+  const [unarchiveModalConfig, setUnarchiveModalConfig] = useState<{ show: boolean, isBulk: boolean, orderId?: string }>({ show: false, isBulk: false })
+  const [isArchiving, setIsArchiving] = useState(false)
+  const [isUnarchiving, setIsUnarchiving] = useState(false)
   const [refundModalConfig, setRefundModalConfig] = useState<{ show: boolean, orderId?: string }>({ show: false })
   const [isRefunding, setIsRefunding] = useState(false)
 
@@ -1091,6 +1095,7 @@ export function OrdersTable({
 
   const [draftMarketplace, setDraftMarketplace] = useState(urlParams.marketplace || 'all')
   const [draftStatus, setDraftStatus] = useState(urlParams.status || 'all')
+  const isArchivedView = urlParams.status === 'archived'
   const [draftShippingStatus, setDraftShippingStatus] = useState(urlParams.shippingStatus || 'all')
   const [draftCountry, setDraftCountry] = useState(urlParams.country || 'all')
   const [draftFromDate, setDraftFromDate] = useState(urlParams.fromDate || '')
@@ -1899,55 +1904,113 @@ const filteredOrders = orders;
     }
   }
 
-  const handleDelete = async (orderId: string) => {
-    setDeleteModalConfig({ show: true, isBulk: false, orderId })
+  const handleArchive = (orderId: string) => {
+    setArchiveModalConfig({ show: true, isBulk: false, orderId })
   }
 
-  const handleBulkDelete = async () => {
+  const handleBulkArchive = () => {
     const visibleSelected = orders.filter(o => selectedIds.has(o.id))
     if (visibleSelected.length === 0) return
-    setDeleteModalConfig({ show: true, isBulk: true })
+    setArchiveModalConfig({ show: true, isBulk: true })
   }
 
-  const confirmDelete = async () => {
-    if (deleteModalConfig.isBulk) {
-      setIsDeletingBulk(true)
+  const confirmArchive = async () => {
+    if (archiveModalConfig.isBulk) {
+      setIsArchiving(true)
       try {
         const ids = orders.filter(o => selectedIds.has(o.id)).map(o => o.id)
         const result = await archiveOrdersBulkAction(ids)
         if (result.error) {
           showToast(result.error, 'error')
         } else {
-          showToast(result.message, 'success')
+          showToast(result.message || 'Bestellungen wurden archiviert.', 'success')
           setSelectedIds(new Set())
         }
       } catch (e) {
         showToast('Fehler: ' + (e instanceof Error ? e.message : String(e)), 'error')
       } finally {
-        setIsDeletingBulk(false)
-        setDeleteModalConfig({ show: false, isBulk: false })
+        setIsArchiving(false)
+        setArchiveModalConfig({ show: false, isBulk: false })
       }
     } else {
-      if (!deleteModalConfig.orderId) return
+      if (!archiveModalConfig.orderId) return
+      setIsArchiving(true)
       try {
-        const result = await archiveOrderAction(deleteModalConfig.orderId)
+        const result = await archiveOrderAction(archiveModalConfig.orderId)
         if (result.error) {
           showToast(result.error, 'error')
         } else {
-          showToast(result.message, 'success')
+          showToast(result.message || 'Bestellung wurde archiviert.', 'success')
           setSelectedIds(prev => {
             const next = new Set(prev)
-            next.delete(deleteModalConfig.orderId!)
+            next.delete(archiveModalConfig.orderId!)
             return next
           })
         }
       } catch (e) {
-        showToast('Fehler beim Löschen.', 'error')
+        showToast('Fehler beim Archivieren.', 'error')
       } finally {
-        setDeleteModalConfig({ show: false, isBulk: false })
+        setIsArchiving(false)
+        setArchiveModalConfig({ show: false, isBulk: false })
       }
     }
   }
+
+  const handleUnarchive = (orderId: string) => {
+    setUnarchiveModalConfig({ show: true, isBulk: false, orderId })
+  }
+
+  const handleBulkUnarchive = () => {
+    const visibleSelected = orders.filter(o => selectedIds.has(o.id))
+    if (visibleSelected.length === 0) return
+    setUnarchiveModalConfig({ show: true, isBulk: true })
+  }
+
+  const confirmUnarchive = async () => {
+    if (unarchiveModalConfig.isBulk) {
+      setIsUnarchiving(true)
+      try {
+        const ids = orders.filter(o => selectedIds.has(o.id)).map(o => o.id)
+        const result = await unarchiveOrdersBulkAction(ids)
+        if (result.error) {
+          showToast(result.error, 'error')
+        } else {
+          showToast(result.message || 'Bestellungen wurden wiederhergestellt.', 'success')
+          setSelectedIds(new Set())
+        }
+      } catch (e) {
+        showToast('Fehler: ' + (e instanceof Error ? e.message : String(e)), 'error')
+      } finally {
+        setIsUnarchiving(false)
+        setUnarchiveModalConfig({ show: false, isBulk: false })
+      }
+    } else {
+      if (!unarchiveModalConfig.orderId) return
+      setIsUnarchiving(true)
+      try {
+        const result = await unarchiveOrderAction(unarchiveModalConfig.orderId)
+        if (result.error) {
+          showToast(result.error, 'error')
+        } else {
+          showToast(result.message || 'Bestellung wurde wiederhergestellt.', 'success')
+          setSelectedIds(prev => {
+            const next = new Set(prev)
+            next.delete(unarchiveModalConfig.orderId!)
+            return next
+          })
+        }
+      } catch (e) {
+        showToast('Fehler beim Wiederherstellen.', 'error')
+      } finally {
+        setIsUnarchiving(false)
+        setUnarchiveModalConfig({ show: false, isBulk: false })
+      }
+    }
+  }
+
+  const handleDelete = handleArchive
+  const handleBulkDelete = handleBulkArchive
+  const confirmDelete = confirmArchive
 
   const handleRefund = (orderId: string) => {
     setRefundModalConfig({ show: true, orderId })
@@ -2214,23 +2277,33 @@ const filteredOrders = orders;
             </button>
           )}
 
-          {selectedVisibleCount > 0 && (
+          {selectedVisibleCount > 0 && isArchivedView && (
             <button
-              onClick={handleBulkDelete}
-              disabled={isDeletingBulk || isGenerating}
-              className="flex items-center gap-2 bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 font-semibold py-2 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              onClick={handleBulkUnarchive}
+              disabled={isUnarchiving || isArchiving || isGenerating}
+              className="flex items-center gap-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-300 font-semibold py-2 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow-sm cursor-pointer"
             >
-              {isDeletingBulk ? (
-                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
+              {isUnarchiving ? (
+                <RefreshCw className="w-4 h-4 animate-spin text-emerald-600" />
               ) : (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
+                <ArchiveRestore className="w-4 h-4 text-emerald-600" />
               )}
-              Löschen ({selectedVisibleCount})
+              Wiederherstellen ({selectedVisibleCount})
+            </button>
+          )}
+
+          {selectedVisibleCount > 0 && !isArchivedView && (
+            <button
+              onClick={handleBulkArchive}
+              disabled={isArchiving || isUnarchiving || isGenerating}
+              className="flex items-center gap-2 bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300 font-semibold py-2 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow-sm cursor-pointer"
+            >
+              {isArchiving ? (
+                <RefreshCw className="w-4 h-4 animate-spin text-slate-600" />
+              ) : (
+                <Archive className="w-4 h-4 text-slate-600" />
+              )}
+              Archivieren ({selectedVisibleCount})
             </button>
           )}
 
@@ -2449,6 +2522,7 @@ const filteredOrders = orders;
             <option value="refunded">Erstattet</option>
             <option value="partially_refunded">Teilerstattet</option>
             <option value="marketplace_failed">⚠️ Marktplatz nicht bestätigt</option>
+            <option value="archived">📦 Archiviert</option>
           </select>
 
           {/* Shipping status filter temporarily hidden per user request */}
@@ -2628,6 +2702,31 @@ const filteredOrders = orders;
         </div>
       </div>
 
+      {/* Archived Orders Notice Banner */}
+      {isArchivedView && (
+        <div className="my-4 bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-slate-200 text-slate-700 rounded-lg shrink-0">
+              <Archive className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold text-slate-900">Archivierte Bestellungen</h4>
+              <p className="text-xs text-slate-500">Diese Bestellungen sind aus der regulären Übersicht ausgeblendet. Du kannst sie jederzeit wiederherstellen.</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setDraftStatus('all')
+              pushParams({ status: undefined, page: '1' })
+            }}
+            className="text-xs font-semibold text-blue-600 hover:text-blue-800 bg-white border border-slate-300 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors shadow-xs shrink-0 cursor-pointer"
+          >
+            Zurück zur aktiven Übersicht
+          </button>
+        </div>
+      )}
+
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
         {totalOrdersCount === 0 ? (
           <div className="p-8 text-center text-gray-500">
@@ -2755,6 +2854,15 @@ const filteredOrders = orders;
                               >
                                 <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
                                 Nicht bestätigt
+                              </span>
+                            )}
+                            {order.isArchived && (
+                              <span 
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-300 shadow-xs"
+                                title="Bestellung ist archiviert"
+                              >
+                                <Archive className="w-3 h-3 text-slate-500 shrink-0" />
+                                Archiviert
                               </span>
                             )}
                           </div>
@@ -2932,16 +3040,24 @@ const filteredOrders = orders;
                             </svg>
                           </button>
 
-                          {/* Delete Button */}
-                          <button
-                            onClick={() => handleDelete(order.id)}
-                            className="text-red-400 hover:text-red-600 transition-colors p-1.5 rounded-lg hover:bg-red-50"
-                            title="Bestellung löschen"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
+                          {/* Archive / Restore Button */}
+                          {order.isArchived ? (
+                            <button
+                              onClick={() => handleUnarchive(order.id)}
+                              className="text-emerald-600 hover:text-emerald-800 transition-colors p-1.5 rounded-lg hover:bg-emerald-50"
+                              title="Aus Archiv wiederherstellen"
+                            >
+                              <ArchiveRestore className="w-5 h-5" />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleArchive(order.id)}
+                              className="text-slate-400 hover:text-slate-700 transition-colors p-1.5 rounded-lg hover:bg-slate-100"
+                              title="Bestellung archivieren"
+                            >
+                              <Archive className="w-5 h-5" />
+                            </button>
+                          )}
 
                           {/* Dropdown Menu Portal */}
                           {openMenuOrderId === order.id && menuPosition && typeof document !== 'undefined' && createPortal(
@@ -3275,19 +3391,34 @@ const filteredOrders = orders;
 
                               <div className="border-t border-slate-100 my-1"></div>
 
-                              {/* 8. Bestellung löschen */}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setOpenMenuOrderId(null)
-                                  setMenuPosition(null)
-                                  handleDelete(order.id)
-                                }}
-                                className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 transition-colors whitespace-nowrap"
-                              >
-                                <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                Bestellung löschen
-                              </button>
+                              {/* 8. Bestellung archivieren / wiederherstellen */}
+                              {order.isArchived ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenMenuOrderId(null)
+                                    setMenuPosition(null)
+                                    handleUnarchive(order.id)
+                                  }}
+                                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-emerald-700 hover:bg-emerald-50 transition-colors whitespace-nowrap"
+                                >
+                                  <ArchiveRestore className="w-4 h-4 text-emerald-600" />
+                                  Aus Archiv wiederherstellen
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenMenuOrderId(null)
+                                    setMenuPosition(null)
+                                    handleArchive(order.id)
+                                  }}
+                                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-100 transition-colors whitespace-nowrap"
+                                >
+                                  <Archive className="w-4 h-4 text-slate-500" />
+                                  Bestellung archivieren
+                                </button>
+                              )}
                             </div>,
                             document.body
                           )}
@@ -4123,15 +4254,23 @@ const filteredOrders = orders;
                                   </svg>
                                   Bestellung erstatten
                                 </button>
-                                <button
-                                  onClick={() => handleDelete(order.id)}
-                                  className="text-sm text-red-600 hover:text-red-800 font-medium px-3 py-1.5 border border-red-200 hover:bg-red-50 rounded-md transition-colors flex items-center gap-2"
-                                >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                  </svg>
-                                  Bestellung löschen
-                                </button>
+                                {order.isArchived ? (
+                                  <button
+                                    onClick={() => handleUnarchive(order.id)}
+                                    className="text-sm text-emerald-700 hover:text-emerald-900 font-medium px-3 py-1.5 border border-emerald-300 hover:bg-emerald-50 rounded-md transition-colors flex items-center gap-2"
+                                  >
+                                    <ArchiveRestore className="w-4 h-4 text-emerald-600" />
+                                    Aus Archiv wiederherstellen
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => handleArchive(order.id)}
+                                    className="text-sm text-slate-700 hover:text-slate-900 font-medium px-3 py-1.5 border border-slate-300 hover:bg-slate-100 rounded-md transition-colors flex items-center gap-2"
+                                  >
+                                    <Archive className="w-4 h-4 text-slate-500" />
+                                    Bestellung archivieren
+                                  </button>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -4451,45 +4590,106 @@ const filteredOrders = orders;
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
-      {deleteModalConfig.show && (
+      {/* Archive Confirmation Modal */}
+      {(archiveModalConfig.show || deleteModalConfig.show) && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => !isDeletingBulk && setDeleteModalConfig({ show: false, isBulk: false })}></div>
-          <div className="relative bg-white rounded-2xl p-6 shadow-2xl w-full max-w-md border border-slate-200 flex flex-col">
+          <div 
+            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" 
+            onClick={() => !isArchiving && (setArchiveModalConfig({ show: false, isBulk: false }), setDeleteModalConfig({ show: false, isBulk: false }))}
+          ></div>
+          <div className="relative bg-white rounded-2xl p-6 shadow-2xl w-full max-w-md border border-slate-200 flex flex-col animate-in fade-in zoom-in-95 duration-150">
             <div className="mb-6 flex flex-col items-center text-center">
-              <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
+              <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mb-4 text-slate-700">
+                <Archive className="w-6 h-6 text-slate-700" />
               </div>
               <h3 className="text-xl font-bold text-slate-900 mb-2">
-                Bestellung{deleteModalConfig.isBulk ? 'en' : ''} löschen?
+                Bestellung{(archiveModalConfig.isBulk || deleteModalConfig.isBulk) ? 'en' : ''} archivieren?
               </h3>
               <p className="text-slate-500 text-sm">
-                Möchtest du wirklich {deleteModalConfig.isBulk ? `${selectedVisibleCount} Bestellungen` : 'diese Bestellung'} unwiderruflich löschen? Diese Aktion kann nicht rückgängig gemacht werden.
+                Möchtest du wirklich {(archiveModalConfig.isBulk || deleteModalConfig.isBulk) ? `${selectedVisibleCount} Bestellungen` : 'diese Bestellung'} archivieren? Archivierte Bestellungen werden aus der aktiven Übersicht ausgeblendet und können im Archiv jederzeit eingesehen oder wiederhergestellt werden.
               </p>
             </div>
             
-            <div className="flex gap-3 justify-end mt-4">
+            <div className="flex gap-3 justify-end mt-2">
               <button
-                onClick={() => setDeleteModalConfig({ show: false, isBulk: false })}
-                disabled={isDeletingBulk}
-                className="flex-1 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors disabled:opacity-50"
+                type="button"
+                onClick={() => {
+                  setArchiveModalConfig({ show: false, isBulk: false })
+                  setDeleteModalConfig({ show: false, isBulk: false })
+                }}
+                disabled={isArchiving}
+                className="flex-1 px-4 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors disabled:opacity-50 cursor-pointer"
               >
                 Abbrechen
               </button>
               <button
-                onClick={confirmDelete}
-                disabled={isDeletingBulk}
-                className="flex-1 flex justify-center items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-colors shadow-sm shadow-red-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                type="button"
+                onClick={confirmArchive}
+                disabled={isArchiving}
+                className="flex-1 flex justify-center items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
-                {isDeletingBulk ? (
-                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
+                {isArchiving ? (
+                  <>
+                    <RefreshCw className="animate-spin h-4 w-4 text-white" />
+                    <span>Archiviert...</span>
+                  </>
                 ) : (
-                  'Ja, löschen'
+                  <>
+                    <Archive className="w-4 h-4 text-white" />
+                    <span>Ja, archivieren</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Unarchive / Restore Confirmation Modal */}
+      {unarchiveModalConfig.show && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" 
+            onClick={() => !isUnarchiving && setUnarchiveModalConfig({ show: false, isBulk: false })}
+          ></div>
+          <div className="relative bg-white rounded-2xl p-6 shadow-2xl w-full max-w-md border border-slate-200 flex flex-col animate-in fade-in zoom-in-95 duration-150">
+            <div className="mb-6 flex flex-col items-center text-center">
+              <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mb-4 text-emerald-700">
+                <ArchiveRestore className="w-6 h-6 text-emerald-600" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-2">
+                Bestellung{unarchiveModalConfig.isBulk ? 'en' : ''} wiederherstellen?
+              </h3>
+              <p className="text-slate-500 text-sm">
+                Möchtest du wirklich {unarchiveModalConfig.isBulk ? `${selectedVisibleCount} Bestellungen` : 'diese Bestellung'} aus dem Archiv wiederherstellen? Sie werden wieder in der aktiven Bestellübersicht angezeigt.
+              </p>
+            </div>
+            
+            <div className="flex gap-3 justify-end mt-2">
+              <button
+                type="button"
+                onClick={() => setUnarchiveModalConfig({ show: false, isBulk: false })}
+                disabled={isUnarchiving}
+                className="flex-1 px-4 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                Abbrechen
+              </button>
+              <button
+                type="button"
+                onClick={confirmUnarchive}
+                disabled={isUnarchiving}
+                className="flex-1 flex justify-center items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium transition-colors shadow-sm shadow-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              >
+                {isUnarchiving ? (
+                  <>
+                    <RefreshCw className="animate-spin h-4 w-4 text-white" />
+                    <span>Wiederherstellen...</span>
+                  </>
+                ) : (
+                  <>
+                    <ArchiveRestore className="w-4 h-4 text-white" />
+                    <span>Ja, wiederherstellen</span>
+                  </>
                 )}
               </button>
             </div>
