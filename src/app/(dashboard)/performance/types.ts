@@ -71,6 +71,7 @@ export interface MarketplacePerformanceData {
 export interface ProductPerformanceData {
   sku: string
   title: string
+  mappingSkus?: string
   unitsSold: number
   revenue: number
   averagePrice: number

@@ -3,7 +3,7 @@
 import { requireAuth } from '@/lib/session'
 import { db } from '@/db/client'
 import { orders, orderItems } from '@/db/schema/orders'
-import { products } from '@/db/schema/products'
+import { products, productMappings } from '@/db/schema/products'
 import { returnsLog, returnedItems } from '@/db/schema/returns'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { eq, and, ne, gte, lte, sql, inArray } from 'drizzle-orm'
@@ -213,12 +213,22 @@ export async function getPerformanceAnalytics(filters: PerformanceFilterOptions)
   // 5. Fetch central products catalog for stock and titles
   const productsPromise = db
     .select({
+      id: products.id,
       sku: products.sku,
       title: products.title,
       currentStock: products.currentStock,
     })
     .from(products)
     .where(eq(products.companyId, companyId))
+
+  // 5b. Fetch product mappings to link marketplace listings to central catalog products
+  const productMappingsPromise = db
+    .select({
+      productId: productMappings.productId,
+      marketplaceSku: productMappings.marketplaceSku,
+    })
+    .from(productMappings)
+    .where(eq(productMappings.companyId, companyId))
 
   // 6. Fetch previous year (N-1) orders for YoY comparison
   const prevYearFromDate = new Date(fromDate.getFullYear() - 1, fromDate.getMonth(), fromDate.getDate(), 0, 0, 0, 0)
@@ -279,6 +289,7 @@ export async function getPerformanceAnalytics(filters: PerformanceFilterOptions)
     returnsList,
     returnedItemsList,
     productsList,
+    productMappingsList,
     prevYearOrders,
     prevYear2Orders
   ] = await Promise.all([
@@ -288,6 +299,7 @@ export async function getPerformanceAnalytics(filters: PerformanceFilterOptions)
     returnsPromise,
     returnedItemsPromise,
     productsPromise,
+    productMappingsPromise,
     prevYearOrdersPromise,
     prevYear2OrdersPromise
   ])
@@ -544,9 +556,46 @@ export async function getPerformanceAnalytics(filters: PerformanceFilterOptions)
     }
   }).sort((a, b) => b.revenue - a.revenue)
 
-  // --- Aggregate Product Performance ---
+  // --- Aggregate Product Performance (grouped by central catalog product where mapped) ---
+  const catalogProductById = new Map(productsList.map(p => [p.id, p]))
+  const catalogProductBySku = new Map(productsList.map(p => [p.sku.trim().toLowerCase(), p]))
+
+  // Map marketplaceSku (case-insensitive) to central product
+  const marketplaceSkuToCentralProduct = new Map<string, typeof productsList[0]>()
+  // For each central product ID, set of all associated SKUs (central SKU + mapped marketplace SKUs)
+  const productAllSkusMap = new Map<string, Set<string>>()
+
+  for (const p of productsList) {
+    const s = new Set<string>()
+    if (p.sku) s.add(p.sku.trim())
+    productAllSkusMap.set(p.id, s)
+  }
+
+  for (const m of productMappingsList) {
+    const central = catalogProductById.get(m.productId)
+    if (central && m.marketplaceSku) {
+      const cleanSku = m.marketplaceSku.trim()
+      marketplaceSkuToCentralProduct.set(cleanSku.toLowerCase(), central)
+      let skus = productAllSkusMap.get(m.productId)
+      if (!skus) {
+        skus = new Set()
+        productAllSkusMap.set(m.productId, skus)
+      }
+      skus.add(cleanSku)
+    }
+  }
+
+  // Helper to find central product for any SKU
+  const resolveCentralProduct = (sku: string) => {
+    const clean = sku.trim().toLowerCase()
+    return marketplaceSkuToCentralProduct.get(clean) || catalogProductBySku.get(clean) || null
+  }
+
   const productMap: Record<string, {
+    key: string
+    sku: string
     title: string
+    catalogProduct: typeof productsList[0] | null
     unitsSold: number
     revenue: number
     orderIds: Set<string>
@@ -554,14 +603,20 @@ export async function getPerformanceAnalytics(filters: PerformanceFilterOptions)
   }> = {}
 
   for (const item of currentOrderItems) {
-    const sku = (item.sku || 'SKU-OHNE').trim()
+    const rawSku = (item.sku || 'SKU-OHNE').trim()
     const qty = parseFloat(item.quantity || '0') || 0
     const price = parseFloat(item.unitPrice || '0') || 0
     const lineTotal = qty * price
 
-    if (!productMap[sku]) {
-      productMap[sku] = {
-        title: item.title || sku,
+    const central = resolveCentralProduct(rawSku)
+    const groupKey = central ? `prod_${central.id}` : `raw_${rawSku.toLowerCase()}`
+
+    if (!productMap[groupKey]) {
+      productMap[groupKey] = {
+        key: groupKey,
+        sku: central ? central.sku : rawSku,
+        title: central ? central.title : (item.title || rawSku),
+        catalogProduct: central,
         unitsSold: 0,
         revenue: 0,
         orderIds: new Set(),
@@ -569,27 +624,29 @@ export async function getPerformanceAnalytics(filters: PerformanceFilterOptions)
       }
     }
 
-    productMap[sku].unitsSold += qty
-    productMap[sku].revenue += lineTotal
-    productMap[sku].orderIds.add(item.orderId)
+    productMap[groupKey].unitsSold += qty
+    productMap[groupKey].revenue += lineTotal
+    productMap[groupKey].orderIds.add(item.orderId)
     const mp = orderMarketplaceMap.get(item.orderId)
-    if (mp) productMap[sku].marketplaces.add(mp)
+    if (mp) productMap[groupKey].marketplaces.add(mp)
   }
 
-  // Returns per SKU
-  const returnCountBySku: Record<string, number> = {}
+  // Returns per group (matching central product or raw SKU)
+  const returnCountByGroupKey: Record<string, number> = {}
   for (const retItem of returnedItemsList) {
-    const sku = retItem.skuOrProductName.trim()
-    returnCountBySku[sku] = (returnCountBySku[sku] || 0) + (retItem.quantity || 1)
+    const rawSku = (retItem.skuOrProductName || '').trim()
+    if (!rawSku) continue
+    const central = resolveCentralProduct(rawSku)
+    const groupKey = central ? `prod_${central.id}` : `raw_${rawSku.toLowerCase()}`
+    returnCountByGroupKey[groupKey] = (returnCountByGroupKey[groupKey] || 0) + (retItem.quantity || 1)
   }
 
-  // Catalog products map for stock and catalog title
-  const catalogProductsMap = new Map(productsList.map(p => [p.sku.trim(), p]))
-
-  const productsData: ProductPerformanceData[] = Object.keys(productMap).map(sku => {
-    const item = productMap[sku]
-    const catalogProduct = catalogProductsMap.get(sku)
-    const stock = catalogProduct?.currentStock ? parseInt(catalogProduct.currentStock, 10) : null
+  const productsData: ProductPerformanceData[] = Object.keys(productMap).map(groupKey => {
+    const item = productMap[groupKey]
+    const central = item.catalogProduct
+    const stock = central?.currentStock !== undefined && central?.currentStock !== null
+      ? parseInt(central.currentStock, 10)
+      : null
     
     let stockStatus: 'in_stock' | 'low_stock' | 'out_of_stock' | 'untracked' = 'untracked'
     if (stock !== null) {
@@ -598,13 +655,18 @@ export async function getPerformanceAnalytics(filters: PerformanceFilterOptions)
       else stockStatus = 'in_stock'
     }
 
-    const retCount = returnCountBySku[sku] || 0
+    const retCount = returnCountByGroupKey[groupKey] || 0
     const retRate = item.unitsSold > 0 ? Number(((retCount / item.unitsSold) * 100).toFixed(1)) : 0
     const avgPrice = item.unitsSold > 0 ? Number((item.revenue / item.unitsSold).toFixed(2)) : 0
 
+    // Collect all mapped SKUs for search
+    const allSkus = central ? Array.from(productAllSkusMap.get(central.id) || []) : [item.sku]
+    const mappingSkus = allSkus.join(' ')
+
     return {
-      sku,
-      title: catalogProduct?.title || item.title,
+      sku: item.sku,
+      title: item.title,
+      mappingSkus,
       unitsSold: Math.round(item.unitsSold),
       revenue: Number(item.revenue.toFixed(2)),
       averagePrice: avgPrice,
@@ -717,9 +779,11 @@ export async function getProductPerformanceDrilldown(
 
   const { fromDate, toDate } = calculateDateRange(filters.timeRange, filters.customFrom, filters.customTo)
 
-  // 1. Fetch catalog details for SKU
-  const [catalogProduct] = await db
+  // 1. Fetch catalog details for SKU or check if it's a mapped marketplace SKU
+  let [catalogProduct] = await db
     .select({
+      id: products.id,
+      sku: products.sku,
       title: products.title,
       currentStock: products.currentStock
     })
@@ -727,7 +791,44 @@ export async function getProductPerformanceDrilldown(
     .where(and(eq(products.companyId, companyId), eq(products.sku, sku)))
     .limit(1)
 
-  // 2. Fetch order items matching this SKU in range
+  if (!catalogProduct) {
+    const [mapping] = await db
+      .select({ productId: productMappings.productId })
+      .from(productMappings)
+      .where(and(eq(productMappings.companyId, companyId), eq(productMappings.marketplaceSku, sku)))
+      .limit(1)
+
+    if (mapping) {
+      const [found] = await db
+        .select({
+          id: products.id,
+          sku: products.sku,
+          title: products.title,
+          currentStock: products.currentStock
+        })
+        .from(products)
+        .where(and(eq(products.companyId, companyId), eq(products.id, mapping.productId)))
+        .limit(1)
+      if (found) catalogProduct = found
+    }
+  }
+
+  // Collect all candidate SKUs (central SKU + all mapped marketplace SKUs)
+  const candidateSkus = new Set<string>([sku])
+  if (catalogProduct) {
+    candidateSkus.add(catalogProduct.sku)
+    const mappings = await db
+      .select({ marketplaceSku: productMappings.marketplaceSku })
+      .from(productMappings)
+      .where(and(eq(productMappings.companyId, companyId), eq(productMappings.productId, catalogProduct.id)))
+    for (const m of mappings) {
+      if (m.marketplaceSku) candidateSkus.add(m.marketplaceSku.trim())
+    }
+  }
+
+  const skuList = Array.from(candidateSkus).filter(Boolean)
+
+  // 2. Fetch order items matching this SKU or any of its mappings in range
   const items = await db
     .select({
       orderId: orderItems.orderId,
@@ -743,7 +844,7 @@ export async function getProductPerformanceDrilldown(
     .where(
       and(
         eq(orders.companyId, companyId),
-        eq(orderItems.sku, sku),
+        inArray(orderItems.sku, skuList),
         eq(orders.isArchived, false),
         ne(orders.status, 'draft'),
         ne(orders.status, 'cancelled'),
@@ -752,7 +853,7 @@ export async function getProductPerformanceDrilldown(
       )
     )
 
-  // 3. Fetch returns for this SKU
+  // 3. Fetch returns for this product or any of its mappings
   const returnStats = await db
     .select({
       totalReturned: sql<number>`coalesce(sum(${returnedItems.quantity}), 0)::int`
@@ -762,7 +863,7 @@ export async function getProductPerformanceDrilldown(
     .where(
       and(
         eq(returnsLog.companyId, companyId),
-        eq(returnedItems.skuOrProductName, sku),
+        inArray(returnedItems.skuOrProductName, skuList),
         gte(returnsLog.scannedAt, fromDate),
         lte(returnsLog.scannedAt, toDate)
       )
@@ -824,8 +925,8 @@ export async function getProductPerformanceDrilldown(
   })).sort((a, b) => b.revenue - a.revenue)
 
   return {
-    sku,
-    title: mainTitle || sku,
+    sku: catalogProduct?.sku || sku,
+    title: catalogProduct?.title || mainTitle || sku,
     currentStock: catalogProduct?.currentStock ? parseInt(catalogProduct.currentStock, 10) : null,
     totalUnitsSold: Math.round(totalUnits),
     totalRevenue: Number(totalRev.toFixed(2)),

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useTransition } from 'react'
+import React, { useState, useTransition, useMemo } from 'react'
 import {
   TrendingUp,
   TrendingDown,
@@ -155,22 +155,62 @@ export function PerformanceClient({ initialData }: { initialData: PerformanceAna
     setDrilldownData(null)
   }
 
-  // Filtered products list
-  const filteredProducts = data.products
-    .filter((p) => {
-      const matchesSearch =
-        p.title.toLowerCase().includes(productSearch.toLowerCase()) ||
-        p.sku.toLowerCase().includes(productSearch.toLowerCase())
-      const matchesStock =
-        productStockFilter === 'all' || p.stockStatus === productStockFilter
-      return matchesSearch && matchesStock
-    })
-    .sort((a, b) => {
-      if (productSortBy === 'revenue') return b.revenue - a.revenue
-      if (productSortBy === 'units') return b.unitsSold - a.unitsSold
-      if (productSortBy === 'returns') return b.returnCount - a.returnCount
-      return 0
-    })
+  // Filtered products list (including mapped marketplace SKUs in search)
+  const filteredProducts = useMemo(() => {
+    return data.products
+      .filter((p) => {
+        const q = productSearch.toLowerCase().trim()
+        const matchesSearch =
+          !q ||
+          p.title.toLowerCase().includes(q) ||
+          p.sku.toLowerCase().includes(q) ||
+          (p.mappingSkus && p.mappingSkus.toLowerCase().includes(q))
+        const matchesStock =
+          productStockFilter === 'all' || p.stockStatus === productStockFilter
+        return matchesSearch && matchesStock
+      })
+      .sort((a, b) => {
+        if (productSortBy === 'revenue') return b.revenue - a.revenue
+        if (productSortBy === 'units') return b.unitsSold - a.unitsSold
+        if (productSortBy === 'returns') return b.returnCount - a.returnCount
+        return 0
+      })
+  }, [data.products, productSearch, productStockFilter, productSortBy])
+
+  // Summary row calculation for filtered products
+  const filteredSummary = useMemo(() => {
+    let totalUnits = 0
+    let totalRevenue = 0
+    let totalOrders = 0
+    let totalReturns = 0
+    let totalStock = 0
+    let hasStock = false
+
+    for (const p of filteredProducts) {
+      totalUnits += p.unitsSold
+      totalRevenue += p.revenue
+      totalOrders += p.orderCount
+      totalReturns += p.returnCount
+      if (p.currentStock !== null && p.currentStock !== undefined) {
+        totalStock += p.currentStock
+        hasStock = true
+      }
+    }
+
+    const avgPrice = totalUnits > 0 ? totalRevenue / totalUnits : 0
+    const returnRate = totalUnits > 0 ? (totalReturns / totalUnits) * 100 : 0
+
+    return {
+      count: filteredProducts.length,
+      totalUnits,
+      totalRevenue,
+      avgPrice,
+      totalOrders,
+      totalReturns,
+      returnRate: Number(returnRate.toFixed(1)),
+      totalStock: hasStock ? totalStock : null,
+    }
+  }, [filteredProducts])
 
   const totalProductPages = Math.ceil(filteredProducts.length / productsPerPage) || 1
   const displayedProducts = filteredProducts.slice(
@@ -738,6 +778,58 @@ export function PerformanceClient({ initialData }: { initialData: PerformanceAna
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
+                  {/* Summary Row at the top of search/filter results */}
+                  {filteredProducts.length > 0 && (
+                    <tr className="bg-slate-100/95 font-bold border-b-2 border-slate-300 text-slate-900 select-none">
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs uppercase tracking-wider font-extrabold text-cyan-800 bg-cyan-100/80 px-2 py-0.5 rounded">
+                            SUMME
+                          </span>
+                          <span className="text-xs font-semibold text-slate-600">
+                            ({filteredSummary.count} {filteredSummary.count === 1 ? 'Produkt' : 'Produkte'})
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-right font-black text-slate-900">
+                        {filteredSummary.totalUnits.toLocaleString('de-DE')}
+                      </td>
+                      <td className="py-3 px-4 text-right font-black text-cyan-700">
+                        {formatCurrency(filteredSummary.totalRevenue)}
+                      </td>
+                      <td className="py-3 px-4 text-right font-bold text-slate-800">
+                        {formatCurrency(filteredSummary.avgPrice)}
+                      </td>
+                      <td className="py-3 px-4 text-right font-bold text-slate-800">
+                        {filteredSummary.totalOrders.toLocaleString('de-DE')}
+                      </td>
+                      <td className="py-3 px-4 text-right font-bold">
+                        {filteredSummary.totalReturns > 0 ? (
+                          <span className="text-rose-600">
+                            {filteredSummary.totalReturns.toLocaleString('de-DE')}{' '}
+                            <span className="text-[11px] text-slate-500 font-normal">
+                              ({filteredSummary.returnRate}%)
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="text-slate-500">0</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        {filteredSummary.totalStock !== null ? (
+                          <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-slate-200 text-slate-800 border border-slate-300">
+                            {filteredSummary.totalStock.toLocaleString('de-DE')} Stk.
+                          </span>
+                        ) : (
+                          <span className="text-xs text-slate-400">-</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-center text-xs text-slate-400 font-normal">
+                        Gesamt
+                      </td>
+                    </tr>
+                  )}
+
                   {displayedProducts.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="py-8 text-center text-slate-500 text-sm">
@@ -755,7 +847,14 @@ export function PerformanceClient({ initialData }: { initialData: PerformanceAna
                           <p className="font-semibold text-slate-900 line-clamp-1 group-hover:text-cyan-600 transition-colors">
                             {p.title}
                           </p>
-                          <p className="text-xs text-slate-400 font-mono mt-0.5">SKU: {p.sku}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-xs text-slate-400 font-mono">SKU: {p.sku}</span>
+                            {p.marketplaceSpread > 1 && (
+                              <span className="text-[10px] font-medium bg-cyan-50 text-cyan-700 border border-cyan-200/60 px-1.5 py-0.5 rounded">
+                                {p.marketplaceSpread} Marktplätze
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="py-3.5 px-4 text-right font-bold text-slate-800">
                           {p.unitsSold}
