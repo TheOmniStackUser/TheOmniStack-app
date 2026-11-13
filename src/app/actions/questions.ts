@@ -256,7 +256,7 @@ export async function answerQuestionAction(questionId: string, answerText: strin
 
 export async function updateQuestionStatusAction(
   questionId: string,
-  newStatus: 'open' | 'answered' | 'closed'
+  newStatus: 'open' | 'in_progress' | 'answered' | 'closed'
 ) {
   const auth = await requireAuth()
 

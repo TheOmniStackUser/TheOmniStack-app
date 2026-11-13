@@ -36,7 +36,7 @@ export async function syncQuestionsForCompany(companyId: string): Promise<{ tota
         for (const q of fetched) {
           // Check if question already exists in DB
           const [existing] = await db
-            .select({ id: marketplaceQuestions.id })
+            .select({ id: marketplaceQuestions.id, status: marketplaceQuestions.status })
             .from(marketplaceQuestions)
             .where(
               and(
@@ -106,6 +106,15 @@ export async function syncQuestionsForCompany(companyId: string): Promise<{ tota
             })
 
             totalSynced++
+          } else if (existing.status !== q.status && q.status) {
+            // Sync status update from marketplace (e.g. from open to in_progress)
+            await db
+              .update(marketplaceQuestions)
+              .set({
+                status: q.status,
+                updatedAt: new Date(),
+              })
+              .where(eq(marketplaceQuestions.id, existing.id))
           }
         }
       } catch (err) {

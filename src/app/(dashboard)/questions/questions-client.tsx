@@ -38,7 +38,7 @@ interface QuestionItem {
   companyId: string
   marketplace: string
   externalQuestionId: string
-  status: 'open' | 'answered' | 'closed'
+  status: 'open' | 'in_progress' | 'answered' | 'closed'
   questionType: 'product' | 'order' | 'general'
   customerName: string
   customerEmail: string | null
@@ -116,7 +116,7 @@ export function QuestionsClient({
   // Filters & Sorting
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedMarketplace, setSelectedMarketplace] = useState<string>('all')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'urgent' | 'answered' | 'closed'>('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'in_progress' | 'urgent' | 'answered' | 'closed'>('all')
   const [sortOrder, setSortOrder] = useState<'deadline' | 'newest' | 'oldest'>('deadline')
 
   // Answer composer state
@@ -172,14 +172,16 @@ export function QuestionsClient({
   // Counts for tabs & summary
   const counts = useMemo(() => {
     const openCount = questions.filter((q) => q.status === 'open').length
+    const inProgressCount = questions.filter((q) => q.status === 'in_progress').length
     const urgentCount = questions.filter(
       (q) => q.status === 'open' && (q.sla.severity === 'urgent' || q.sla.severity === 'overdue')
     ).length
-    const answeredCount = questions.filter((q) => q.status === 'answered').length
+    const answeredCount = questions.filter((q) => q.status === 'answered' || q.status === 'closed').length
     const closedCount = questions.filter((q) => q.status === 'closed').length
     return {
       all: questions.length,
       open: openCount,
+      inProgress: inProgressCount,
       urgent: urgentCount,
       answered: answeredCount,
       closed: closedCount
@@ -196,11 +198,12 @@ export function QuestionsClient({
         }
         // Status filter
         if (statusFilter === 'open' && q.status !== 'open') return false
+        if (statusFilter === 'in_progress' && q.status !== 'in_progress') return false
         if (statusFilter === 'urgent') {
           if (q.status !== 'open') return false
           if (q.sla.severity !== 'urgent' && q.sla.severity !== 'overdue') return false
         }
-        if (statusFilter === 'answered' && q.status !== 'answered') return false
+        if (statusFilter === 'answered' && q.status !== 'answered' && q.status !== 'closed') return false
         if (statusFilter === 'closed' && q.status !== 'closed') return false
 
         // Search Query
@@ -293,13 +296,21 @@ export function QuestionsClient({
   }
 
   // Handle Status Update
-  const handleUpdateStatus = (newStatus: 'open' | 'answered' | 'closed') => {
+  const handleUpdateStatus = (newStatus: 'open' | 'in_progress' | 'answered' | 'closed') => {
     if (!selectedQuestionId) return
 
     updateQuestionStatusAction(selectedQuestionId, newStatus)
       .then((res) => {
         if (res.success) {
-          showNotification('success', `Status auf "${newStatus}" gesetzt.`)
+          const statusLabel =
+            newStatus === 'in_progress'
+              ? 'In Bearbeitung'
+              : newStatus === 'answered'
+              ? 'Beantwortet'
+              : newStatus === 'closed'
+              ? 'Geschlossen'
+              : 'Offen'
+          showNotification('success', `Status auf "${statusLabel}" gesetzt.`)
           setQuestions((prev) =>
             prev.map((q) =>
               q.id === selectedQuestionId
@@ -308,8 +319,20 @@ export function QuestionsClient({
                     status: newStatus,
                     sla: {
                       ...q.sla,
-                      severity: newStatus === 'open' ? 'warning' : 'resolved',
-                      label: newStatus === 'open' ? 'Wiedereröffnet' : newStatus === 'answered' ? 'Beantwortet' : 'Geschlossen'
+                      severity:
+                        newStatus === 'in_progress'
+                          ? 'safe'
+                          : newStatus === 'open'
+                          ? 'warning'
+                          : 'resolved',
+                      label:
+                        newStatus === 'in_progress'
+                          ? 'In Bearbeitung'
+                          : newStatus === 'open'
+                          ? 'Wiedereröffnet'
+                          : newStatus === 'answered'
+                          ? 'Beantwortet'
+                          : 'Geschlossen'
                     }
                   }
                 : q
@@ -442,6 +465,14 @@ export function QuestionsClient({
 
   // SLA Badge style helper
   const renderSlaBadge = (sla: QuestionItem['sla']) => {
+    if (sla.label === 'In Bearbeitung') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-800 border border-blue-200">
+          <Clock size={12} className="text-blue-600" />
+          In Bearbeitung
+        </span>
+      )
+    }
     if (sla.severity === 'overdue') {
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-300 shadow-sm animate-pulse">
@@ -592,7 +623,7 @@ export function QuestionsClient({
       </div>
 
       {/* Metric Cards Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <div
           onClick={() => setStatusFilter('all')}
           className={`p-5 rounded-2xl border transition-all cursor-pointer ${
@@ -619,12 +650,30 @@ export function QuestionsClient({
           }`}
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-cyan-700 uppercase tracking-wider">Offen</span>
+            <span className="text-xs font-bold text-cyan-700 uppercase tracking-wider">Neue Anfragen</span>
             <div className="w-2.5 h-2.5 rounded-full bg-cyan-500 animate-pulse" />
           </div>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-3xl font-extrabold text-slate-900">{counts.open}</span>
-            <span className="text-xs font-medium text-slate-500">zu beantworten</span>
+            <span className="text-xs font-medium text-slate-500">neu</span>
+          </div>
+        </div>
+
+        <div
+          onClick={() => setStatusFilter('in_progress')}
+          className={`p-5 rounded-2xl border transition-all cursor-pointer ${
+            statusFilter === 'in_progress'
+              ? 'bg-white border-blue-500 shadow-md ring-2 ring-blue-500/20'
+              : 'bg-white border-slate-200 hover:border-slate-300'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-blue-700 uppercase tracking-wider">In Bearbeitung</span>
+            <Clock size={18} className="text-blue-500" />
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-3xl font-extrabold text-slate-900">{counts.inProgress}</span>
+            <span className="text-xs font-medium text-slate-500">laufend</span>
           </div>
         </div>
 
@@ -859,6 +908,25 @@ export function QuestionsClient({
                 </div>
               )}
 
+              {activeQuestion.status === 'in_progress' && (
+                <div className="p-3.5 px-6 border-b bg-blue-50/70 border-blue-200 text-blue-900 flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <Clock size={18} className="text-blue-600" />
+                    <div>
+                      <span className="text-xs font-bold uppercase tracking-wider block text-blue-800">
+                        In Bearbeitung
+                      </span>
+                      <span className="text-xs font-medium text-blue-950">
+                        Diese Anfrage befindet sich aktuell in Abstimmung mit OTTO / Kunde.
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-semibold text-blue-700 px-2.5 py-1 rounded-full bg-blue-100 border border-blue-200 hidden sm:inline">
+                    Keine Friststrafe aktiv
+                  </span>
+                </div>
+              )}
+
               {/* Conversation Header */}
               <div className="p-5 border-b border-slate-100 bg-white">
                 <div className="flex items-start justify-between gap-4">
@@ -882,12 +950,35 @@ export function QuestionsClient({
                   {/* Status Toggle Actions */}
                   <div className="flex items-center gap-2">
                     {activeQuestion.status === 'open' ? (
-                      <button
-                        onClick={() => handleUpdateStatus('answered')}
-                        className="px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-sm transition-all"
-                      >
-                        Als erledigt markieren
-                      </button>
+                      <>
+                        <button
+                          onClick={() => handleUpdateStatus('in_progress')}
+                          className="px-3 py-1.5 rounded-xl border border-blue-200 hover:bg-blue-50 text-blue-700 text-xs font-semibold shadow-sm transition-all"
+                        >
+                          In Bearbeitung
+                        </button>
+                        <button
+                          onClick={() => handleUpdateStatus('answered')}
+                          className="px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-sm transition-all"
+                        >
+                          Als erledigt markieren
+                        </button>
+                      </>
+                    ) : activeQuestion.status === 'in_progress' ? (
+                      <>
+                        <button
+                          onClick={() => handleUpdateStatus('answered')}
+                          className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-sm transition-all"
+                        >
+                          Als erledigt markieren
+                        </button>
+                        <button
+                          onClick={() => handleUpdateStatus('open')}
+                          className="px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-sm transition-all"
+                        >
+                          Als neu markieren
+                        </button>
+                      </>
                     ) : (
                       <button
                         onClick={() => handleUpdateStatus('open')}

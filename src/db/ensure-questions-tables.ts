@@ -17,8 +17,9 @@ export async function ensureQuestionsTablesExist() {
 
     await db.execute(sql`
       DO $$ BEGIN
-        CREATE TYPE "marketplace_question_status" AS ENUM('open', 'answered', 'closed');
-      EXCEPTION WHEN duplicate_object THEN null;
+        CREATE TYPE "marketplace_question_status" AS ENUM('open', 'in_progress', 'answered', 'closed');
+      EXCEPTION WHEN duplicate_object THEN
+        ALTER TYPE "marketplace_question_status" ADD VALUE IF NOT EXISTS 'in_progress';
       END $$;
     `)
 

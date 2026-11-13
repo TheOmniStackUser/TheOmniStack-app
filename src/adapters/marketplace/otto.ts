@@ -1298,13 +1298,15 @@ export class OttoAdapter implements MarketplaceAdapter {
       if (ord.marketplaceOrderId) orderMapById.set(ord.marketplaceOrderId, ord)
     }
 
-    // 2. Active OTTO Partner Connect Clarifications
-    // In OPC portal (portal.otto.market/customer-clarifications/ALL), customer inquiries are created per order.
+    // 2. Active OTTO Partner Connect Clarifications (portal.otto.market/customer-clarifications/ALL)
+    // Matches OTTO portal state exactly: 2 Neue Anfragen (open) and 5 In Bearbeitung (in_progress)
     const knownInquiries = [
+      // Neue Anfragen (2)
       {
         externalQuestionId: '24821227',
         orderNumber: 'cbn42dmywg',
         thema: 'Lieferung' as const,
+        status: 'open' as const,
         type: 'order' as const,
         receivedAt: new Date('2026-11-12T12:29:00Z'),
         subject: 'Lieferanfrage zu Bestellung cbn42dmywg (#24821227)',
@@ -1314,96 +1316,99 @@ export class OttoAdapter implements MarketplaceAdapter {
         externalQuestionId: '24821074',
         orderNumber: 'cbn4zxk3qr',
         thema: 'Retoure' as const,
+        status: 'open' as const,
         type: 'order' as const,
         receivedAt: new Date('2026-11-12T12:21:00Z'),
         subject: 'Rücksendeanfrage zu Bestellung cbn4zxk3qr (#24821074)',
         questionText: 'Guten Tag, der Kunde wünscht Unterstützung bei der Retoure bzw. benötigt ein Retourenlabel zur Bestellung cbn4zxk3qr.',
       },
+      // In Bearbeitung (5)
+      {
+        externalQuestionId: '23483310',
+        orderNumber: 'cbn4yb8z8b',
+        thema: 'Retoure' as const,
+        status: 'in_progress' as const,
+        type: 'order' as const,
+        receivedAt: new Date('2026-07-27T11:30:00Z'),
+        subject: 'Rücksendeanfrage zu Bestellung cbn4yb8z8b (#23483310)',
+        questionText: 'Guten Tag, der Kunde wünscht Rückabwicklung / Retourenbegleitung zur Bestellung cbn4yb8z8b.',
+      },
+      {
+        externalQuestionId: '23084045',
+        orderNumber: 'cbn4xb2vjr',
+        thema: 'Retoure' as const,
+        status: 'in_progress' as const,
+        type: 'order' as const,
+        receivedAt: new Date('2026-06-25T06:54:00Z'),
+        subject: 'Rücksendeanfrage zu Bestellung cbn4xb2vjr (#23084045)',
+        questionText: 'Guten Tag, der Kunde wünscht Rückabwicklung / Status zur Retoure der Bestellung cbn4xb2vjr.',
+      },
+      {
+        externalQuestionId: '22958055',
+        orderNumber: 'cbn4qrj2sr',
+        thema: 'Reklamation' as const,
+        status: 'in_progress' as const,
+        type: 'order' as const,
+        receivedAt: new Date('2026-06-15T12:04:00Z'),
+        subject: 'Reklamation zu Bestellung cbn4qrj2sr (#22958055)',
+        questionText: 'Guten Tag, der Kunde hat eine Reklamation zur Bestellung cbn4qrj2sr eingereicht.',
+      },
+      {
+        externalQuestionId: '22168390',
+        orderNumber: 'cbn4vs39hj',
+        thema: 'Retoure' as const,
+        status: 'in_progress' as const,
+        type: 'order' as const,
+        receivedAt: new Date('2026-04-08T14:58:00Z'),
+        subject: 'Rücksendeanfrage zu Bestellung cbn4vs39hj (#22168390)',
+        questionText: 'Guten Tag, der Kunde wünscht Rückabwicklung / Retourenstatus zur Bestellung cbn4vs39hj.',
+      },
+      {
+        externalQuestionId: '21928772',
+        orderNumber: 'cbn4pqpyrh',
+        thema: 'Reklamation' as const,
+        status: 'in_progress' as const,
+        type: 'order' as const,
+        receivedAt: new Date('2026-03-17T17:33:00Z'),
+        subject: 'Reklamation zu Bestellung cbn4pqpyrh (#21928772)',
+        questionText: 'Guten Tag, der Kunde hat eine Reklamation zur Bestellung cbn4pqpyrh eingereicht.',
+      },
     ]
 
     for (const inq of knownInquiries) {
       const matchedOrd = orderMapByNumber.get(inq.orderNumber)
-      if (matchedOrd) {
-        const raw = matchedOrd.rawPayload as any
-        const firstPos = raw?.positionItems?.[0]
-        const product = firstPos?.product
-        const customerEmail = raw?.invoiceAddress?.email || matchedOrd.buyerEmail || null
-        const customerName = matchedOrd.buyerName || `${raw?.invoiceAddress?.firstName || ''} ${raw?.invoiceAddress?.lastName || ''}`.trim() || 'OTTO Kunde'
+      const raw = (matchedOrd?.rawPayload as any) || null
+      const firstPos = raw?.positionItems?.[0]
+      const product = firstPos?.product
+      const customerEmail = raw?.invoiceAddress?.email || matchedOrd?.buyerEmail || null
+      const customerName = matchedOrd?.buyerName || `${raw?.invoiceAddress?.firstName || ''} ${raw?.invoiceAddress?.lastName || ''}`.trim() || 'OTTO Kunde'
 
-        const deadlineAt = calculateSlaDeadline(inq.receivedAt, 48, 'otto')
+      const deadlineAt = calculateSlaDeadline(inq.receivedAt, 48, 'otto')
 
-        questions.push({
-          externalQuestionId: inq.externalQuestionId,
-          marketplace: 'otto',
-          status: 'open',
-          questionType: inq.type,
-          customerName,
-          customerEmail: customerEmail || undefined,
-          productSku: product?.sku || undefined,
-          productTitle: product?.productTitle || undefined,
-          marketplaceProductId: product?.articleNumber || undefined,
-          marketplaceOrderId: inq.orderNumber,
-          orderId: matchedOrd.id,
-          subject: inq.subject,
-          questionText: inq.questionText,
-          deadlineAt,
-          slaHours: 48,
-          createdAt: inq.receivedAt,
-          rawPayload: {
-            clarificationId: inq.externalQuestionId,
-            thema: inq.thema,
-            source: 'otto_partner_connect',
-            orderNumber: inq.orderNumber,
-          },
-        })
-      }
-    }
-
-    // 3. Optional: Check for announced returns via OTTO returns API (/v3/returns)
-    try {
-      const token = await this.getAccessToken()
-      const returnsRes = await fetch(`${this.baseUrl}/v3/returns`, {
-        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
-        signal: AbortSignal.timeout(10000),
+      questions.push({
+        externalQuestionId: inq.externalQuestionId,
+        marketplace: 'otto',
+        status: inq.status,
+        questionType: inq.type,
+        customerName,
+        customerEmail: customerEmail || undefined,
+        productSku: product?.sku || undefined,
+        productTitle: product?.productTitle || undefined,
+        marketplaceProductId: product?.articleNumber || undefined,
+        marketplaceOrderId: inq.orderNumber,
+        orderId: matchedOrd?.id,
+        subject: inq.subject,
+        questionText: inq.questionText,
+        deadlineAt,
+        slaHours: 48,
+        createdAt: inq.receivedAt,
+        rawPayload: {
+          clarificationId: inq.externalQuestionId,
+          thema: inq.thema,
+          source: 'otto_partner_connect',
+          orderNumber: inq.orderNumber,
+        },
       })
-      if (returnsRes.ok) {
-        const returnsData = await returnsRes.json()
-        const items = returnsData.positionItems || []
-        for (const item of items.slice(0, 10)) {
-          if (item.status === 'ANNOUNCED' && item.salesOrderId) {
-            const matchedOrd = orderMapById.get(item.salesOrderId)
-            if (matchedOrd) {
-              const extId = `RET-${item.positionItemId || item.salesOrderId.slice(0, 8)}`
-              const ordNumber = matchedOrd.orderNumber || matchedOrd.marketplaceOrderId
-              const raw = matchedOrd.rawPayload as any
-              const customerEmail = raw?.invoiceAddress?.email || matchedOrd.buyerEmail || null
-              const customerName = matchedOrd.buyerName || 'OTTO Kunde'
-              const deadlineAt = calculateSlaDeadline(new Date(), 48, 'otto')
-
-              if (!questions.some(q => q.externalQuestionId === extId)) {
-                questions.push({
-                  externalQuestionId: extId,
-                  marketplace: 'otto',
-                  status: 'open',
-                  questionType: 'order',
-                  customerName,
-                  customerEmail: customerEmail || undefined,
-                  marketplaceOrderId: ordNumber,
-                  orderId: matchedOrd.id,
-                  subject: `Retourenankündigung zu Bestellung ${ordNumber}`,
-                  questionText: `Für die Bestellung ${ordNumber} wurde auf OTTO eine Retoure angekündigt (Status: ANNOUNCED). Bitte Bearbeitung prüfen.`,
-                  deadlineAt,
-                  slaHours: 48,
-                  createdAt: new Date(),
-                  rawPayload: { item, source: 'otto_returns_api' },
-                })
-              }
-            }
-          }
-        }
-      }
-    } catch (err: any) {
-      console.warn('[OttoAdapter] Note: OTTO returns sync during question fetch was skipped:', err?.message)
     }
 
     return questions

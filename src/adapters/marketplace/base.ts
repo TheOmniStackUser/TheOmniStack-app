@@ -54,7 +54,7 @@ export type NormalizedOrder = {
 export type NormalizedQuestion = {
   externalQuestionId: string
   marketplace: string
-  status: 'open' | 'answered' | 'closed'
+  status: 'open' | 'in_progress' | 'answered' | 'closed'
   questionType: 'product' | 'order' | 'general'
   customerName: string
   customerEmail?: string

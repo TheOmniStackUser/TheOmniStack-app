@@ -6,6 +6,7 @@ export type TimeRangePreset =
   | 'last_month' 
   | '90d' 
   | 'this_year' 
+  | '365d'
   | 'all_time'
   | 'custom'
 
@@ -44,6 +45,12 @@ export interface TimelineDataPoint {
   revenue: number    // in EUR
   orders: number
   units: number
+  prevYearDate?: string
+  prevYearRevenue?: number // in EUR 1 year ago
+  prevYearOrders?: number  // orders 1 year ago
+  prevYear2Date?: string
+  prevYear2Revenue?: number // in EUR 2 years ago
+  prevYear2Orders?: number  // orders 2 years ago
 }
 
 export interface MarketplacePerformanceData {
@@ -97,6 +104,14 @@ export interface ProductDrilldownData {
   }[]
 }
 
+export interface PreviousYearSummary {
+  year: number
+  totalRevenue: number
+  totalOrders: number
+  growthPercentRevenue: number
+  growthPercentOrders: number
+}
+
 export interface PerformanceAnalyticsResponse {
   timeRange: {
     preset: TimeRangePreset
@@ -111,4 +126,6 @@ export interface PerformanceAnalyticsResponse {
   timeline: TimelineDataPoint[]
   marketplaces: MarketplacePerformanceData[]
   products: ProductPerformanceData[]
+  previousYearSummary?: PreviousYearSummary
+  previousYear2Summary?: PreviousYearSummary
 }

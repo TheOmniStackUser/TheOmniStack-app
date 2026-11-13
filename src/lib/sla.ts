@@ -45,6 +45,18 @@ export function getSlaStatus(
   deadlineAt: Date | string | null | undefined,
   status: string = 'open'
 ): SlaStatus {
+  if (status === 'in_progress') {
+    return {
+      isOverdue: false,
+      remainingMs: 0,
+      remainingHours: 0,
+      remainingMinutes: 0,
+      severity: 'safe',
+      label: 'In Bearbeitung',
+      formattedDeadline: '',
+    }
+  }
+
   if (status !== 'open') {
     return {
       isOverdue: false,

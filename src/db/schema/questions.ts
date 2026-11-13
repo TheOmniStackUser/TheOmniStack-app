@@ -15,6 +15,7 @@ import { marketplaceIntegrations } from './integrations'
 // ─── Enums ────────────────────────────────────────────────────────────────────
 export const marketplaceQuestionStatusEnum = pgEnum('marketplace_question_status', [
   'open',
+  'in_progress',
   'answered',
   'closed',
 ])
