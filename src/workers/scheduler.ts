@@ -254,3 +254,39 @@ export async function setupSystemStatusCheck() {
   console.log('   - Scheduled system status check (every 15 minutes)')
 }
 
+/**
+ * Sets up a 30-minute periodic Auto-Abruf for marketplace customer inquiries.
+ */
+export async function setupScheduledQuestionsSync() {
+  console.log('⏰ Setting up scheduled marketplace questions auto-fetch (every 30 minutes)...')
+
+  try {
+    const repeatableJobs = await marketplaceSyncQueue.getRepeatableJobs()
+    for (const job of repeatableJobs) {
+      if (job.name === 'auto-questions-sync' || job.key?.includes('questions-sync')) {
+        await marketplaceSyncQueue.removeRepeatableByKey(job.key)
+        console.log(`   - Cleared old questions sync job: ${job.key}`)
+      }
+    }
+  } catch (err) {
+    console.error('[Scheduler] Failed to clear old questions sync jobs:', err)
+  }
+
+  await marketplaceSyncQueue.add(
+    'auto-questions-sync',
+    { companyId: 'all' },
+    {
+      jobId: 'auto-questions-sync',
+      repeat: {
+        pattern: '*/30 * * * *', // every 30 minutes
+        tz: 'Europe/Berlin',
+      },
+      removeOnComplete: true,
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 10000 },
+    }
+  )
+  console.log('   - Scheduled questions auto-fetch every 30 minutes (Europe/Berlin)')
+}
+
+

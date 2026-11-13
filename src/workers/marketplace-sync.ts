@@ -270,6 +270,12 @@ export function createMarketplaceSyncWorker() {
         return { success: true, message: `Dispatched hourly invoice sync for ${toSync.length} marketplaces.` }
       }
 
+      if (job.name === 'auto-questions-sync') {
+        const { syncAllCompaniesQuestions } = await import('@/lib/sync-questions')
+        const result = await syncAllCompaniesQuestions()
+        return { success: true, message: `Auto-synced ${result.totalSynced} questions across ${result.companiesProcessed} companies.` }
+      }
+
       const isInvoiceSync = job.name.includes('-invoices-') || (job.data as any).isInvoiceSync === true
 
       if (!isInvoiceSync) {

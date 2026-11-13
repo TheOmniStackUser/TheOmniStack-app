@@ -281,30 +281,8 @@ export async function syncMarketplaceQuestionsAction() {
   const auth = await requireAuth()
   await ensureQuestionsTablesExist()
 
-  // Retrieve active integrations for company
-  const activeIntegrations = await db
-    .select()
-    .from(marketplaceIntegrations)
-    .where(
-      and(
-        eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
-        eq(marketplaceIntegrations.isActive, true)
-      )
-    )
-
-  let totalSynced = 0
-
-  for (const integration of activeIntegrations) {
-    const adapter = getAdapterForIntegration(integration)
-    if (adapter && typeof adapter.fetchOpenQuestions === 'function') {
-      try {
-        const fetched = await adapter.fetchOpenQuestions(auth.activeCompanyId)
-        totalSynced += fetched.length
-      } catch (err) {
-        console.error(`[syncMarketplaceQuestionsAction] Error syncing for ${integration.type}:`, err)
-      }
-    }
-  }
+  const { syncQuestionsForCompany } = await import('@/lib/sync-questions')
+  const { totalSynced } = await syncQuestionsForCompany(auth.activeCompanyId)
 
   revalidatePath('/questions')
   return { success: true, count: totalSynced }

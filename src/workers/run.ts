@@ -3,7 +3,7 @@ import { createReturnsReportWorker } from './returns-report'
 import { createDunningWorker } from './dunning'
 import { createProductSyncWorker } from './product-sync'
 import { systemStatusWorker } from './system-status-check'
-import { setupScheduledReports, setupScheduledSyncs, setupDunningSchedule, setupHourlyInvoiceSyncs, setupSystemStatusCheck } from './scheduler'
+import { setupScheduledReports, setupScheduledSyncs, setupDunningSchedule, setupHourlyInvoiceSyncs, setupSystemStatusCheck, setupScheduledQuestionsSync } from './scheduler'
 
 console.log('🚀 Starting OmniStack Worker Engine...')
 
@@ -22,6 +22,7 @@ setupScheduledSyncs().catch(console.error)
 setupHourlyInvoiceSyncs().catch(console.error)
 setupDunningSchedule().catch(console.error)
 setupSystemStatusCheck().catch(console.error)
+setupScheduledQuestionsSync().catch(console.error)
 
 marketplaceWorker.on('completed', (job) => {
   console.log(`✅ [Marketplace] Job ${job.id} completed.`)

@@ -325,7 +325,20 @@ export function QuestionsClient({
       try {
         const res = await syncMarketplaceQuestionsAction()
         if (res.success) {
-          showNotification('success', `Synchronisation abgeschlossen. ${res.count || 0} Fragen aktualisiert.`)
+          // Immediately fetch the updated questions from database into state
+          const updated = await getQuestionsAction({
+            marketplace: selectedMarketplace,
+            status: statusFilter,
+            search: searchQuery,
+            sort: sortOrder,
+          })
+          setQuestions(updated)
+          showNotification(
+            'success',
+            res.count > 0
+              ? `Synchronisation erfolgreich: ${res.count} neue Kundenanfrage(n) importiert.`
+              : 'Synchronisation abgeschlossen. Alle Anfragen sind auf dem neuesten Stand.'
+          )
         } else {
           showNotification('error', 'Fehler beim Synchronisieren.')
         }
@@ -545,12 +558,20 @@ export function QuestionsClient({
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 text-xs font-semibold shadow-sm" title="Automatischer Hintergrundabruf läuft alle 30 Minuten">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span>Auto-Abruf aktiv (alle 30 Min.)</span>
+          </div>
+
           <button
             onClick={handleSync}
             disabled={isSyncing}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-semibold shadow-sm transition-all disabled:opacity-50"
-            title="Fragen von OTTO und Marktplätzen aktualisieren"
+            title="Fragen von OTTO und Marktplätzen jetzt sofort manuell aktualisieren"
           >
             <RefreshCw size={16} className={isSyncing ? 'animate-spin text-cyan-600' : 'text-slate-500'} />
             <span>{isSyncing ? 'Synchronisiere...' : 'Fragen abrufen'}</span>
