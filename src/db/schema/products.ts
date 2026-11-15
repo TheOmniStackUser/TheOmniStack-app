@@ -194,6 +194,28 @@ export const productSyncLogsRelations = relations(productSyncLogs, ({ one }) => 
   integration: one(marketplaceIntegrations, { fields: [productSyncLogs.integrationId], references: [marketplaceIntegrations.id] }),
 }))
 
+// ─── Sync Jobs ────────────────────────────────────────────────────────────────
+export const syncJobs = pgTable('sync_jobs', {
+  id: text('id').primaryKey(),
+  companyId: uuid('company_id')
+    .notNull()
+    .references(() => companies.id, { onDelete: 'cascade' }),
+  type: text('type').notNull().default('price_sync'), // 'price_sync' | 'marketplace_sync' | 'inventory_sync'
+  status: text('status').notNull().default('running'), // 'running' | 'completed' | 'failed'
+  params: jsonb('params'),
+  result: jsonb('result'),
+  errorMessage: text('error_message'),
+  startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+}, (t) => ({
+  companyIdx: index('sync_jobs_company_idx').on(t.companyId),
+  createdAtIdx: index('sync_jobs_created_at_idx').on(t.startedAt),
+}))
+
+export const syncJobsRelations = relations(syncJobs, ({ one }) => ({
+  company: one(companies, { fields: [syncJobs.companyId], references: [companies.id] }),
+}))
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type Product = typeof products.$inferSelect
 export type NewProduct = typeof products.$inferInsert
@@ -203,3 +225,5 @@ export type UnmappedMarketplaceProduct = typeof unmappedMarketplaceProducts.$inf
 export type NewUnmappedMarketplaceProduct = typeof unmappedMarketplaceProducts.$inferInsert
 export type ProductSyncLog = typeof productSyncLogs.$inferSelect
 export type NewProductSyncLog = typeof productSyncLogs.$inferInsert
+export type SyncJob = typeof syncJobs.$inferSelect
+export type NewSyncJob = typeof syncJobs.$inferInsert

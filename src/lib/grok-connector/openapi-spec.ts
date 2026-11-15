@@ -543,9 +543,9 @@ export function getOpenApiSpec(baseUrl: string = 'https://theomnistack.de') {
         },
         patch: {
           summary: 'Update Product',
-          description: 'Update fields on a product.',
+          description: 'Update fields on a product including title, price, reducedPrice, purchasePrice, brand, etc.',
           operationId: 'updateProduct',
-          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', description: 'Product ID (UUID) or SKU' } }],
           requestBody: {
             required: true,
             content: {
@@ -554,14 +554,71 @@ export function getOpenApiSpec(baseUrl: string = 'https://theomnistack.de') {
                   type: 'object',
                   properties: {
                     title: { type: 'string' },
-                    price: { type: 'number' },
+                    price: { type: 'number', description: 'Regular price gross EUR' },
+                    reducedPrice: { type: 'number', nullable: true, description: 'Reduced promotional price gross EUR (null to remove)' },
+                    purchasePrice: { type: 'number' },
                     description: { type: 'string' },
                     brand: { type: 'string' },
+                    weight: { type: 'number' },
+                    storageLocation: { type: 'string' },
+                    ean: { type: 'string' },
                   },
                 },
               },
             },
           },
+          responses: {
+            '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/StandardSuccessResponse' } } } },
+          },
+        },
+      },
+      '/api/connector/grok/products/bulk-prices': {
+        post: {
+          summary: 'Bulk Update Product Prices',
+          description: 'Update regular prices and/or reduced promotional prices in bulk (up to 500 items). Supports dry-run simulation.',
+          operationId: 'bulkUpdatePrices',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['items'],
+                  properties: {
+                    items: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          sku: { type: 'string' },
+                          productId: { type: 'string' },
+                          price: { type: 'number' },
+                          reducedPrice: { type: 'number', nullable: true },
+                        },
+                      },
+                    },
+                    dryRun: { type: 'boolean' },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/StandardSuccessResponse' } } } },
+          },
+        },
+      },
+      '/api/connector/grok/products/price-rules': {
+        get: {
+          summary: 'Get Channel Price Rules',
+          description: 'Read channel price rules (Shopify, OTTO, About You, Amazon, Kaufland, etc.). Optional sku or productId returns calculated prices per channel.',
+          operationId: 'getPriceRules',
+          parameters: [
+            { name: 'productId', in: 'query', schema: { type: 'string' } },
+            { name: 'sku', in: 'query', schema: { type: 'string' } },
+            { name: 'marketplace', in: 'query', schema: { type: 'string' } },
+            { name: 'integrationId', in: 'query', schema: { type: 'string' } },
+          ],
           responses: {
             '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/StandardSuccessResponse' } } } },
           },
@@ -597,6 +654,43 @@ export function getOpenApiSpec(baseUrl: string = 'https://theomnistack.de') {
           summary: 'Trigger Inventory Sync',
           description: 'Pushes inventory and prices out to Otto, Amazon, Shopify, Mirakl, eBay.',
           operationId: 'syncInventory',
+          responses: {
+            '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/StandardSuccessResponse' } } } },
+          },
+        },
+      },
+      '/api/connector/grok/products/sync-prices': {
+        post: {
+          summary: 'Trigger Price Sync',
+          description: 'Pushes price updates to connected marketplaces with rules and modifiers applied. Returns a tracked jobId.',
+          operationId: 'triggerPriceSync',
+          requestBody: {
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    skus: { type: 'array', items: { type: 'string' } },
+                    sku: { type: 'string' },
+                    productIds: { type: 'array', items: { type: 'string' } },
+                    productId: { type: 'string' },
+                    dryRun: { type: 'boolean' },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/StandardSuccessResponse' } } } },
+          },
+        },
+      },
+      '/api/connector/grok/products/sync-status/{jobId}': {
+        get: {
+          summary: 'Get Sync Status',
+          description: 'Check status, error messages, and channel success counts for an asynchronous sync job.',
+          operationId: 'getSyncStatus',
+          parameters: [{ name: 'jobId', in: 'path', required: true, schema: { type: 'string' } }],
           responses: {
             '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/StandardSuccessResponse' } } } },
           },

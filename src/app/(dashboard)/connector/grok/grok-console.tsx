@@ -58,9 +58,20 @@ const SAMPLE_PAYLOADS: Record<string, any> = {
   generate_missing_invoices: { maxCount: 10 },
   list_products: { limit: 10, lowStockOnly: false },
   get_product_details: { identifier: 'REPLACE_WITH_SKU_OR_ID' },
+  update_product: { productId: 'REPLACE_WITH_SKU_OR_ID', price: 49.99, reducedPrice: 39.99 },
+  bulk_update_prices: {
+    items: [
+      { sku: 'SKU-001', price: 49.99, reducedPrice: 39.99 },
+      { sku: 'SKU-002', reducedPrice: 29.90 },
+    ],
+    dryRun: false,
+  },
+  get_price_rules: { sku: 'REPLACE_WITH_SKU' },
   adjust_stock: { identifier: 'REPLACE_WITH_SKU', newStock: 50 },
   create_product: { sku: 'TEST-SKU-100', title: 'Sample Product', price: 29.99, currentStock: 25 },
   trigger_inventory_sync: {},
+  trigger_price_sync: { skus: ['REPLACE_WITH_SKU'], dryRun: false },
+  get_sync_status: { jobId: 'REPLACE_WITH_JOB_ID' },
   list_unmapped_listings: { limit: 10, isBlocked: false },
   get_unmapped_listing_details: { identifier: 'REPLACE_WITH_UNMAPPED_ID_OR_SKU' },
   map_unmapped_listing: { unmappedId: 'REPLACE_WITH_UNMAPPED_ID', productId: 'REPLACE_WITH_PRODUCT_ID_OR_SKU', syncStock: true },
@@ -129,10 +140,11 @@ You have access to the complete TheOmniStack Grok Bot Connector API.
 Your capabilities include:
 1. ORDER MANAGEMENT: Searching orders, checking status, fetching shipping details, updating order status, cancelling orders, and assigning delivery notes.
 2. BILLING & INVOICING: Issuing GoBD-compliant PDF invoices, retrieving invoice lines, cancelling invoices via credit notes (Storno), recording payments, and batch generating missing invoices.
-3. WAREHOUSE, INVENTORY (WAWI) & MAPPINGS: Listing products, checking inventory, adjusting warehouse stock, listing unmapped marketplace listings (Otto, Amazon, Shopify, Mirakl, eBay), blocking/unblocking unmapped listings (e.g. parent variation listings), creating central products directly from unmapped listings, mapping listings to central products, running automated batch mapping via SKU/EAN, and managing product mappings.
-4. RETURNS MANAGEMENT: Scanning incoming returns, inspecting item condition (new, used, damaged, defect), and executing automated refunds through marketplace channels.
-5. LOGISTICS & CARRIERS: Generating shipping labels for DHL, Hermes, and DPD, and retrieving live tracking numbers.
-6. REAL-TIME INTELLIGENCE: Providing instant analytics on sales revenue, pending fulfillment counts, return rates, and low-stock alerts.
+3. WAREHOUSE, INVENTORY (WAWI) & MAPPINGS: Listing products, checking inventory, adjusting warehouse stock, listing unmapped marketplace listings (Otto, Amazon, Shopify, Mirakl, eBay), blocking/unblocking unmapped listings, creating central products directly from unmapped listings, mapping listings to central products, running automated batch mapping via SKU/EAN, and managing product mappings.
+4. PRICING & MULTI-CHANNEL PROMOTIONS: Managing regular prices and reduced promotional prices, performing bulk price updates with dry-run validation, inspecting channel pricing rules (Shopify, OTTO, About You, Amazon, Kaufland, Decathlon, Limango, Secret Sales, etc.), triggering multi-channel price synchronizations, and tracking push job status.
+5. RETURNS MANAGEMENT: Scanning incoming returns, inspecting item condition (new, used, damaged, defect), and executing automated refunds through marketplace channels.
+6. LOGISTICS & CARRIERS: Generating shipping labels for DHL, Hermes, and DPD, and retrieving live tracking numbers.
+7. REAL-TIME INTELLIGENCE: Providing instant analytics on sales revenue, pending fulfillment counts, return rates, and low-stock alerts.
 
 Operating Guidelines:
 - Base URL: ${baseUrl}

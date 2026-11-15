@@ -1,7 +1,7 @@
 import { db } from '@/db/client'
 import { orders, orderItems, orderStatusEnum } from '@/db/schema/orders'
 import { invoices, invoiceItems } from '@/db/schema/invoices'
-import { products, productMappings, unmappedMarketplaceProducts } from '@/db/schema/products'
+import { products, productMappings, unmappedMarketplaceProducts, productSyncLogs, syncJobs } from '@/db/schema/products'
 import { returnsLog, returnedItems } from '@/db/schema/returns'
 import { customers } from '@/db/schema/customers'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
@@ -9,6 +9,8 @@ import { companies } from '@/db/schema/companies'
 import { eq, and, or, desc, sql, ilike, inArray, gte, lte, ne, isNotNull } from 'drizzle-orm'
 import { createInvoiceForOrder, getDefaultSettings, formatDocumentNumber } from '@/lib/invoice-service'
 import { executeRefund } from '@/lib/refund-service'
+import { auditLog } from '@/lib/audit'
+import { calculateChannelPrice, getChannelPriceRule } from '@/lib/pricing-rules'
 import type { GrokAuthContext } from './auth'
 import {
   getOrGenerateDeliveryNotePdf,
@@ -37,6 +39,13 @@ function getEanFromPayload(payload: any): string | null {
 
 function isUuid(val: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val)
+}
+
+function productMatchFilter(ident: string) {
+  if (isUuid(ident)) {
+    return or(eq(products.id, ident), eq(products.sku, ident), eq(products.ean, ident))!
+  }
+  return or(eq(products.sku, ident), eq(products.ean, ident))!
 }
 
 export interface ToolDefinition {
@@ -413,13 +422,15 @@ export const TOOLS_MANIFEST: ToolDefinition[] = [
   {
     name: 'update_product',
     category: 'products',
-    description: 'Update product properties such as title, selling price, purchase price, weight, description, or storage location.',
+    description: 'Update product properties such as title, selling price, reduced promotional price, purchase price, weight, description, or storage location.',
     parameters: {
       type: 'object',
       properties: {
-        productId: { type: 'string', description: 'Product ID (UUID)' },
+        productId: { type: 'string', description: 'Product ID (UUID) or SKU' },
+        sku: { type: 'string', description: 'Product SKU (alternative to productId)' },
         title: { type: 'string' },
-        price: { type: 'number' },
+        price: { type: 'number', description: 'Regular selling price / UVP in EUR gross' },
+        reducedPrice: { type: 'number', nullable: true, description: 'Reduced promotional price in EUR gross (must be > 0 and <= regular price; pass null to remove)' },
         purchasePrice: { type: 'number' },
         description: { type: 'string' },
         brand: { type: 'string' },
@@ -427,7 +438,48 @@ export const TOOLS_MANIFEST: ToolDefinition[] = [
         storageLocation: { type: 'string' },
         ean: { type: 'string' },
       },
-      required: ['productId'],
+    },
+  },
+  {
+    name: 'bulk_update_prices',
+    category: 'products',
+    description: 'Update regular prices and/or reduced promotional prices in bulk (up to 500 products). Supports dry-run validation.',
+    parameters: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          description: 'Array of products to update (max 500 items)',
+          items: {
+            type: 'object',
+            properties: {
+              sku: { type: 'string', description: 'Product SKU' },
+              productId: { type: 'string', description: 'Product ID (UUID)' },
+              price: { type: 'number', description: 'Regular selling price in EUR gross' },
+              reducedPrice: { type: 'number', nullable: true, description: 'Reduced promotional price in EUR gross (null to remove reduced price)' },
+            },
+          },
+        },
+        dryRun: {
+          type: 'boolean',
+          description: 'If true, validates and calculates price changes without writing to database',
+        },
+      },
+      required: ['items'],
+    },
+  },
+  {
+    name: 'get_price_rules',
+    category: 'products',
+    description: 'Get price synchronization rules per active sales channel (Shopify, OTTO, About You, Amazon, Kaufland, Decathlon, Limango, Secret Sales, Worten, etc.). If productId or sku is provided, also returns exact calculated prices per channel for that product.',
+    parameters: {
+      type: 'object',
+      properties: {
+        productId: { type: 'string', description: 'Optional Product ID (UUID) to calculate channel prices for' },
+        sku: { type: 'string', description: 'Optional Product SKU to calculate channel prices for' },
+        marketplace: { type: 'string', description: 'Optional filter by marketplace/channel type' },
+        integrationId: { type: 'string', description: 'Optional filter by specific integration ID' },
+      },
     },
   },
   {
@@ -457,6 +509,49 @@ export const TOOLS_MANIFEST: ToolDefinition[] = [
           description: 'Optional list of specific product IDs. If empty, triggers global sync.',
         },
       },
+    },
+  },
+  {
+    name: 'trigger_price_sync',
+    category: 'products',
+    description: 'Push price updates to connected marketplaces and sales channels with channel rules and modifiers applied. Returns a jobId to track status.',
+    parameters: {
+      type: 'object',
+      properties: {
+        skus: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional list of specific SKUs to push. If omitted, pushes for all mapped products.',
+        },
+        sku: { type: 'string', description: 'Single SKU shorthand' },
+        productId: { type: 'string', description: 'Single product ID shorthand' },
+        productIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional list of product IDs',
+        },
+        integrations: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional list of target integration IDs or channel types (e.g. ["shopify", "otto"])',
+        },
+        dryRun: {
+          type: 'boolean',
+          description: 'If true, computes calculated prices for target channels without dispatching to marketplaces',
+        },
+      },
+    },
+  },
+  {
+    name: 'get_sync_status',
+    category: 'products',
+    description: 'Get execution status, channel results, and error logs of an asynchronous sync job by jobId.',
+    parameters: {
+      type: 'object',
+      properties: {
+        jobId: { type: 'string', description: 'Job ID returned by trigger_price_sync or trigger_marketplace_sync' },
+      },
+      required: ['jobId'],
     },
   },
   {
@@ -1619,7 +1714,7 @@ export async function executeTool(
           .where(
             and(
               eq(products.companyId, companyId),
-              or(eq(products.id, ident), eq(products.sku, ident), eq(products.ean, ident))
+              productMatchFilter(ident)
             )
           )
           .limit(1)
@@ -1663,9 +1758,55 @@ export async function executeTool(
 
       case 'update_product': {
         const companyId = ctx.companyId
+        const ident = (params.productId || params.sku || params.identifier || '').toString().trim()
+        if (!ident) {
+          return { success: false, error: "Product identifier is required (provide 'productId' or 'sku')." }
+        }
+
+        const [product] = await db
+          .select()
+          .from(products)
+          .where(
+            and(
+              eq(products.companyId, companyId),
+              productMatchFilter(ident)
+            )
+          )
+          .limit(1)
+
+        if (!product) return { success: false, error: `Product '${ident}' not found.` }
+
+        let effectivePrice = Number(product.price || 0)
         const updates: any = { updatedAt: new Date() }
+
+        if (params.price !== undefined) {
+          const pNum = Number(params.price)
+          if (isNaN(pNum) || pNum <= 0) {
+            return { success: false, error: 'Price must be a positive number.' }
+          }
+          effectivePrice = pNum
+          updates.price = pNum.toFixed(2)
+        }
+
+        if (params.reducedPrice !== undefined) {
+          if (params.reducedPrice === null || params.reducedPrice === '') {
+            updates.reducedPrice = null
+          } else {
+            const redNum = Number(params.reducedPrice)
+            if (isNaN(redNum) || redNum <= 0) {
+              return { success: false, error: 'reducedPrice must be greater than 0, or null to remove.' }
+            }
+            if (redNum > effectivePrice) {
+              return {
+                success: false,
+                error: `reducedPrice (${redNum.toFixed(2)} EUR) cannot be higher than regular price (${effectivePrice.toFixed(2)} EUR).`,
+              }
+            }
+            updates.reducedPrice = redNum.toFixed(2)
+          }
+        }
+
         if (params.title !== undefined) updates.title = params.title
-        if (params.price !== undefined) updates.price = Number(params.price).toFixed(2)
         if (params.purchasePrice !== undefined) updates.purchasePrice = Number(params.purchasePrice).toFixed(2)
         if (params.description !== undefined) updates.description = params.description
         if (params.brand !== undefined) updates.brand = params.brand
@@ -1676,12 +1817,317 @@ export async function executeTool(
         const [updated] = await db
           .update(products)
           .set(updates)
-          .where(and(eq(products.companyId, companyId), eq(products.id, params.productId)))
+          .where(and(eq(products.companyId, companyId), eq(products.id, product.id)))
           .returning()
 
-        if (!updated) return { success: false, error: `Product '${params.productId}' not found.` }
+        if (!updated) return { success: false, error: `Product '${ident}' could not be updated.` }
+
+        // GoBD §146 AO compliant audit trail for price mutations
+        const priceChanged = updates.price !== undefined && updates.price !== product.price
+        const reducedPriceChanged = updates.reducedPrice !== undefined && updates.reducedPrice !== product.reducedPrice
+        if (priceChanged || reducedPriceChanged) {
+          await auditLog({
+            companyId,
+            userId: ctx.userId || undefined,
+            action: 'update',
+            entityType: 'product',
+            entityId: product.id,
+            previousState: {
+              sku: product.sku,
+              price: product.price,
+              reducedPrice: product.reducedPrice,
+            },
+            nextState: {
+              sku: updated.sku,
+              price: updated.price,
+              reducedPrice: updated.reducedPrice,
+              updatedBy: 'grok_connector',
+            },
+            userAgent: 'grok-connector-api',
+          })
+        }
 
         return { success: true, data: updated }
+      }
+
+      case 'bulk_update_prices': {
+        const companyId = ctx.companyId
+        const items = params.items
+        if (!Array.isArray(items) || items.length === 0) {
+          return { success: false, error: "Parameter 'items' must be a non-empty array." }
+        }
+        if (items.length > 500) {
+          return { success: false, error: 'Maximum 500 items allowed per batch.' }
+        }
+
+        const dryRun = Boolean(params.dryRun)
+
+        const identifiers = items
+          .map((item) => (item.sku || item.productId || item.identifier || '').toString().trim())
+          .filter(Boolean)
+
+        const uuidIdents = identifiers.filter(isUuid)
+        const matchOrFilters = [inArray(products.sku, identifiers)]
+        if (uuidIdents.length > 0) {
+          matchOrFilters.push(inArray(products.id, uuidIdents))
+        }
+
+        const matchedProducts =
+          identifiers.length > 0
+            ? await db
+                .select()
+                .from(products)
+                .where(
+                  and(
+                    eq(products.companyId, companyId),
+                    matchOrFilters.length === 1 ? matchOrFilters[0] : or(...matchOrFilters)!
+                  )
+                )
+            : []
+
+        const productBySkuOrId = new Map<string, typeof products.$inferSelect>()
+        for (const p of matchedProducts) {
+          productBySkuOrId.set(p.id, p)
+          productBySkuOrId.set(p.sku, p)
+        }
+
+        const results: Array<{
+          identifier?: string
+          sku?: string
+          productId?: string
+          status: 'updated' | 'not_found' | 'validation_error'
+          oldValues?: { price: string | null; reducedPrice: string | null }
+          newValues?: { price: string | null; reducedPrice: string | null }
+          error?: string
+        }> = []
+
+        for (const item of items) {
+          const ident = (item.sku || item.productId || item.identifier || '').toString().trim()
+          if (!ident) {
+            results.push({
+              status: 'validation_error',
+              error: "Missing product identifier (provide 'sku' or 'productId').",
+            })
+            continue
+          }
+
+          const product = productBySkuOrId.get(ident)
+          if (!product) {
+            results.push({
+              identifier: ident,
+              status: 'not_found',
+              error: `Product '${ident}' not found.`,
+            })
+            continue
+          }
+
+          let effectivePrice = Number(product.price || 0)
+          let targetPriceStr: string | null = product.price
+
+          if (item.price !== undefined) {
+            const pNum = Number(item.price)
+            if (isNaN(pNum) || pNum <= 0) {
+              results.push({
+                identifier: ident,
+                sku: product.sku,
+                productId: product.id,
+                status: 'validation_error',
+                error: 'Price must be a positive number.',
+              })
+              continue
+            }
+            effectivePrice = pNum
+            targetPriceStr = pNum.toFixed(2)
+          }
+
+          let targetReducedPriceStr: string | null = product.reducedPrice
+
+          if (item.reducedPrice !== undefined) {
+            if (item.reducedPrice === null || item.reducedPrice === '') {
+              targetReducedPriceStr = null
+            } else {
+              const redNum = Number(item.reducedPrice)
+              if (isNaN(redNum) || redNum <= 0) {
+                results.push({
+                  identifier: ident,
+                  sku: product.sku,
+                  productId: product.id,
+                  status: 'validation_error',
+                  error: 'reducedPrice must be greater than 0, or null to remove.',
+                })
+                continue
+              }
+              if (redNum > effectivePrice) {
+                results.push({
+                  identifier: ident,
+                  sku: product.sku,
+                  productId: product.id,
+                  status: 'validation_error',
+                  error: `reducedPrice (${redNum.toFixed(2)} EUR) cannot be higher than regular price (${effectivePrice.toFixed(2)} EUR).`,
+                })
+                continue
+              }
+              targetReducedPriceStr = redNum.toFixed(2)
+            }
+          }
+
+          const oldValues = {
+            price: product.price,
+            reducedPrice: product.reducedPrice,
+          }
+          const newValues = {
+            price: targetPriceStr,
+            reducedPrice: targetReducedPriceStr,
+          }
+
+          if (!dryRun) {
+            await db
+              .update(products)
+              .set({
+                price: targetPriceStr,
+                reducedPrice: targetReducedPriceStr,
+                updatedAt: new Date(),
+              })
+              .where(eq(products.id, product.id))
+
+            await auditLog({
+              companyId,
+              userId: ctx.userId || undefined,
+              action: 'update',
+              entityType: 'product',
+              entityId: product.id,
+              previousState: {
+                sku: product.sku,
+                price: product.price,
+                reducedPrice: product.reducedPrice,
+              },
+              nextState: {
+                sku: product.sku,
+                price: targetPriceStr,
+                reducedPrice: targetReducedPriceStr,
+                updatedBy: 'grok_connector_bulk',
+              },
+              userAgent: 'grok-connector-api',
+            })
+          }
+
+          results.push({
+            identifier: ident,
+            sku: product.sku,
+            productId: product.id,
+            status: 'updated',
+            oldValues,
+            newValues,
+          })
+        }
+
+        return {
+          success: true,
+          data: {
+            dryRun,
+            totalItems: items.length,
+            updatedCount: results.filter((r) => r.status === 'updated').length,
+            errorCount: results.filter((r) => r.status !== 'updated').length,
+            results,
+          },
+        }
+      }
+
+      case 'get_price_rules': {
+        const companyId = ctx.companyId
+        const ident = (params.productId || params.sku || params.identifier || '').toString().trim()
+
+        let product: typeof products.$inferSelect | null = null
+        if (ident) {
+          const [found] = await db
+            .select()
+            .from(products)
+            .where(
+              and(
+                eq(products.companyId, companyId),
+                productMatchFilter(ident)
+              )
+            )
+            .limit(1)
+
+          if (!found) {
+            return { success: false, error: `Product '${ident}' not found.` }
+          }
+          product = found
+        }
+
+        const integrations = await db
+          .select()
+          .from(marketplaceIntegrations)
+          .where(
+            and(
+              eq(marketplaceIntegrations.companyId, companyId),
+              eq(marketplaceIntegrations.isActive, true),
+              params.integrationId
+                ? eq(marketplaceIntegrations.id, params.integrationId)
+                : sql`true`
+            )
+          )
+
+        const filteredIntegrations = params.marketplace
+          ? integrations.filter(
+              (i) =>
+                i.type.toLowerCase() === params.marketplace.toLowerCase() ||
+                (i.metadata as any)?.customName?.toLowerCase() === params.marketplace.toLowerCase()
+            )
+          : integrations
+
+        let mappings: typeof productMappings.$inferSelect[] = []
+        if (product) {
+          mappings = await db
+            .select()
+            .from(productMappings)
+            .where(
+              and(
+                eq(productMappings.companyId, companyId),
+                eq(productMappings.productId, product.id)
+              )
+            )
+        }
+
+        const channelRules = filteredIntegrations.map((int) => {
+          const rule = getChannelPriceRule(int)
+          let calculatedPrice: any = undefined
+
+          if (product) {
+            const mapping = mappings.find(
+              (m) => m.integrationId === int.id || m.marketplace === int.type
+            )
+            calculatedPrice = calculateChannelPrice({
+              product,
+              integration: int,
+              mapping,
+            })
+          }
+
+          return {
+            ...rule,
+            calculatedPrice,
+          }
+        })
+
+        return {
+          success: true,
+          data: {
+            product: product
+              ? {
+                  id: product.id,
+                  sku: product.sku,
+                  title: product.title,
+                  price: product.price ? Number(product.price) : 0,
+                  reducedPrice: product.reducedPrice ? Number(product.reducedPrice) : null,
+                  msrp: product.msrp ? Number(product.msrp) : null,
+                }
+              : null,
+            totalChannels: channelRules.length,
+            channelRules,
+          },
+        }
       }
 
       case 'adjust_stock': {
@@ -1694,7 +2140,7 @@ export async function executeTool(
           .where(
             and(
               eq(products.companyId, companyId),
-              or(eq(products.id, ident), eq(products.sku, ident))
+              productMatchFilter(ident)
             )
           )
           .limit(1)
@@ -1777,6 +2223,252 @@ export async function executeTool(
             data: { message: 'Inventory sync request queued.', note: err?.message },
           }
         }
+      }
+
+      case 'trigger_price_sync': {
+        const companyId = ctx.companyId
+        const jobId = `sync_price_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+
+        let targetSkus: string[] = []
+        if (params.skus && Array.isArray(params.skus)) {
+          targetSkus.push(...params.skus.map((s: any) => String(s).trim()))
+        } else if (params.sku) {
+          targetSkus.push(String(params.sku).trim())
+        }
+
+        let targetProductIds: string[] = []
+        if (params.productIds && Array.isArray(params.productIds)) {
+          targetProductIds.push(...params.productIds.map((id: any) => String(id).trim()))
+        } else if (params.productId) {
+          targetProductIds.push(String(params.productId).trim())
+        }
+
+        const validProductIds = targetProductIds.filter(isUuid)
+        const queryConditions: any[] = [eq(products.companyId, companyId)]
+        if (targetSkus.length > 0 && validProductIds.length > 0) {
+          queryConditions.push(or(inArray(products.sku, targetSkus), inArray(products.id, validProductIds))!)
+        } else if (targetSkus.length > 0) {
+          queryConditions.push(inArray(products.sku, targetSkus))
+        } else if (validProductIds.length > 0) {
+          queryConditions.push(inArray(products.id, validProductIds))
+        }
+
+        const selectedProducts = await db
+          .select({
+            id: products.id,
+            sku: products.sku,
+            currentStock: products.currentStock,
+            price: products.price,
+            reducedPrice: products.reducedPrice,
+            msrp: products.msrp,
+            saleStartDate: products.saleStartDate,
+            saleEndDate: products.saleEndDate,
+          })
+          .from(products)
+          .where(and(...queryConditions))
+
+        if (selectedProducts.length === 0 && (targetSkus.length > 0 || targetProductIds.length > 0)) {
+          return { success: false, error: 'No matching products found for the specified SKUs/product IDs.' }
+        }
+
+        const dryRun = Boolean(params.dryRun)
+
+        if (dryRun) {
+          const integrations = await db
+            .select()
+            .from(marketplaceIntegrations)
+            .where(
+              and(
+                eq(marketplaceIntegrations.companyId, companyId),
+                eq(marketplaceIntegrations.isActive, true)
+              )
+            )
+
+          const prodIds = selectedProducts.map((p) => p.id)
+          const mappings =
+            prodIds.length > 0
+              ? await db
+                  .select()
+                  .from(productMappings)
+                  .where(
+                    and(
+                      eq(productMappings.companyId, companyId),
+                      inArray(productMappings.productId, prodIds)
+                    )
+                  )
+              : []
+
+          const calculatedDryRun = selectedProducts.map((prod) => {
+            const prodMappings = mappings.filter((m) => m.productId === prod.id)
+            const channelOutputs = integrations.map((int) => {
+              const mapping = prodMappings.find(
+                (m) => m.integrationId === int.id || m.marketplace === int.type
+              )
+              return calculateChannelPrice({
+                product: prod,
+                integration: int,
+                mapping,
+              })
+            })
+            return {
+              sku: prod.sku,
+              basePrice: prod.price,
+              reducedPrice: prod.reducedPrice,
+              channels: channelOutputs,
+            }
+          })
+
+          const resultData = {
+            dryRun: true,
+            totalProducts: selectedProducts.length,
+            items: calculatedDryRun,
+          }
+
+          await db.insert(syncJobs).values({
+            id: jobId,
+            companyId,
+            type: 'price_sync',
+            status: 'completed',
+            params: { targetSkus, targetProductIds, dryRun: true },
+            result: resultData,
+            completedAt: new Date(),
+          })
+
+          return {
+            success: true,
+            data: {
+              jobId,
+              status: 'completed',
+              dryRun: true,
+              totalProducts: selectedProducts.length,
+              preview: calculatedDryRun,
+            },
+          }
+        }
+
+        // Live execution
+        await db.insert(syncJobs).values({
+          id: jobId,
+          companyId,
+          type: 'price_sync',
+          status: 'running',
+          params: { targetSkus, targetProductIds },
+          startedAt: new Date(),
+        })
+
+        try {
+          const { pushUpdatesToMarketplaces } = await import('@/workers/product-sync')
+          const updates = selectedProducts.map((p) => ({
+            sku: p.sku,
+            stock: p.currentStock !== null && p.currentStock !== undefined ? Number(p.currentStock) : undefined,
+            price: p.price !== null && p.price !== undefined ? Number(p.price) : undefined,
+            reducedPrice: p.reducedPrice !== null && p.reducedPrice !== undefined ? Number(p.reducedPrice) : undefined,
+            msrp: p.msrp !== null && p.msrp !== undefined ? Number(p.msrp) : undefined,
+            saleStartDate: p.saleStartDate ? p.saleStartDate : undefined,
+            saleEndDate: p.saleEndDate ? p.saleEndDate : undefined,
+          }))
+
+          const syncResult = await pushUpdatesToMarketplaces(companyId, updates)
+          const hasErrors = syncResult.failedMarketplaces && syncResult.failedMarketplaces.length > 0
+          const allFailed = hasErrors && (!syncResult.activeMarketplaces || syncResult.activeMarketplaces.length === 0)
+          const finalStatus = allFailed ? 'failed' : 'completed'
+
+          const errorMsg = hasErrors
+            ? syncResult.failedMarketplaces.map((f: any) => `${f.name}: ${f.error}`).join('; ')
+            : null
+
+          await db
+            .update(syncJobs)
+            .set({
+              status: finalStatus,
+              result: syncResult,
+              errorMessage: errorMsg,
+              completedAt: new Date(),
+            })
+            .where(eq(syncJobs.id, jobId))
+
+          return {
+            success: true,
+            data: {
+              jobId,
+              status: finalStatus,
+              totalUpdatesSent: syncResult.totalUpdatesSent,
+              activeMarketplaces: syncResult.activeMarketplaces,
+              failedMarketplaces: syncResult.failedMarketplaces,
+            },
+          }
+        } catch (err: any) {
+          await db
+            .update(syncJobs)
+            .set({
+              status: 'failed',
+              errorMessage: err?.message || 'Sync failed',
+              completedAt: new Date(),
+            })
+            .where(eq(syncJobs.id, jobId))
+
+          return {
+            success: false,
+            error: `Price sync failed: ${err?.message || 'Unknown error'}`,
+            data: { jobId, status: 'failed' },
+          }
+        }
+      }
+
+      case 'get_sync_status': {
+        const companyId = ctx.companyId
+        const jobId = params.jobId
+        if (!jobId) {
+          return { success: false, error: "Parameter 'jobId' is required." }
+        }
+
+        const [job] = await db
+          .select()
+          .from(syncJobs)
+          .where(and(eq(syncJobs.companyId, companyId), eq(syncJobs.id, jobId)))
+          .limit(1)
+
+        if (job) {
+          return {
+            success: true,
+            data: {
+              jobId: job.id,
+              type: job.type,
+              status: job.status,
+              params: job.params,
+              result: job.result,
+              errorMessage: job.errorMessage,
+              startedAt: job.startedAt,
+              completedAt: job.completedAt,
+            },
+          }
+        }
+
+        // Fallback: check productSyncLogs if jobId matches a productSyncLog id
+        const [syncLog] = await db
+          .select()
+          .from(productSyncLogs)
+          .where(and(eq(productSyncLogs.companyId, companyId), eq(productSyncLogs.id, jobId)))
+          .limit(1)
+
+        if (syncLog) {
+          return {
+            success: true,
+            data: {
+              jobId: syncLog.id,
+              type: 'marketplace_push',
+              status: syncLog.status,
+              marketplace: syncLog.marketplace,
+              totalUpdates: syncLog.totalUpdates,
+              syncedSkus: syncLog.syncedSkus,
+              errorMessage: syncLog.errorMessage,
+              startedAt: syncLog.startedAt,
+              completedAt: syncLog.completedAt,
+            },
+          }
+        }
+
+        return { success: false, error: `Sync job '${jobId}' not found.` }
       }
 
       // ── Unmapped Listings & Product Mappings ────────────────
@@ -3004,19 +3696,37 @@ export async function executeTool(
       case 'list_integrations': {
         const companyId = ctx.companyId
         const integrations = await db
-          .select({
-            id: marketplaceIntegrations.id,
-            type: marketplaceIntegrations.type,
-            isActive: marketplaceIntegrations.isActive,
-            environment: marketplaceIntegrations.environment,
-            updatedAt: marketplaceIntegrations.updatedAt,
-          })
+          .select()
           .from(marketplaceIntegrations)
           .where(eq(marketplaceIntegrations.companyId, companyId))
 
+        const formatted = integrations.map((int) => {
+          const rule = getChannelPriceRule(int)
+          return {
+            id: int.id,
+            type: int.type,
+            isActive: int.isActive,
+            environment: int.environment,
+            updatedAt: int.updatedAt,
+            displayName: rule.displayName,
+            marketplace: rule.marketplace,
+            priceSyncEnabled: rule.priceSyncEnabled,
+            stockSyncEnabled: rule.stockSyncEnabled,
+            priceRule: {
+              ruleType: rule.ruleType,
+              value: rule.value,
+              basePrice: rule.basePrice,
+              roundingRule: rule.roundingRule,
+              currency: rule.currency,
+              exchangeRate: rule.exchangeRate,
+              minPriceThreshold: rule.minPriceThreshold,
+            },
+          }
+        })
+
         return {
           success: true,
-          data: { integrations },
+          data: { integrations: formatted },
         }
       }
 
@@ -3034,10 +3744,13 @@ export async function executeTool(
               )
             )
 
+          const queuedJobIds: string[] = []
           for (const integration of integrations) {
             if (params.marketplace && params.marketplace !== 'all' && integration.type !== params.marketplace) {
               continue
             }
+            const jId = `grok-sync-${integration.id}-${Date.now()}`
+            queuedJobIds.push(jId)
             await marketplaceSyncQueue.add(
               `sync-${integration.type}`,
               {
@@ -3046,13 +3759,28 @@ export async function executeTool(
                 triggeredByUserId: ctx.userId,
                 integrationId: integration.id,
               },
-              { jobId: `grok-sync-${integration.id}-${Date.now()}` }
+              { jobId: jId }
             )
+
+            try {
+              await db.insert(syncJobs).values({
+                id: jId,
+                companyId,
+                type: 'marketplace_order_sync',
+                status: 'queued',
+                params: { marketplace: integration.type, integrationId: integration.id },
+                startedAt: new Date(),
+              })
+            } catch {}
           }
 
           return {
             success: true,
-            data: { message: 'Marketplace synchronization successfully queued.' },
+            data: {
+              message: 'Marketplace synchronization successfully queued.',
+              jobId: queuedJobIds[0] || null,
+              jobIds: queuedJobIds,
+            },
           }
         } catch (e: any) {
           return {

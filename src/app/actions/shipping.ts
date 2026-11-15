@@ -1334,10 +1334,46 @@ export async function generateSingleDhlReturnLabelAction(orderId: string) {
       return { error: 'Kein Sendungsobjekt in der DHL-Antwort vorhanden.' }
     }
 
-    const returnTrackingNumber = shipment.shipmentTrackingNumber || shipment.shipmentNumber || shipment.barcode || ''
-    const returnLabelUrl = shipment.label?.url ?? (shipment.label?.b64 ? `data:application/pdf;base64,${shipment.label.b64}` : '')
+    // Check item-level error status or validation messages
+    if (shipment.sstatus?.statusCode && Number(shipment.sstatus.statusCode) >= 400) {
+      let rawMsg = shipment.validationMessages?.map((v: any) => v.validationMessage).filter(Boolean).join('; ')
+        || shipment.sstatus.detail
+        || shipment.sstatus.title
+        || 'Unbekannter Fehler bei der DHL-Validierung.'
+
+      rawMsg = rawMsg
+        .replace(/consignee\.addressHouse/g, 'Hausnummer des Lagers')
+        .replace(/consignee\.addressStreet/g, 'Straße des Lagers')
+        .replace(/consignee\.postalCode/g, 'Postleitzahl des Lagers')
+        .replace(/shipper\.addressHouse/g, 'Hausnummer der Kundenadresse')
+        .replace(/shipper\.addressStreet/g, 'Straße der Kundenadresse')
+        .replace(/shipper\.postalCode/g, 'Postleitzahl der Kundenadresse')
+
+      return { error: `DHL Validierungsfehler: ${rawMsg}` }
+    }
+
+    const returnTrackingNumber =
+      shipment.shipmentNo ||
+      shipment.shipmentTrackingNumber ||
+      shipment.shipmentNumber ||
+      shipment.barcode ||
+      shipment.returnShipmentNo ||
+      shipment.returnShipmentTrackingNumber ||
+      shipment.returnBarcode ||
+      ''
+
+    const returnLabelUrl =
+      shipment.label?.url ||
+      (shipment.label?.b64 ? `data:application/pdf;base64,${shipment.label.b64}` : '') ||
+      shipment.returnLabel?.url ||
+      (shipment.returnLabel?.b64 ? `data:application/pdf;base64,${shipment.returnLabel.b64}` : '') ||
+      ''
 
     if (!returnTrackingNumber || !returnLabelUrl) {
+      const msgs = shipment.validationMessages?.map((v: any) => v.validationMessage).filter(Boolean).join('; ')
+      if (msgs) {
+        return { error: `DHL API-Meldung: ${msgs}` }
+      }
       return { error: 'Sendungsnummer oder PDF-Label fehlt in der DHL-Antwort.' }
     }
 

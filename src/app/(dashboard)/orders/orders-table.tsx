@@ -1783,10 +1783,34 @@ const filteredOrders = orders;
       } else {
         showToast(result.message || 'DHL-Retourenlabel erfolgreich erstellt!', 'success')
         if (result.returnLabelUrl) {
-          if (newTab) {
-            newTab.location.href = result.returnLabelUrl
+          let base64: string | null = null
+          if (result.returnLabelUrl.startsWith('data:application/pdf;base64,')) {
+            base64 = result.returnLabelUrl.split(',')[1]
+          } else if (!result.returnLabelUrl.startsWith('http')) {
+            base64 = result.returnLabelUrl
+          }
+
+          if (base64) {
+            try {
+              const binary = atob(base64)
+              const bytes = new Uint8Array(binary.length)
+              for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+              const blob = new Blob([bytes], { type: 'application/pdf' })
+              const blobUrl = URL.createObjectURL(blob)
+              if (newTab) {
+                newTab.location.href = blobUrl
+              } else {
+                window.open(blobUrl, '_blank')
+              }
+            } catch {
+              if (newTab) newTab.location.href = result.returnLabelUrl
+            }
           } else {
-            window.open(result.returnLabelUrl, '_blank')
+            if (newTab) {
+              newTab.location.href = result.returnLabelUrl
+            } else {
+              window.open(result.returnLabelUrl, '_blank')
+            }
           }
         } else {
           if (newTab) newTab.close()
