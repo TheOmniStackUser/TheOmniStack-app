@@ -3,8 +3,12 @@
 import { useState } from 'react'
 import { updateMarketplaceSyncSettings } from '@/app/actions/products'
 import type { MarketplaceSyncSettings } from '@/app/actions/products'
-import { Save, Check, ServerCrash, CheckCircle2, AlertCircle, X } from 'lucide-react'
+import { Save, Check, ServerCrash, CheckCircle2, AlertCircle, X, ChevronUp, ChevronDown } from 'lucide-react'
 import { formatMarketplaceName } from '@/lib/marketplaces'
+
+type IntegrationSettingsState = Omit<MarketplaceSyncSettings, 'priceModifierValue'> & {
+  priceModifierValue: number | string
+}
 
 function IntegrationCard({ 
   integration, 
@@ -32,7 +36,7 @@ function IntegrationCard({
     ? !!savedSync.enableCurrencyConversion
     : (savedSync.targetCurrency ? savedSync.targetCurrency !== 'EUR' : isForeignCurrency)
 
-  const initialSettings: MarketplaceSyncSettings = {
+  const initialSettings: IntegrationSettingsState = {
     enabled: false,
     syncStock: true,
     syncPrice: false,
@@ -48,14 +52,22 @@ function IntegrationCard({
     ...savedSync,
   }
 
-  const [settings, setSettings] = useState<MarketplaceSyncSettings>(initialSettings)
+  const [settings, setSettings] = useState<IntegrationSettingsState>(initialSettings)
   const [isSaving, setIsSaving] = useState(false)
 
   const handleSave = async () => {
     const displayName = formatMarketplaceName(integration, allIntegrations)
     setIsSaving(true)
     try {
-      await updateMarketplaceSyncSettings(integration.id, settings)
+      const rawVal = typeof settings.priceModifierValue === 'string'
+        ? settings.priceModifierValue.trim().replace(',', '.')
+        : settings.priceModifierValue
+      const parsedVal = typeof rawVal === 'string' ? parseFloat(rawVal) : Number(rawVal)
+      const sanitizedSettings: MarketplaceSyncSettings = {
+        ...settings,
+        priceModifierValue: isNaN(parsedVal) ? 0 : Math.round(parsedVal * 100) / 100,
+      }
+      await updateMarketplaceSyncSettings(integration.id, sanitizedSettings)
       showNotification(`${displayName} Einstellungen gespeichert.`, undefined, 'success')
     } catch (err: any) {
       showNotification('Fehler beim Speichern', err.message, 'error')
@@ -172,16 +184,74 @@ function IntegrationCard({
               <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Wert</label>
               <div className="relative">
                 <input 
-                  type="number"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   disabled={settings.priceModifierType === 'none'}
-                  className="w-full bg-white border border-slate-200 rounded-lg pl-4 pr-10 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-500 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all disabled:opacity-50 disabled:bg-slate-50 shadow-sm"
+                  className="w-full bg-white border border-slate-200 rounded-lg pl-4 pr-16 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-500 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all disabled:opacity-50 disabled:bg-slate-50 shadow-sm"
                   placeholder="z.B. 10 für +10% oder -15 für 15% Rabatt"
-                  value={settings.priceModifierValue}
-                  onChange={(e) => setSettings({ ...settings, priceModifierValue: parseFloat(e.target.value) || 0 })}
+                  value={settings.priceModifierValue ?? ''}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    if (val === '' || val === '-' || /^-?\d*[.,]?\d*$/.test(val)) {
+                      setSettings({ ...settings, priceModifierValue: val })
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                      e.preventDefault()
+                      const raw = String(settings.priceModifierValue ?? '').replace(',', '.')
+                      const currentVal = parseFloat(raw) || 0
+                      const step = 1
+                      const nextVal = e.key === 'ArrowUp' ? currentVal + step : currentVal - step
+                      const rounded = Math.round(nextVal * 100) / 100
+                      setSettings({ ...settings, priceModifierValue: rounded })
+                    }
+                  }}
+                  onBlur={() => {
+                    const raw = String(settings.priceModifierValue ?? '').trim().replace(',', '.')
+                    const parsed = parseFloat(raw)
+                    setSettings({
+                      ...settings,
+                      priceModifierValue: isNaN(parsed) ? 0 : parsed,
+                    })
+                  }}
                 />
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-sm pointer-events-none">
-                  {settings.priceModifierType === 'percentage' ? '%' : settings.priceModifierType === 'fixed' ? '€' : ''}
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+                  {settings.priceModifierType !== 'none' && (
+                    <div className="flex flex-col border border-slate-200 rounded overflow-hidden bg-white shadow-xs">
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        className="px-1 py-0.5 hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors leading-none cursor-pointer"
+                        title="Erhöhen"
+                        onClick={() => {
+                          const raw = String(settings.priceModifierValue ?? '').replace(',', '.')
+                          const currentVal = parseFloat(raw) || 0
+                          const nextVal = Math.round((currentVal + 1) * 100) / 100
+                          setSettings({ ...settings, priceModifierValue: nextVal })
+                        }}
+                      >
+                        <ChevronUp className="w-2.5 h-2.5" />
+                      </button>
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        className="px-1 py-0.5 hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors leading-none border-t border-slate-200 cursor-pointer"
+                        title="Verringern"
+                        onClick={() => {
+                          const raw = String(settings.priceModifierValue ?? '').replace(',', '.')
+                          const currentVal = parseFloat(raw) || 0
+                          const nextVal = Math.round((currentVal - 1) * 100) / 100
+                          setSettings({ ...settings, priceModifierValue: nextVal })
+                        }}
+                      >
+                        <ChevronDown className="w-2.5 h-2.5" />
+                      </button>
+                    </div>
+                  )}
+                  <span className="text-slate-500 font-bold text-sm pointer-events-none min-w-[14px] text-center">
+                    {settings.priceModifierType === 'percentage' ? '%' : settings.priceModifierType === 'fixed' ? '€' : ''}
+                  </span>
                 </div>
               </div>
             </div>

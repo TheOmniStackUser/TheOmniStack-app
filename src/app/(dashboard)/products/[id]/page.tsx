@@ -142,7 +142,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       const syncStock = formData.get(`mapping_${mapping.id}_syncStock`) === 'on'
       const syncPrice = formData.get(`mapping_${mapping.id}_syncPrice`) === 'on'
       const modifierType = formData.get(`mapping_${mapping.id}_priceModifierType`) as any || 'none'
-      const modifierValue = formData.get(`mapping_${mapping.id}_priceModifierValue`) as string || '0'
+      const modifierValue = (formData.get(`mapping_${mapping.id}_priceModifierValue`) as string || '0').trim().replace(',', '.')
       
       await db.update(productMappings).set({
         syncStock,

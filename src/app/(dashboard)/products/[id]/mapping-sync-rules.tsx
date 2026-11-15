@@ -44,9 +44,9 @@ export function MappingSyncRules({ mapping }: { mapping: any }) {
               onChange={(e) => setModifierType(e.target.value)}
               className="text-sm border border-slate-200 rounded-lg py-1.5 px-2 focus:ring-cyan-500 outline-none text-slate-900 bg-white"
             >
-              <option value="none">Kein Aufschlag</option>
-              <option value="percentage">% Aufschlag</option>
-              <option value="fixed">Fixer Aufschlag (€)</option>
+              <option value="none">Keine Änderung (1:1)</option>
+              <option value="percentage">Prozentual (%)</option>
+              <option value="fixed">Fixbetrag (€)</option>
             </select>
             {modifierType !== 'none' && (
               <input 
@@ -54,7 +54,8 @@ export function MappingSyncRules({ mapping }: { mapping: any }) {
                 step="0.01" 
                 name={`mapping_${mapping.id}_priceModifierValue`} 
                 defaultValue={Number(mapping.priceModifierValue)} 
-                className="w-24 text-sm border border-slate-200 rounded-lg py-1.5 px-3 focus:ring-cyan-500 outline-none text-slate-900 placeholder:text-slate-500" 
+                placeholder="z.B. -10"
+                className="w-24 text-sm border border-slate-200 rounded-lg py-1.5 px-3 focus:ring-cyan-500 outline-none text-slate-900 placeholder:text-slate-500 bg-white" 
               />
             )}
           </div>
