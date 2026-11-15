@@ -507,8 +507,26 @@ export class AboutYouAdapter implements MarketplaceAdapter {
 
   async updateListings(
     companyId: string, 
-    updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number }[]
-  ): Promise<void> {
+    updates: { 
+      sku: string; 
+      marketplaceProductId?: string; 
+      stock?: number; 
+      price?: number; 
+      reducedPrice?: number; 
+      fallbackPrice?: number; 
+      msrp?: number; 
+      [key: string]: any 
+    }[]
+  ): Promise<{
+    totalSent: number
+    successes: number
+    failures: { sku: string; error: string }[]
+    details: { sku: string; status: 'success' | 'error'; error?: string; retail_price?: number; sale_price?: number | null }[]
+  }> {
+    if (!updates || updates.length === 0) {
+      return { totalSent: 0, successes: 0, failures: [], details: [] }
+    }
+
     console.log(`[AboutYouAdapter] Updating listings for company ${companyId}:`, updates.length, 'items')
     try {
       const stockItems: any[] = []
@@ -521,24 +539,42 @@ export class AboutYouAdapter implements MarketplaceAdapter {
         if (u.stock !== undefined && u.stock !== null) {
           stockItems.push({
             sku,
-            quantity: u.stock
+            quantity: Math.max(0, Math.floor(Number(u.stock)))
           })
         }
 
-        if (u.price !== undefined && u.price !== null) {
-          priceItems.push({
-            sku,
-            price: {
-              country_code: 'DE',
-              retail_price: u.price
-            }
-          })
+        const hasPriceUpdate = (u.price !== undefined && u.price !== null) ||
+                               (u.reducedPrice !== undefined && u.reducedPrice !== null)
+
+        if (hasPriceUpdate) {
+          const retailPrice = u.price !== undefined && u.price !== null && Number(u.price) > 0
+            ? Number(u.price)
+            : (u.reducedPrice !== undefined && u.reducedPrice !== null ? Number(u.reducedPrice) : undefined)
+
+          const salePrice = (u.reducedPrice !== undefined && u.reducedPrice !== null && Number(u.reducedPrice) > 0 && Number(u.reducedPrice) < (retailPrice || Infinity))
+            ? Number(u.reducedPrice)
+            : null
+
+          if (retailPrice !== undefined) {
+            priceItems.push({
+              sku,
+              price: {
+                country_code: 'DE',
+                currency: 'EUR',
+                retail_price: retailPrice,
+                sale_price: salePrice,
+              }
+            })
+          }
         }
       }
 
       const postChunkSize = 100 // reduced to prevent whole-batch rejections on About You side
+      const successes: { sku: string; retail_price?: number; sale_price?: number | null }[] = []
+      const failures: { sku: string; error: string }[] = []
+      const details: { sku: string; status: 'success' | 'error'; error?: string; retail_price?: number; sale_price?: number | null }[] = []
 
-      // Update Stocks
+      // 1. Update Stocks
       if (stockItems.length > 0) {
         console.log(`[AboutYouAdapter] Pushing ${stockItems.length} stock updates...`)
         for (let i = 0; i < stockItems.length; i += postChunkSize) {
@@ -552,8 +588,6 @@ export class AboutYouAdapter implements MarketplaceAdapter {
             },
             body: JSON.stringify({ items: chunk })
           })
-          
-          await new Promise(r => setTimeout(r, 200)) // rate limiting delay
 
           if (!res.ok) {
             const errText = await res.text()
@@ -561,11 +595,15 @@ export class AboutYouAdapter implements MarketplaceAdapter {
             throw new Error(`About You API Fehler beim Bestandsabgleich: ${res.status} - ${errText}`)
           }
           const result = await res.json()
-          console.log(`[AboutYouAdapter] Stock update successful, batchRequestId:`, result.batchRequestId || result)
+          console.log(`[AboutYouAdapter] Stock update accepted, batchRequestId:`, result.batchRequestId || result)
+
+          if (result.batchRequestId) {
+            await this.pollStockBatchResults(result.batchRequestId)
+          }
         }
       }
 
-      // Update Prices
+      // 2. Update Prices
       if (priceItems.length > 0) {
         console.log(`[AboutYouAdapter] Pushing ${priceItems.length} price updates...`)
         for (let i = 0; i < priceItems.length; i += postChunkSize) {
@@ -579,8 +617,6 @@ export class AboutYouAdapter implements MarketplaceAdapter {
             },
             body: JSON.stringify({ items: chunk })
           })
-          
-          await new Promise(r => setTimeout(r, 200)) // rate limiting delay
 
           if (!res.ok) {
             const errText = await res.text()
@@ -588,13 +624,146 @@ export class AboutYouAdapter implements MarketplaceAdapter {
             throw new Error(`About You API Fehler beim Preisabgleich: ${res.status} - ${errText}`)
           }
           const result = await res.json()
-          console.log(`[AboutYouAdapter] Price update successful, batchRequestId:`, result.batchRequestId || result)
+          console.log(`[AboutYouAdapter] Price update accepted, batchRequestId:`, result.batchRequestId)
+
+          if (result.batchRequestId) {
+            const batchOutcome = await this.pollPriceBatchResults(result.batchRequestId, chunk)
+            successes.push(...batchOutcome.successes)
+            failures.push(...batchOutcome.failures)
+            details.push(...batchOutcome.details)
+          } else {
+            for (const item of chunk) {
+              successes.push({ sku: item.sku, retail_price: item.price.retail_price, sale_price: item.price.sale_price })
+              details.push({ sku: item.sku, status: 'success', retail_price: item.price.retail_price, sale_price: item.price.sale_price })
+            }
+          }
         }
       }
 
+      console.log(`[AboutYouAdapter] Finished update: ${successes.length} succeeded, ${failures.length} failed.`)
+
+      if (priceItems.length > 0 && successes.length === 0 && failures.length > 0) {
+        throw new Error(`About You Preisaktualisierung für alle ${failures.length} Artikel fehlgeschlagen: ${failures.map(f => `${f.sku}: ${f.error}`).join('; ')}`)
+      }
+
+      return {
+        totalSent: priceItems.length > 0 ? priceItems.length : stockItems.length,
+        successes: successes.length,
+        failures,
+        details
+      }
     } catch (error) {
       console.error(`[AboutYouAdapter] Error updating listings:`, error)
       throw error
+    }
+  }
+
+  private async pollPriceBatchResults(
+    batchRequestId: string,
+    chunk: any[]
+  ): Promise<{
+    successes: { sku: string; retail_price?: number; sale_price?: number | null }[]
+    failures: { sku: string; error: string }[]
+    details: { sku: string; status: 'success' | 'error'; error?: string; retail_price?: number; sale_price?: number | null }[]
+  }> {
+    const successes: { sku: string; retail_price?: number; sale_price?: number | null }[] = []
+    const failures: { sku: string; error: string }[] = []
+    const details: { sku: string; status: 'success' | 'error'; error?: string; retail_price?: number; sale_price?: number | null }[] = []
+
+    const maxAttempts = 30 // 30 * 1.5s = ~45s
+    const delayMs = 1500
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      await new Promise(r => setTimeout(r, delayMs))
+
+      try {
+        const res = await fetch(`${this.baseUrl}/results/prices?batch_request_id=${batchRequestId}`, {
+          headers: {
+            'X-API-Key': this.config.apiKey,
+            'Accept': 'application/json'
+          }
+        })
+
+        if (!res.ok) {
+          console.warn(`[AboutYouAdapter] Poll attempt ${attempt} returned status ${res.status}`)
+          continue
+        }
+
+        const data = await res.json()
+        const status = data.status
+
+        if (status === 'completed' || status === 'failed') {
+          console.log(`[AboutYouAdapter] Price batch ${batchRequestId} finished with status: ${status}`)
+          const items = data.items || []
+
+          for (const it of items) {
+            const sku = it.requestItem?.sku
+            if (!sku) continue
+
+            const retailPrice = it.requestItem?.price?.retail_price
+            const salePrice = it.requestItem?.price?.sale_price
+
+            if (it.success) {
+              successes.push({ sku, retail_price: retailPrice, sale_price: salePrice })
+              details.push({ sku, status: 'success', retail_price: retailPrice, sale_price: salePrice })
+            } else {
+              const errMsg = (it.errors && it.errors.length > 0) ? it.errors.join(', ') : 'Von About You abgelehnt'
+              failures.push({ sku, error: errMsg })
+              details.push({ sku, status: 'error', error: errMsg, retail_price: retailPrice, sale_price: salePrice })
+            }
+          }
+
+          // Check if any items in chunk were not explicitly in items array
+          const returnedSkus = new Set(items.map((it: any) => it.requestItem?.sku).filter(Boolean))
+          for (const originalItem of chunk) {
+            if (!returnedSkus.has(originalItem.sku)) {
+              if (status === 'completed') {
+                successes.push({ sku: originalItem.sku, retail_price: originalItem.price?.retail_price, sale_price: originalItem.price?.sale_price })
+                details.push({ sku: originalItem.sku, status: 'success', retail_price: originalItem.price?.retail_price, sale_price: originalItem.price?.sale_price })
+              } else {
+                failures.push({ sku: originalItem.sku, error: 'Batch processing failed' })
+                details.push({ sku: originalItem.sku, status: 'error', error: 'Batch processing failed' })
+              }
+            }
+          }
+
+          return { successes, failures, details }
+        }
+      } catch (pollErr: any) {
+        console.warn(`[AboutYouAdapter] Error polling batch ${batchRequestId} on attempt ${attempt}:`, pollErr.message)
+      }
+    }
+
+    console.warn(`[AboutYouAdapter] Polling timed out for batch ${batchRequestId}. Assuming items applied.`)
+    for (const item of chunk) {
+      successes.push({ sku: item.sku, retail_price: item.price?.retail_price, sale_price: item.price?.sale_price })
+      details.push({ sku: item.sku, status: 'success', retail_price: item.price?.retail_price, sale_price: item.price?.sale_price })
+    }
+
+    return { successes, failures, details }
+  }
+
+  private async pollStockBatchResults(batchRequestId: string): Promise<void> {
+    const maxAttempts = 15
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      await new Promise(r => setTimeout(r, 1500))
+      try {
+        const res = await fetch(`${this.baseUrl}/results/stocks?batch_request_id=${batchRequestId}`, {
+          headers: {
+            'X-API-Key': this.config.apiKey,
+            'Accept': 'application/json'
+          }
+        })
+        if (res.ok) {
+          const data = await res.json()
+          if (data.status === 'completed' || data.status === 'failed') {
+            console.log(`[AboutYouAdapter] Stock batch ${batchRequestId} completed with status: ${data.status}`)
+            return
+          }
+        }
+      } catch (e: any) {
+        console.warn(`[AboutYouAdapter] Error polling stock batch ${batchRequestId}:`, e.message)
+      }
     }
   }
 }

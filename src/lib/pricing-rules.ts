@@ -250,15 +250,28 @@ export function calculateChannelPrice(params: {
     finalReducedPrice !== null && finalReducedPrice > 0 ? finalReducedPrice : finalRegularPrice
 
   const isKaufland = rule.marketplace === 'kaufland' || rule.channel === 'kaufland'
-  const payload: Record<string, any> = isKaufland
-    ? {
-        ...(mapping?.marketplaceProductId ? { id_unit: mapping.marketplaceProductId } : {}),
-        listing_price: Math.round(finalPrice * 100),
-      }
-    : {
-        price: finalPrice,
-        ...(finalReducedPrice !== null && finalReducedPrice > 0 ? { reducedPrice: finalReducedPrice } : {}),
-      }
+  const isAboutYou = rule.marketplace === 'aboutyou' || rule.channel === 'aboutyou'
+
+  let payload: Record<string, any>
+  if (isKaufland) {
+    payload = {
+      ...(mapping?.marketplaceProductId ? { id_unit: mapping.marketplaceProductId } : {}),
+      listing_price: Math.round(finalPrice * 100),
+    }
+  } else if (isAboutYou) {
+    payload = {
+      sku: mapping?.marketplaceSku || product.sku,
+      country_code: 'DE',
+      currency: 'EUR',
+      retail_price: finalRegularPrice,
+      sale_price: finalReducedPrice !== null && finalReducedPrice > 0 ? finalReducedPrice : null,
+    }
+  } else {
+    payload = {
+      price: finalPrice,
+      ...(finalReducedPrice !== null && finalReducedPrice > 0 ? { reducedPrice: finalReducedPrice } : {}),
+    }
+  }
 
   return {
     ...rule,
