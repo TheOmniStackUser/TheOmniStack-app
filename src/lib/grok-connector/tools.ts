@@ -695,22 +695,22 @@ export const TOOLS_MANIFEST: ToolDefinition[] = [
   {
     name: 'set_product_mapping',
     category: 'products',
-    description: 'Create or update a manual mapping linking a central product to a marketplace listing (by integration ID or marketplace channel and marketplace SKU).',
+    description: 'Create or partially update a mapping linking a central product to a marketplace listing. Only fields present in the request are modified; omitted fields remain unchanged. EAN is never auto-filled from the central product.',
     parameters: {
       type: 'object',
       properties: {
-        productId: { type: 'string', description: 'Central product UUID or SKU' },
+        mappingId: { type: 'string', description: 'Optional UUID of an existing mapping to update directly' },
+        productId: { type: 'string', description: 'Central product UUID or SKU (required for new mapping, optional if mappingId is provided)' },
         marketplace: { type: 'string', description: 'Marketplace channel (e.g. otto, amazon, shopify, mirakl_decathlon, ebay)' },
         marketplaceSku: { type: 'string', description: 'SKU on the marketplace' },
         marketplaceProductId: { type: 'string', description: 'Optional internal ID on marketplace (e.g. Shopify Item ID)' },
         integrationId: { type: 'string', description: 'Optional UUID of the marketplace integration' },
-        ean: { type: 'string', description: 'Optional EAN/barcode for this mapping' },
-        syncStock: { type: 'boolean', description: 'Synchronize stock (default: true)' },
-        syncPrice: { type: 'boolean', description: 'Synchronize price (default: false)' },
-        priceModifierType: { type: 'string', enum: ['none', 'percentage', 'fixed'], description: 'Price modifier type (default: none)' },
+        ean: { type: 'string', description: 'Optional EAN/barcode for this mapping. Set to empty string or null to clear. Never auto-filled from central product.' },
+        syncStock: { type: 'boolean', description: 'Synchronize stock' },
+        syncPrice: { type: 'boolean', description: 'Synchronize price' },
+        priceModifierType: { type: 'string', enum: ['none', 'percentage', 'fixed'], description: 'Price modifier type' },
         priceModifierValue: { type: 'number', description: 'Price modifier value (e.g. 10 for 10% or 5.00 for EUR 5)' },
       },
-      required: ['productId', 'marketplace', 'marketplaceSku'],
     },
   },
   {
@@ -1123,16 +1123,16 @@ export async function executeTool(
       case 'get_order_details': {
         const companyId = ctx.companyId
         const id = params.orderId
+        if (!id) return { success: false, error: 'orderId is required.' }
+
+        const orderCondition = isUuid(id)
+          ? or(eq(orders.id, id), eq(orders.marketplaceOrderId, id))
+          : eq(orders.marketplaceOrderId, id)
 
         const [order] = await db
           .select()
           .from(orders)
-          .where(
-            and(
-              eq(orders.companyId, companyId),
-              or(eq(orders.id, id), eq(orders.marketplaceOrderId, id))
-            )
-          )
+          .where(and(eq(orders.companyId, companyId), orderCondition))
           .limit(1)
 
         if (!order) {
@@ -1511,16 +1511,16 @@ export async function executeTool(
       case 'get_invoice_details': {
         const companyId = ctx.companyId
         const id = params.invoiceId
+        if (!id) return { success: false, error: 'invoiceId is required.' }
+
+        const invCondition = isUuid(id)
+          ? or(eq(invoices.id, id), eq(invoices.invoiceNumber, id))
+          : eq(invoices.invoiceNumber, id)
 
         const [invoice] = await db
           .select()
           .from(invoices)
-          .where(
-            and(
-              eq(invoices.companyId, companyId),
-              or(eq(invoices.id, id), eq(invoices.invoiceNumber, id))
-            )
-          )
+          .where(and(eq(invoices.companyId, companyId), invCondition))
           .limit(1)
 
         if (!invoice) {
@@ -2284,6 +2284,12 @@ export async function executeTool(
               )
             )
 
+          // Respect channel settings: only channels with priceSyncEnabled = true are price sync targets
+          const priceIntegrations = integrations.filter((int) => {
+            const rule = getChannelPriceRule(int)
+            return rule.priceSyncEnabled
+          })
+
           const prodIds = selectedProducts.map((p) => p.id)
           const mappings =
             prodIds.length > 0
@@ -2300,7 +2306,7 @@ export async function executeTool(
 
           const calculatedDryRun = selectedProducts.map((prod) => {
             const prodMappings = mappings.filter((m) => m.productId === prod.id)
-            const channelOutputs = integrations.map((int) => {
+            const channelOutputs = priceIntegrations.map((int) => {
               const mapping = prodMappings.find(
                 (m) => m.integrationId === int.id || m.marketplace === int.type
               )
@@ -2358,9 +2364,9 @@ export async function executeTool(
 
         try {
           const { pushUpdatesToMarketplaces } = await import('@/workers/product-sync')
+          // CRITICAL: Send ONLY price updates; do NOT include stock in price sync jobs
           const updates = selectedProducts.map((p) => ({
             sku: p.sku,
-            stock: p.currentStock !== null && p.currentStock !== undefined ? Number(p.currentStock) : undefined,
             price: p.price !== null && p.price !== undefined ? Number(p.price) : undefined,
             reducedPrice: p.reducedPrice !== null && p.reducedPrice !== undefined ? Number(p.reducedPrice) : undefined,
             msrp: p.msrp !== null && p.msrp !== undefined ? Number(p.msrp) : undefined,
@@ -2548,18 +2554,17 @@ export async function executeTool(
         const ident = params.identifier?.trim()
         if (!ident) return { success: false, error: 'Parameter identifier is required.' }
 
+        const unmappedCondition = isUuid(ident)
+          ? or(
+              eq(unmappedMarketplaceProducts.id, ident),
+              eq(unmappedMarketplaceProducts.marketplaceSku, ident)
+            )
+          : eq(unmappedMarketplaceProducts.marketplaceSku, ident)
+
         const [item] = await db
           .select()
           .from(unmappedMarketplaceProducts)
-          .where(
-            and(
-              eq(unmappedMarketplaceProducts.companyId, companyId),
-              or(
-                eq(unmappedMarketplaceProducts.id, ident),
-                eq(unmappedMarketplaceProducts.marketplaceSku, ident)
-              )
-            )
-          )
+          .where(and(eq(unmappedMarketplaceProducts.companyId, companyId), unmappedCondition))
           .limit(1)
 
         if (!item) return { success: false, error: `Unmapped listing '${ident}' not found.` }
@@ -2620,6 +2625,10 @@ export async function executeTool(
           return { success: false, error: 'unmappedId and productId are required.' }
         }
 
+        if (!isUuid(unmappedId)) {
+          return { success: false, error: `Invalid unmapped listing ID format '${unmappedId}' (UUID expected).` }
+        }
+
         const [unmapped] = await db
           .select()
           .from(unmappedMarketplaceProducts)
@@ -2633,15 +2642,14 @@ export async function executeTool(
 
         if (!unmapped) return { success: false, error: `Unmapped listing '${unmappedId}' not found.` }
 
+        const prodCondition = isUuid(productId)
+          ? or(eq(products.id, productId), eq(products.sku, productId))
+          : eq(products.sku, productId)
+
         const [central] = await db
           .select()
           .from(products)
-          .where(
-            and(
-              eq(products.companyId, companyId),
-              or(eq(products.id, productId), eq(products.sku, productId))
-            )
-          )
+          .where(and(eq(products.companyId, companyId), prodCondition))
           .limit(1)
 
         if (!central) return { success: false, error: `Central product '${productId}' not found.` }
@@ -2670,8 +2678,8 @@ export async function executeTool(
               integrationId: unmapped.integrationId || existingMapping.integrationId,
               marketplaceProductId: unmapped.marketplaceProductId || existingMapping.marketplaceProductId,
               ean: unmappedEan || existingMapping.ean,
-              syncStock: params.syncStock !== undefined ? Boolean(params.syncStock) : true,
-              syncPrice: params.syncPrice !== undefined ? Boolean(params.syncPrice) : false,
+              syncStock: params.syncStock !== undefined ? Boolean(params.syncStock) : existingMapping.syncStock,
+              syncPrice: params.syncPrice !== undefined ? Boolean(params.syncPrice) : existingMapping.syncPrice,
               updatedAt: new Date(),
             })
             .where(eq(productMappings.id, existingMapping.id))
@@ -3197,10 +3205,12 @@ export async function executeTool(
         if (params.productId) {
           const prodIdent = params.productId.trim()
           conditions.push(
-            or(
-              eq(productMappings.productId, prodIdent),
-              eq(products.sku, prodIdent)
-            )
+            isUuid(prodIdent)
+              ? or(
+                  eq(productMappings.productId, prodIdent),
+                  eq(products.sku, prodIdent)
+                )
+              : eq(products.sku, prodIdent)
           )
         }
 
@@ -3271,12 +3281,61 @@ export async function executeTool(
 
       case 'set_product_mapping': {
         const companyId = ctx.companyId
-        const prodIdent = params.productId?.trim()
-        const marketplace = params.marketplace?.trim()
-        const marketplaceSku = params.marketplaceSku?.trim()
+        const mappingId = (params.mappingId || params.mappingReference || params.id)?.toString().trim()
+        const prodIdent = (params.productId || params.centralSku || params.productSku)?.toString().trim()
+        const marketplace = params.marketplace?.toString().trim()
+        const marketplaceSku = (params.marketplaceSku || params.sku)?.toString().trim()
 
-        if (!prodIdent || !marketplace || !marketplaceSku) {
-          return { success: false, error: 'productId, marketplace, and marketplaceSku are required.' }
+        // 1. Locate existing mapping if mappingId or (marketplace && marketplaceSku) is provided
+        let existing: typeof productMappings.$inferSelect | null = null
+
+        if (mappingId) {
+          if (!isUuid(mappingId)) {
+            return { success: false, error: `Invalid mapping ID format '${mappingId}' (UUID expected).` }
+          }
+          const [found] = await db
+            .select()
+            .from(productMappings)
+            .where(
+              and(
+                eq(productMappings.companyId, companyId),
+                eq(productMappings.id, mappingId)
+              )
+            )
+            .limit(1)
+          if (!found) {
+            return { success: false, error: `Mapping '${mappingId}' not found.` }
+          }
+          existing = found
+        } else if (marketplace && marketplaceSku) {
+          const mappingConditions: any[] = [
+            eq(productMappings.companyId, companyId),
+            eq(productMappings.marketplace, marketplace as any),
+            eq(productMappings.marketplaceSku, marketplaceSku),
+          ]
+          if (params.integrationId && isUuid(params.integrationId)) {
+            mappingConditions.push(eq(productMappings.integrationId, params.integrationId))
+          }
+          const [found] = await db
+            .select()
+            .from(productMappings)
+            .where(and(...mappingConditions))
+            .limit(1)
+          existing = found || null
+        } else {
+          return {
+            success: false,
+            error: 'Either mappingId or both marketplace and marketplaceSku are required.',
+          }
+        }
+
+        // 2. Resolve central product
+        const targetProdIdent = prodIdent || existing?.productId
+        if (!targetProdIdent) {
+          return {
+            success: false,
+            error: 'productId is required to create a new mapping.',
+          }
         }
 
         const [central] = await db
@@ -3285,64 +3344,140 @@ export async function executeTool(
           .where(
             and(
               eq(products.companyId, companyId),
-              or(eq(products.id, prodIdent), eq(products.sku, prodIdent))
+              isUuid(targetProdIdent)
+                ? or(eq(products.id, targetProdIdent), eq(products.sku, targetProdIdent))
+                : eq(products.sku, targetProdIdent)
             )
           )
           .limit(1)
 
-        if (!central) return { success: false, error: `Central product '${prodIdent}' not found.` }
-
-        // Find integrationId if not passed
-        let integrationId = params.integrationId
-        if (!integrationId) {
-          const [intg] = await db
-            .select({ id: marketplaceIntegrations.id })
-            .from(marketplaceIntegrations)
-            .where(
-              and(
-                eq(marketplaceIntegrations.companyId, companyId),
-                eq(marketplaceIntegrations.type, marketplace as any),
-                eq(marketplaceIntegrations.isActive, true)
-              )
-            )
-            .limit(1)
-          if (intg) integrationId = intg.id
+        if (!central) {
+          return { success: false, error: `Central product '${targetProdIdent}' not found.` }
         }
 
-        const targetEan = params.ean?.trim() || central.ean?.split(',')[0]?.trim() || null
+        // 3. Perform Partial Update or Insert
+        let mapping: typeof productMappings.$inferSelect
+        const changes: Record<string, { from: any; to: any }> = {}
 
-        // Check for existing mapping
-        const [existing] = await db
-          .select()
-          .from(productMappings)
-          .where(
-            and(
-              eq(productMappings.companyId, companyId),
-              eq(productMappings.marketplace, marketplace as any),
-              eq(productMappings.marketplaceSku, marketplaceSku)
-            )
-          )
-          .limit(1)
-
-        let mapping: any = null
         if (existing) {
+          const updateData: Record<string, any> = {
+            updatedAt: new Date(),
+          }
+
+          if (prodIdent !== undefined && central.id !== existing.productId) {
+            updateData.productId = central.id
+          }
+
+          if (params.integrationId !== undefined) {
+            if (params.integrationId === null || params.integrationId === '') {
+              updateData.integrationId = null
+            } else if (isUuid(params.integrationId)) {
+              updateData.integrationId = params.integrationId
+            } else {
+              return { success: false, error: `Invalid integrationId format '${params.integrationId}' (UUID expected).` }
+            }
+          }
+
+          if (params.marketplaceSku !== undefined) {
+            updateData.marketplaceSku = marketplaceSku
+          }
+
+          if (params.marketplaceProductId !== undefined) {
+            updateData.marketplaceProductId = params.marketplaceProductId ? String(params.marketplaceProductId).trim() : null
+          }
+
+          // Rule: Never auto-fill or overwrite EAN unless explicitly sent.
+          // If params.ean is explicitly provided (even as empty string or null), update it.
+          // Otherwise, leave existing.ean untouched.
+          if (params.ean !== undefined) {
+            updateData.ean = params.ean ? String(params.ean).trim() : null
+          }
+
+          if (params.syncStock !== undefined) {
+            updateData.syncStock = Boolean(params.syncStock)
+          }
+
+          if (params.syncPrice !== undefined) {
+            updateData.syncPrice = Boolean(params.syncPrice)
+          }
+
+          if (params.priceModifierType !== undefined) {
+            const validTypes = ['none', 'percentage', 'fixed']
+            if (!validTypes.includes(params.priceModifierType)) {
+              return {
+                success: false,
+                error: `Invalid priceModifierType '${params.priceModifierType}'. Must be one of: ${validTypes.join(', ')}.`,
+              }
+            }
+            updateData.priceModifierType = params.priceModifierType
+          }
+
+          if (params.priceModifierValue !== undefined) {
+            const numVal = Number(params.priceModifierValue)
+            if (isNaN(numVal)) {
+              return { success: false, error: 'priceModifierValue must be a valid number.' }
+            }
+            updateData.priceModifierValue = numVal.toFixed(4)
+          }
+
           const [updated] = await db
             .update(productMappings)
-            .set({
-              productId: central.id,
-              integrationId: integrationId || existing.integrationId,
-              marketplaceProductId: params.marketplaceProductId || existing.marketplaceProductId,
-              ean: targetEan || existing.ean,
-              syncStock: params.syncStock !== undefined ? Boolean(params.syncStock) : true,
-              syncPrice: params.syncPrice !== undefined ? Boolean(params.syncPrice) : false,
-              priceModifierType: (params.priceModifierType as any) || existing.priceModifierType,
-              priceModifierValue: params.priceModifierValue !== undefined ? Number(params.priceModifierValue).toFixed(4) : existing.priceModifierValue,
-              updatedAt: new Date(),
-            })
+            .set(updateData)
             .where(eq(productMappings.id, existing.id))
             .returning()
+
           mapping = updated
+
+          // Calculate changed fields between before and after
+          for (const key of Object.keys(updateData)) {
+            if (key === 'updatedAt') continue
+            const prevVal = (existing as any)[key]
+            const nextVal = (mapping as any)[key]
+            if (prevVal !== nextVal) {
+              changes[key] = { from: prevVal, to: nextVal }
+            }
+          }
         } else {
+          // Creating a new mapping
+          if (!marketplace || !marketplaceSku) {
+            return {
+              success: false,
+              error: 'marketplace and marketplaceSku are required to create a new mapping.',
+            }
+          }
+
+          let integrationId = params.integrationId
+          if (integrationId) {
+            if (!isUuid(integrationId)) {
+              return { success: false, error: `Invalid integrationId format '${integrationId}' (UUID expected).` }
+            }
+          } else {
+            const [intg] = await db
+              .select({ id: marketplaceIntegrations.id })
+              .from(marketplaceIntegrations)
+              .where(
+                and(
+                  eq(marketplaceIntegrations.companyId, companyId),
+                  eq(marketplaceIntegrations.type, marketplace as any),
+                  eq(marketplaceIntegrations.isActive, true)
+                )
+              )
+              .limit(1)
+            if (intg) integrationId = intg.id
+          }
+
+          let priceModVal = '0'
+          if (params.priceModifierValue !== undefined) {
+            const numVal = Number(params.priceModifierValue)
+            if (isNaN(numVal)) {
+              return { success: false, error: 'priceModifierValue must be a valid number.' }
+            }
+            priceModVal = numVal.toFixed(4)
+          }
+
+          // Rule: Never auto-fill EAN from central product. Only explicit params.ean is used.
+          const newEan = params.ean ? String(params.ean).trim() : null
+
           const [inserted] = await db
             .insert(productMappings)
             .values({
@@ -3351,24 +3486,26 @@ export async function executeTool(
               marketplace: marketplace as any,
               integrationId: integrationId || null,
               marketplaceSku,
-              marketplaceProductId: params.marketplaceProductId || null,
-              ean: targetEan,
+              marketplaceProductId: params.marketplaceProductId ? String(params.marketplaceProductId).trim() : null,
+              ean: newEan,
               syncStock: params.syncStock !== undefined ? Boolean(params.syncStock) : true,
               syncPrice: params.syncPrice !== undefined ? Boolean(params.syncPrice) : false,
               priceModifierType: (params.priceModifierType as any) || 'none',
-              priceModifierValue: params.priceModifierValue !== undefined ? Number(params.priceModifierValue).toFixed(4) : '0',
+              priceModifierValue: priceModVal,
             })
             .returning()
+
           mapping = inserted
+          changes._action = { from: null, to: 'created' }
         }
 
-        // Remove from unmapped if it existed
+        // Clean up unmapped table if matching entry exists
         await db
           .delete(unmappedMarketplaceProducts)
           .where(
             and(
               eq(unmappedMarketplaceProducts.companyId, companyId),
-              eq(unmappedMarketplaceProducts.marketplaceSku, marketplaceSku)
+              eq(unmappedMarketplaceProducts.marketplaceSku, mapping.marketplaceSku)
             )
           )
 
@@ -3376,6 +3513,9 @@ export async function executeTool(
           success: true,
           data: {
             mapping,
+            before: existing || null,
+            after: mapping,
+            changes,
             product: { id: central.id, sku: central.sku, title: central.title },
           },
         }
@@ -3626,16 +3766,16 @@ export async function executeTool(
       case 'get_customer_details': {
         const companyId = ctx.companyId
         const id = params.customerId
+        if (!id) return { success: false, error: 'customerId is required.' }
+
+        const custCondition = isUuid(id)
+          ? or(eq(customers.id, id), eq(customers.customerNumber, id))
+          : eq(customers.customerNumber, id)
 
         const [customer] = await db
           .select()
           .from(customers)
-          .where(
-            and(
-              eq(customers.companyId, companyId),
-              or(eq(customers.id, id), eq(customers.customerNumber, id))
-            )
-          )
+          .where(and(eq(customers.companyId, companyId), custCondition))
           .limit(1)
 
         if (!customer) return { success: false, error: `Customer '${id}' not found.` }
@@ -4062,9 +4202,30 @@ export async function executeTool(
     }
   } catch (err: any) {
     console.error(`Error executing tool '${toolName}':`, err)
+    let errorMessage = err?.message || `An error occurred while executing tool '${toolName}'.`
+
+    // Do not expose raw database/SQL errors to callers
+    if (
+      errorMessage.includes('invalid input syntax for type uuid') ||
+      errorMessage.includes('syntax error at or near') ||
+      (errorMessage.includes('column') && errorMessage.includes('does not exist')) ||
+      (errorMessage.includes('relation') && errorMessage.includes('does not exist')) ||
+      errorMessage.includes('SELECT ') ||
+      errorMessage.includes('UPDATE ') ||
+      errorMessage.includes('INSERT ') ||
+      err?.code?.startsWith?.('22') ||
+      err?.code?.startsWith?.('42')
+    ) {
+      if (errorMessage.includes('invalid input syntax for type uuid')) {
+        errorMessage = 'Invalid identifier format: a valid UUID was expected.'
+      } else {
+        errorMessage = `A database error occurred while executing tool '${toolName}'. Please verify the provided parameters.`
+      }
+    }
+
     return {
       success: false,
-      error: err.message || `An error occurred while executing tool '${toolName}'.`,
+      error: errorMessage,
     }
   }
 }

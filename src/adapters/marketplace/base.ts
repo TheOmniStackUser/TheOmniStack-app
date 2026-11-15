@@ -171,7 +171,7 @@ export interface MarketplaceAdapter {
   updateListings?(
     companyId: string, 
     updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number; reducedPrice?: number; fallbackPrice?: number; msrp?: number; saleStartDate?: Date | null; saleEndDate?: Date | null; gpsrDetails?: any; }[]
-  ): Promise<void>
+  ): Promise<void | any>
 
   /**
    * Marks a return as received on the marketplace if applicable.

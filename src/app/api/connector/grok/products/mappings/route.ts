@@ -36,6 +36,7 @@ export async function POST(req: Request) {
   const result = await executeTool(
     'set_product_mapping',
     {
+      mappingId: body.mappingId || body.mappingReference || body.id,
       productId: body.productId,
       marketplace: body.marketplace,
       marketplaceSku: body.marketplaceSku,

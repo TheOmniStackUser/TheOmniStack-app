@@ -483,37 +483,142 @@ export class KauflandAdapter implements MarketplaceAdapter {
 
   async updateListings(
     companyId: string, 
-    updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number }[]
-  ): Promise<void> {
-    if (!updates || updates.length === 0) return
+    updates: { 
+      sku: string; 
+      marketplaceProductId?: string; 
+      stock?: number; 
+      price?: number; 
+      reducedPrice?: number; 
+      fallbackPrice?: number; 
+      minimum_price?: number; 
+      msrp?: number; 
+      [key: string]: any 
+    }[]
+  ): Promise<{
+    totalSent: number
+    successes: number
+    failures: { sku: string; idUnit?: string; error: string }[]
+    details: { sku: string; idUnit?: string; status: 'success' | 'error'; error?: string; listing_price?: number; amount?: number }[]
+  }> {
+    if (!updates || updates.length === 0) {
+      return { totalSent: 0, successes: 0, failures: [], details: [] }
+    }
 
-    try {
-      console.log(`[KauflandAdapter] Updating ${updates.length} products...`)
+    console.log(`[KauflandAdapter] Updating ${updates.length} products...`)
 
-      // Updates in Kaufland are typically done by patching the unit via /units/{id_unit}
-      for (const update of updates) {
-        if (!update.marketplaceProductId) continue
+    const successes: { sku: string; idUnit?: string; status: 'success'; listing_price?: number; amount?: number }[] = []
+    const failures: { sku: string; idUnit?: string; error: string }[] = []
+    const details: { sku: string; idUnit?: string; status: 'success' | 'error'; error?: string; listing_price?: number; amount?: number }[] = []
 
-        const idUnit = update.marketplaceProductId
-        const patchBody: any = {}
+    for (const update of updates) {
+      let idUnit = update.marketplaceProductId ? String(update.marketplaceProductId).trim() : ''
 
-        if (update.stock !== undefined) {
-          patchBody.amount = update.stock
+      if (!idUnit) {
+        // Fallback: look up unit on Kaufland by id_offer (seller SKU)
+        try {
+          const lookup = await this.makeRequest('GET', '/units', '', {
+            id_offer: update.sku,
+            storefront: this.storefront,
+            limit: '1'
+          })
+          const found = lookup.data?.[0]
+          if (found && found.id_unit) {
+            idUnit = String(found.id_unit)
+          }
+        } catch (lookupErr: any) {
+          console.warn(`[KauflandAdapter] Unit lookup failed for SKU '${update.sku}':`, lookupErr.message)
         }
-
-        if (update.price !== undefined) {
-          patchBody.price = Math.round(update.price * 100) // Price is in cents
-        }
-
-        if (Object.keys(patchBody).length === 0) continue
-
-        await this.makeRequest('PATCH', `/units/${idUnit}`, JSON.stringify(patchBody), { storefront: this.storefront })
       }
 
-      console.log(`[KauflandAdapter] Listings successfully updated.`)
-    } catch (error) {
-      console.error(`[KauflandAdapter] Error updating listings:`, error)
-      throw error
+      if (!idUnit) {
+        const errMsg = `Unit not found on Kaufland for offer/SKU '${update.sku}'`
+        failures.push({ sku: update.sku, error: errMsg })
+        details.push({ sku: update.sku, status: 'error', error: errMsg })
+        continue
+      }
+
+      const patchBody: Record<string, any> = {}
+
+      if (update.stock !== undefined && update.stock !== null) {
+        patchBody.amount = Math.max(0, Math.floor(Number(update.stock)))
+      }
+
+      // Price logic:
+      // If reducedPrice is set (> 0), that is the selling price.
+      // Otherwise, use regular price.
+      const rawPrice = (update.reducedPrice !== undefined && update.reducedPrice !== null && Number(update.reducedPrice) > 0)
+        ? Number(update.reducedPrice)
+        : (update.price !== undefined && update.price !== null ? Number(update.price) : undefined)
+
+      if (rawPrice !== undefined && !isNaN(rawPrice)) {
+        // Kaufland requires integer in euro cents gross (e.g. 154.90 EUR -> 15490)
+        patchBody.listing_price = Math.round(rawPrice * 100)
+      }
+
+      // Optional minimum_price (also in cents)
+      if (update.minimum_price !== undefined && update.minimum_price !== null) {
+        patchBody.minimum_price = Math.round(Number(update.minimum_price) * 100)
+      }
+
+      // CRITICAL: Strip any "price", "fallbackPrice", "reducedPrice", or "msrp" properties
+      // Kaufland Seller API v2 strictly rejects "price" as an excess property
+      delete patchBody.price
+      delete patchBody.fallbackPrice
+      delete patchBody.reducedPrice
+      delete patchBody.msrp
+
+      if (Object.keys(patchBody).length === 0) {
+        continue
+      }
+
+      try {
+        await this.makeRequest('PATCH', `/units/${idUnit}`, JSON.stringify(patchBody), { storefront: this.storefront })
+        successes.push({
+          sku: update.sku,
+          idUnit,
+          status: 'success',
+          listing_price: patchBody.listing_price,
+          amount: patchBody.amount
+        })
+        details.push({
+          sku: update.sku,
+          idUnit,
+          status: 'success',
+          listing_price: patchBody.listing_price,
+          amount: patchBody.amount
+        })
+      } catch (err: any) {
+        let errorMsg = err?.message || 'Unknown error'
+        // Format if problem JSON
+        try {
+          const jsonStart = errorMsg.indexOf('{')
+          if (jsonStart !== -1) {
+            const parsed = JSON.parse(errorMsg.substring(jsonStart))
+            if (parsed.errors && Array.isArray(parsed.errors)) {
+              errorMsg = parsed.errors.map((e: any) => e.message || e.field).join(', ')
+            } else if (parsed.message) {
+              errorMsg = parsed.message
+            }
+          }
+        } catch {}
+
+        console.error(`[KauflandAdapter] Failed to update unit ${idUnit} (SKU: ${update.sku}): ${errorMsg}`)
+        failures.push({ sku: update.sku, idUnit, error: errorMsg })
+        details.push({ sku: update.sku, idUnit, status: 'error', error: errorMsg })
+      }
+    }
+
+    console.log(`[KauflandAdapter] Update complete: ${successes.length} succeeded, ${failures.length} failed out of ${updates.length} items.`)
+
+    if (successes.length === 0 && failures.length > 0) {
+      throw new Error(`Kaufland update failed for all ${failures.length} items: ${failures.map(f => `${f.sku}: ${f.error}`).join('; ')}`)
+    }
+
+    return {
+      totalSent: updates.length,
+      successes: successes.length,
+      failures,
+      details
     }
   }
 }

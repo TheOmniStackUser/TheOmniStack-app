@@ -353,9 +353,6 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
     const updateDef = updates.find(u => u.sku === centralProduct.sku)
     if (!updateDef) continue
 
-    if (!updatesByIntegration[intId]) {
-      updatesByIntegration[intId] = []
-    }
 
     const mUpdate: any = {
       sku: mapping.marketplaceSku,
@@ -526,7 +523,11 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
       (mUpdate as any).fallbackPrice = mUpdate.price || 0
     }
 
-    if (mUpdate.stock !== undefined || mUpdate.price !== undefined || mUpdate.reducedPrice !== undefined || mUpdate.msrp !== undefined || mUpdate.gpsrDetails !== undefined) {
+    // Only push if there is an actual stock or price update for this marketplace
+    if (mUpdate.stock !== undefined || mUpdate.price !== undefined || mUpdate.reducedPrice !== undefined || mUpdate.msrp !== undefined) {
+      if (!updatesByIntegration[intId]) {
+        updatesByIntegration[intId] = []
+      }
       updatesByIntegration[intId].push(mUpdate)
     }
   }
@@ -555,7 +556,7 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
 
     const marketplace = integration.type
     const adapter = getAdapterForIntegration(integration)
-    if (!adapter || !adapter.updateListings) {
+    if (!adapter || !adapter.updateListings || !mpUpdates || mpUpdates.length === 0) {
       currentIndex++
       return
     }
@@ -615,22 +616,51 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
 
     try {
       console.log(`[ProductSync] Pushing ${mpUpdates.length} updates to ${marketplace}...`)
-      await adapter.updateListings(companyId, mpUpdates)
+      const adapterResult = (await adapter.updateListings(companyId, mpUpdates)) as any
       totalUpdatesSent += mpUpdates.length
       if (!activeMarketplaces.includes(displayName)) {
         activeMarketplaces.push(displayName)
       }
       
-      // Save success status
-      const updatedMeta = { ...meta, lastPushSync: { timestamp: Date.now(), status: 'success', updatesCount: mpUpdates.length } }
+      const failures: { sku: string; error: string }[] = adapterResult?.failures || []
+      const isPartial = failures.length > 0
+
+      // Update log payload with per-SKU status
+      const finalSyncedSkus = logPayload.map((item: any) => {
+        const itemFail = failures.find((f: any) => f.sku === item.sku)
+        if (itemFail) {
+          return { ...item, status: 'error', error: itemFail.error }
+        }
+        return { ...item, status: 'success' }
+      })
+
+      // Save success or partial status in metadata
+      const updatedMeta = {
+        ...meta,
+        lastPushSync: {
+          timestamp: Date.now(),
+          status: isPartial ? 'partial' : 'success',
+          updatesCount: mpUpdates.length,
+          ...(isPartial ? { partialFailures: failures } : {})
+        }
+      }
       await db.update(marketplaceIntegrations).set({ metadata: updatedMeta }).where(eq(marketplaceIntegrations.id, integrationId))
 
-      // Update log to success
+      // Update log to success or partial
       if (logId) {
         await db.update(productSyncLogs).set({
-          status: 'success',
+          status: isPartial ? 'partial' : 'success',
+          syncedSkus: finalSyncedSkus,
+          errorMessage: isPartial ? failures.map((f: any) => `${f.sku}: ${f.error}`).join('; ') : null,
           completedAt: new Date()
         }).where(eq(productSyncLogs.id, logId))
+      }
+
+      if (isPartial) {
+        failedMarketplaces.push({
+          name: `${displayName} (Teilweise fehlgeschlagen)`,
+          error: `${failures.length} von ${mpUpdates.length} Artikeln fehlgeschlagen: ${failures.map((f: any) => `${f.sku}: ${f.error}`).join('; ')}`
+        })
       }
 
     } catch (error: any) {

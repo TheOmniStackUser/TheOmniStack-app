@@ -29,6 +29,7 @@ export interface ChannelPriceCalculation extends ChannelPriceRule {
   rawBasePrice: number
   isDiscounted: boolean
   mappingModifierActive: boolean
+  payload?: Record<string, any>
 }
 
 export function formatChannelDisplayName(integration: {
@@ -145,6 +146,7 @@ export function calculateChannelPrice(params: {
   }
   mapping?: {
     marketplaceSku?: string | null
+    marketplaceProductId?: string | null
     priceModifierType?: string | null
     priceModifierValue?: number | string | null
     syncPrice?: boolean | null
@@ -247,6 +249,17 @@ export function calculateChannelPrice(params: {
   const finalPrice =
     finalReducedPrice !== null && finalReducedPrice > 0 ? finalReducedPrice : finalRegularPrice
 
+  const isKaufland = rule.marketplace === 'kaufland' || rule.channel === 'kaufland'
+  const payload: Record<string, any> = isKaufland
+    ? {
+        ...(mapping?.marketplaceProductId ? { id_unit: mapping.marketplaceProductId } : {}),
+        listing_price: Math.round(finalPrice * 100),
+      }
+    : {
+        price: finalPrice,
+        ...(finalReducedPrice !== null && finalReducedPrice > 0 ? { reducedPrice: finalReducedPrice } : {}),
+      }
+
   return {
     ...rule,
     sku: product.sku,
@@ -259,5 +272,6 @@ export function calculateChannelPrice(params: {
     rawBasePrice,
     isDiscounted: Boolean(finalReducedPrice !== null && finalReducedPrice > 0 && finalReducedPrice < finalRegularPrice),
     mappingModifierActive: hasMappingModifier,
+    payload,
   }
 }
