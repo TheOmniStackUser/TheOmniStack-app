@@ -32,8 +32,12 @@ export async function GET(request: Request) {
       return new Response('Keine gültigen IDs übergeben', { status: 400 })
     }
 
+    const parcelClass = searchParams.get('parcelClass') || searchParams.get('parcel_class') || undefined
+    const weightKg = searchParams.get('weightKg') ? Number(searchParams.get('weightKg')) : undefined
+    const replaceExisting = searchParams.get('replaceExisting') === 'true'
+
     // Fetch orders matching the IDs and company ID
-    const ordersData = await db
+    let ordersData = await db
       .select()
       .from(orders)
       .where(
@@ -45,6 +49,37 @@ export async function GET(request: Request) {
 
     if (ordersData.length === 0) {
       return new Response('Keine Bestellungen gefunden', { status: 404 })
+    }
+
+    // Check if any order needs label generation
+    const { executeTool } = await import('@/lib/grok-connector/tools')
+    let needsRefresh = false
+    for (const order of ordersData) {
+      if (!order.labelUrl || replaceExisting) {
+        await executeTool(
+          'generate_shipping_label',
+          {
+            orderId: order.id,
+            parcelClass,
+            weightKg,
+            replaceExisting,
+          },
+          { userId: 'system', companyId, role: 'admin', companyName: '' }
+        )
+        needsRefresh = true
+      }
+    }
+
+    if (needsRefresh) {
+      ordersData = await db
+        .select()
+        .from(orders)
+        .where(
+          and(
+            inArray(orders.id, ids),
+            eq(orders.companyId, companyId)
+          )
+        )
     }
 
     // Sort ordersData to match the requested ids order

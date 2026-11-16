@@ -151,7 +151,7 @@ export class HermesAdapter {
   async generateLabelForOrder(
     order: any, 
     company: any, 
-    parcelClass: string = 'S'
+    parcelClass: string = 'XS'
   ): Promise<{ labelUrl: string, returnLabelUrl?: string, trackingNumber: string, returnTrackingNumber?: string }> {
     console.log(`[Hermes Adapter] Generiere Versandetikett für Bestellung ${order.marketplaceOrderId || order.id} (Klasse: ${parcelClass})...`)
 
@@ -241,6 +241,12 @@ export class HermesAdapter {
     if (marketplace === 'otto' && returnType === 'none') {
       console.log(`[Hermes Adapter] Auto-fixing returnType to 'virtual' for Otto shipment.`)
       returnType = 'virtual'
+    }
+
+    // AUTO-FIX: ABOUT YOU requires an enclosed return label.
+    if (marketplace === 'aboutyou' && returnType === 'none') {
+      console.log(`[Hermes Adapter] Auto-fixing returnType to 'enclosed' for About You shipment.`)
+      returnType = 'enclosed'
     }
 
     console.log(`[Hermes Adapter] Return Config Check: marketplace=${marketplace}, returnType=${returnType}, integrationId=${this.integrationId}`)
@@ -411,5 +417,18 @@ export class HermesAdapter {
     }
 
     return await response.json()
+  }
+
+  /**
+   * Voids a Hermes shipment reference.
+   * Note: The Hermes HSI API does not provide a cancellation endpoint; parcels that
+   * never receive an induction scan at a ParcelShop or depot expire without incurring charges.
+   */
+  async cancelShipment(shipmentId: string): Promise<{ success: boolean; message: string }> {
+    console.log(`[Hermes Adapter] Voiding shipment reference: ${shipmentId}`)
+    return {
+      success: true,
+      message: `Hermes shipment '${shipmentId}' voided locally. Unscanned labels expire automatically without carrier charges.`
+    }
   }
 }

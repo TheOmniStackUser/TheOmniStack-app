@@ -94,6 +94,8 @@ export const orders = pgTable('orders', {
   labelUrl: text('label_url'),
   returnTrackingNumber: text('return_tracking_number'),
   returnLabelUrl: text('return_label_url'),
+  parcelClass: text('parcel_class'),
+  carrier: text('carrier'),
   totalWeight: numeric('total_weight', { precision: 8, scale: 3 }),
   notes: text('notes'),
   scheduledShipmentDate: timestamp('scheduled_shipment_date', { withTimezone: true }),

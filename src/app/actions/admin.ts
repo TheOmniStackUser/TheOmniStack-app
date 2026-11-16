@@ -50,3 +50,47 @@ export async function toggleCompanyFeatureAction(companyId: string, feature: 're
   
   return { success: true }
 }
+
+export async function updateCompanyBillingAddressAction(companyId: string, data: {
+  legalName?: string
+  street?: string
+  zip?: string
+  city?: string
+  country?: string
+  vatId?: string
+  taxId?: string
+  email?: string
+  phone?: string
+}) {
+  await requireSuperAdmin()
+
+  const [existing] = await db
+    .select({ id: companies.id, legalName: companies.legalName, country: companies.country })
+    .from(companies)
+    .where(eq(companies.id, companyId))
+    .limit(1)
+
+  if (!existing) throw new Error('Company not found')
+
+  await db
+    .update(companies)
+    .set({
+      legalName: data.legalName !== undefined && data.legalName.trim() !== '' ? data.legalName.trim() : existing.legalName,
+      street: data.street !== undefined ? data.street.trim() || null : undefined,
+      zip: data.zip !== undefined ? data.zip.trim() || null : undefined,
+      city: data.city !== undefined ? data.city.trim() || null : undefined,
+      country: data.country ? data.country.trim() : existing.country,
+      vatId: data.vatId !== undefined ? data.vatId.trim() || null : undefined,
+      taxId: data.taxId !== undefined ? data.taxId.trim() || null : undefined,
+      email: data.email !== undefined ? data.email.trim() || null : undefined,
+      phone: data.phone !== undefined ? data.phone.trim() || null : undefined,
+      updatedAt: new Date(),
+    })
+    .where(eq(companies.id, companyId))
+
+  revalidatePath('/admin/billing')
+  revalidatePath(`/admin/merchants/${companyId}`)
+  revalidatePath('/admin/merchants')
+
+  return { success: true }
+}

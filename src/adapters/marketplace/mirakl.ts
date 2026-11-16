@@ -25,6 +25,43 @@ export class MiraklAdapter implements MarketplaceAdapter {
   private supportedCarriersCache: { code: string; label: string }[] | null = null
   private supportedCarriersCacheTime = 0
 
+  private channelsCache: string[] | null = null
+
+  /**
+   * Fetches active sales channels for this Mirakl instance (e.g. Decathlon DE, FR, IT, etc.).
+   */
+  private async getMarketplaceChannels(): Promise<string[]> {
+    if (this.channelsCache !== null) return this.channelsCache
+    try {
+      const token = await this.getAccessToken()
+      const headers: Record<string, string> = { Accept: 'application/json' }
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      } else {
+        const apiKey = this.config.clientSecret === '' || !this.config.clientSecret 
+          ? this.config.clientId 
+          : this.config.apiKey
+        if (apiKey) {
+          headers['Authorization'] = apiKey
+          headers['X-Mirakl-Api-Key'] = apiKey
+        }
+      }
+      const baseUrl = this.config.baseUrl.replace(/\/$/, '')
+      const cleanBaseUrl = baseUrl.endsWith('/api') ? baseUrl : `${baseUrl}/api`
+      const res = await fetch(`${cleanBaseUrl}/channels`, { headers })
+      if (res.ok) {
+        const data = await res.json()
+        const channels = (data.channels || []).map((c: any) => c.code).filter(Boolean)
+        this.channelsCache = channels
+        return channels
+      }
+    } catch (err) {
+      console.warn(`[MiraklAdapter:${this.marketplace}] Failed to fetch channels:`, err)
+    }
+    this.channelsCache = []
+    return []
+  }
+
   constructor(private readonly config: MiraklAdapterConfig) {
     this.marketplace = config.instance
   }
@@ -2003,39 +2040,47 @@ export class MiraklAdapter implements MarketplaceAdapter {
           url += `?shop_id=${this.config.shopId}`
         }
 
-        // We fetch existing offers only when base price is missing to satisfy OF01 mandatory price requirement
+        const channelCodes = await this.getMarketplaceChannels()
+
+        // We fetch existing offers when base price is missing OR stock is missing, to satisfy OF01 requirements
+        // and ensure Mirakl does not wipe stock to 0 when updating prices.
         const currentOffersMap: Record<string, any> = {}
-        const itemsNeedingLookup = priceOrFullUpdates.filter(u => u.price === undefined || u.price === null)
+        const itemsNeedingLookup = priceOrFullUpdates.filter(u => u.price === undefined || u.price === null || u.stock === undefined)
 
         if (itemsNeedingLookup.length > 0) {
-          console.log(`[MiraklAdapter:${this.marketplace}] Fetching existing offers to preserve marketplace prices for ${itemsNeedingLookup.length} items...`)
+          console.log(`[MiraklAdapter:${this.marketplace}] Fetching existing offers to preserve marketplace prices/stock for ${itemsNeedingLookup.length} items...`)
           try {
-            await Promise.all(itemsNeedingLookup.map(async (u) => {
-              try {
-                const lookupUrl = u.marketplaceProductId
-                  ? `${baseUrl}/api/offers/${u.marketplaceProductId}`
-                  : `${url}${url.includes('?') ? '&' : '?'}sku=${encodeURIComponent(u.sku)}`
-                const res = await fetch(lookupUrl, { headers })
-                if (res.ok) {
-                  const data = await res.json()
-                  const offer = data.offers ? data.offers[0] : data
-                  if (offer && offer.shop_sku) {
-                    let normalPrice = offer.price
-                    if (offer.discount && offer.discount.origin_price !== undefined) {
-                      normalPrice = offer.discount.origin_price
-                    }
-                    currentOffersMap[offer.shop_sku || u.sku] = {
-                      price: normalPrice,
-                      discount: offer.discount
+            const batchSize = 20
+            for (let i = 0; i < itemsNeedingLookup.length; i += batchSize) {
+              const batch = itemsNeedingLookup.slice(i, i + batchSize)
+              await Promise.all(batch.map(async (u) => {
+                try {
+                  const lookupUrl = u.marketplaceProductId
+                    ? `${baseUrl}/api/offers/${u.marketplaceProductId}`
+                    : `${url}${url.includes('?') ? '&' : '?'}sku=${encodeURIComponent(u.sku)}`
+                  const res = await fetch(lookupUrl, { headers })
+                  if (res.ok) {
+                    const data = await res.json()
+                    const offer = data.offers ? data.offers[0] : data
+                    if (offer && offer.shop_sku) {
+                      let normalPrice = offer.price
+                      if (offer.discount && offer.discount.origin_price !== undefined) {
+                        normalPrice = offer.discount.origin_price
+                      }
+                      currentOffersMap[offer.shop_sku || u.sku] = {
+                        price: normalPrice,
+                        discount: offer.discount,
+                        quantity: offer.quantity
+                      }
                     }
                   }
+                } catch (err) {
+                  console.warn(`[MiraklAdapter:${this.marketplace}] Failed to fetch offer for SKU ${u.sku}:`, err)
                 }
-              } catch (err) {
-                console.warn(`[MiraklAdapter:${this.marketplace}] Failed to fetch offer for SKU ${u.sku}:`, err)
-              }
-            }))
+              }))
+            }
           } catch (e) {
-            console.warn(`[MiraklAdapter:${this.marketplace}] Failed to fetch existing offers for price fallback:`, e)
+            console.warn(`[MiraklAdapter:${this.marketplace}] Failed to fetch existing offers for price/stock fallback:`, e)
           }
         }
 
@@ -2045,7 +2090,11 @@ export class MiraklAdapter implements MarketplaceAdapter {
             shop_sku: update.sku,
             update_delete: 'update'
           }
-          if (update.stock !== undefined) offer.quantity = update.stock
+          if (update.stock !== undefined) {
+            offer.quantity = update.stock
+          } else if (currentOffersMap[update.sku]?.quantity !== undefined) {
+            offer.quantity = currentOffersMap[update.sku].quantity
+          }
           
           // Price is mandatory in Mirakl OF01
           if (update.price !== undefined && update.price !== null) {
@@ -2101,6 +2150,15 @@ export class MiraklAdapter implements MarketplaceAdapter {
               if (rawDisc.start_date) offer['discount-start-date'] = rawDisc.start_date
               if (rawDisc.end_date) offer['discount-end-date'] = rawDisc.end_date
             }
+          }
+
+          // Multi-channel pricing support (e.g. Decathlon DE, FR, IT, ES, etc.)
+          if (channelCodes.length > 0 && offer.price !== undefined) {
+            offer.all_prices = channelCodes.map((code: string) => ({
+              channel_code: code,
+              price: offer.price,
+              ...(offer.discount ? { discount: offer.discount } : {})
+            }))
           }
 
           // Handle MSRP / UVP / Additional fields

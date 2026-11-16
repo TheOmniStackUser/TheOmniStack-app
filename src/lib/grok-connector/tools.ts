@@ -248,15 +248,19 @@ export const TOOLS_MANIFEST: ToolDefinition[] = [
   {
     name: 'generate_bulk_shipping_labels',
     category: 'shipping',
-    description: 'Merge existing shipping labels (outbound and return) for multiple orders into a single batch PDF (Versandlabels_Sammel).',
+    description: 'Generate or merge shipping labels (outbound and return) for multiple orders into a single batch PDF (Versandlabels_Sammel). Automatically generates missing labels with the resolved or provided parcel class, and optionally replaces existing labels if replaceExisting is true.',
     parameters: {
       type: 'object',
       properties: {
         orderIds: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Array of order IDs whose shipping labels to merge',
+          description: 'Array of order IDs whose shipping labels to generate or merge',
         },
+        carrier: { type: 'string', enum: ['hermes', 'dhl', 'dpd'], description: 'Shipping carrier (default: hermes)' },
+        parcelClass: { type: 'string', description: 'Hermes parcel class (XS, S, M, L, XL). If omitted, resolved via SKU/shoe detection (S) or company default (XS).' },
+        weightKg: { type: 'number', description: 'Total parcel weight in kg' },
+        replaceExisting: { type: 'boolean', description: 'Whether to void and re-issue existing labels for these orders (default: false)' },
       },
       required: ['orderIds'],
     },
@@ -895,14 +899,28 @@ export const TOOLS_MANIFEST: ToolDefinition[] = [
   {
     name: 'generate_shipping_label',
     category: 'shipping',
-    description: 'Generate a carrier shipping label (Hermes, DHL, or DPD) for an order, record the tracking code, mark the order as shipped, and automatically confirm the shipment and tracking code to the connected marketplace (Otto, About You, Decathlon, Amazon, etc.). Idempotent: If the order already has a tracking number or label URL, returns the existing label immediately to prevent duplicate carrier charges and ensures marketplace confirmation.',
+    description: 'Generate a carrier shipping label (Hermes, DHL, or DPD) for an order, record the tracking code, mark the order as shipped, and automatically confirm the shipment and tracking code to the connected marketplace (Otto, About You, Decathlon, Amazon, etc.). Idempotent by default: If the order already has a tracking number or label URL, returns the existing label immediately without duplicate carrier charges. Set replaceExisting: true to void/replace an existing label and create a new one with given/resolved parcelClass and weight, re-issuing return labels for About You and pushing the new tracking to marketplaces. Set dryRun: true to preview resolution without creating carrier charges.',
     parameters: {
       type: 'object',
       properties: {
         orderId: { type: 'string', description: 'Order ID (UUID)' },
         carrier: { type: 'string', enum: ['dhl', 'hermes', 'dpd'], description: 'Shipping carrier (default: hermes)' },
-        parcelClass: { type: 'string', description: 'Parcel class for Hermes (XS, S, M, L, XL), default: S' },
+        parcelClass: { type: 'string', description: 'Parcel class for Hermes (XS, S, M, L, XL). If omitted, automatically resolved via per-SKU shoe/boot detection (S) or company default (XS).' },
         weightKg: { type: 'number', description: 'Total parcel weight in kg' },
+        replaceExisting: { type: 'boolean', description: 'If true, voids any existing label and re-issues a new label with given parcelClass/weight, recreating return labels and updating connected marketplaces (default: false)' },
+        dryRun: { type: 'boolean', description: 'If true, validates address and resolves carrier, parcel class, and weight without creating a label or charging carrier (default: false)' },
+      },
+      required: ['orderId'],
+    },
+  },
+  {
+    name: 'void_shipping_label',
+    category: 'shipping',
+    description: 'Void or cancel an existing shipping label on an order, clear the tracking number and label PDF URLs, and reset the shipping status so a new label can be generated. For Hermes, unscanned labels expire automatically without incurring carrier charges.',
+    parameters: {
+      type: 'object',
+      properties: {
+        orderId: { type: 'string', description: 'Order ID (UUID) or marketplace order ID' },
       },
       required: ['orderId'],
     },
@@ -1165,7 +1183,11 @@ export async function executeTool(
         return {
           success: true,
           data: {
-            order,
+            order: {
+              ...order,
+              parcelClass: order.parcelClass || null,
+              weightKg: order.totalWeight ? Number(order.totalWeight) : null,
+            },
             items,
             invoice: linkedInvoice,
           },
@@ -1340,6 +1362,29 @@ export async function executeTool(
 
         if (orderIds.length === 0) {
           return { success: false, error: 'orderIds array cannot be empty.' }
+        }
+
+        // Generate or re-issue labels for any orders that need them
+        const targetOrders = await db
+          .select()
+          .from(orders)
+          .where(and(eq(orders.companyId, companyId), inArray(orders.id, orderIds)))
+
+        for (const targetOrder of targetOrders) {
+          const needsLabel = !targetOrder.labelUrl || params.replaceExisting
+          if (needsLabel) {
+            await executeTool(
+              'generate_shipping_label',
+              {
+                orderId: targetOrder.id,
+                carrier: params.carrier,
+                parcelClass: params.parcelClass,
+                weightKg: params.weightKg,
+                replaceExisting: params.replaceExisting,
+              },
+              ctx
+            )
+          }
         }
 
         const result = await getMergedShippingLabelsPdf(orderIds, companyId)
@@ -3932,21 +3977,95 @@ export async function executeTool(
 
       case 'generate_shipping_label': {
         const companyId = ctx.companyId
+        const targetId = params.orderId
+        if (!targetId) return { success: false, error: 'orderId is required.' }
+
+        const orderCondition = isUuid(targetId)
+          ? or(eq(orders.id, targetId), eq(orders.marketplaceOrderId, targetId))
+          : eq(orders.marketplaceOrderId, targetId)
+
         const [order] = await db
           .select()
           .from(orders)
-          .where(and(eq(orders.companyId, companyId), eq(orders.id, params.orderId)))
+          .where(and(eq(orders.companyId, companyId), orderCondition))
           .limit(1)
 
-        if (!order) return { success: false, error: `Order '${params.orderId}' not found.` }
+        if (!order) return { success: false, error: `Order '${targetId}' not found.` }
 
-        // SAFETY / IDEMPOTENCY: Check if the order already has trackingNumber or labelUrl
-        if (order.trackingNumber || order.labelUrl) {
-          // If confirmation was pending or failed, retry marketplace confirmation now!
+        const requestedCarrier = (params.carrier || order.carrier || 'hermes').toLowerCase()
+
+        // Resolve parcel class dynamically (Explicit > Per-SKU shoe/boot = S > Company default > Global default XS)
+        const { resolveParcelClassForOrder } = await import('@/lib/parcel-class-resolver')
+        const resolution = await resolveParcelClassForOrder({
+          order,
+          orderId: order.id,
+          companyId,
+          explicitParcelClass: params.parcelClass,
+        })
+        const parcelClass = resolution.parcelClass
+        const resolvedWeight = params.weightKg
+          ? Number(params.weightKg)
+          : order.totalWeight
+          ? Number(order.totalWeight)
+          : 1.0
+
+        // ─── DRY RUN MODE ────────────────────────────────────────────────────────
+        if (params.dryRun) {
+          const [company] = await db.select().from(companies).where(eq(companies.id, companyId)).limit(1)
+          const missingCompanyFields: string[] = []
+          if (!company?.street) missingCompanyFields.push('street')
+          if (!company?.zip) missingCompanyFields.push('zip')
+          if (!company?.city) missingCompanyFields.push('city')
+
+          const addressWarnings: string[] = []
+          if (!order.shippingStreet) addressWarnings.push('Missing shippingStreet')
+          if (!order.shippingZip) addressWarnings.push('Missing shippingZip')
+          if (!order.shippingCity) addressWarnings.push('Missing shippingCity')
+          if (!order.shippingCountry) addressWarnings.push('Missing shippingCountry')
+
+          return {
+            success: true,
+            data: {
+              dryRun: true,
+              orderId: order.id,
+              marketplaceOrderId: order.marketplaceOrderId,
+              marketplace: order.marketplace,
+              carrier: requestedCarrier,
+              parcelClass,
+              parcelClassResolution: resolution,
+              weightKg: resolvedWeight,
+              existingLabel: {
+                hasLabel: Boolean(order.trackingNumber || order.labelUrl),
+                trackingNumber: order.trackingNumber || null,
+                parcelClass: order.parcelClass || null,
+              },
+              validation: {
+                valid: missingCompanyFields.length === 0 && addressWarnings.length === 0,
+                missingCompanyFields,
+                addressWarnings,
+              },
+              recipient: {
+                name: order.shippingName || order.buyerName || 'Empfänger',
+                street: order.shippingStreet,
+                zip: order.shippingZip,
+                city: order.shippingCity,
+                country: order.shippingCountry || 'DE',
+              },
+              message: `[Dry Run] Validation successful. Carrier: ${requestedCarrier.toUpperCase()}, Parcel Class: ${parcelClass} (${resolution.source}), Weight: ${resolvedWeight} kg. No carrier charges incurred.`,
+            },
+          }
+        }
+
+        const isExisting = Boolean(order.trackingNumber || order.labelUrl)
+        const shouldReplace = Boolean(params.replaceExisting)
+
+        // ─── EXISTING LABEL CHECK (unless replaceExisting is requested) ──────────
+        if (isExisting && !shouldReplace) {
+          // If confirmation was pending or failed, retry marketplace confirmation now
           if (order.marketplace !== 'manual' && order.marketplaceConfirmationStatus !== 'confirmed') {
             try {
               const { confirmMarketplaceShipment } = await import('@/lib/marketplace-confirmation')
-              await confirmMarketplaceShipment(order.id, companyId, (params.carrier || 'HERMES').toUpperCase())
+              await confirmMarketplaceShipment(order.id, companyId, (requestedCarrier || 'HERMES').toUpperCase())
             } catch (err: any) {
               console.warn('[generate_shipping_label] Retrying confirmation on existing label failed:', err.message)
             }
@@ -3957,6 +4076,8 @@ export async function executeTool(
               marketplaceConfirmationStatus: orders.marketplaceConfirmationStatus,
               marketplaceConfirmationError: orders.marketplaceConfirmationError,
               marketplaceConfirmedAt: orders.marketplaceConfirmedAt,
+              parcelClass: orders.parcelClass,
+              carrier: orders.carrier,
             })
             .from(orders)
             .where(eq(orders.id, order.id))
@@ -3968,17 +4089,21 @@ export async function executeTool(
               orderId: order.id,
               trackingNumber: order.trackingNumber,
               labelUrl: order.labelUrl,
-              carrier: params.carrier || 'hermes',
+              returnTrackingNumber: order.returnTrackingNumber || null,
+              returnLabelUrl: order.returnLabelUrl || null,
+              carrier: refreshed?.carrier || order.carrier || requestedCarrier,
+              parcelClass: refreshed?.parcelClass || order.parcelClass || parcelClass,
+              weightKg: order.totalWeight ? Number(order.totalWeight) : resolvedWeight,
               status: order.status,
               marketplaceConfirmationStatus: refreshed?.marketplaceConfirmationStatus || order.marketplaceConfirmationStatus,
               marketplaceConfirmationError: refreshed?.marketplaceConfirmationError || order.marketplaceConfirmationError,
               isExisting: true,
-              message: 'Shipping label already exists for this order. Reusing existing label to prevent duplicate carrier charges.',
+              message: 'Shipping label already exists for this order. Reusing existing label to prevent duplicate carrier charges. Pass replaceExisting: true to void and re-issue.',
             },
           }
         }
 
-        const requestedCarrier = (params.carrier || 'hermes').toLowerCase()
+        const previousTrackingNumber = order.trackingNumber
 
         if (requestedCarrier === 'hermes') {
           try {
@@ -3989,7 +4114,11 @@ export async function executeTool(
               return { success: false, error: 'Company address is missing in settings. Please configure billing/shipping address first.' }
             }
 
-            const parcelClass = params.parcelClass || 'S'
+            if (isExisting && shouldReplace && previousTrackingNumber) {
+              console.log(`[generate_shipping_label] Voiding previous Hermes label ${previousTrackingNumber} on re-issue for order ${order.id}`)
+              await hermes.cancelShipment(previousTrackingNumber).catch(console.warn)
+            }
+
             const { labelUrl, returnLabelUrl, trackingNumber, returnTrackingNumber } = await hermes.generateLabelForOrder(order, company, parcelClass)
 
             await db
@@ -3999,10 +4128,12 @@ export async function executeTool(
                 shippingStatus: 'in_transit',
                 trackingNumber,
                 labelUrl,
-                returnTrackingNumber,
+                returnTrackingNumber: returnTrackingNumber ?? null,
                 returnLabelUrl: returnLabelUrl ?? null,
+                parcelClass,
+                carrier: 'hermes',
                 marketplaceConfirmationStatus: order.marketplace === 'manual' ? 'not_applicable' : 'pending',
-                totalWeight: params.weightKg ? Number(params.weightKg).toFixed(3) : order.totalWeight,
+                totalWeight: resolvedWeight.toFixed(3),
                 updatedAt: new Date(),
               })
               .where(eq(orders.id, order.id))
@@ -4010,6 +4141,8 @@ export async function executeTool(
             // Auto-confirm shipment on marketplace immediately
             let marketplaceConfirmed = false
             let confirmationError: string | null = null
+            let marketplaceNotice: string | null = null
+
             if (order.marketplace !== 'manual') {
               try {
                 const { confirmMarketplaceShipment } = await import('@/lib/marketplace-confirmation')
@@ -4017,9 +4150,12 @@ export async function executeTool(
                 marketplaceConfirmed = confResult.success
                 if (!confResult.success) {
                   confirmationError = confResult.error || null
+                  if (order.marketplace === 'otto' && confResult.error?.includes('POSITION_ITEM_INCLUDED_IN_OTHER_SHIPMENT')) {
+                    marketplaceNotice = 'Otto Market does not allow overwriting tracking numbers via API once a shipment is reported. The new tracking number is saved in Omni Stack, but Otto seller portal must be updated manually if customer visibility is required.'
+                  }
                 }
               } catch (confErr: any) {
-                console.warn('[generate_shipping_label] Background marketplace confirmation failed:', confErr.message)
+                console.warn('[generate_shipping_label] Marketplace confirmation failed:', confErr.message)
                 confirmationError = confErr.message
               }
             } else {
@@ -4032,11 +4168,19 @@ export async function executeTool(
                 orderId: order.id,
                 trackingNumber,
                 labelUrl,
+                returnTrackingNumber: returnTrackingNumber || null,
+                returnLabelUrl: returnLabelUrl || null,
                 carrier: 'hermes',
+                parcelClass,
+                parcelClassResolution: resolution,
+                weightKg: resolvedWeight,
                 status: 'shipped',
                 marketplaceConfirmationStatus: marketplaceConfirmed ? 'confirmed' : 'failed',
                 marketplaceConfirmationError: confirmationError,
+                marketplaceNotice: marketplaceNotice || undefined,
                 isExisting: false,
+                isReissued: isExisting && shouldReplace,
+                previousTrackingNumber: isExisting && shouldReplace ? previousTrackingNumber : undefined,
               },
             }
           } catch (hermesErr: any) {
@@ -4056,7 +4200,9 @@ export async function executeTool(
             trackingNumber: trackingNum,
             status: 'shipped',
             shippingStatus: 'in_transit',
-            totalWeight: params.weightKg ? Number(params.weightKg).toFixed(3) : order.totalWeight,
+            parcelClass,
+            carrier: requestedCarrier,
+            totalWeight: resolvedWeight.toFixed(3),
             updatedAt: new Date(),
           })
           .where(eq(orders.id, order.id))
@@ -4091,11 +4237,92 @@ export async function executeTool(
           data: {
             orderId: updated.id,
             trackingNumber: updated.trackingNumber,
-            carrier: params.carrier || 'dhl',
+            carrier: requestedCarrier,
+            parcelClass,
+            parcelClassResolution: resolution,
+            weightKg: resolvedWeight,
             status: updated.status,
             marketplaceConfirmationStatus: marketplaceConfirmed ? 'confirmed' : 'failed',
             marketplaceConfirmationError: confirmationError,
             isExisting: false,
+            isReissued: isExisting && shouldReplace,
+            previousTrackingNumber: isExisting && shouldReplace ? previousTrackingNumber : undefined,
+          },
+        }
+      }
+
+      case 'void_shipping_label': {
+        const companyId = ctx.companyId
+        const targetId = params.orderId
+        if (!targetId) return { success: false, error: 'orderId is required.' }
+
+        const orderCondition = isUuid(targetId)
+          ? or(eq(orders.id, targetId), eq(orders.marketplaceOrderId, targetId))
+          : eq(orders.marketplaceOrderId, targetId)
+
+        const [order] = await db
+          .select()
+          .from(orders)
+          .where(and(eq(orders.companyId, companyId), orderCondition))
+          .limit(1)
+
+        if (!order) return { success: false, error: `Order '${targetId}' not found.` }
+
+        const previousTrackingNumber = order.trackingNumber
+        const previousParcelClass = order.parcelClass
+        const previousStatus = order.status
+
+        if (!previousTrackingNumber && !order.labelUrl) {
+          return {
+            success: false,
+            error: `Order '${order.marketplaceOrderId || order.id}' does not have an active shipping label to void.`,
+          }
+        }
+
+        // Void Hermes shipment if carrier was hermes
+        if (order.carrier === 'hermes' || !order.carrier) {
+          try {
+            const { HermesAdapter } = await import('@/adapters/shipping/hermes')
+            const hermes = await HermesAdapter.initialize(companyId)
+            if (previousTrackingNumber) {
+              await hermes.cancelShipment(previousTrackingNumber).catch(console.warn)
+            }
+          } catch (err: any) {
+            console.warn('[void_shipping_label] Hermes adapter notice:', err.message)
+          }
+        }
+
+        const newStatus = order.invoiceId ? 'invoiced' : 'pending'
+
+        await db
+          .update(orders)
+          .set({
+            trackingNumber: null,
+            labelUrl: null,
+            returnTrackingNumber: null,
+            returnLabelUrl: null,
+            parcelClass: null,
+            carrier: null,
+            shippingStatus: 'in_preparation',
+            status: newStatus,
+            marketplaceConfirmationStatus: null,
+            marketplaceConfirmationError: null,
+            marketplaceConfirmedAt: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(orders.id, order.id))
+
+        return {
+          success: true,
+          data: {
+            orderId: order.id,
+            marketplaceOrderId: order.marketplaceOrderId,
+            voidedTrackingNumber: previousTrackingNumber,
+            previousParcelClass,
+            previousStatus,
+            currentStatus: newStatus,
+            shippingStatus: 'in_preparation',
+            message: `Shipping label successfully voided. Tracking number '${previousTrackingNumber || ''}' cleared. Order reset to '${newStatus}'.`,
           },
         }
       }

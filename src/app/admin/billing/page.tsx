@@ -5,6 +5,7 @@ import { companies } from '@/db/schema/companies'
 import { count, gte, and, lte, eq } from 'drizzle-orm'
 import { getBillingConfigAction } from '@/app/actions/system-settings'
 import { BillingConfigEditor } from './billing-config-editor'
+import { BillingTable } from './billing-table'
 
 function getBillingPeriod(createdAt: Date, now: Date) {
   const day = createdAt.getDate()
@@ -52,11 +53,30 @@ export default async function AdminBillingPage() {
     }
 
     return {
-      ...c,
+      id: c.id,
+      name: c.name,
+      legalName: c.legalName,
+      street: c.street,
+      zip: c.zip,
+      city: c.city,
+      country: c.country,
+      vatId: c.vatId,
+      taxId: c.taxId,
+      email: c.email,
+      phone: c.phone,
+      website: c.website,
+      bankName: c.bankName,
+      iban: c.iban,
+      bic: c.bic,
+      paymentRecipient: c.paymentRecipient,
+      createdAt: c.createdAt ? c.createdAt.toISOString() : null,
       orderCount,
       tier,
       total,
-      period
+      period: {
+        start: period.start.toISOString(),
+        end: period.end.toISOString(),
+      },
     }
   }))
 
@@ -109,54 +129,8 @@ export default async function AdminBillingPage() {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-white/5 border border-white/10 rounded-2xl overflow-x-auto">
-        <table className="w-full text-sm text-left min-w-[1000px]">
-          <thead>
-            <tr className="border-b border-white/10">
-              <th className="px-6 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider">Händler</th>
-              <th className="px-6 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider">Abrechnungszeitraum</th>
-              <th className="text-right px-6 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider">Bestellungen</th>
-              <th className="text-right px-6 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider">Preis/Stufe</th>
-              <th className="text-right px-6 py-4 text-xs font-semibold text-white/40 uppercase tracking-wider">Betrag</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-white/5">
-            {rows.map(row => (
-              <tr key={row.id} className="hover:bg-white/5 transition-colors">
-                <td className="px-6 py-4">
-                  <p className="font-medium text-white">{row.name}</p>
-                  <p className="text-xs text-white/30">{row.email || '–'}</p>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="px-1.5 py-0.5 bg-violet-500/20 text-violet-400 text-[10px] font-bold rounded uppercase border border-violet-500/20">
-                      Jeden {row.createdAt.getDate()}.
-                    </span>
-                    <p className="text-white font-medium">
-                      {row.period.start.toLocaleDateString('de-DE')} – {row.period.end.toLocaleDateString('de-DE')}
-                    </p>
-                  </div>
-                  <p className="text-[10px] text-white/30 uppercase">Zyklus: Monatlich ab Anmeldung</p>
-                </td>
-                <td className="px-6 py-4 text-right font-semibold text-white">{row.orderCount}</td>
-                <td className="px-6 py-4 text-right">
-                  <p className="text-white font-mono">{row.tier.pricePerOrder.toFixed(4)} €</p>
-                  <p className="text-[10px] text-white/30">Stufe: {row.tier.upTo === Infinity ? '∞' : row.tier.upTo}</p>
-                </td>
-                <td className="px-6 py-4 text-right font-bold text-white">
-                  <div className="flex flex-col items-end">
-                    <span>{new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(row.total)}</span>
-                    {row.orderCount * row.tier.pricePerOrder < config.minPrice && (
-                      <span className="text-[10px] text-amber-400 font-bold uppercase tracking-tighter">Mindestpreis</span>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {/* Table with Clickable Merchants */}
+      <BillingTable rows={rows} minPrice={config.minPrice} />
     </div>
   )
 }

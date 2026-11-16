@@ -306,7 +306,7 @@ export function getOpenApiSpec(baseUrl: string = 'https://theomnistack.de') {
       '/api/connector/grok/orders/{id}/shipping-label': {
         post: {
           summary: 'Create Shipping Label & Auto-Confirm Marketplace',
-          description: 'Creates a shipping label with Hermes, DHL, or DPD, assigns tracking number, and automatically confirms the shipment with the tracking number on the marketplace. Idempotent: If the order already has a tracking number or label URL, returns the existing label immediately without duplicate carrier charges and ensures marketplace confirmation is synced.',
+          description: 'Creates a shipping label with Hermes, DHL, or DPD, assigns tracking number, and automatically confirms the shipment with the tracking number on the marketplace. Idempotent by default: If the order already has a tracking number or label URL, returns the existing label immediately without duplicate carrier charges. Set replaceExisting: true to void/replace an existing label and re-issue a new label with given/resolved parcelClass and weight, re-issuing return labels for About You and pushing new tracking to marketplaces. Set dryRun: true to preview resolution without creating carrier charges.',
           operationId: 'generateShippingLabel',
           parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
           requestBody: {
@@ -316,13 +316,26 @@ export function getOpenApiSpec(baseUrl: string = 'https://theomnistack.de') {
                   type: 'object',
                   properties: {
                     carrier: { type: 'string', enum: ['dhl', 'hermes', 'dpd'] },
-                    parcelClass: { type: 'string', description: 'Hermes parcel class (XS, S, M, L, XL)' },
+                    parcelClass: { type: 'string', description: 'Hermes parcel class (XS, S, M, L, XL). Defaults to XS, or S if footwear is detected in order items.' },
                     weightKg: { type: 'number' },
+                    replaceExisting: { type: 'boolean', description: 'Void and re-issue label if one already exists, updating marketplace tracking (default: false)' },
+                    dryRun: { type: 'boolean', description: 'Validate addresses and resolve carrier, parcel class, and weight without creating carrier charges' },
                   },
                 },
               },
             },
           },
+          responses: {
+            '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/StandardSuccessResponse' } } } },
+          },
+        },
+      },
+      '/api/connector/grok/orders/{id}/shipping-label/void': {
+        post: {
+          summary: 'Void Shipping Label',
+          description: 'Voids an existing carrier shipping label, clears tracking number and label PDF URLs, and resets shipping status to in_preparation. For Hermes, unscanned labels expire automatically without carrier charges.',
+          operationId: 'voidShippingLabel',
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
           responses: {
             '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/StandardSuccessResponse' } } } },
           },
@@ -354,7 +367,7 @@ export function getOpenApiSpec(baseUrl: string = 'https://theomnistack.de') {
       '/api/connector/grok/orders/shipping-labels/batch': {
         post: {
           summary: 'Batch Merged Shipping Labels PDF',
-          description: 'Merge existing shipping labels (outbound and return) for multiple orders into a single printable batch PDF (Versandlabels_Sammel). If format=pdf or Accept: application/pdf is specified, streams the binary PDF directly.',
+          description: 'Generate or merge shipping labels (outbound and return) for multiple orders into a single printable batch PDF (Versandlabels_Sammel). Automatically generates missing labels with the resolved or provided parcel class. If format=pdf or Accept: application/pdf is specified, streams the binary PDF directly.',
           operationId: 'generateBatchShippingLabels',
           requestBody: {
             required: true,
@@ -365,6 +378,10 @@ export function getOpenApiSpec(baseUrl: string = 'https://theomnistack.de') {
                   required: ['orderIds'],
                   properties: {
                     orderIds: { type: 'array', items: { type: 'string' } },
+                    carrier: { type: 'string', enum: ['hermes', 'dhl', 'dpd'] },
+                    parcelClass: { type: 'string', description: 'Hermes parcel class (XS, S, M, L, XL)' },
+                    weightKg: { type: 'number' },
+                    replaceExisting: { type: 'boolean' },
                   },
                 },
               },

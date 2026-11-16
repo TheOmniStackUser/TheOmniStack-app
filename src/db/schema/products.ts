@@ -55,6 +55,7 @@ export const products = pgTable('products', {
   
   // Optional Fields
   weight: numeric('weight', { precision: 8, scale: 3 }), // kg
+  parcelClass: text('parcel_class'),
   storageLocation: text('storage_location'),
   hsCode: text('hs_code'),
   countryOfOrigin: text('country_of_origin').default('DE'),

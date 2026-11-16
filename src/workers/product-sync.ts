@@ -256,11 +256,11 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
 
   // Find all mappings for these SKUs
   // First find central products
-  const centralProducts: { id: string, sku: string, isPreorder?: boolean, price?: string | null, reducedPrice?: string | null, msrp?: string | null, saleStartDate?: Date | null, saleEndDate?: Date | null, gpsrDetails?: any }[] = []
+  const centralProducts: { id: string, sku: string, isPreorder?: boolean, price?: string | null, reducedPrice?: string | null, msrp?: string | null, saleStartDate?: Date | null, saleEndDate?: Date | null, gpsrDetails?: any, currentStock?: string | null }[] = []
   for (let i = 0; i < skus.length; i += 1000) {
     const chunkSkus = skus.slice(i, i + 1000)
     const chunkProducts = await db
-      .select({ id: products.id, sku: products.sku, isPreorder: products.isPreorder, reducedPrice: products.reducedPrice, price: products.price, msrp: products.msrp, saleStartDate: products.saleStartDate, saleEndDate: products.saleEndDate, gpsrDetails: products.gpsrDetails })
+      .select({ id: products.id, sku: products.sku, isPreorder: products.isPreorder, reducedPrice: products.reducedPrice, price: products.price, msrp: products.msrp, saleStartDate: products.saleStartDate, saleEndDate: products.saleEndDate, gpsrDetails: products.gpsrDetails, currentStock: products.currentStock })
       .from(products)
       .where(
         and(
@@ -363,20 +363,28 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
     const canSyncStock = productSyncSettings ? productSyncSettings.syncStock !== false : true
     const canSyncPrice = productSyncSettings ? productSyncSettings.syncPrice === true : false
 
-    if (canSyncStock && mapping.syncStock && updateDef.stock !== undefined) {
-      if (centralProduct.isPreorder) {
-        // Pre-order logic:
-        // When a product is set to pre-order, positive stock is only transferred to marketplaces
-        // where lead times can be adjusted manually (allowPreorder === true).
-        // All other marketplaces receive 0 stock.
-        const supportsPreorder = !!productSyncSettings?.allowPreorder
-        if (updateDef.stock > 0) {
-          mUpdate.stock = supportsPreorder ? updateDef.stock : 0
+    if (canSyncStock && mapping.syncStock) {
+      const resolvedStock = updateDef.stock !== undefined
+        ? updateDef.stock
+        : (centralProduct.currentStock !== null && centralProduct.currentStock !== undefined
+            ? parseFloat(centralProduct.currentStock.toString())
+            : undefined)
+
+      if (resolvedStock !== undefined) {
+        if (centralProduct.isPreorder) {
+          // Pre-order logic:
+          // When a product is set to pre-order, positive stock is only transferred to marketplaces
+          // where lead times can be adjusted manually (allowPreorder === true).
+          // All other marketplaces receive 0 stock.
+          const supportsPreorder = !!productSyncSettings?.allowPreorder
+          if (resolvedStock > 0) {
+            mUpdate.stock = supportsPreorder ? resolvedStock : 0
+          } else {
+            mUpdate.stock = resolvedStock
+          }
         } else {
-          mUpdate.stock = updateDef.stock
+          mUpdate.stock = resolvedStock
         }
-      } else {
-        mUpdate.stock = updateDef.stock
       }
     }
 

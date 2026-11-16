@@ -60,6 +60,9 @@ export const companies = pgTable('companies', {
   returnsNoteEn: text('returns_note_en'),
   internationalLanguage: text('international_language').notNull().default('en'), // 'de' or 'en'
 
+  // Shipping settings
+  defaultParcelClass: text('default_parcel_class').default('XS'),
+
   // Invoice settings
   invoicePrefix: text('invoice_prefix').notNull().default('INV'),
   nextInvoiceNumber: text('next_invoice_number').notNull().default('1'),

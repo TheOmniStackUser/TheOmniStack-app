@@ -89,9 +89,19 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
 
     const tasks = pendingOrders.map(order => async (): Promise<ShippingTaskResult> => {
       try {
-        const orderParcelClass = typeof parcelClassMap === 'string' 
+        let orderParcelClass = typeof parcelClassMap === 'string' 
           ? parcelClassMap 
-          : (parcelClassMap?.[order.id] || 'S')
+          : parcelClassMap?.[order.id]
+
+        if (!orderParcelClass) {
+          const { resolveParcelClassForOrder } = await import('@/lib/parcel-class-resolver')
+          const res = await resolveParcelClassForOrder({
+            order,
+            orderId: order.id,
+            companyId: auth.activeCompanyId,
+          })
+          orderParcelClass = res.parcelClass
+        }
 
         const { labelUrl, returnLabelUrl, trackingNumber, returnTrackingNumber } = await hermes.generateLabelForOrder(order, company, orderParcelClass)
         
@@ -104,6 +114,8 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
             labelUrl: labelUrl,
             returnTrackingNumber: returnTrackingNumber,
             returnLabelUrl: returnLabelUrl ?? null,
+            parcelClass: orderParcelClass,
+            carrier: 'hermes',
             marketplaceConfirmationStatus: order.marketplace === 'manual' ? 'not_applicable' : 'pending',
             updatedAt: new Date() 
           })
