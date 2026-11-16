@@ -2932,6 +2932,17 @@ const filteredOrders = orders;
                           {/* @ts-ignore */}
                           {formatCustomerName(order.buyerName || order.buyer?.name || 'Unbekannt')}
                         </div>
+                        {order.status !== 'shipped' && order.status !== 'cancelled' && (!order.shippingStreet || !order.shippingCity || !order.shippingZip) && (
+                          <div className="mt-1">
+                            <span 
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs"
+                              title="Lieferadresse unvollständig: Straße, PLZ oder Ort fehlen"
+                            >
+                              <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
+                              Adresse unvollständig
+                            </span>
+                          </div>
+                        )}
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap">
                         {(() => {
@@ -4569,6 +4580,12 @@ const filteredOrders = orders;
                             {(order as any).shippingAddressAddition && <div>{(order as any).shippingAddressAddition}</div>}
                             <div>{order.shippingZip} {order.shippingCity}</div>
                             <div>{formatCountry(order.shippingCountry)}</div>
+                            {(!order.shippingStreet || !order.shippingCity || !order.shippingZip) && (
+                              <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800 flex items-start gap-1.5">
+                                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                                <span>Lieferadresse unvollständig (Straße, PLZ oder Ort fehlen). Bitte über <strong>Bearbeiten</strong> nachtragen.</span>
+                              </div>
+                            )}
                             {order.buyerEmail && <div className="text-slate-500 mt-0.5">{order.buyerEmail}</div>}
                             {((order as any).shippingPhone || (order as any).buyerPhone) && <div className="text-slate-500">{(order as any).shippingPhone || (order as any).buyerPhone}</div>}
                           </div>

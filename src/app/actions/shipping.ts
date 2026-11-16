@@ -103,6 +103,14 @@ export async function generateHermesLabelsAction(orderIds?: string[], parcelClas
           orderParcelClass = res.parcelClass
         }
 
+        if (!order.shippingStreet || !order.shippingCity || !order.shippingZip) {
+          const missingFields: string[] = []
+          if (!order.shippingStreet) missingFields.push('Straße')
+          if (!order.shippingZip) missingFields.push('PLZ')
+          if (!order.shippingCity) missingFields.push('Ort')
+          throw new Error(`Bestellung ${order.marketplaceOrderId ?? order.id}: Lieferadresse ist unvollständig (${missingFields.join(', ')} fehlt). Bitte trage die Adresse über "Bearbeiten" nach.`)
+        }
+
         const { labelUrl, returnLabelUrl, trackingNumber, returnTrackingNumber } = await hermes.generateLabelForOrder(order, company, orderParcelClass)
         
         // Update order status to shipped and save label data
@@ -521,6 +529,14 @@ export async function generateDhlLabelsAction(
       try {
         const { street: rawConsigneeStreet, houseNo: consigneeHouseNo } = splitStreet(order.shippingStreet)
         const consigneeStreet = (rawConsigneeStreet || '').replace(/[,;]+$/, '').trim()
+
+        if (!consigneeStreet || !order.shippingCity || !order.shippingZip) {
+          const missingFields: string[] = []
+          if (!consigneeStreet) missingFields.push('Straße')
+          if (!order.shippingZip) missingFields.push('PLZ')
+          if (!order.shippingCity) missingFields.push('Ort')
+          throw new Error(`Bestellung ${order.marketplaceOrderId ?? order.id}: Lieferadresse ist unvollständig (${missingFields.join(', ')} fehlt). Bitte trage die Adresse über "Bearbeiten" nach.`)
+        }
 
         const orderConfig = orderConfigMap?.[order.id]
         const destinationCountry = toIso3(order.shippingCountry)
@@ -1568,6 +1584,14 @@ export async function generateDpdLabelsAction(
 
     const tasks = pendingOrders.map(order => async (): Promise<ShippingTaskResult> => {
       try {
+        if (!order.shippingStreet || !order.shippingCity || !order.shippingZip) {
+          const missingFields: string[] = []
+          if (!order.shippingStreet) missingFields.push('Straße')
+          if (!order.shippingZip) missingFields.push('PLZ')
+          if (!order.shippingCity) missingFields.push('Ort')
+          throw new Error(`Bestellung ${order.marketplaceOrderId ?? order.id}: Lieferadresse ist unvollständig (${missingFields.join(', ')} fehlt). Bitte trage die Adresse über "Bearbeiten" nach.`)
+        }
+
         const customWeight = orderConfigMap?.[order.id]?.weight
         const { labelUrl, trackingNumber } = await dpd.generateLabelForOrder(order, company, {
           weight: customWeight,

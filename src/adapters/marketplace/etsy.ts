@@ -143,6 +143,32 @@ export class EtsyAdapter implements MarketplaceAdapter {
     })
 
     if (!res.ok) {
+      // Etsy restricts createReceiptShipment (POST .../tracking) to approved partners (Preferred Partner Program / whitelisted apps).
+      // Standard apps without fulfillment-tier approval receive 403 {"error":"Unauthorized"}.
+      // When that occurs, fall back to updateShopReceipt (PUT .../receipts/{id}) with was_shipped=true,
+      // which is permitted under transactions_w and successfully marks the order as shipped on Etsy.
+      if (res.status === 403) {
+        console.warn(`[Etsy] createReceiptShipment returned 403 (restricted endpoint). Falling back to updateShopReceipt (was_shipped=true) for receipt ${marketplaceOrderId}...`)
+        const updateEndpoint = `${this.baseUrl}/shops/${shopId}/receipts/${marketplaceOrderId}`
+        const updateRes = await fetch(updateEndpoint, {
+          method: 'PUT',
+          headers: {
+            'x-api-key': `${integration.clientId!}:${integration.clientSecret!}`,
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: new URLSearchParams({ was_shipped: 'true' }).toString()
+        })
+
+        if (updateRes.ok) {
+          console.log(`[Etsy] Order ${marketplaceOrderId} successfully marked as shipped on Etsy via updateShopReceipt fallback.`)
+          return
+        }
+
+        const updateErr = await updateRes.text()
+        throw new Error(`Etsy API Error confirming shipment (tracking 403, fallback updateShopReceipt failed: ${updateRes.status} - ${updateErr})`)
+      }
+
       const errText = await res.text()
       throw new Error(`Etsy API Error confirming shipment: ${res.status} - ${errText}`)
     }
