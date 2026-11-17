@@ -107,23 +107,58 @@ export default async function ProductsPage() {
               {productList.length} Produkte
             </span>
           </h1>
-          <p className="text-slate-500 mt-2 font-medium">Verwalten Sie Ihre {productList.length} Produkte und Marktplatz-Listings zentral.</p>
-          <details className="mt-4 group bg-blue-50/50 border border-blue-100 rounded-xl max-w-3xl overflow-hidden cursor-pointer">
-            <summary className="flex gap-3 p-3 text-sm text-blue-800/90 items-center font-medium select-none outline-none">
-              <div className="shrink-0 text-blue-500">
-                <Info className="w-5 h-5" />
+          <p className="text-slate-500 mt-2 font-medium">Verwalte deine {productList.length} Produkte und Marktplatz-Listings zentral.</p>
+          <div className="mt-4 flex flex-col gap-2.5 max-w-3xl">
+            <details className="group bg-blue-50/50 border border-blue-100 rounded-xl overflow-hidden cursor-pointer">
+              <summary className="flex gap-3 p-3 text-sm text-blue-800/90 items-center font-medium select-none outline-none">
+                <div className="shrink-0 text-blue-500">
+                  <Info className="w-5 h-5" />
+                </div>
+                <span><strong>TheOmniStack ist dein Master-System.</strong> (Klicken für Details)</span>
+              </summary>
+              <div className="px-3 pb-3 pt-1 text-sm text-blue-800/90 leading-relaxed border-t border-blue-100/50 ml-11">
+                Bitte passe manuelle Bestände und Preise immer hier an. 
+                Diese werden dann automatisch an alle angebundenen Marktplätze (Otto, About You, etc.) gepusht. 
+                <br/><br/>
+                <em>Hinweis zu Verkäufen:</em> Eingehende Bestellungen aus den Marktplätzen reduzieren den Bestand hier in TheOmniStack natürlich vollautomatisch. Nur <strong>manuelle Änderungen</strong>, die direkt in Fremdportalen vorgenommen werden, überträgt das System nicht zurück.
+                <br/><br/>
+                <em>Hinweis zu Aktionspreisen:</em> Wird ein Aktionspreis gesetzt, ohne ein explizites Datum auszuwählen, übermittelt das System automatisch einen Aktionszeitraum von „ab sofort bis in 10 Jahren“. So wird sichergestellt, dass Marktplätze wie Otto oder Amazon den reduzierten Preis garantiert akzeptieren.
               </div>
-              <span><strong>TheOmniStack ist Ihr Master-System.</strong> (Klicken für Details)</span>
-            </summary>
-            <div className="px-3 pb-3 pt-1 text-sm text-blue-800/90 leading-relaxed border-t border-blue-100/50 ml-11">
-              Bitte passen Sie manuelle Bestände und Preise immer hier an. 
-              Diese werden dann automatisch an alle angebundenen Marktplätze (Otto, About You, etc.) gepusht. 
-              <br/><br/>
-              <em>Hinweis zu Verkäufen:</em> Eingehende Bestellungen aus den Marktplätzen reduzieren den Bestand hier in TheOmniStack natürlich vollautomatisch. Nur <strong>manuelle Änderungen</strong>, die direkt in Fremdportalen vorgenommen werden, überträgt das System nicht zurück.
-              <br/><br/>
-              <em>Hinweis zu Aktionspreisen:</em> Wird ein Aktionspreis gesetzt, ohne ein explizites Datum auszuwählen, übermittelt das System automatisch einen Aktionszeitraum von "ab sofort bis in 10 Jahren". So wird sichergestellt, dass Marktplätze wie Otto oder Amazon den reduzierten Preis garantiert akzeptieren.
-            </div>
-          </details>
+            </details>
+
+            <details className="group bg-cyan-50/50 border border-cyan-100 rounded-xl overflow-hidden cursor-pointer">
+              <summary className="flex gap-3 p-3 text-sm text-cyan-900/90 items-center font-medium select-none outline-none">
+                <div className="shrink-0 text-cyan-600">
+                  <Settings className="w-5 h-5" />
+                </div>
+                <span><strong>Wie funktionieren die Sync-Einstellungen?</strong> (Allgemein vs. Produkt)</span>
+              </summary>
+              <div className="px-3 pb-3.5 pt-2 text-sm text-cyan-950/90 leading-relaxed border-t border-cyan-100/60 ml-11 space-y-3">
+                <p>
+                  Die Synchronisation von Beständen und Preisen wird auf <strong>zwei Ebenen</strong> gesteuert, die Hand in Hand arbeiten:
+                </p>
+                <div className="space-y-2">
+                  <div>
+                    <strong className="text-cyan-900">1. Allgemeine Einstellungen (pro Marktplatz):</strong> Unter dem Button <em>„Einstellungen“</em> oben rechts legst du für jeden Marktplatz fest, ob der Sync generell aktiv ist, ob Bestände und/oder Preise übertragen werden dürfen und welche globalen Preisregeln (Auf-/Abschläge, Basispreis, Währungsumrechnung) oder Vorbestellungs-Freigaben gelten.
+                  </div>
+                  <div>
+                    <strong className="text-cyan-900">2. Einstellungen am Produkt (pro Artikel / Mapping):</strong> Direkt am Produkt (über das <code>...</code>-Menü in der Tabelle, die Mehrfachauswahl oder in der Produkt-Detailansicht unter <em>Marktplatz Mappings</em>) steuerst du den Bestands- und Preis-Sync für das einzelne Produkt und kannst optional einen individuellen Preisaufschlag oder Rabatt hinterlegen.
+                  </div>
+                </div>
+                <div className="bg-white/70 border border-cyan-200/60 rounded-lg p-3 space-y-1.5 text-xs text-cyan-950">
+                  <div className="font-bold text-cyan-900 uppercase tracking-wide text-[11px]">So greifen beide Ebenen ineinander:</div>
+                  <ul className="list-disc pl-4 space-y-1">
+                    <li>
+                      <strong>Beide Schalter müssen AN sein (UND-Prinzip):</strong> Ein Bestand oder Preis wird nur dann an einen Marktplatz gesendet, wenn der Abgleich sowohl in den <em>Allgemeinen Einstellungen</em> des Marktplatzes als auch <em>am Produkt selbst</em> aktiviert ist. Schaltest du den Preis-Sync global für einen Marktplatz aus, werden für diesen Kanal keinerlei Preise übertragen – selbst wenn der Haken am Produkt gesetzt ist. Umgekehrt kannst du einzelne Produkte gezielt vom Sync ausschließen.
+                    </li>
+                    <li>
+                      <strong>Preisregeln (Produkt überschreibt Allgemein):</strong> Hast du direkt am Produkt-Mapping einen eigenen Preisaufschlag oder Rabatt eingestellt, hat dieser <strong>Vorrang</strong> vor der allgemeinen Marktplatz-Regel. Steht das Produkt-Mapping auf <em>„Keine Änderung (1:1)“</em>, greift automatisch die allgemeine Preisregel aus den Marktplatz-Einstellungen.
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </details>
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-3">
