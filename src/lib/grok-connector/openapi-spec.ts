@@ -145,6 +145,9 @@ export function getOpenApiSpec(baseUrl: string = 'https://theomnistack.de') {
             { name: 'status', in: 'query', schema: { type: 'string' } },
             { name: 'marketplace', in: 'query', schema: { type: 'string' } },
             { name: 'query', in: 'query', schema: { type: 'string' } },
+            { name: 'customerName', in: 'query', schema: { type: 'string' }, description: 'Filter by customer name' },
+            { name: 'orderNumber', in: 'query', schema: { type: 'string' }, description: 'Filter by marketplace order number' },
+            { name: 'sku', in: 'query', schema: { type: 'string' }, description: 'Filter orders containing specific product SKU' },
             { name: 'limit', in: 'query', schema: { type: 'integer', default: 25 } },
             { name: 'offset', in: 'query', schema: { type: 'integer', default: 0 } },
             { name: 'archived', in: 'query', schema: { type: 'boolean' }, description: 'Filter by archived status (e.g. false for open orders)' },
@@ -990,6 +993,44 @@ export function getOpenApiSpec(baseUrl: string = 'https://theomnistack.de') {
           parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
           responses: {
             '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/StandardSuccessResponse' } } } },
+          },
+        },
+        patch: {
+          summary: 'Update / Correct Return',
+          description: 'Correct a return before refunding: change orderNumber (re-links order), update items (SKU, quantity), and add notes. Only allowed when status is neu or in_klaerung.',
+          operationId: 'updateReturn',
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    orderNumber: { type: 'string', description: 'Corrected marketplace order number' },
+                    items: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'string', description: 'Return line item ID' },
+                          sku: { type: 'string', description: 'Corrected SKU' },
+                          quantity: { type: 'integer', description: 'Corrected quantity' },
+                          condition: { type: 'string' },
+                          notes: { type: 'string' },
+                        },
+                        required: ['sku'],
+                      },
+                    },
+                    notes: { type: 'string', description: 'Return notes' },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/StandardSuccessResponse' } } } },
+            '400': { content: { 'application/json': { schema: { $ref: '#/components/schemas/StandardErrorResponse' } } } },
           },
         },
       },

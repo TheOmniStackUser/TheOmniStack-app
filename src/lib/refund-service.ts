@@ -4,7 +4,7 @@ import { orders } from '@/db/schema/orders'
 import { invoices, invoiceItems, invoiceLogs } from '@/db/schema/invoices'
 import { companies } from '@/db/schema/companies'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
-import { eq, and, or } from 'drizzle-orm'
+import { eq, and, or, ilike } from 'drizzle-orm'
 import { buildInvoiceKey, uploadDocument } from '@/lib/storage'
 import { createInvoiceForOrder, getDefaultSettings, formatDocumentNumber } from '@/lib/invoice-service'
 import { getAdapterForIntegration } from '@/workers/marketplace-sync'
@@ -39,6 +39,18 @@ export async function executeRefund({
 
   if (!returnEntry) {
     throw new Error('Retouren-Eintrag nicht gefunden.')
+  }
+
+  // Protection against double refunding
+  if (returnEntry.status === 'bearbeitet' || (returnEntry.metadata as any)?.refunded_at) {
+    const refundedAt = (returnEntry.metadata as any)?.refunded_at
+      ? new Date((returnEntry.metadata as any).refunded_at).toLocaleString('de-DE')
+      : 'bereits'
+    throw new Error(`Die Retoure ${returnEntry.orderNumber || returnLogId} wurde bereits am ${refundedAt} erstattet. Doppel-Erstattungen sind nicht zulässig.`)
+  }
+
+  if (returnEntry.status === 'storniert' || returnEntry.status === 'cancelled') {
+    throw new Error('Die Retoure ist storniert und kann nicht erstattet werden.')
   }
 
   if (!returnEntry.orderId) {
@@ -82,6 +94,15 @@ export async function executeRefund({
   
   // Otto, Limango & AboutYou generate their own credit notes. For Decathlon and the rest WE generate them locally.
   let autoCreditNote = !(isLimango || isAboutYou || isOtto)
+
+  // Resolve itemsToRefund: default to all items on the return if omitted or empty
+  if (!itemsToRefund || itemsToRefund.length === 0) {
+    itemsToRefund = returnEntry.items.map(item => ({
+      sku: item.skuOrProductName,
+      quantity: item.quantity,
+      restock: true
+    }))
+  }
 
   // 3. Resolve EAN to actual marketplace SKUs if needed
   const itemConditions: Record<string, string> = {}
@@ -562,9 +583,32 @@ export async function executeRefund({
       const shouldRestock = refundItem.restock !== undefined ? refundItem.restock : isNew
 
       if (shouldRestock) {
-        const [product] = await db.select().from(products)
-          .where(and(eq(products.sku, refundItem.sku), eq(products.companyId, companyId)))
+        let [product] = await db.select().from(products)
+          .where(and(ilike(products.sku, refundItem.sku), eq(products.companyId, companyId)))
           .limit(1)
+
+        // If not found directly by SKU, resolve via marketplace productMappings
+        if (!product) {
+          const { productMappings } = await import('@/db/schema/products')
+          const [mapping] = await db
+            .select({ productId: productMappings.productId })
+            .from(productMappings)
+            .innerJoin(products, eq(products.id, productMappings.productId))
+            .where(
+              and(
+                eq(products.companyId, companyId),
+                ilike(productMappings.marketplaceSku, refundItem.sku)
+              )
+            )
+            .limit(1)
+
+          if (mapping) {
+            const [mappedProduct] = await db.select().from(products)
+              .where(and(eq(products.id, mapping.productId), eq(products.companyId, companyId)))
+              .limit(1)
+            product = mappedProduct
+          }
+        }
 
         if (product) {
           const currentStock = parseInt(product.currentStock?.toString() || '0', 10)
@@ -574,8 +618,8 @@ export async function executeRefund({
             .set({ currentStock: newStock.toString(), updatedAt: new Date() })
             .where(eq(products.id, product.id))
 
-          console.log(`[RefundService] Restocked ${refundItem.quantity}x ${refundItem.sku}. New stock: ${newStock}`)
-          stockUpdates.push({ sku: refundItem.sku, stock: newStock })
+          console.log(`[RefundService] Restocked ${refundItem.quantity}x ${refundItem.sku} (catalog SKU ${product.sku}). New stock: ${newStock}`)
+          stockUpdates.push({ sku: product.sku, stock: newStock })
         } else {
           console.log(`[RefundService] Could not find product with SKU ${refundItem.sku} in DB for restock.`)
         }
@@ -586,13 +630,18 @@ export async function executeRefund({
 
     if (stockUpdates.length > 0) {
       console.log(`[RefundService] Triggering marketplace sync for ${stockUpdates.length} restocked items...`)
-      after(async () => {
+      const runPush = async () => {
         try {
           await pushUpdatesToMarketplaces(companyId, stockUpdates)
         } catch (err) {
           console.error(`[RefundService] Error during background marketplace sync:`, err)
         }
-      })
+      }
+      try {
+        after(runPush)
+      } catch {
+        runPush().catch(console.error)
+      }
     }
   } catch (restockErr) {
     console.error(`[RefundService] Error during auto-restock:`, restockErr)

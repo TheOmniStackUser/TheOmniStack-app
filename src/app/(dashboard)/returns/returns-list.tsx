@@ -1237,6 +1237,57 @@ export function ReturnsList({
                             Details konnten nicht geladen werden.
                           </div>
                         )}
+
+                        {log.metadata?.auditLog && Array.isArray(log.metadata.auditLog) && log.metadata.auditLog.length > 0 && (
+                          <div className="mt-6 pt-4 border-t border-slate-200">
+                            <div className="flex items-center gap-2 mb-3">
+                              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Änderungsprotokoll / Audit Trail</h4>
+                              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                                {log.metadata.auditLog.length} {log.metadata.auditLog.length === 1 ? 'Änderung' : 'Änderungen'}
+                              </span>
+                            </div>
+                            <div className="space-y-2">
+                              {log.metadata.auditLog.map((entry: any, aIdx: number) => (
+                                <div key={aIdx} className="bg-white p-3 rounded-lg border border-slate-200 text-xs text-slate-800 shadow-sm">
+                                  <div className="flex items-center justify-between mb-1.5 text-slate-500">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded text-[11px] border border-indigo-100">
+                                        {entry.source || 'grok-connector'}
+                                      </span>
+                                      <span className="text-slate-600">{new Date(entry.timestamp).toLocaleString('de-DE')}</span>
+                                    </div>
+                                  </div>
+                                  <div className="mt-2 space-y-1 font-mono text-[11px] text-slate-900">
+                                    {entry.changes?.orderNumber && (
+                                      <div>
+                                        <span className="text-slate-500 font-sans">Bestellnummer:</span>{' '}
+                                        <span className="text-rose-600 line-through">{entry.changes.orderNumber.old || '(keine)'}</span>{' '}
+                                        → <span className="text-emerald-700 font-semibold">{entry.changes.orderNumber.new}</span>
+                                      </div>
+                                    )}
+                                    {entry.changes?.notes && (
+                                      <div>
+                                        <span className="text-slate-500 font-sans">Notiz:</span>{' '}
+                                        <span className="text-slate-700 font-sans">{entry.changes.notes.new}</span>
+                                      </div>
+                                    )}
+                                    {entry.changes?.items && Array.isArray(entry.changes.items) && (
+                                      <div>
+                                        <span className="text-slate-500 font-sans">Artikel:</span>
+                                        {entry.changes.items.map((ci: any, ciIdx: number) => (
+                                          <div key={ciIdx} className="ml-3 mt-0.5">
+                                            <span className="text-rose-600 line-through">{ci.oldSku} ({ci.oldQuantity}x)</span>{' '}
+                                            → <span className="text-emerald-700 font-semibold">{ci.newSku} ({ci.newQuantity}x)</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </td>
                   </tr>

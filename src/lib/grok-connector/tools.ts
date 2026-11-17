@@ -48,6 +48,30 @@ function productMatchFilter(ident: string) {
   return or(eq(products.sku, ident), eq(products.ean, ident))!
 }
 
+function isSameCustomer(name1?: string | null, name2?: string | null): boolean {
+  if (!name1 || !name2) return true
+  const tokenize = (s: string) =>
+    s.toLowerCase().replace(/[^a-z0-9äöüß]/g, ' ').trim().split(/\s+/).filter(p => p.length >= 3)
+  const tokens1 = tokenize(name1)
+  const tokens2 = tokenize(name2)
+  if (tokens1.length === 0 || tokens2.length === 0) return true
+  return tokens1.some(t => tokens2.includes(t))
+}
+
+function normalizeMarketplace(m?: string | null): string {
+  if (!m) return ''
+  const lower = m.toLowerCase()
+  if (lower.includes('otto')) return 'otto'
+  if (lower.includes('shopify')) return 'shopify'
+  if (lower.includes('amazon')) return 'amazon'
+  if (lower.includes('kaufland')) return 'kaufland'
+  if (lower.includes('limango')) return 'limango'
+  if (lower.includes('decathlon')) return 'decathlon'
+  if (lower.includes('aboutyou') || lower.includes('about you')) return 'aboutyou'
+  if (lower.includes('ebay')) return 'ebay'
+  return lower.replace(/[^a-z0-9]/g, '')
+}
+
 export interface ToolDefinition {
   name: string
   description: string
@@ -100,6 +124,18 @@ export const TOOLS_MANIFEST: ToolDefinition[] = [
         query: {
           type: 'string',
           description: 'Search term matching order ID, customer name, email, or tracking code',
+        },
+        customerName: {
+          type: 'string',
+          description: 'Filter by buyer or shipping customer name (e.g. Hapich)',
+        },
+        orderNumber: {
+          type: 'string',
+          description: 'Filter by marketplace order number or raw order number',
+        },
+        sku: {
+          type: 'string',
+          description: 'Filter orders that contain a specific product SKU',
         },
         fromDate: {
           type: 'string',
@@ -800,6 +836,35 @@ export const TOOLS_MANIFEST: ToolDefinition[] = [
     },
   },
   {
+    name: 'update_return',
+    category: 'returns',
+    description: 'Update and correct a return before refunding: change orderNumber (re-links matching order), update line items (SKU, quantity), and add notes. Allowed only when status is "neu" or "in_klaerung".',
+    parameters: {
+      type: 'object',
+      properties: {
+        returnId: { type: 'string', description: 'Return log ID (UUID)' },
+        orderNumber: { type: 'string', description: 'Marketplace order number or tracking number to re-link this return' },
+        items: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', description: 'Return line item ID (UUID). Optional if return has only 1 line item.' },
+              sku: { type: 'string', description: 'Corrected SKU' },
+              quantity: { type: 'integer', description: 'Corrected return quantity' },
+              condition: { type: 'string', enum: ['new', 'used_good', 'damaged', 'defect'] },
+              notes: { type: 'string' },
+            },
+            required: ['sku'],
+          },
+          description: 'Corrected return line items',
+        },
+        notes: { type: 'string', description: 'Optional note or comment' },
+      },
+      required: ['returnId'],
+    },
+  },
+  {
     name: 'refund_return',
     category: 'returns',
     description: 'Execute automated refund for a return directly through the marketplace integration.',
@@ -1078,6 +1143,32 @@ export async function executeTool(
               ilike(orders.trackingNumber, q),
               ilike(orders.customerNumber, q)
             )
+          )
+        }
+        if (params.customerName) {
+          const cName = `%${params.customerName.trim()}%`
+          conditions.push(or(ilike(orders.buyerName, cName), ilike(orders.shippingName, cName)))
+        }
+        if (params.orderNumber) {
+          const oNum = `%${params.orderNumber.trim()}%`
+          conditions.push(
+            or(
+              ilike(orders.marketplaceOrderId, oNum),
+              sql`${orders.rawPayload}->>'orderNumber' ILIKE ${oNum}`,
+              sql`${orders.rawPayload}->>'order_number' ILIKE ${oNum}`,
+              sql`${orders.rawPayload}->>'salesOrderId' ILIKE ${oNum}`,
+              sql`${orders.rawPayload}->>'name' ILIKE ${oNum}`
+            )
+          )
+        }
+        if (params.sku) {
+          const skuFilter = `%${params.sku.trim()}%`
+          conditions.push(
+            sql`EXISTS (
+              SELECT 1 FROM order_items
+              WHERE order_items.order_id = ${orders.id}
+              AND order_items.sku ILIKE ${skuFilter}
+            )`
           )
         }
 
@@ -3670,11 +3761,16 @@ export async function executeTool(
           .from(returnedItems)
           .where(eq(returnedItems.returnLogId, ret.id))
 
+        const auditTrail = Array.isArray((ret.metadata as any)?.auditLog)
+          ? (ret.metadata as any).auditLog
+          : []
+
         return {
           success: true,
           data: {
             return: ret,
             items,
+            auditTrail,
           },
         }
       }
@@ -3751,12 +3847,367 @@ export async function executeTool(
         return { success: true, data: updated }
       }
 
+      case 'update_return': {
+        const companyId = ctx.companyId
+        const returnId = params.returnId
+        if (!returnId) return { success: false, error: 'returnId is required.' }
+
+        const [ret] = await db
+          .select()
+          .from(returnsLog)
+          .where(and(eq(returnsLog.companyId, companyId), eq(returnsLog.id, returnId)))
+          .limit(1)
+
+        if (!ret) return { success: false, error: `Return '${returnId}' not found.` }
+
+        // Check return status: only allow edit when status is 'neu' or 'in_klaerung' (or 'in_klärung')
+        const currentStatus = (ret.status || '').toLowerCase()
+        const isEditableStatus = currentStatus === 'neu' || currentStatus === 'in_klaerung' || currentStatus === 'in_klärung'
+        const isRefunded = !!(ret.metadata as any)?.refunded_at || currentStatus === 'bearbeitet' || currentStatus === 'abgeschlossen'
+
+        if (!isEditableStatus || isRefunded) {
+          return {
+            success: false,
+            error: `Return '${returnId}' cannot be modified because it is in status '${ret.status}' or has already been refunded.`,
+          }
+        }
+
+        const changesRecorded: Record<string, any> = {}
+        let newMatchedOrder: any = null
+
+        // 1. If orderNumber provided, re-link to matching order
+        if (params.orderNumber && params.orderNumber.trim() !== '') {
+          const scanInput = params.orderNumber.trim()
+          const matchedOrders = await db
+            .select()
+            .from(orders)
+            .where(
+              and(
+                eq(orders.companyId, companyId),
+                or(
+                  ilike(orders.marketplaceOrderId, scanInput),
+                  ilike(orders.trackingNumber, scanInput),
+                  ilike(orders.returnTrackingNumber, scanInput),
+                  ilike(orders.customerNumber, scanInput),
+                  ilike(orders.deliveryNoteNumber, scanInput),
+                  sql`${orders.rawPayload}->>'orderNumber' ILIKE ${scanInput}`,
+                  sql`${orders.rawPayload}->>'order_number' ILIKE ${scanInput}`,
+                  sql`${orders.rawPayload}->>'salesOrderId' ILIKE ${scanInput}`,
+                  sql`${orders.rawPayload}->>'name' ILIKE ${scanInput}`
+                )
+              )
+            )
+            .limit(1)
+
+          if (matchedOrders.length === 0) {
+            return {
+              success: false,
+              error: `Order '${params.orderNumber}' not found for this merchant.`,
+            }
+          }
+
+          newMatchedOrder = matchedOrders[0]
+
+          // Validate same customer
+          if (ret.customerName) {
+            const customerMatches =
+              isSameCustomer(ret.customerName, newMatchedOrder.buyerName) ||
+              isSameCustomer(ret.customerName, newMatchedOrder.shippingName)
+            if (!customerMatches) {
+              return {
+                success: false,
+                error: `Customer mismatch: Return belongs to customer '${ret.customerName}', but order '${params.orderNumber}' belongs to '${newMatchedOrder.buyerName || newMatchedOrder.shippingName}'.`,
+              }
+            }
+          }
+
+          // Validate same marketplace
+          if (ret.marketplace && newMatchedOrder.marketplace) {
+            const m1 = normalizeMarketplace(ret.marketplace)
+            const m2 = normalizeMarketplace(newMatchedOrder.marketplace)
+            if (m1 && m2 && m1 !== m2) {
+              return {
+                success: false,
+                error: `Marketplace mismatch: Return belongs to marketplace '${ret.marketplace}', but order '${params.orderNumber}' belongs to '${newMatchedOrder.marketplace}'.`,
+              }
+            }
+          }
+
+          if (ret.orderNumber !== scanInput || ret.orderId !== newMatchedOrder.id) {
+            changesRecorded.orderNumber = { old: ret.orderNumber, new: scanInput }
+            changesRecorded.orderId = { old: ret.orderId, new: newMatchedOrder.id }
+          }
+        }
+
+        // Target linked order
+        const targetOrderId = newMatchedOrder ? newMatchedOrder.id : ret.orderId
+        let targetOrderItems: any[] = []
+        if (targetOrderId) {
+          targetOrderItems = await db
+            .select()
+            .from(orderItems)
+            .where(eq(orderItems.orderId, targetOrderId))
+        }
+
+        // Fetch existing return items
+        const currentReturnItems = await db
+          .select()
+          .from(returnedItems)
+          .where(eq(returnedItems.returnLogId, ret.id))
+
+        // 2. Validate and prepare item changes
+        const itemUpdates: { id: string; sku: string; quantity: number; condition: string; notes?: string | null }[] = []
+        const itemChangesAudit: any[] = []
+
+        if (params.items && Array.isArray(params.items) && params.items.length > 0) {
+          if (!targetOrderId || targetOrderItems.length === 0) {
+            return {
+              success: false,
+              error: `Cannot validate items because return is not linked to an order with line items. Please provide a valid orderNumber.`,
+            }
+          }
+
+          // Query other returns on this order to calculate already-returned quantity
+          const otherReturns = await db
+            .select({
+              returnId: returnsLog.id,
+              sku: returnedItems.skuOrProductName,
+              quantity: returnedItems.quantity,
+            })
+            .from(returnsLog)
+            .innerJoin(returnedItems, eq(returnedItems.returnLogId, returnsLog.id))
+            .where(
+              and(
+                eq(returnsLog.companyId, companyId),
+                eq(returnsLog.orderId, targetOrderId),
+                ne(returnsLog.id, ret.id),
+                ne(returnsLog.status, 'storniert')
+              )
+            )
+
+          for (const itemInput of params.items) {
+            let targetReturnItem = itemInput.id
+              ? currentReturnItems.find(ri => ri.id === itemInput.id)
+              : currentReturnItems.length === 1
+              ? currentReturnItems[0]
+              : undefined
+
+            if (!targetReturnItem) {
+              return {
+                success: false,
+                error: itemInput.id
+                  ? `Return item line with id '${itemInput.id}' not found on this return.`
+                  : `Line item id is required when return has multiple items.`,
+              }
+            }
+
+            const newSku = (itemInput.sku || '').trim()
+            if (!newSku) {
+              return { success: false, error: 'SKU cannot be empty.' }
+            }
+
+            // Find matching order line item (case-insensitive)
+            let matchedOrderItem = targetOrderItems.find(
+              oi => oi.sku?.toLowerCase() === newSku.toLowerCase()
+            )
+
+            // Also check products catalogue
+            const [catalogueProduct] = await db
+              .select()
+              .from(products)
+              .where(
+                and(
+                  eq(products.companyId, companyId),
+                  or(ilike(products.sku, newSku), eq(products.ean, newSku))
+                )
+              )
+              .limit(1)
+
+            if (!matchedOrderItem && catalogueProduct) {
+              matchedOrderItem = targetOrderItems.find(
+                oi => oi.sku?.toLowerCase() === catalogueProduct.sku.toLowerCase()
+              )
+            }
+
+            if (!matchedOrderItem) {
+              const availableSkus = targetOrderItems.map(oi => oi.sku).filter(Boolean).join(', ')
+              return {
+                success: false,
+                error: `SKU '${newSku}' does not exist on the linked order. Available order SKUs: ${availableSkus || 'none'}.`,
+              }
+            }
+
+            // Adopt exact casing from order item
+            const resolvedSku = matchedOrderItem.sku || newSku
+            const newQuantity = itemInput.quantity !== undefined ? itemInput.quantity : targetReturnItem.quantity
+            if (newQuantity <= 0) {
+              return { success: false, error: `Quantity must be greater than 0.` }
+            }
+
+            // Validate against ordered quantity minus already returned
+            const orderedQty = parseFloat(matchedOrderItem.quantity || '1')
+            const alreadyReturnedQty = otherReturns
+              .filter(or => or.sku?.toLowerCase() === resolvedSku.toLowerCase())
+              .reduce((sum, or) => sum + (or.quantity || 0), 0)
+            const maxReturnableQty = orderedQty - alreadyReturnedQty
+
+            if (newQuantity > maxReturnableQty) {
+              return {
+                success: false,
+                error: `Quantity ${newQuantity} exceeds available order quantity (${maxReturnableQty}) for SKU '${resolvedSku}' (ordered: ${orderedQty}, already returned: ${alreadyReturnedQty}).`,
+              }
+            }
+
+            const skuChanged = targetReturnItem.skuOrProductName !== resolvedSku
+            const qtyChanged = targetReturnItem.quantity !== newQuantity
+            const condChanged = itemInput.condition && targetReturnItem.condition !== itemInput.condition
+
+            if (skuChanged || qtyChanged || condChanged) {
+              itemChangesAudit.push({
+                id: targetReturnItem.id,
+                oldSku: targetReturnItem.skuOrProductName,
+                newSku: resolvedSku,
+                oldQuantity: targetReturnItem.quantity,
+                newQuantity: newQuantity,
+                ...(condChanged ? { oldCondition: targetReturnItem.condition, newCondition: itemInput.condition } : {}),
+              })
+            }
+
+            itemUpdates.push({
+              id: targetReturnItem.id,
+              sku: resolvedSku,
+              quantity: newQuantity,
+              condition: itemInput.condition || targetReturnItem.condition,
+              notes: itemInput.notes !== undefined ? itemInput.notes : targetReturnItem.notes,
+            })
+          }
+
+          if (itemChangesAudit.length > 0) {
+            changesRecorded.items = itemChangesAudit
+          }
+        }
+
+        // 3. Notes / comments
+        if (params.notes !== undefined && params.notes !== ret.notes) {
+          changesRecorded.notes = { old: ret.notes, new: params.notes }
+        }
+
+        // If no changes, return early
+        if (Object.keys(changesRecorded).length === 0) {
+          return {
+            success: true,
+            data: {
+              return: ret,
+              items: currentReturnItems,
+              auditTrail: (ret.metadata as any)?.auditLog || [],
+              message: 'No changes detected.',
+            },
+          }
+        }
+
+        // 4. Record Audit Log
+        const now = new Date()
+        const auditEntry = {
+          timestamp: now.toISOString(),
+          source: 'grok-connector',
+          userId: ctx.userId || null,
+          changes: changesRecorded,
+        }
+
+        const existingAuditLog = Array.isArray((ret.metadata as any)?.auditLog)
+          ? (ret.metadata as any).auditLog
+          : []
+        const updatedAuditLog = [...existingAuditLog, auditEntry]
+
+        const updatedMetadata = {
+          ...((ret.metadata as Record<string, any>) || {}),
+          auditLog: updatedAuditLog,
+        }
+
+        // Update returnsLog
+        const [updatedRet] = await db
+          .update(returnsLog)
+          .set({
+            ...(newMatchedOrder ? {
+              orderId: newMatchedOrder.id,
+              orderNumber: params.orderNumber.trim(),
+              marketplace: newMatchedOrder.marketplace || ret.marketplace,
+              customerName: ret.customerName || newMatchedOrder.shippingName || newMatchedOrder.buyerName,
+            } : {}),
+            ...(params.notes !== undefined ? { notes: params.notes } : {}),
+            metadata: updatedMetadata,
+          })
+          .where(and(eq(returnsLog.companyId, companyId), eq(returnsLog.id, ret.id)))
+          .returning()
+
+        // Update returnedItems
+        for (const it of itemUpdates) {
+          await db
+            .update(returnedItems)
+            .set({
+              skuOrProductName: it.sku,
+              quantity: it.quantity,
+              condition: it.condition,
+              notes: it.notes,
+            })
+            .where(eq(returnedItems.id, it.id))
+        }
+
+        const updatedItemsList = await db
+          .select()
+          .from(returnedItems)
+          .where(eq(returnedItems.returnLogId, ret.id))
+
+        // Record central GoBD audit log
+        await auditLog({
+          companyId,
+          userId: ctx.userId || undefined,
+          action: 'update',
+          entityType: 'return',
+          entityId: ret.id,
+          userAgent: 'grok-connector',
+          previousState: {
+            orderNumber: ret.orderNumber,
+            orderId: ret.orderId,
+            notes: ret.notes,
+            items: currentReturnItems.map(i => ({ id: i.id, sku: i.skuOrProductName, quantity: i.quantity })),
+          },
+          nextState: {
+            orderNumber: updatedRet.orderNumber,
+            orderId: updatedRet.orderId,
+            notes: updatedRet.notes,
+            items: updatedItemsList.map(i => ({ id: i.id, sku: i.skuOrProductName, quantity: i.quantity })),
+          },
+        })
+
+        return {
+          success: true,
+          data: {
+            return: updatedRet,
+            items: updatedItemsList,
+            auditTrail: updatedAuditLog,
+          },
+        }
+      }
+
       case 'refund_return': {
         const companyId = ctx.companyId
+        let itemsToRefund = params.items || []
+        if (!itemsToRefund || itemsToRefund.length === 0) {
+          const retItems = await db
+            .select()
+            .from(returnedItems)
+            .where(eq(returnedItems.returnLogId, params.returnId))
+          itemsToRefund = retItems.map(it => ({
+            sku: it.skuOrProductName,
+            quantity: it.quantity,
+            restock: true,
+          }))
+        }
         const result = await executeRefund({
           companyId,
           returnLogId: params.returnId,
-          itemsToRefund: params.items || [],
+          itemsToRefund,
           userId: ctx.userId || undefined,
         })
         return { success: true, data: result }

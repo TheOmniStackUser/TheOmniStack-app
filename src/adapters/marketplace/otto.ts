@@ -731,8 +731,10 @@ export class OttoAdapter implements MarketplaceAdapter {
         if (!item.positionItemId) continue
         const itemSku = item.product?.sku || item.product?.articleNumber || 'UNKNOWN'
         
-        // Find if this item sku is requested for refund
-        const refundIndex = remainingRefundItems.findIndex(ri => ri.sku === itemSku)
+        // Find if this item sku is requested for refund (case-insensitive)
+        const refundIndex = remainingRefundItems.findIndex(
+          ri => ri.sku.toLowerCase() === itemSku.toLowerCase()
+        )
         if (refundIndex !== -1) {
           returnsPayload.push({
             salesOrderId: salesOrderId,
