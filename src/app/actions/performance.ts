@@ -683,7 +683,7 @@ export async function getPerformanceAnalytics(filters: PerformanceFilterOptions)
   const knownMps = new Set<string>()
   marketplaces.forEach(m => knownMps.add(m.marketplace))
   integrations.forEach(i => {
-    if (i.type !== 'hermes' && i.type !== 'dhl') knownMps.add(i.type)
+    if (i.type !== 'hermes' && i.type !== 'dhl' && i.type !== 'dpd') knownMps.add(i.type)
   })
 
   const availableMarketplaces = Array.from(knownMps).map(id => ({

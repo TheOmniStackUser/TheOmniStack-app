@@ -29,7 +29,7 @@ export default async function ProductImportPage() {
     )
 
   // Filter out shipping providers
-  const marketplaces = integrations.filter(i => i.type !== 'dhl' && i.type !== 'hermes')
+  const marketplaces = integrations.filter(i => i.type !== 'dhl' && i.type !== 'hermes' && i.type !== 'dpd')
 
   // Fetch unmapped products
   const unmappedProducts = await db

@@ -30,7 +30,7 @@ export async function getActiveIntegrationsList() {
       and(
         eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
         eq(marketplaceIntegrations.isActive, true),
-        notInArray(marketplaceIntegrations.type, ['dhl', 'hermes'])
+        notInArray(marketplaceIntegrations.type, ['dhl', 'hermes', 'dpd'])
       )
     )
 
@@ -75,7 +75,7 @@ export async function triggerSyncAction() {
       and(
         eq(marketplaceIntegrations.companyId, auth.activeCompanyId),
         eq(marketplaceIntegrations.isActive, true),
-        notInArray(marketplaceIntegrations.type, ['dhl', 'hermes'])
+        notInArray(marketplaceIntegrations.type, ['dhl', 'hermes', 'dpd'])
       )
     )
 

@@ -47,7 +47,7 @@ export default async function ReturnsPage() {
   ])
 
   const activeMarketplaces = integrations
-    .filter(i => i.type !== 'hermes' && i.type !== 'dhl')
+    .filter(i => i.type !== 'hermes' && i.type !== 'dhl' && i.type !== 'dpd')
     .map(i => {
       if (i.type === 'mirakl_custom') {
         return { id: 'mirakl_custom', name: (i.metadata as any)?.customName || 'Mirakl' };

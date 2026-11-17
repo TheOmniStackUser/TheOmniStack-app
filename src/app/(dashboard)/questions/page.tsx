@@ -57,7 +57,7 @@ export default async function QuestionsPage() {
   }))
 
   const activeMarketplaces = integrations
-    .filter((i) => i.type !== 'hermes' && i.type !== 'dhl')
+    .filter((i) => i.type !== 'hermes' && i.type !== 'dhl' && i.type !== 'dpd')
     .map((i) => {
       const name =
         i.type === 'otto'

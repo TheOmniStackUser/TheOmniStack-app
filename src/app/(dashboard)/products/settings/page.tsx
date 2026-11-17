@@ -25,7 +25,7 @@ export default async function ProductsSettingsPage() {
     .orderBy(marketplaceIntegrations.createdAt)
 
   // Filter out shipping providers
-  const marketplaces = integrations.filter(i => i.type !== 'dhl' && i.type !== 'hermes')
+  const marketplaces = integrations.filter(i => i.type !== 'dhl' && i.type !== 'hermes' && i.type !== 'dpd')
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">

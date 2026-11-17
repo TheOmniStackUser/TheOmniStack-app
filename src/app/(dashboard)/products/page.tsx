@@ -69,7 +69,7 @@ export default async function ProductsPage() {
   ])
 
   const marketplaceOnlyIntegrations = activeIntegrations.filter(
-    (i) => i.type !== 'dhl' && i.type !== 'hermes'
+    (i) => i.type !== 'dhl' && i.type !== 'hermes' && i.type !== 'dpd'
   )
 
   const productsWithMappings = productList.map(p => {
