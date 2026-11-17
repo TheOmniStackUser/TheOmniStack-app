@@ -31,6 +31,17 @@ export async function PATCH(
     return NextResponse.json({ success: false, error: 'Invalid JSON request body.' }, { status: 400 })
   }
 
-  const result = await executeTool('update_return', { returnId: id, ...body }, authResult.auth)
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return NextResponse.json({ success: false, error: 'Invalid JSON request body: object expected.' }, { status: 400 })
+  }
+
+  if (body.returnId !== undefined && body.returnId !== id) {
+    return NextResponse.json(
+      { success: false, error: `Body returnId '${body.returnId}' does not match path parameter id '${id}'.` },
+      { status: 400 }
+    )
+  }
+
+  const result = await executeTool('update_return', { ...body, returnId: id }, authResult.auth)
   return NextResponse.json(result, { status: result.success ? 200 : 400 })
 }

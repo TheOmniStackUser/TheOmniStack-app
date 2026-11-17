@@ -68,6 +68,276 @@ export function getOpenApiSpec(baseUrl: string = 'https://theomnistack.de') {
             },
           },
         },
+        OrderSummary: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            marketplace: { type: 'string', example: 'otto' },
+            marketplaceOrderId: { type: 'string', example: 'OTTO-12345678' },
+            status: {
+              type: 'string',
+              enum: ['draft', 'pending', 'processing', 'invoiced', 'shipped', 'cancelled', 'later_shipment'],
+            },
+            shippingStatus: {
+              type: 'string',
+              nullable: true,
+              enum: ['in_preparation', 'in_transit', 'delivered', 'ready_for_pickup', 'delayed', 'not_possible', 'returned'],
+            },
+            isArchived: { type: 'boolean' },
+            deliveryNoteNumber: { type: 'string', nullable: true },
+            buyerName: { type: 'string', nullable: true },
+            buyerEmail: { type: 'string', nullable: true },
+            shippingName: { type: 'string', nullable: true },
+            shippingCity: { type: 'string', nullable: true },
+            shippingCountry: { type: 'string', nullable: true },
+            currency: { type: 'string', example: 'EUR' },
+            totalAmount: { type: 'string', nullable: true, example: '49.90' },
+            trackingNumber: { type: 'string', nullable: true },
+            labelUrl: { type: 'string', nullable: true },
+            invoiceId: { type: 'string', format: 'uuid', nullable: true },
+            createdAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        PaginationMeta: {
+          type: 'object',
+          required: ['total', 'limit', 'offset', 'hasMore'],
+          properties: {
+            total: { type: 'integer', example: 42 },
+            limit: { type: 'integer', example: 25 },
+            offset: { type: 'integer', example: 0 },
+            hasMore: { type: 'boolean', example: true },
+          },
+        },
+        ListOrdersResponse: {
+          type: 'object',
+          required: ['success', 'data'],
+          properties: {
+            success: { type: 'boolean', example: true },
+            data: {
+              type: 'object',
+              required: ['orders', 'pagination'],
+              properties: {
+                orders: {
+                  type: 'array',
+                  items: { $ref: '#/components/schemas/OrderSummary' },
+                },
+                pagination: { $ref: '#/components/schemas/PaginationMeta' },
+              },
+            },
+          },
+        },
+        ReturnRecord: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            companyId: { type: 'string', format: 'uuid' },
+            orderId: { type: 'string', format: 'uuid', nullable: true },
+            orderNumber: { type: 'string' },
+            customerName: { type: 'string', nullable: true },
+            shippingAddress: { type: 'string', nullable: true },
+            scannedAt: { type: 'string', format: 'date-time' },
+            receivedAt: { type: 'string', format: 'date-time' },
+            processedByUserId: { type: 'string', format: 'uuid', nullable: true },
+            status: { type: 'string', example: 'neu' },
+            marketplace: { type: 'string', nullable: true },
+            metadata: { type: 'object', nullable: true },
+            notes: { type: 'string', nullable: true },
+          },
+        },
+        ReturnedItemRecord: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            returnLogId: { type: 'string', format: 'uuid' },
+            skuOrProductName: { type: 'string' },
+            quantity: { type: 'integer' },
+            condition: { type: 'string', enum: ['new', 'used_good', 'damaged', 'defect'] },
+            notes: { type: 'string', nullable: true },
+          },
+        },
+        ReturnAuditTrailEntry: {
+          type: 'object',
+          required: ['timestamp', 'source', 'changes'],
+          properties: {
+            timestamp: { type: 'string', format: 'date-time', description: 'ISO-8601 UTC timestamp of the correction' },
+            source: { type: 'string', example: 'grok-connector', description: 'System or connector that made the change' },
+            userId: { type: 'string', format: 'uuid', nullable: true, description: 'Acting user ID if authenticated with a personal key' },
+            changes: {
+              type: 'object',
+              description: 'Field-level diff recorded for this update',
+              properties: {
+                orderNumber: {
+                  type: 'object',
+                  properties: {
+                    old: { type: 'string', nullable: true },
+                    new: { type: 'string' },
+                  },
+                },
+                orderId: {
+                  type: 'object',
+                  properties: {
+                    old: { type: 'string', format: 'uuid', nullable: true },
+                    new: { type: 'string', format: 'uuid' },
+                  },
+                },
+                notes: {
+                  type: 'object',
+                  properties: {
+                    old: { type: 'string', nullable: true },
+                    new: { type: 'string', nullable: true },
+                  },
+                },
+                items: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      id: { type: 'string', format: 'uuid' },
+                      oldSku: { type: 'string' },
+                      newSku: { type: 'string' },
+                      oldQuantity: { type: 'integer' },
+                      newQuantity: { type: 'integer' },
+                      oldCondition: { type: 'string' },
+                      newCondition: { type: 'string' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        ReturnDetailsResponse: {
+          type: 'object',
+          required: ['success', 'data'],
+          properties: {
+            success: { type: 'boolean', example: true },
+            data: {
+              type: 'object',
+              required: ['return', 'items', 'auditTrail'],
+              properties: {
+                return: { $ref: '#/components/schemas/ReturnRecord' },
+                items: {
+                  type: 'array',
+                  items: { $ref: '#/components/schemas/ReturnedItemRecord' },
+                },
+                auditTrail: {
+                  type: 'array',
+                  description: 'Chronological audit trail of return corrections stored on return.metadata.auditLog',
+                  items: { $ref: '#/components/schemas/ReturnAuditTrailEntry' },
+                },
+                message: { type: 'string', description: 'Optional informational message (e.g. when no changes were detected)' },
+              },
+            },
+          },
+        },
+        UpdateReturnRequest: {
+          type: 'object',
+          description: 'Fields to update on a return while in status neu or in_klaerung. At least one field should be provided.',
+          properties: {
+            returnId: {
+              type: 'string',
+              format: 'uuid',
+              description: 'Return log ID (UUID). Optional in the PATCH /returns/{id} body since {id} comes from the path parameter; if supplied, it must match {id}.',
+            },
+            orderNumber: {
+              type: 'string',
+              description: 'Corrected marketplace order number, tracking number, return tracking number, customer number, or delivery note number to re-link this return',
+            },
+            items: {
+              type: 'array',
+              description: 'Corrected return line items',
+              items: {
+                type: 'object',
+                required: ['sku'],
+                properties: {
+                  id: {
+                    type: 'string',
+                    format: 'uuid',
+                    description: 'Return line item ID (UUID). Required if the return has multiple items; optional if the return has only 1 line item.',
+                  },
+                  sku: {
+                    type: 'string',
+                    description: 'Corrected SKU (case-insensitive; also resolves EAN/SKU via central product catalog onto the linked order)',
+                  },
+                  quantity: {
+                    type: 'integer',
+                    minimum: 1,
+                    description: 'Corrected quantity (> 0, cannot exceed ordered quantity minus already-returned quantity on other returns)',
+                  },
+                  condition: {
+                    type: 'string',
+                    enum: ['new', 'used_good', 'damaged', 'defect'],
+                    description: 'Updated item inspection condition',
+                  },
+                  notes: {
+                    type: 'string',
+                    description: 'Updated line item notes',
+                  },
+                },
+              },
+            },
+            notes: {
+              type: 'string',
+              description: 'Return-level notes or correction comment',
+            },
+          },
+        },
+        RefundReturnRequest: {
+          type: 'object',
+          description: 'Optional refund payload. Both requestBody and items are optional.',
+          properties: {
+            items: {
+              type: 'array',
+              description: 'Optional list of items to refund and optionally restock. If omitted or empty, defaults to all items on the return with restock: true.',
+              items: {
+                type: 'object',
+                required: ['sku', 'quantity'],
+                properties: {
+                  sku: { type: 'string', description: 'SKU (or EAN) of the item to refund' },
+                  quantity: { type: 'integer', minimum: 1, description: 'Quantity to refund' },
+                  restock: {
+                    type: 'boolean',
+                    description: 'Whether to restock into warehouse inventory (defaults to true when items is omitted; defaults to condition === new when items is provided without restock)',
+                  },
+                },
+              },
+            },
+          },
+        },
+        RefundReturnResponse: {
+          type: 'object',
+          required: ['success', 'data'],
+          properties: {
+            success: { type: 'boolean', example: true },
+            data: {
+              type: 'object',
+              required: ['success', 'creditNoteNumber', 'refundedAmountEur', 'currency'],
+              properties: {
+                success: { type: 'boolean', example: true },
+                creditNoteNumber: { type: 'string', example: 'GS-00123' },
+                creditNoteId: { type: 'string', format: 'uuid', nullable: true },
+                refundedAmountEur: { type: 'number', format: 'float', example: 49.9, description: 'Total refunded gross amount in EUR' },
+                currency: { type: 'string', example: 'EUR' },
+                refundedAmount: { type: 'number', format: 'float', example: 49.9, description: 'Total refunded gross amount in order currency' },
+                orderCurrency: { type: 'string', example: 'EUR' },
+                subtotalAmountEur: { type: 'number', format: 'float', example: 41.93 },
+                taxAmountEur: { type: 'number', format: 'float', example: 7.97 },
+                refundedItems: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      sku: { type: 'string' },
+                      quantity: { type: 'integer' },
+                      restock: { type: 'boolean' },
+                      amountEur: { type: 'number', format: 'float' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     },
     paths: {
@@ -139,25 +409,37 @@ export function getOpenApiSpec(baseUrl: string = 'https://theomnistack.de') {
       '/api/connector/grok/orders': {
         get: {
           summary: 'List Orders',
-          description: 'List and filter orders with pagination, status, marketplace, and search queries.',
+          description: 'List and filter merchant orders with pagination, status, marketplace, customerName, orderNumber, sku, date range, and archived filters.',
           operationId: 'listOrders',
           parameters: [
-            { name: 'status', in: 'query', schema: { type: 'string' } },
-            { name: 'marketplace', in: 'query', schema: { type: 'string' } },
-            { name: 'query', in: 'query', schema: { type: 'string' } },
-            { name: 'customerName', in: 'query', schema: { type: 'string' }, description: 'Filter by customer name' },
-            { name: 'orderNumber', in: 'query', schema: { type: 'string' }, description: 'Filter by marketplace order number' },
-            { name: 'sku', in: 'query', schema: { type: 'string' }, description: 'Filter orders containing specific product SKU' },
-            { name: 'limit', in: 'query', schema: { type: 'integer', default: 25 } },
-            { name: 'offset', in: 'query', schema: { type: 'integer', default: 0 } },
+            {
+              name: 'status',
+              in: 'query',
+              schema: { type: 'string', enum: ['draft', 'pending', 'processing', 'invoiced', 'shipped', 'cancelled', 'later_shipment'] },
+              description: 'Filter by order status',
+            },
+            { name: 'marketplace', in: 'query', schema: { type: 'string' }, description: 'Filter by marketplace channel (e.g. otto, amazon, shopify, ebay, kaufland)' },
+            { name: 'query', in: 'query', schema: { type: 'string' }, description: 'Free-text search across order ID, customer name, email, tracking number, and customer number' },
+            { name: 'customerName', in: 'query', schema: { type: 'string' }, description: 'Filter by buyer or shipping customer name (case-insensitive substring match)' },
+            { name: 'orderNumber', in: 'query', schema: { type: 'string' }, description: 'Filter by marketplace order number or raw order number fields (orderNumber, order_number, salesOrderId, name)' },
+            { name: 'sku', in: 'query', schema: { type: 'string' }, description: 'Filter orders containing a specific product SKU in order items (case-insensitive substring match)' },
+            { name: 'fromDate', in: 'query', schema: { type: 'string', format: 'date-time' }, description: 'ISO-8601 start date (inclusive)' },
+            { name: 'toDate', in: 'query', schema: { type: 'string', format: 'date-time' }, description: 'ISO-8601 end date (inclusive)' },
+            { name: 'limit', in: 'query', schema: { type: 'integer', default: 25, minimum: 1, maximum: 100 } },
+            { name: 'offset', in: 'query', schema: { type: 'integer', default: 0, minimum: 0 } },
             { name: 'archived', in: 'query', schema: { type: 'boolean' }, description: 'Filter by archived status (e.g. false for open orders)' },
             { name: 'isArchived', in: 'query', schema: { type: 'boolean' }, description: 'Alias for archived (e.g. false for open orders)' },
           ],
           responses: {
             '200': {
-              description: 'List of orders',
-              content: { 'application/json': { schema: { $ref: '#/components/schemas/StandardSuccessResponse' } } },
+              description: 'Paginated list of matching orders',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/ListOrdersResponse' } } },
             },
+            '400': {
+              description: 'Invalid query parameters',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/StandardErrorResponse' } } },
+            },
+            '401': { description: 'Unauthorized' },
           },
         },
       },
@@ -988,41 +1270,102 @@ export function getOpenApiSpec(baseUrl: string = 'https://theomnistack.de') {
       '/api/connector/grok/returns/{id}': {
         get: {
           summary: 'Get Return Details',
-          description: 'Get full details of a return log and returned items.',
+          description: 'Get full details of a return log, returned items, and the chronological auditTrail of corrections.',
           operationId: 'getReturnDetails',
-          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
           responses: {
-            '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/StandardSuccessResponse' } } } },
+            '200': {
+              description: 'Return details including return record, items, and auditTrail',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/ReturnDetailsResponse' } } },
+            },
+            '400': {
+              description: 'Return not found or invalid UUID returnId',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/StandardErrorResponse' } } },
+            },
+            '401': { description: 'Unauthorized' },
           },
         },
         patch: {
           summary: 'Update / Correct Return',
-          description: 'Correct a return before refunding: change orderNumber (re-links order), update items (SKU, quantity), and add notes. Only allowed when status is neu or in_klaerung.',
+          description:
+            'Correct a return before refunding: change orderNumber (re-links matching order after verifying same customer and same marketplace), update items (id, sku, quantity, condition, notes), and set notes. Allowed only when status is neu or in_klaerung and not yet refunded; records all changes in auditTrail.',
           operationId: 'updateReturn',
-          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/UpdateReturnRequest' },
+              },
+            },
+          },
+          responses: {
+            '200': {
+              description: 'Return updated (or no changes detected), returning updated return, items, and auditTrail',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/ReturnDetailsResponse' } } },
+            },
+            '400': {
+              description:
+                'Validation error. Possible error reasons: invalid JSON body or body returnId mismatch with path {id}; invalid UUID format; return not found; return status is not neu/in_klaerung or return has already been refunded; target orderNumber not found for merchant; customer mismatch between return and target order; marketplace mismatch between return and target order; return has no linked order with line items when correcting items; missing or invalid line item id (required when return has multiple items); empty SKU or SKU not present on the linked order; quantity <= 0 or quantity exceeds ordered quantity minus already-returned quantity on other non-cancelled returns.',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/StandardErrorResponse' },
+                  examples: {
+                    invalidJsonOrMismatch: {
+                      summary: 'Invalid JSON or mismatched returnId',
+                      value: { success: false, error: "Body returnId '...' does not match path parameter id '...'." },
+                    },
+                    statusNotEditable: {
+                      summary: 'Return already refunded or status not editable',
+                      value: { success: false, error: "Return '...' cannot be modified because it is in status 'bearbeitet' or has already been refunded." },
+                    },
+                    orderNotFound: {
+                      summary: 'Order not found',
+                      value: { success: false, error: "Order '...' not found for this merchant." },
+                    },
+                    customerMismatch: {
+                      summary: 'Customer mismatch on re-link',
+                      value: { success: false, error: "Customer mismatch: Return belongs to customer '...', but order '...' belongs to '...'." },
+                    },
+                    marketplaceMismatch: {
+                      summary: 'Marketplace mismatch on re-link',
+                      value: { success: false, error: "Marketplace mismatch: Return belongs to marketplace 'otto', but order '...' belongs to 'shopify'." },
+                    },
+                    lineItemIdRequired: {
+                      summary: 'Missing item id on multi-item return',
+                      value: { success: false, error: 'Line item id is required when return has multiple items.' },
+                    },
+                    skuNotOnOrder: {
+                      summary: 'SKU does not exist on linked order',
+                      value: { success: false, error: "SKU '...' does not exist on the linked order. Available order SKUs: SKU-1, SKU-2." },
+                    },
+                    quantityExceeded: {
+                      summary: 'Quantity exceeds returnable quantity',
+                      value: { success: false, error: "Quantity 2 exceeds available order quantity (1) for SKU 'SKU-1' (ordered: 1, already returned: 0)." },
+                    },
+                  },
+                },
+              },
+            },
+            '401': { description: 'Unauthorized' },
+          },
+        },
+      },
+      '/api/connector/grok/returns/{id}/status': {
+        post: {
+          summary: 'Update Return Status',
+          description: 'Update the processing status of a return (e.g. neu, in_klaerung, geprueft, abgeschlossen).',
+          operationId: 'updateReturnStatus',
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
           requestBody: {
             required: true,
             content: {
               'application/json': {
                 schema: {
                   type: 'object',
+                  required: ['status'],
                   properties: {
-                    orderNumber: { type: 'string', description: 'Corrected marketplace order number' },
-                    items: {
-                      type: 'array',
-                      items: {
-                        type: 'object',
-                        properties: {
-                          id: { type: 'string', description: 'Return line item ID' },
-                          sku: { type: 'string', description: 'Corrected SKU' },
-                          quantity: { type: 'integer', description: 'Corrected quantity' },
-                          condition: { type: 'string' },
-                          notes: { type: 'string' },
-                        },
-                        required: ['sku'],
-                      },
-                    },
-                    notes: { type: 'string', description: 'Return notes' },
+                    status: { type: 'string', description: 'New return status (e.g. neu, geprueft, abgeschlossen)' },
                   },
                 },
               },
@@ -1031,6 +1374,35 @@ export function getOpenApiSpec(baseUrl: string = 'https://theomnistack.de') {
           responses: {
             '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/StandardSuccessResponse' } } } },
             '400': { content: { 'application/json': { schema: { $ref: '#/components/schemas/StandardErrorResponse' } } } },
+            '401': { description: 'Unauthorized' },
+          },
+        },
+      },
+      '/api/connector/grok/returns/{id}/refund': {
+        post: {
+          summary: 'Refund Return',
+          description:
+            'Execute automated refund for a return through the connected marketplace integration and return credit note details plus the refunded amount in EUR (refundedAmountEur). Request body and items are optional: when items is omitted or empty, defaults to all items on the return with restock: true. Double-refunding and refunding cancelled returns are blocked.',
+          operationId: 'refundReturn',
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+          requestBody: {
+            required: false,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/RefundReturnRequest' },
+              },
+            },
+          },
+          responses: {
+            '200': {
+              description: 'Refund executed with credit note info and refunded amount in EUR',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/RefundReturnResponse' } } },
+            },
+            '400': {
+              description: 'Validation, double-refund protection, or marketplace refund error',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/StandardErrorResponse' } } },
+            },
+            '401': { description: 'Unauthorized' },
           },
         },
       },
@@ -1111,7 +1483,17 @@ export function jsonToYaml(obj: any, indent = 0): string {
   if (obj === null) return 'null'
   if (typeof obj === 'boolean' || typeof obj === 'number') return String(obj)
   if (typeof obj === 'string') {
-    if (obj.includes('\n') || obj.includes(':') || obj.includes('#') || obj.includes('"') || obj.startsWith('@')) {
+    if (
+      obj === '' ||
+      obj.includes('\n') ||
+      obj.includes(':') ||
+      obj.includes('#') ||
+      obj.includes('"') ||
+      obj.startsWith('@') ||
+      /^[\[{*&!%?\->|'\s]/.test(obj) ||
+      /\s$/.test(obj) ||
+      /^(true|false|null|yes|no|on|off)$/i.test(obj)
+    ) {
       return JSON.stringify(obj)
     }
     return obj

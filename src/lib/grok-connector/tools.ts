@@ -108,7 +108,7 @@ export const TOOLS_MANIFEST: ToolDefinition[] = [
   {
     name: 'list_orders',
     category: 'orders',
-    description: 'List and search merchant orders with filters for status, marketplace channel, date range, customer search query, and pagination.',
+    description: 'List and search merchant orders with filters for status, marketplace channel, customerName, orderNumber, sku, date range, archived status, free-text search query, and pagination.',
     parameters: {
       type: 'object',
       properties: {
@@ -785,7 +785,7 @@ export const TOOLS_MANIFEST: ToolDefinition[] = [
   {
     name: 'get_return_details',
     category: 'returns',
-    description: 'Get details of a return log including all returned items, physical inspection conditions (new, used, defective), and notes.',
+    description: 'Get details of a return log including all returned items, physical inspection conditions (new, used, defective), notes, and auditTrail of corrections.',
     parameters: {
       type: 'object',
       properties: {
@@ -838,28 +838,28 @@ export const TOOLS_MANIFEST: ToolDefinition[] = [
   {
     name: 'update_return',
     category: 'returns',
-    description: 'Update and correct a return before refunding: change orderNumber (re-links matching order), update line items (SKU, quantity), and add notes. Allowed only when status is "neu" or "in_klaerung".',
+    description: 'Update and correct a return before refunding: change orderNumber (re-links matching order after customer and marketplace match checks), update line items (id, sku, quantity, condition, notes — validating SKU against order items and quantity against ordered minus already-returned qty), and add notes. Allowed only when status is "neu" or "in_klaerung" and not yet refunded; records changes in auditTrail.',
     parameters: {
       type: 'object',
       properties: {
         returnId: { type: 'string', description: 'Return log ID (UUID)' },
-        orderNumber: { type: 'string', description: 'Marketplace order number or tracking number to re-link this return' },
+        orderNumber: { type: 'string', description: 'Marketplace order number, tracking number, return tracking number, customer number, or delivery note number to re-link this return' },
         items: {
           type: 'array',
           items: {
             type: 'object',
             properties: {
-              id: { type: 'string', description: 'Return line item ID (UUID). Optional if return has only 1 line item.' },
-              sku: { type: 'string', description: 'Corrected SKU' },
-              quantity: { type: 'integer', description: 'Corrected return quantity' },
-              condition: { type: 'string', enum: ['new', 'used_good', 'damaged', 'defect'] },
-              notes: { type: 'string' },
+              id: { type: 'string', description: 'Return line item ID (UUID). Required if the return has multiple line items; optional if the return has only 1 line item.' },
+              sku: { type: 'string', description: 'Corrected SKU (case-insensitive; also resolves EAN/SKU via central product catalog onto the linked order)' },
+              quantity: { type: 'integer', description: 'Corrected return quantity (> 0, cannot exceed ordered minus already-returned quantity)' },
+              condition: { type: 'string', enum: ['new', 'used_good', 'damaged', 'defect'], description: 'Updated inspection condition' },
+              notes: { type: 'string', description: 'Updated line item notes' },
             },
             required: ['sku'],
           },
           description: 'Corrected return line items',
         },
-        notes: { type: 'string', description: 'Optional note or comment' },
+        notes: { type: 'string', description: 'Optional return-level note or comment' },
       },
       required: ['returnId'],
     },
@@ -867,7 +867,7 @@ export const TOOLS_MANIFEST: ToolDefinition[] = [
   {
     name: 'refund_return',
     category: 'returns',
-    description: 'Execute automated refund for a return directly through the marketplace integration.',
+    description: 'Execute automated refund for a return directly through the marketplace integration and return credit note details plus the refunded amount in EUR (refundedAmountEur). The items parameter is optional: if omitted or empty, defaults to all items on the return with restock: true.',
     parameters: {
       type: 'object',
       properties: {
@@ -877,13 +877,13 @@ export const TOOLS_MANIFEST: ToolDefinition[] = [
           items: {
             type: 'object',
             properties: {
-              sku: { type: 'string' },
-              quantity: { type: 'integer' },
-              restock: { type: 'boolean' },
+              sku: { type: 'string', description: 'SKU (or EAN) of the returned item to refund' },
+              quantity: { type: 'integer', description: 'Quantity to refund' },
+              restock: { type: 'boolean', description: 'Whether to restock into warehouse inventory (defaults to true when items is omitted; defaults to condition === new when items is provided without restock)' },
             },
             required: ['sku', 'quantity'],
           },
-          description: 'Items to refund and optionally restock',
+          description: 'Optional items to refund and optionally restock. If omitted or empty, defaults to all items on the return with restock: true.',
         },
       },
       required: ['returnId'],
@@ -3748,6 +3748,9 @@ export async function executeTool(
 
       case 'get_return_details': {
         const companyId = ctx.companyId
+        if (!params.returnId || !isUuid(String(params.returnId))) {
+          return { success: false, error: 'Valid UUID returnId is required.' }
+        }
         const [ret] = await db
           .select()
           .from(returnsLog)
@@ -3851,6 +3854,10 @@ export async function executeTool(
         const companyId = ctx.companyId
         const returnId = params.returnId
         if (!returnId) return { success: false, error: 'returnId is required.' }
+        if (!isUuid(String(returnId))) return { success: false, error: 'Invalid identifier format: a valid UUID was expected.' }
+        if (params.items !== undefined && params.items !== null && !Array.isArray(params.items)) {
+          return { success: false, error: "Parameter 'items' must be an array." }
+        }
 
         const [ret] = await db
           .select()
@@ -4192,12 +4199,19 @@ export async function executeTool(
 
       case 'refund_return': {
         const companyId = ctx.companyId
+        const returnId = params.returnId
+        if (!returnId) return { success: false, error: 'returnId is required.' }
+        if (!isUuid(String(returnId))) return { success: false, error: 'Invalid identifier format: a valid UUID was expected.' }
+        if (params.items !== undefined && params.items !== null && !Array.isArray(params.items)) {
+          return { success: false, error: "Parameter 'items' must be an array." }
+        }
+
         let itemsToRefund = params.items || []
         if (!itemsToRefund || itemsToRefund.length === 0) {
           const retItems = await db
             .select()
             .from(returnedItems)
-            .where(eq(returnedItems.returnLogId, params.returnId))
+            .where(eq(returnedItems.returnLogId, returnId))
           itemsToRefund = retItems.map(it => ({
             sku: it.skuOrProductName,
             quantity: it.quantity,
@@ -4206,10 +4220,13 @@ export async function executeTool(
         }
         const result = await executeRefund({
           companyId,
-          returnLogId: params.returnId,
+          returnLogId: returnId,
           itemsToRefund,
           userId: ctx.userId || undefined,
         })
+        if (!result.success) {
+          return { success: false, error: 'error' in result ? result.error : 'Refund execution failed.' }
+        }
         return { success: true, data: result }
       }
 

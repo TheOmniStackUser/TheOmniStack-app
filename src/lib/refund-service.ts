@@ -104,6 +104,10 @@ export async function executeRefund({
     }))
   }
 
+  if (itemsToRefund.length === 0) {
+    throw new Error('Keine Artikel für die Rückerstattung angegeben oder in der Retoure hinterlegt.')
+  }
+
   // 3. Resolve EAN to actual marketplace SKUs if needed
   const itemConditions: Record<string, string> = {}
   for (const item of returnEntry.items) {
@@ -123,30 +127,45 @@ export async function executeRefund({
     )
 
     if (!matchedOrderItem) {
-      // Try to resolve EAN -> SKU via products table
+      // Try to resolve EAN or catalog SKU -> marketplace SKU via products table
       const { products, productMappings } = await import('@/db/schema/products')
-      const productByEan = await db.query.products.findFirst({
-        where: and(eq(products.ean, refundItem.sku), eq(products.companyId, companyId)),
-        columns: { sku: true, id: true }
+      const candidateProducts = await db.query.products.findMany({
+        where: and(
+          eq(products.companyId, companyId),
+          or(
+            ilike(products.sku, refundItem.sku),
+            ilike(products.ean, `%${refundItem.sku}%`)
+          )
+        ),
+        columns: { sku: true, id: true, ean: true }
       })
 
-      if (productByEan) {
+      const productByMatch = candidateProducts.find(p =>
+        p.sku?.toLowerCase() === refundItem.sku.toLowerCase() ||
+        (p.ean && p.ean.split(',').map(s => s.trim().toLowerCase()).includes(refundItem.sku.toLowerCase()))
+      )
+
+      if (productByMatch) {
         matchedOrderItem = order.items.find(
-          item => item.sku?.toLowerCase() === productByEan.sku.toLowerCase()
+          item => item.sku?.toLowerCase() === productByMatch.sku.toLowerCase()
         )
         
         if (!matchedOrderItem) {
-           // Try to resolve via productMappings for this marketplace
-           const mapping = await db.query.productMappings.findFirst({
+           // Try to resolve via productMappings for this product
+           const mappings = await db.query.productMappings.findMany({
              where: and(
-               eq(productMappings.productId, productByEan.id),
-               eq(productMappings.marketplace, order.marketplace as any)
+               eq(productMappings.productId, productByMatch.id),
+               eq(productMappings.companyId, companyId)
              )
            })
-           if (mapping) {
-              matchedOrderItem = order.items.find(
-                item => item.sku?.toLowerCase() === mapping.marketplaceSku.toLowerCase()
-              )
+           for (const mapping of mappings) {
+             const found = order.items.find(
+               item => item.sku?.toLowerCase() === mapping.marketplaceSku.toLowerCase()
+             )
+             if (found) {
+               matchedOrderItem = found
+               break
+             }
            }
         }
       }
@@ -249,6 +268,82 @@ export async function executeRefund({
     }
   }
 
+  // 4. Map and calculate refunded items & EUR totals based on order items (for all marketplaces)
+  const creditNoteItems: { sku: string; title: string; quantity: number; unitPrice: number; taxRate: number; description: string }[] = []
+  const refundedItemsSummary: { sku: string; quantity: number; restock: boolean; amountEur: number }[] = []
+  let subtotalAmount = 0
+  let taxAmount = 0
+  let totalAmount = 0
+
+  const orderCurrency = (order.currency || 'EUR').toUpperCase()
+  const integrationMeta = (integration?.metadata ?? null) as {
+    priceSync?: { currencyConversionEnabled?: boolean; targetCurrency?: string; exchangeRate?: number | string }
+  } | null
+  const priceSyncMeta = integrationMeta?.priceSync
+  const conversionRate =
+    orderCurrency !== 'EUR' &&
+    priceSyncMeta?.currencyConversionEnabled &&
+    priceSyncMeta?.targetCurrency?.toUpperCase() === orderCurrency &&
+    Number(priceSyncMeta?.exchangeRate) > 0
+      ? Number(priceSyncMeta.exchangeRate)
+      : 1
+
+  for (const refundItem of itemsToRefund) {
+    if (refundItem.quantity <= 0) continue
+
+    const matchedOrderItem = order.items.find(
+      item => item.sku?.toLowerCase() === refundItem.sku.toLowerCase()
+    )
+
+    const condition = resolvedConditions[refundItem.sku.toLowerCase()] || 'new'
+    const isNew = condition.toLowerCase() === 'new' || condition.toLowerCase() === 'neu'
+    const willRestock = refundItem.restock !== undefined ? refundItem.restock : isNew
+
+    if (!matchedOrderItem) {
+      console.warn(`[RefundService] SKU ${refundItem.sku} not found in order ${order.marketplaceOrderId}. Skipping.`)
+      refundedItemsSummary.push({
+        sku: refundItem.sku,
+        quantity: refundItem.quantity,
+        restock: willRestock,
+        amountEur: 0,
+      })
+      continue
+    }
+
+    const qty = refundItem.quantity
+    const netUnitPrice = parseFloat(matchedOrderItem.unitPrice)
+    const taxRate = parseFloat(matchedOrderItem.taxRate)
+
+    const lineNet = netUnitPrice * qty
+    const lineTax = lineNet * taxRate
+    const lineGross = lineNet + lineTax
+
+    subtotalAmount += lineNet
+    taxAmount += lineTax
+    totalAmount += lineGross
+
+    refundedItemsSummary.push({
+      sku: matchedOrderItem.sku || refundItem.sku,
+      quantity: qty,
+      restock: willRestock,
+      amountEur: Number((lineGross / conversionRate).toFixed(2)),
+    })
+
+    creditNoteItems.push({
+      sku: matchedOrderItem.sku || 'UNKNOWN',
+      title: matchedOrderItem.title,
+      quantity: qty,
+      unitPrice: netUnitPrice,
+      taxRate: taxRate,
+      description: matchedOrderItem.title
+    })
+  }
+
+  const subtotalAmountEur = Number((subtotalAmount / conversionRate).toFixed(2))
+  const taxAmountEur = Number((taxAmount / conversionRate).toFixed(2))
+  const refundedAmountEur = Number((totalAmount / conversionRate).toFixed(2))
+  const refundedAmount = Number(totalAmount.toFixed(2))
+
   if (autoCreditNote) {
     // 3. Ensure order has a linked invoice; otherwise generate it first
     if (!order.invoiceId) {
@@ -283,46 +378,6 @@ export async function executeRefund({
 
     if (originalInvoice.status === 'cancelled') {
       throw new Error(`Die Original-Rechnung ${originalInvoice.invoiceNumber} ist bereits storniert.`)
-    }
-
-    // 4. Map and calculate refunded items based on order items
-    const creditNoteItems: { sku: string; title: string; quantity: number; unitPrice: number; taxRate: number; description: string }[] = []
-    let subtotalAmount = 0
-    let taxAmount = 0
-    let totalAmount = 0
-
-    for (const refundItem of itemsToRefund) {
-      if (refundItem.quantity <= 0) continue
-
-      const matchedOrderItem = order.items.find(
-        item => item.sku?.toLowerCase() === refundItem.sku.toLowerCase()
-      )
-
-      if (!matchedOrderItem) {
-        console.warn(`[RefundService] SKU ${refundItem.sku} not found in order ${order.marketplaceOrderId}. Skipping.`)
-        continue
-      }
-
-      const qty = refundItem.quantity
-      const netUnitPrice = parseFloat(matchedOrderItem.unitPrice)
-      const taxRate = parseFloat(matchedOrderItem.taxRate)
-
-      const lineNet = netUnitPrice * qty
-      const lineTax = lineNet * taxRate
-      const lineGross = lineNet + lineTax
-
-      subtotalAmount += lineNet
-      taxAmount += lineTax
-      totalAmount += lineGross
-
-      creditNoteItems.push({
-        sku: matchedOrderItem.sku || 'UNKNOWN',
-        title: matchedOrderItem.title,
-        quantity: qty,
-        unitPrice: netUnitPrice,
-        taxRate: taxRate,
-        description: matchedOrderItem.title
-      })
     }
 
     if (creditNoteItems.length === 0) {
@@ -494,7 +549,9 @@ export async function executeRefund({
             ...existingMetadata,
             creditNoteId: newCreditNoteInvoice.id,
             refunded_at: new Date().toISOString(),
-            refundedItems: itemsToRefund
+            refundedItems: itemsToRefund,
+            refundedAmountEur,
+            currency: 'EUR',
           }
         })
         .where(eq(returnsLog.id, returnLogId))
@@ -561,7 +618,9 @@ export async function executeRefund({
         metadata: {
           ...existingMetadata,
           refunded_at: new Date().toISOString(),
-          refundedItems: itemsToRefund
+          refundedItems: itemsToRefund,
+          refundedAmountEur,
+          currency: 'EUR',
         }
       })
       .where(eq(returnsLog.id, returnLogId))
@@ -647,5 +706,16 @@ export async function executeRefund({
     console.error(`[RefundService] Error during auto-restock:`, restockErr)
   }
 
-  return { success: true, creditNoteNumber, creditNoteId: newCreditNoteInvoiceId || undefined }
+  return {
+    success: true,
+    creditNoteNumber,
+    creditNoteId: newCreditNoteInvoiceId || undefined,
+    refundedAmountEur,
+    currency: 'EUR',
+    refundedAmount,
+    orderCurrency,
+    subtotalAmountEur,
+    taxAmountEur,
+    refundedItems: refundedItemsSummary,
+  }
 }

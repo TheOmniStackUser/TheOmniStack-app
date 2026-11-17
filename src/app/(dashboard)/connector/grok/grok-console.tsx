@@ -92,6 +92,13 @@ const SAMPLE_PAYLOADS: Record<string, any> = {
     items: [{ skuOrProductName: 'SKU-ABC', quantity: 1, condition: 'new' }],
   },
   update_return_status: { returnId: 'REPLACE_WITH_RETURN_ID', status: 'geprueft' },
+  update_return: {
+    returnId: 'REPLACE_WITH_RETURN_ID',
+    orderNumber: 'OPTIONAL_ORDER_NUMBER',
+    items: [{ id: 'OPTIONAL_IF_SINGLE_ITEM', sku: 'REPLACE_WITH_SKU', quantity: 1, condition: 'new', notes: 'Corrected SKU/qty' }],
+    notes: 'Corrected before refund',
+  },
+  refund_return: { returnId: 'REPLACE_WITH_RETURN_ID' },
   list_customers: { limit: 10 },
   get_customer_details: { customerId: 'REPLACE_WITH_CUSTOMER_ID' },
   list_integrations: {},
@@ -142,7 +149,7 @@ Your capabilities include:
 2. BILLING & INVOICING: Issuing GoBD-compliant PDF invoices, retrieving invoice lines, cancelling invoices via credit notes (Storno), recording payments, and batch generating missing invoices.
 3. WAREHOUSE, INVENTORY (WAWI) & MAPPINGS: Listing products, checking inventory, adjusting warehouse stock, listing unmapped marketplace listings (Otto, Amazon, Shopify, Mirakl, eBay), blocking/unblocking unmapped listings, creating central products directly from unmapped listings, mapping listings to central products, running automated batch mapping via SKU/EAN, and managing product mappings.
 4. PRICING & MULTI-CHANNEL PROMOTIONS: Managing regular prices and reduced promotional prices, performing bulk price updates with dry-run validation, inspecting channel pricing rules (Shopify, OTTO, About You, Amazon, Kaufland, Decathlon, Limango, Secret Sales, etc.), triggering multi-channel price synchronizations, and tracking push job status.
-5. RETURNS MANAGEMENT: Scanning incoming returns, inspecting item condition (new, used, damaged, defect), and executing automated refunds through marketplace channels.
+5. RETURNS MANAGEMENT: Scanning incoming returns, inspecting item condition (new, used, damaged, defect), correcting unrefunded returns with audit trail, and executing automated refunds through marketplace channels (returning refunded amount in EUR).
 6. LOGISTICS & CARRIERS: Generating shipping labels for DHL, Hermes, and DPD, and retrieving live tracking numbers.
 7. REAL-TIME INTELLIGENCE: Providing instant analytics on sales revenue, pending fulfillment counts, return rates, and low-stock alerts.
 
