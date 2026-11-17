@@ -1259,159 +1259,46 @@ export class OttoAdapter implements MarketplaceAdapter {
 
   /**
    * Fetches open customer questions for Otto.
-   * Matches customer clarifications from OTTO Partner Connect, linked orders, and return notices.
+   * Note: OTTO Partner Connect does not expose a REST API endpoint for customer clarifications.
+   * Real customer messages arrive via OTTO's email relay (@customer.otto.market) forwarded to
+   * the inbound webhook (/api/webhooks/marketplace-questions) or created manually.
    */
   async fetchOpenQuestions(companyId: string, options?: { fromDate?: string }): Promise<NormalizedQuestion[]> {
     console.log(`[OttoAdapter] Fetching open questions for company ${companyId}...`)
     const { db } = await import('@/db/client')
-    const { orders } = await import('@/db/schema/orders')
-    const { calculateSlaDeadline } = await import('@/lib/sla')
-    const { eq, and, sql } = await import('drizzle-orm')
+    const { marketplaceQuestions } = await import('@/db/schema/questions')
+    const { eq, and } = await import('drizzle-orm')
 
-    const questions: NormalizedQuestion[] = []
-
-    // 1. Fetch relevant Otto orders from DB for this company
-    const relevantOrders = await db
-      .select({
-        id: orders.id,
-        marketplaceOrderId: orders.marketplaceOrderId,
-        orderNumber: sql<string>`orders.raw_payload->>'orderNumber'`,
-        buyerName: orders.buyerName,
-        buyerEmail: orders.buyerEmail,
-        rawPayload: orders.rawPayload,
-        shippingStatus: orders.shippingStatus,
-        createdAt: orders.createdAt,
-      })
-      .from(orders)
+    const dbQuestions = await db
+      .select()
+      .from(marketplaceQuestions)
       .where(
         and(
-          eq(orders.companyId, companyId),
-          eq(orders.marketplace, 'otto')
+          eq(marketplaceQuestions.companyId, companyId),
+          eq(marketplaceQuestions.marketplace, 'otto'),
+          eq(marketplaceQuestions.status, 'open')
         )
       )
 
-    // Build lookup maps by orderNumber and salesOrderId
-    const orderMapByNumber = new Map<string, typeof relevantOrders[0]>()
-    const orderMapById = new Map<string, typeof relevantOrders[0]>()
-    for (const ord of relevantOrders) {
-      if (ord.orderNumber) orderMapByNumber.set(ord.orderNumber, ord)
-      if (ord.marketplaceOrderId) orderMapById.set(ord.marketplaceOrderId, ord)
-    }
-
-    // 2. Active OTTO Partner Connect Clarifications (portal.otto.market/customer-clarifications/ALL)
-    // Matches OTTO portal state exactly: 2 Neue Anfragen (open) and 5 In Bearbeitung (in_progress)
-    const knownInquiries = [
-      // Neue Anfragen (2)
-      {
-        externalQuestionId: '24821227',
-        orderNumber: 'cbn42dmywg',
-        thema: 'Lieferung' as const,
-        status: 'open' as const,
-        type: 'order' as const,
-        receivedAt: new Date('2026-11-12T12:29:00Z'),
-        subject: 'Lieferanfrage zu Bestellung cbn42dmywg (#24821227)',
-        questionText: 'Guten Tag, der Kunde erkundigt sich nach dem aktuellen Lieferstatus und der Sendungsverfolgung zur Bestellung cbn42dmywg.',
-      },
-      {
-        externalQuestionId: '24821074',
-        orderNumber: 'cbn4zxk3qr',
-        thema: 'Retoure' as const,
-        status: 'open' as const,
-        type: 'order' as const,
-        receivedAt: new Date('2026-11-12T12:21:00Z'),
-        subject: 'Rücksendeanfrage zu Bestellung cbn4zxk3qr (#24821074)',
-        questionText: 'Guten Tag, der Kunde wünscht Unterstützung bei der Retoure bzw. benötigt ein Retourenlabel zur Bestellung cbn4zxk3qr.',
-      },
-      // In Bearbeitung (5)
-      {
-        externalQuestionId: '23483310',
-        orderNumber: 'cbn4yb8z8b',
-        thema: 'Retoure' as const,
-        status: 'in_progress' as const,
-        type: 'order' as const,
-        receivedAt: new Date('2026-07-27T11:30:00Z'),
-        subject: 'Rücksendeanfrage zu Bestellung cbn4yb8z8b (#23483310)',
-        questionText: 'Guten Tag, der Kunde wünscht Rückabwicklung / Retourenbegleitung zur Bestellung cbn4yb8z8b.',
-      },
-      {
-        externalQuestionId: '23084045',
-        orderNumber: 'cbn4xb2vjr',
-        thema: 'Retoure' as const,
-        status: 'in_progress' as const,
-        type: 'order' as const,
-        receivedAt: new Date('2026-06-25T06:54:00Z'),
-        subject: 'Rücksendeanfrage zu Bestellung cbn4xb2vjr (#23084045)',
-        questionText: 'Guten Tag, der Kunde wünscht Rückabwicklung / Status zur Retoure der Bestellung cbn4xb2vjr.',
-      },
-      {
-        externalQuestionId: '22958055',
-        orderNumber: 'cbn4qrj2sr',
-        thema: 'Reklamation' as const,
-        status: 'in_progress' as const,
-        type: 'order' as const,
-        receivedAt: new Date('2026-06-15T12:04:00Z'),
-        subject: 'Reklamation zu Bestellung cbn4qrj2sr (#22958055)',
-        questionText: 'Guten Tag, der Kunde hat eine Reklamation zur Bestellung cbn4qrj2sr eingereicht.',
-      },
-      {
-        externalQuestionId: '22168390',
-        orderNumber: 'cbn4vs39hj',
-        thema: 'Retoure' as const,
-        status: 'in_progress' as const,
-        type: 'order' as const,
-        receivedAt: new Date('2026-04-08T14:58:00Z'),
-        subject: 'Rücksendeanfrage zu Bestellung cbn4vs39hj (#22168390)',
-        questionText: 'Guten Tag, der Kunde wünscht Rückabwicklung / Retourenstatus zur Bestellung cbn4vs39hj.',
-      },
-      {
-        externalQuestionId: '21928772',
-        orderNumber: 'cbn4pqpyrh',
-        thema: 'Reklamation' as const,
-        status: 'in_progress' as const,
-        type: 'order' as const,
-        receivedAt: new Date('2026-03-17T17:33:00Z'),
-        subject: 'Reklamation zu Bestellung cbn4pqpyrh (#21928772)',
-        questionText: 'Guten Tag, der Kunde hat eine Reklamation zur Bestellung cbn4pqpyrh eingereicht.',
-      },
-    ]
-
-    for (const inq of knownInquiries) {
-      const matchedOrd = orderMapByNumber.get(inq.orderNumber)
-      const raw = (matchedOrd?.rawPayload as any) || null
-      const firstPos = raw?.positionItems?.[0]
-      const product = firstPos?.product
-      const customerEmail = raw?.invoiceAddress?.email || matchedOrd?.buyerEmail || null
-      const customerName = matchedOrd?.buyerName || `${raw?.invoiceAddress?.firstName || ''} ${raw?.invoiceAddress?.lastName || ''}`.trim() || 'OTTO Kunde'
-
-      const deadlineAt = calculateSlaDeadline(inq.receivedAt, 48, 'otto')
-
-      questions.push({
-        externalQuestionId: inq.externalQuestionId,
-        marketplace: 'otto',
-        status: inq.status,
-        questionType: inq.type,
-        customerName,
-        customerEmail: customerEmail || undefined,
-        productSku: product?.sku || undefined,
-        productTitle: product?.productTitle || undefined,
-        marketplaceProductId: product?.articleNumber || undefined,
-        marketplaceOrderId: inq.orderNumber,
-        orderId: matchedOrd?.id,
-        subject: inq.subject,
-        questionText: inq.questionText,
-        deadlineAt,
-        slaHours: 48,
-        createdAt: inq.receivedAt,
-        rawPayload: {
-          clarificationId: inq.externalQuestionId,
-          thema: inq.thema,
-          source: 'otto_partner_connect',
-          orderNumber: inq.orderNumber,
-        },
-      })
-    }
-
-    return questions
+    return dbQuestions.map((q) => ({
+      externalQuestionId: q.externalQuestionId,
+      marketplace: q.marketplace,
+      status: q.status as 'open' | 'in_progress' | 'answered' | 'closed',
+      questionType: q.questionType as 'product' | 'order' | 'general',
+      customerName: q.customerName,
+      customerEmail: q.customerEmail || undefined,
+      productSku: q.productSku || undefined,
+      productTitle: q.productTitle || undefined,
+      marketplaceProductId: q.marketplaceProductId || undefined,
+      marketplaceOrderId: q.marketplaceOrderId || undefined,
+      orderId: q.orderId || undefined,
+      subject: q.subject,
+      questionText: q.questionText,
+      deadlineAt: q.deadlineAt || undefined,
+      slaHours: q.slaHours,
+      createdAt: q.createdAt,
+      rawPayload: q.rawPayload,
+    }))
   }
 
   /**

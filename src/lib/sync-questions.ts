@@ -15,6 +15,18 @@ import type { NormalizedQuestion } from '@/adapters/marketplace/base'
 export async function syncQuestionsForCompany(companyId: string): Promise<{ totalSynced: number }> {
   await ensureQuestionsTablesExist()
 
+  // Ensure any legacy hardcoded synthetic placeholder entries are removed
+  await db.execute(sql`
+    DELETE FROM "marketplace_questions"
+    WHERE "company_id" = ${companyId}
+      AND (
+        "external_question_id" IN (
+          '24821227', '24821074', '23483310', '23084045', '22958055', '22168390', '21928772'
+        )
+        OR "raw_payload"->>'source' = 'otto_partner_connect'
+      );
+  `)
+
   const activeIntegrations = await db
     .select()
     .from(marketplaceIntegrations)

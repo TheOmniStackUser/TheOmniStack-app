@@ -21,7 +21,15 @@ import {
   X,
   AlertCircle,
   HelpCircle,
-  ArrowUpDown
+  ArrowUpDown,
+  Mail,
+  Server,
+  Copy,
+  Check,
+  Settings,
+  ChevronDown,
+  ChevronUp,
+  Info
 } from 'lucide-react'
 import {
   getQuestionsAction,
@@ -77,9 +85,19 @@ interface ThreadMessage {
   createdAt: Date | string
 }
 
+interface SetupConfig {
+  companyId: string
+  companyEmail: string | null
+  smtpEnabled: boolean
+  smtpFromEmail: string | null
+  smtpHost: string | null
+  ottoConnected: boolean
+}
+
 interface QuestionsClientProps {
   initialQuestions: QuestionItem[]
   activeMarketplaces: { id: string; name: string }[]
+  setupConfig?: SetupConfig
 }
 
 const QUICK_TEMPLATES = [
@@ -103,7 +121,8 @@ const QUICK_TEMPLATES = [
 
 export function QuestionsClient({
   initialQuestions,
-  activeMarketplaces
+  activeMarketplaces,
+  setupConfig
 }: QuestionsClientProps) {
   const [questions, setQuestions] = useState<QuestionItem[]>(initialQuestions)
   const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(
@@ -124,16 +143,20 @@ export function QuestionsClient({
   const [isAnswering, startAnswering] = useTransition()
   const [isSyncing, startSyncing] = useTransition()
 
-  // Modal States
+  // Modal & Setup Guide States
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [showHelpModal, setShowHelpModal] = useState(false)
+  const [showSetupGuide, setShowSetupGuide] = useState<boolean>(
+    initialQuestions.length === 0 || !setupConfig?.smtpEnabled
+  )
+  const [copiedField, setCopiedField] = useState<string | null>(null)
   const [modalForm, setModalForm] = useState<ManualQuestionInput>({
     marketplace: 'otto',
     customerName: '',
     customerEmail: '',
     subject: '',
     questionText: '',
-    questionType: 'product',
+    questionType: 'order',
     productSku: '',
     productTitle: '',
     marketplaceOrderId: '',
@@ -373,35 +396,11 @@ export function QuestionsClient({
     })
   }
 
-  // Modal Handlers
-  const handlePreloadOttoSample = (type: 'product' | 'order') => {
-    if (type === 'product') {
-      setModalForm({
-        marketplace: 'otto',
-        customerName: 'Sabine Weber',
-        customerEmail: 'knd-9382104@otto.de',
-        subject: 'Frage zu Artikelgröße und Material',
-        questionText: 'Hallo, ist das Produkt auch in der Farbe Weiß verfügbar und wie hoch ist die maximale Belastbarkeit? Vielen Dank!',
-        questionType: 'product',
-        productSku: 'SKU-OTTO-1002',
-        productTitle: 'Premium Wandregal Eiche Massiv',
-        marketplaceOrderId: '',
-        slaHours: 48
-      })
-    } else {
-      setModalForm({
-        marketplace: 'otto',
-        customerName: 'Michael Schulz',
-        customerEmail: 'knd-7462193@otto.de',
-        subject: 'Lieferzeit & Sendungsverfolgung',
-        questionText: 'Guten Tag, können Sie mir bitte mitteilen, wann meine Sendung voraussichtlich zugestellt wird? Die Sendungsverfolgung aktualisiert sich seit gestern nicht mehr.',
-        questionType: 'order',
-        productSku: '',
-        productTitle: '',
-        marketplaceOrderId: 'OTTO-2026-94812',
-        slaHours: 48
-      })
-    }
+  // Copy helper for setup guide
+  const handleCopyText = (text: string, fieldKey: string) => {
+    navigator.clipboard.writeText(text)
+    setCopiedField(fieldKey)
+    setTimeout(() => setCopiedField(null), 2500)
   }
 
   const handleCreateManualQuestion = (e: React.FormEvent) => {
@@ -608,22 +607,28 @@ export function QuestionsClient({
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <div className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 text-xs font-semibold shadow-sm" title="Automatischer Hintergrundabruf läuft alle 30 Minuten">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
-            <span>Auto-Abruf aktiv (alle 30 Min.)</span>
-          </div>
+          <button
+            type="button"
+            onClick={() => setShowSetupGuide((prev) => !prev)}
+            className={`inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl border text-xs font-bold shadow-sm transition-all cursor-pointer ${
+              setupConfig?.smtpEnabled
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100'
+                : 'bg-amber-50 border-amber-300 text-amber-900 hover:bg-amber-100'
+            }`}
+          >
+            <Settings size={15} className={setupConfig?.smtpEnabled ? 'text-emerald-600' : 'text-amber-600'} />
+            <span>Einrichtung & Anleitung</span>
+            {showSetupGuide ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </button>
 
           <button
             onClick={handleSync}
             disabled={isSyncing}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-semibold shadow-sm transition-all disabled:opacity-50"
-            title="Fragen von OTTO und Marktplätzen jetzt sofort manuell aktualisieren"
+            title="Fragen aktualisieren"
           >
             <RefreshCw size={16} className={isSyncing ? 'animate-spin text-cyan-600' : 'text-slate-500'} />
-            <span>{isSyncing ? 'Synchronisiere...' : 'Fragen abrufen'}</span>
+            <span>{isSyncing ? 'Synchronisiere...' : 'Aktualisieren'}</span>
           </button>
 
           <button
@@ -634,10 +639,165 @@ export function QuestionsClient({
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-bold shadow-md shadow-cyan-600/20 transition-all"
           >
             <Plus size={18} />
-            <span>Frage erfassen / testen</span>
+            <span>Anfrage manuell erfassen</span>
           </button>
         </div>
       </div>
+
+      {/* Collapsible Dealer Setup & Configuration Guide */}
+      {showSetupGuide && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="p-5 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className="p-2.5 rounded-xl bg-cyan-500/20 border border-cyan-400/30 text-cyan-300 flex-shrink-0 mt-0.5">
+                <Info size={20} />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold tracking-tight text-white">
+                  So richtest du die OTTO-Kundenanfragen ein (Wichtiger Hinweis für Händler)
+                </h3>
+                <p className="text-xs text-slate-300 mt-1 max-w-3xl leading-relaxed">
+                  <strong>Warum ist eine E-Mail-Einrichtung erforderlich?</strong> OTTO Partner Connect bietet für Kundenanfragen (<em>Klärfälle / Nachrichtenverlauf</em>) <strong>keine öffentliche REST-API</strong> an (anders als für Bestellungen oder Retouren). Stattdessen versendet und empfängt OTTO alle Kundenanfragen ausschließlich über das offizielle <strong>OTTO E-Mail-Gateway (<code className="text-cyan-300 font-mono">*@customer.otto.market</code>)</strong>.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowSetupGuide(false)}
+              className="self-end sm:self-center px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-semibold text-slate-200 transition-colors flex-shrink-0 cursor-pointer"
+            >
+              Ausblenden
+            </button>
+          </div>
+
+          <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-5 bg-slate-50/50">
+            {/* Step 1: OTTO Portal */}
+            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between space-y-4">
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-50 text-cyan-800 border border-cyan-200 text-xs font-extrabold">
+                    Schritt 1: Im OTTO-Portal (OPC)
+                  </span>
+                  <Mail size={18} className="text-slate-400" />
+                </div>
+                <h4 className="text-sm font-bold text-slate-900">
+                  Kundenservice-E-Mail bei OTTO hinterlegen
+                </h4>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                   Öffne das <strong>OTTO Partner Connect Portal</strong> und navigiere zu <em>Einstellungen → Unternehmensdaten / Ansprechpartner</em>.
+                </p>
+                <ul className="text-xs text-slate-600 space-y-1.5 list-disc list-inside">
+                  <li>Hinterlege dort deine offizielle <strong>Kundenservice-E-Mail-Adresse</strong> (z.&nbsp;B. <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-slate-800">service@dein-shop.de</code>).</li>
+                  <li>Aktiviere die Option, dass OTTO neue Kundenanfragen und Antworten per E-Mail an diese Adresse weiterleitet.</li>
+                </ul>
+              </div>
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                <span className="text-slate-500 font-medium">Hinterlegte Firmen-E-Mail:</span>
+                <span className="font-mono font-bold text-slate-800">
+                  {setupConfig?.companyEmail || 'Nicht hinterlegt'}
+                </span>
+              </div>
+            </div>
+
+            {/* Step 2: Incoming Messages (Webhook / Forwarding) */}
+            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between space-y-4">
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-50 text-cyan-800 border border-cyan-200 text-xs font-extrabold">
+                    Schritt 2: Eingehende Anfragen
+                  </span>
+                  <Server size={18} className="text-slate-400" />
+                </div>
+                <h4 className="text-sm font-bold text-slate-900">
+                  E-Mail-Weiterleitung an Webhook einrichten
+                </h4>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Damit eingehende E-Mails von <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-slate-800">*@customer.otto.market</code> mit dem <strong>echten Nachrichtentext</strong> automatisch hier erscheinen, leite sie (z.&nbsp;B. über Make, Zapier, Cloudflare Email Routing oder Mailgun/SendGrid Inbound Parse) per <code className="font-mono">POST</code> an diesen Endpunkt weiter:
+                </p>
+
+                <div className="p-2.5 rounded-lg bg-slate-900 text-slate-100 font-mono text-[11px] flex items-center justify-between gap-2">
+                  <span className="truncate">/api/webhooks/marketplace-questions</span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleCopyText(
+                        `${typeof window !== 'undefined' ? window.location.origin : ''}/api/webhooks/marketplace-questions`,
+                        'webhook-url'
+                      )
+                    }
+                    className="px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-white text-[10px] font-sans font-bold flex items-center gap-1 flex-shrink-0 cursor-pointer"
+                  >
+                    {copiedField === 'webhook-url' ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                    <span>{copiedField === 'webhook-url' ? 'Kopiert' : 'URL kopieren'}</span>
+                  </button>
+                </div>
+
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Die OTTO-Bestellnummer (z.&nbsp;B. <code className="font-mono text-slate-700">cbn4zxk3qr</code>) und Klärfall-ID (<code className="font-mono text-slate-700">#24821074</code>) werden automatisch aus Betreff/Text erkannt und mit der Bestellung verknüpft. Alternativ kannst du Nachrichten über <strong>„Anfrage manuell erfassen“</strong> eintragen.
+                </p>
+              </div>
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                <span className="text-slate-500 font-medium">JSON-Felder:</span>
+                <code className="font-mono text-[11px] text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                  from, to, subject, text
+                </code>
+              </div>
+            </div>
+
+            {/* Step 3: Outgoing SMTP */}
+            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between space-y-4">
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-50 text-cyan-800 border border-cyan-200 text-xs font-extrabold">
+                    Schritt 3: Ausgehende Antworten (SMTP)
+                  </span>
+                  {setupConfig?.smtpEnabled ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      <CheckCircle2 size={12} className="text-emerald-600" />
+                      Aktiv
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                      <AlertTriangle size={12} className="text-amber-600" />
+                      Erforderlich
+                    </span>
+                  )}
+                </div>
+                <h4 className="text-sm font-bold text-slate-900">
+                  Eigenen SMTP-Server für Antworten verbinden
+                </h4>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  <strong>Wichtig:</strong> Das OTTO-Gateway (<code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-slate-800">@customer.otto.market</code>) akzeptiert Antworten <strong>nur dann</strong>, wenn sie von exakt derselben Absender-Adresse verschickt werden, die im OTTO-Portal hinterlegt ist.
+                </p>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Aktiviere daher unter <strong>Einstellungen → E-Mail-Versand (SMTP)</strong> deinen eigenen Mailserver mit genau dieser Absender-E-Mail.
+                </p>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                <div className="text-xs truncate">
+                  {setupConfig?.smtpEnabled ? (
+                    <span className="text-emerald-700 font-semibold">
+                      SMTP aktiv ({setupConfig.smtpFromEmail || setupConfig.smtpHost})
+                    </span>
+                  ) : (
+                    <span className="text-amber-800 font-semibold">
+                      Noch kein eigener SMTP-Server aktiv
+                    </span>
+                  )}
+                </div>
+                <Link
+                  href="/settings#smtp-settings"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all flex-shrink-0"
+                >
+                  <Settings size={13} />
+                  <span>Zu den SMTP-Einstellungen</span>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Metric Cards Row */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -811,18 +971,29 @@ export function QuestionsClient({
                   <MessageSquareText size={24} />
                 </div>
                 <h4 className="text-sm font-bold text-slate-800">Keine Anfragen gefunden</h4>
-                <p className="text-xs text-slate-500 max-w-xs mx-auto">
+                <p className="text-xs text-slate-500 max-w-xs mx-auto leading-relaxed">
                   {searchQuery || statusFilter !== 'all' || selectedMarketplace !== 'all'
                     ? 'Versuche deine Filter zurückzusetzen.'
-                    : 'Es liegen derzeit keine offenen Kundenanfragen vor.'}
+                    : 'Sobald neue Kundenanfragen per E-Mail-Weiterleitung (Webhook) eingehen oder manuell erfasst werden, erscheinen sie hier.'}
                 </p>
-                <button
-                  onClick={() => setIsModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold"
-                >
-                  <Plus size={14} />
-                  <span>Beispielfrage erfassen</span>
-                </button>
+                <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setShowSetupGuide(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-50 hover:bg-cyan-100 text-cyan-800 border border-cyan-200 text-xs font-semibold cursor-pointer"
+                  >
+                    <Settings size={14} />
+                    <span>Einrichtung prüfen</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsModalOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer"
+                  >
+                    <Plus size={14} />
+                    <span>Anfrage manuell erfassen</span>
+                  </button>
+                </div>
               </div>
             ) : (
               filteredQuestions.map((q) => {
@@ -1146,16 +1317,16 @@ export function QuestionsClient({
         </div>
       </div>
 
-      {/* Custom Modal: Frage manuell erfassen oder OTTO-Testnachricht importieren */}
+      {/* Custom Modal: Anfrage manuell erfassen */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in">
           <div className="bg-white w-full max-w-xl rounded-2xl border border-slate-200 shadow-2xl overflow-hidden animate-scale-in">
             {/* Modal Header */}
             <div className="p-6 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-bold text-slate-900">Frage erfassen / testen</h3>
+                <h3 className="text-lg font-bold text-slate-900">Kundenanfrage manuell erfassen</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Erfasse eine Kundenanfrage oder importiere eine realistische OTTO-Beispielfrage.
+                  Übertrage eine Anfrage aus dem OTTO-Portal oder E-Mail-Postfach, um sie hier inklusive Frist zu verwalten und direkt zu beantworten.
                 </p>
               </div>
               <button
@@ -1164,27 +1335,6 @@ export function QuestionsClient({
               >
                 <X size={18} />
               </button>
-            </div>
-
-            {/* Quick Sample Buttons */}
-            <div className="p-4 px-6 bg-cyan-50/50 border-b border-cyan-100 flex items-center justify-between flex-wrap gap-2">
-              <span className="text-xs font-bold text-cyan-900">OTTO Test-Frage einfügen:</span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => handlePreloadOttoSample('product')}
-                  className="px-2.5 py-1 rounded-lg bg-white border border-cyan-200 text-cyan-800 text-xs font-semibold hover:bg-cyan-100 transition-all shadow-sm"
-                >
-                  Produktfrage
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handlePreloadOttoSample('order')}
-                  className="px-2.5 py-1 rounded-lg bg-white border border-cyan-200 text-cyan-800 text-xs font-semibold hover:bg-cyan-100 transition-all shadow-sm"
-                >
-                  Bestellfrage
-                </button>
-              </div>
             </div>
 
             {/* Form */}
@@ -1359,7 +1509,7 @@ export function QuestionsClient({
 
             {/* Content Body */}
             <div className="space-y-4 py-4 text-sm text-slate-600">
-              {/* Notice: Exclusively for OTTO currently */}
+              {/* Technical background notice */}
               <div className="bg-amber-50 p-4 rounded-xl border border-amber-200 text-amber-900">
                 <div className="flex items-start gap-3">
                   <div className="p-1 rounded-lg bg-amber-100 text-amber-700 flex-shrink-0 mt-0.5">
@@ -1367,29 +1517,33 @@ export function QuestionsClient({
                   </div>
                   <div>
                     <h4 className="font-bold text-amber-900 text-sm">
-                      Aktuell exklusiv für OTTO Market verfügbar
+                      Wichtiger technischer Hintergrund zu OTTO Market
                     </h4>
                     <p className="text-xs leading-relaxed text-amber-800 mt-1">
-                      Die automatische Synchronisation und Beantwortung von Kundenanfragen ist derzeit <strong>ausschließlich für OTTO Market</strong> angebunden. 
-                      Weitere Marktplätze wie <strong>Amazon</strong> (Buyer-Seller Messaging), <strong>Kaufland</strong> und <strong>eBay</strong> befinden sich in der Entwicklung und werden schrittweise freigeschaltet.
+                      Anders als für Bestellungen (<code className="font-mono">/v4/orders</code>) und Retouren (<code className="font-mono">/v3/returns</code>) stellt OTTO Partner Connect <strong>keine öffentliche REST-API für Kundenanfragen (Klärfälle)</strong> bereit. 
+                      Stattdessen läuft die gesamte Kundenkommunikation bei OTTO über das offizielle <strong>E-Mail-Relay-Gateway (<code className="font-mono">*@customer.otto.market</code>)</strong>.
                     </p>
                   </div>
                 </div>
               </div>
 
-              {/* 1. Synchronisation & Auto-Abruf */}
+              {/* 1. Was muss der Händler einrichten? */}
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80">
-                <h4 className="font-bold text-slate-900 text-sm mb-1.5 flex items-center gap-2">
+                <h4 className="font-bold text-slate-900 text-sm mb-2 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-cyan-500"></span>
-                  1. Automatischer Abruf & Klärfälle
+                  1. Einmalige Einrichtung für Händler (3 Schritte)
                 </h4>
-                <p className="text-xs leading-relaxed text-slate-700">
-                  TheOmniStack synchronisiert offene Kundenklärfälle (z. B. Fragen zu Lieferung, Retouren oder Reklamationen) <strong>automatisch alle 30 Minuten</strong> im Hintergrund. 
-                  Über den Button <strong>„Fragen abrufen“</strong> kannst du jederzeit sofort eine manuelle Aktualisierung anstoßen.
-                </p>
-                <p className="text-xs leading-relaxed text-slate-700 mt-2">
-                  Anfragen werden automatisch mit deinen Aufträgen anhand der OTTO-Bestellnummer (z. B. <code className="bg-slate-200/80 px-1 py-0.5 rounded font-mono text-slate-900">cbn...</code>) abgeglichen, sodass Kundenname, Artikel und Sendungsdaten sofort verknüpft sind.
-                </p>
+                <ol className="text-xs leading-relaxed text-slate-700 space-y-2 list-decimal list-inside">
+                  <li>
+                    <strong>Im OTTO-Portal (OPC):</strong> Hinterlege unter <em>Einstellungen → Unternehmensdaten / Ansprechpartner</em> deine offizielle Kundenservice-E-Mail-Adresse und aktiviere die E-Mail-Benachrichtigung für neue Kundenanfragen.
+                  </li>
+                  <li>
+                    <strong>Eingehende Nachrichten (E-Mail-Weiterleitung / Webhook):</strong> Leite eingehende E-Mails von <code className="bg-slate-200/80 px-1 py-0.5 rounded font-mono text-slate-900">*@customer.otto.market</code> (z.&nbsp;B. über Make, Zapier, Cloudflare Email Routing oder Mailgun/SendGrid Inbound Parse) per <code className="font-mono">POST</code> an <code className="bg-slate-200/80 px-1 py-0.5 rounded font-mono text-slate-900">/api/webhooks/marketplace-questions</code> weiter. Dadurch wird der echte Nachrichtentext des Kunden automatisch importiert und anhand der OTTO-Bestellnummer (<code className="font-mono">cbn...</code>) mit dem Auftrag verknüpft.
+                  </li>
+                  <li>
+                    <strong>Ausgehende Antworten (Eigener SMTP-Server):</strong> Da das OTTO-Gateway Antworten nur von deiner bei OTTO verifizierten Kundenservice-E-Mail akzeptiert, aktiviere unter <Link href="/settings#smtp-settings" className="text-cyan-700 underline font-semibold">Einstellungen → E-Mail-Versand (SMTP)</Link> deinen eigenen SMTP-Server mit exakt dieser Absender-Adresse.
+                  </li>
+                </ol>
               </div>
 
               {/* 2. SLA & Fristenüberwachung (48h Werktage) */}
@@ -1405,7 +1559,7 @@ export function QuestionsClient({
                 <ul className="mt-2 text-xs space-y-1.5 text-slate-700 list-disc list-inside">
                   <li><strong>Neue Anfragen (Offen):</strong> Die Fristuhr läuft live herunter und warnt bei &lt; 24h Restzeit gelb bzw. rot vor drohenden SLA-Strafen oder Performance-Abzügen.</li>
                   <li><strong>In Bearbeitung:</strong> Fälle, die aktuell in Prüfung oder Klärung sind, pausieren die Frist und haben keine aktive Strafandrohung.</li>
-                  <li><strong>Beantwortet / Erledigt:</strong> Nach dem Absenden der Antwort gilt der Klärfall als fristgerecht erledigt.</li>
+                  <li><strong>Beantwortet / Erledigt:</strong> Nach dem Absenden der Antwort über deinen SMTP-Server an die <code className="font-mono">@customer.otto.market</code>-Adresse wird die Antwort automatisch im OTTO-Ticket hinterlegt.</li>
                 </ul>
               </div>
 
@@ -1416,8 +1570,8 @@ export function QuestionsClient({
                   3. Beantwortung & Schnellvorlagen
                 </h4>
                 <p className="text-xs leading-relaxed text-slate-700">
-                  Antworten werden direkt im Nachrichtenfenster formuliert und über das OTTO-Gateway an die geschützte Kundenadresse übermittelt. 
-                  Über die <strong>Schnellvorlagen</strong> (z. B. Sendungsverfolgung übermitteln, Retourenhilfe, Kulanz/Teilerstattung) sparst du wertvolle Zeit bei Routineanfragen.
+                  Antworten werden direkt im Nachrichtenfenster formuliert und per SMTP über das OTTO-Gateway an die geschützte Kundenadresse (<code className="font-mono">*@customer.otto.market</code>) übermittelt. 
+                  Über die <strong>Schnellvorlagen</strong> (z.&nbsp;B. Sendungsverfolgung übermitteln, Retourenhilfe, Kulanz/Teilerstattung) sparst du wertvolle Zeit bei Routineanfragen.
                 </p>
               </div>
             </div>

@@ -82,6 +82,15 @@ export async function ensureQuestionsTablesExist() {
       CREATE INDEX IF NOT EXISTS "idx_marketplace_question_messages_question" ON "marketplace_question_messages" ("question_id");
     `)
 
+    // 5. Purge legacy hardcoded synthetic placeholder inquiries from database
+    await db.execute(sql`
+      DELETE FROM "marketplace_questions"
+      WHERE "external_question_id" IN (
+        '24821227', '24821074', '23483310', '23084045', '22958055', '22168390', '21928772'
+      )
+      OR "raw_payload"->>'source' = 'otto_partner_connect';
+    `)
+
     isInitialized = true
   } catch (error) {
     console.error('[ensureQuestionsTablesExist] Failed to ensure tables:', error)
