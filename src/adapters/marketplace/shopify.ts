@@ -654,6 +654,52 @@ export class ShopifyAdapter implements MarketplaceAdapter {
     }
   }
 
+  private lastRequestTime = 0
+
+  private async shopifyFetchWithRetry(
+    url: string,
+    options: RequestInit,
+    maxRetries = 5
+  ): Promise<Response> {
+    let attempt = 0
+    while (true) {
+      // Enforce ~550ms minimum pacing between requests (< 2 req/sec Shopify REST limit)
+      const now = Date.now()
+      const elapsed = now - this.lastRequestTime
+      if (elapsed < 550) {
+        await new Promise(r => setTimeout(r, 550 - elapsed))
+      }
+      this.lastRequestTime = Date.now()
+
+      const res = await fetch(url, options)
+
+      // Check Shopify leaky bucket header (e.g. "36/40") and pause if close to limit
+      const callLimit = res.headers.get('X-Shopify-Shop-Api-Call-Limit') || res.headers.get('x-shopify-shop-api-call-limit')
+      if (callLimit) {
+        const [usedStr, maxStr] = callLimit.split('/')
+        const used = parseInt(usedStr, 10)
+        const max = parseInt(maxStr, 10)
+        if (!isNaN(used) && !isNaN(max) && used >= max - 5) {
+          await new Promise(r => setTimeout(r, 1500))
+        }
+      }
+
+      if ((res.status === 429 || res.status >= 500) && attempt < maxRetries) {
+        attempt++
+        const retryAfterHeader = res.headers.get('Retry-After') || res.headers.get('retry-after')
+        let delayMs = retryAfterHeader ? Math.ceil(parseFloat(retryAfterHeader) * 1000) : 0
+        if (!delayMs || isNaN(delayMs) || delayMs < 1000) {
+          delayMs = 2000 * attempt
+        }
+        console.warn(`[Shopify] HTTP ${res.status} on ${options.method || 'GET'} ${url}. Retrying (${attempt}/${maxRetries}) in ${delayMs}ms...`)
+        await new Promise(r => setTimeout(r, delayMs))
+        continue
+      }
+
+      return res
+    }
+  }
+
   async updateListings(
     companyId: string, 
     updates: { 
@@ -668,7 +714,7 @@ export class ShopifyAdapter implements MarketplaceAdapter {
       saleEndDate?: Date | null; 
       gpsrDetails?: any; 
     }[]
-  ): Promise<void> {
+  ): Promise<any> {
     if (!updates || updates.length === 0) return
 
     try {
@@ -707,176 +753,209 @@ export class ShopifyAdapter implements MarketplaceAdapter {
       // We only need location_id if at least one update includes stock
       const hasStockUpdates = updates.some(u => u.stock !== undefined)
       let locationId = ''
+      let totalLocationsCount = 0
       if (hasStockUpdates) {
-        const locRes = await fetch(`${shopUrl}/admin/api/2024-01/locations.json`, { headers })
+        const locRes = await this.shopifyFetchWithRetry(`${shopUrl}/admin/api/2024-01/locations.json`, { headers })
         if (locRes.ok) {
           const locData = await locRes.json()
-          locationId = locData.locations?.[0]?.id?.toString() || ''
+          const locations = locData.locations || []
+          totalLocationsCount = locations.length
+          locationId = locations[0]?.id?.toString() || ''
         }
       }
 
+      const failures: { sku: string; error: string }[] = []
+
       for (const update of updates) {
-        let variantId = update.marketplaceProductId
+        try {
+          let variantId = update.marketplaceProductId
 
-        // Fallback: If variantId is not provided, look it up by SKU in productMappings
-        if (!variantId && update.sku) {
-          const [mapping] = await db
-            .select({ marketplaceProductId: productMappings.marketplaceProductId })
-            .from(productMappings)
-            .where(
-              and(
-                eq(productMappings.companyId, companyId),
-                eq(productMappings.marketplaceSku, update.sku),
-                eq(productMappings.marketplace, 'shopify')
+          // Fallback: If variantId is not provided, look it up by SKU in productMappings
+          if (!variantId && update.sku) {
+            const [mapping] = await db
+              .select({ marketplaceProductId: productMappings.marketplaceProductId })
+              .from(productMappings)
+              .where(
+                and(
+                  eq(productMappings.companyId, companyId),
+                  eq(productMappings.marketplaceSku, update.sku),
+                  eq(productMappings.marketplace, 'shopify')
+                )
               )
-            )
-            .limit(1)
-          if (mapping?.marketplaceProductId) {
-            variantId = mapping.marketplaceProductId
-          }
-        }
-
-        if (!variantId) {
-          console.warn(`[Shopify] Skipping update for SKU ${update.sku}: No variant ID found`)
-          continue
-        }
-
-        let inventoryItemId = ''
-
-        // Check if price / compare-at price update is needed
-        const hasPriceUpdate = update.price !== undefined || update.reducedPrice !== undefined || update.msrp !== undefined || update.fallbackPrice !== undefined
-
-        if (hasPriceUpdate) {
-          const standardPrice = (update.price !== undefined && update.price !== null) ? update.price : update.fallbackPrice
-          const reducedPrice = (update.reducedPrice !== undefined && update.reducedPrice !== null && update.reducedPrice > 0) ? update.reducedPrice : undefined
-          const msrp = (update.msrp !== undefined && update.msrp !== null && update.msrp > 0) ? update.msrp : undefined
-
-          const now = new Date()
-          const isSaleDateValid = (!update.saleStartDate || new Date(update.saleStartDate) <= now) &&
-                                  (!update.saleEndDate || new Date(update.saleEndDate) >= now)
-
-          const isReducedPriceActive = reducedPrice !== undefined && isSaleDateValid
-
-          let sellingPrice: number | undefined
-          let compareAtPrice: number | null = null
-
-          if (isReducedPriceActive) {
-            // Case C & D: A reduced price is active -> customer pays reduced price
-            sellingPrice = reducedPrice
-
-            // Strikethrough / Compare-at price:
-            if (msrp !== undefined && msrp > reducedPrice) {
-              // Case D: UVP is available and higher than reduced price -> use UVP as compare-at price
-              compareAtPrice = msrp
-            } else if (standardPrice !== undefined && standardPrice > reducedPrice) {
-              // Case C: No UVP available (or UVP <= reduced price) -> use standard price as compare-at price
-              compareAtPrice = standardPrice
-            } else {
-              compareAtPrice = null
-            }
-          } else {
-            // Case A & B: No reduced price active (or sale ended / removed) -> customer pays standard price
-            sellingPrice = standardPrice
-
-            if (msrp !== undefined && standardPrice !== undefined && msrp > standardPrice) {
-              // Case B: UVP is higher than standard price -> display UVP as compare-at price
-              compareAtPrice = msrp
-            } else {
-              // Case A: Only standard price (or UVP <= standard price) -> clear compare-at price
-              compareAtPrice = null
+              .limit(1)
+            if (mapping?.marketplaceProductId) {
+              variantId = mapping.marketplaceProductId
             }
           }
 
-          if (sellingPrice !== undefined) {
-            const variantPayload: any = {
-              variant: {
-                id: variantId,
-                price: Number(sellingPrice).toFixed(2),
-                compare_at_price: compareAtPrice !== null ? Number(compareAtPrice).toFixed(2) : null
+          if (!variantId) {
+            console.warn(`[Shopify] Skipping update for SKU ${update.sku}: No variant ID found`)
+            continue
+          }
+
+          let inventoryItemId = ''
+
+          // Check if price / compare-at price update is needed
+          const hasPriceUpdate = update.price !== undefined || update.reducedPrice !== undefined || update.msrp !== undefined || update.fallbackPrice !== undefined
+
+          if (hasPriceUpdate) {
+            const standardPrice = (update.price !== undefined && update.price !== null) ? update.price : update.fallbackPrice
+            const reducedPrice = (update.reducedPrice !== undefined && update.reducedPrice !== null && update.reducedPrice > 0) ? update.reducedPrice : undefined
+            const msrp = (update.msrp !== undefined && update.msrp !== null && update.msrp > 0) ? update.msrp : undefined
+
+            const now = new Date()
+            const isSaleDateValid = (!update.saleStartDate || new Date(update.saleStartDate) <= now) &&
+                                    (!update.saleEndDate || new Date(update.saleEndDate) >= now)
+
+            const isReducedPriceActive = reducedPrice !== undefined && isSaleDateValid
+
+            let sellingPrice: number | undefined
+            let compareAtPrice: number | null = null
+
+            if (isReducedPriceActive) {
+              // Case C & D: A reduced price is active -> customer pays reduced price
+              sellingPrice = reducedPrice
+
+              // Strikethrough / Compare-at price:
+              if (msrp !== undefined && msrp > reducedPrice) {
+                // Case D: UVP is available and higher than reduced price -> use UVP as compare-at price
+                compareAtPrice = msrp
+              } else if (standardPrice !== undefined && standardPrice > reducedPrice) {
+                // Case C: No UVP available (or UVP <= reduced price) -> use standard price as compare-at price
+                compareAtPrice = standardPrice
+              } else {
+                compareAtPrice = null
+              }
+            } else {
+              // Case A & B: No reduced price active (or sale ended / removed) -> customer pays standard price
+              sellingPrice = standardPrice
+
+              if (msrp !== undefined && standardPrice !== undefined && msrp > standardPrice) {
+                // Case B: UVP is higher than standard price -> display UVP as compare-at price
+                compareAtPrice = msrp
+              } else {
+                // Case A: Only standard price (or UVP <= standard price) -> clear compare-at price
+                compareAtPrice = null
               }
             }
 
-            console.log(`[Shopify] Updating variant ${variantId} (SKU: ${update.sku}): price=${variantPayload.variant.price}, compare_at_price=${variantPayload.variant.compare_at_price}`)
-            const vPutRes = await fetch(`${shopUrl}/admin/api/2024-01/variants/${variantId}.json`, {
-              method: 'PUT',
-              headers,
-              body: JSON.stringify(variantPayload)
-            })
-
-            if (!vPutRes.ok) {
-              const errBody = await vPutRes.text()
-              console.error(`[Shopify] Variant ${variantId} price update failed: ${vPutRes.status} - ${errBody}`)
-              throw new Error(`Shopify API variant update error (${vPutRes.status}): ${errBody}`)
-            }
-
-            const putData = await vPutRes.json()
-            if (putData.variant?.inventory_item_id) {
-              inventoryItemId = putData.variant.inventory_item_id.toString()
-            }
-          }
-        }
-
-        // If we need to update stock, we need the inventory_item_id
-        if (update.stock !== undefined && locationId) {
-          if (!inventoryItemId) {
-            const vRes = await fetch(`${shopUrl}/admin/api/2024-01/variants/${variantId}.json`, { headers })
-            if (vRes.ok) {
-              const vData = await vRes.json()
-              inventoryItemId = vData.variant?.inventory_item_id?.toString() || ''
-            }
-          }
-
-          if (inventoryItemId) {
-            const levelsRes = await fetch(`${shopUrl}/admin/api/2024-01/inventory_levels.json?inventory_item_ids=${inventoryItemId}`, { headers })
-
-            if (levelsRes.ok) {
-              const levelsData = await levelsRes.json()
-              const levels = levelsData.inventory_levels || []
-
-              if (levels.length > 0) {
-                // Set the target stock on the first location, and 0 on all others to ensure total sum is exact
-                for (let i = 0; i < levels.length; i++) {
-                  const level = levels[i]
-                  const stockToSet = i === 0 ? update.stock : 0
-
-                  const invPayload = {
-                    location_id: level.location_id,
-                    inventory_item_id: inventoryItemId,
-                    available: stockToSet
-                  }
-                  const setRes = await fetch(`${shopUrl}/admin/api/2024-01/inventory_levels/set.json`, {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify(invPayload)
-                  })
-                  if (!setRes.ok) {
-                    const errText = await setRes.text()
-                    console.error(`[Shopify] Inventory level update failed for location ${level.location_id}: ${setRes.status} - ${errText}`)
-                  }
+            if (sellingPrice !== undefined) {
+              const variantPayload: any = {
+                variant: {
+                  id: variantId,
+                  price: Number(sellingPrice).toFixed(2),
+                  compare_at_price: compareAtPrice !== null ? Number(compareAtPrice).toFixed(2) : null
                 }
-              } else if (locationId) {
-                // Fallback if no inventory levels exist yet but we have a default location
+              }
+
+              console.log(`[Shopify] Updating variant ${variantId} (SKU: ${update.sku}): price=${variantPayload.variant.price}, compare_at_price=${variantPayload.variant.compare_at_price}`)
+              const vPutRes = await this.shopifyFetchWithRetry(`${shopUrl}/admin/api/2024-01/variants/${variantId}.json`, {
+                method: 'PUT',
+                headers,
+                body: JSON.stringify(variantPayload)
+              })
+
+              if (!vPutRes.ok) {
+                const errBody = await vPutRes.text()
+                console.error(`[Shopify] Variant ${variantId} price update failed: ${vPutRes.status} - ${errBody}`)
+                throw new Error(`Shopify API variant update error (${vPutRes.status}): ${errBody}`)
+              }
+
+              const putData = await vPutRes.json()
+              if (putData.variant?.inventory_item_id) {
+                inventoryItemId = putData.variant.inventory_item_id.toString()
+              }
+            }
+          }
+
+          // If we need to update stock, we need the inventory_item_id
+          if (update.stock !== undefined && locationId) {
+            if (!inventoryItemId) {
+              const vRes = await this.shopifyFetchWithRetry(`${shopUrl}/admin/api/2024-01/variants/${variantId}.json`, { headers })
+              if (vRes.ok) {
+                const vData = await vRes.json()
+                inventoryItemId = vData.variant?.inventory_item_id?.toString() || ''
+              }
+            }
+
+            if (inventoryItemId) {
+              // Fast path: if the store only has 1 location, set stock directly without an extra GET /inventory_levels.json call
+              if (totalLocationsCount <= 1) {
                 const invPayload = {
                   location_id: locationId,
                   inventory_item_id: inventoryItemId,
                   available: update.stock
                 }
-                const setRes = await fetch(`${shopUrl}/admin/api/2024-01/inventory_levels/set.json`, {
+                const setRes = await this.shopifyFetchWithRetry(`${shopUrl}/admin/api/2024-01/inventory_levels/set.json`, {
                   method: 'POST',
                   headers,
                   body: JSON.stringify(invPayload)
                 })
                 if (!setRes.ok) {
                   const errText = await setRes.text()
-                  console.error(`[Shopify] Fallback inventory level update failed: ${setRes.status} - ${errText}`)
+                  console.error(`[Shopify] Inventory level update failed for location ${locationId}: ${setRes.status} - ${errText}`)
+                  throw new Error(`Shopify API inventory update error (${setRes.status}): ${errText}`)
+                }
+              } else {
+                const levelsRes = await this.shopifyFetchWithRetry(`${shopUrl}/admin/api/2024-01/inventory_levels.json?inventory_item_ids=${inventoryItemId}`, { headers })
+
+                if (levelsRes.ok) {
+                  const levelsData = await levelsRes.json()
+                  const levels = levelsData.inventory_levels || []
+
+                  if (levels.length > 0) {
+                    // Set the target stock on the first location, and 0 on all others to ensure total sum is exact
+                    for (let i = 0; i < levels.length; i++) {
+                      const level = levels[i]
+                      const stockToSet = i === 0 ? update.stock : 0
+
+                      const invPayload = {
+                        location_id: level.location_id,
+                        inventory_item_id: inventoryItemId,
+                        available: stockToSet
+                      }
+                      const setRes = await this.shopifyFetchWithRetry(`${shopUrl}/admin/api/2024-01/inventory_levels/set.json`, {
+                        method: 'POST',
+                        headers,
+                        body: JSON.stringify(invPayload)
+                      })
+                      if (!setRes.ok) {
+                        const errText = await setRes.text()
+                        console.error(`[Shopify] Inventory level update failed for location ${level.location_id}: ${setRes.status} - ${errText}`)
+                      }
+                    }
+                  } else if (locationId) {
+                    // Fallback if no inventory levels exist yet but we have a default location
+                    const invPayload = {
+                      location_id: locationId,
+                      inventory_item_id: inventoryItemId,
+                      available: update.stock
+                    }
+                    const setRes = await this.shopifyFetchWithRetry(`${shopUrl}/admin/api/2024-01/inventory_levels/set.json`, {
+                      method: 'POST',
+                      headers,
+                      body: JSON.stringify(invPayload)
+                    })
+                    if (!setRes.ok) {
+                      const errText = await setRes.text()
+                      console.error(`[Shopify] Fallback inventory level update failed: ${setRes.status} - ${errText}`)
+                    }
+                  }
                 }
               }
             }
           }
+        } catch (skuErr: any) {
+          failures.push({ sku: update.sku, error: skuErr?.message || 'Unknown Shopify error' })
         }
       }
 
-      console.log(`[Shopify] Listings successfully updated.`)
+      if (failures.length > 0 && failures.length === updates.length) {
+        throw new Error(failures[0].error)
+      }
+
+      console.log(`[Shopify] Listings updated (${updates.length - failures.length}/${updates.length} succeeded).`)
+      return { failures }
     } catch (error) {
       console.error(`[Shopify] Error updating listings:`, error)
       throw error

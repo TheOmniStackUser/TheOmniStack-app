@@ -555,7 +555,7 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
   const integrationEntries = Object.entries(updatesByIntegration)
   let currentIndex = 0
 
-  await Promise.all(integrationEntries.map(async ([integrationId, mpUpdates]) => {
+  const processIntegrationEntry = async ([integrationId, mpUpdates]: [string, any[]]) => {
     const integration = activeIntegrations.find(i => i.id === integrationId)
     if (!integration) {
       currentIndex++
@@ -623,7 +623,7 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
     }
 
     try {
-      console.log(`[ProductSync] Pushing ${mpUpdates.length} updates to ${marketplace}...`)
+      console.log(`[ProductSync] Pushing ${mpUpdates.length} updates to ${marketplace} (${displayName})...`)
       const adapterResult = (await adapter.updateListings(companyId, mpUpdates)) as any
       totalUpdatesSent += mpUpdates.length
       if (!activeMarketplaces.includes(displayName)) {
@@ -689,7 +689,30 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
       }
     }
     
-        currentIndex++
+    currentIndex++
+  }
+
+  // Group Mirakl integrations sharing the same host URL so they run sequentially per host
+  // instead of colliding on Mirakl's per-instance rate limits, while independent marketplaces run in parallel.
+  const buckets = new Map<string, [string, any[]][]>()
+  for (const entry of integrationEntries) {
+    const integration = activeIntegrations.find(i => i.id === entry[0])
+    const bucketKey = (integration && integration.type.startsWith('mirakl') && integration.environment)
+      ? `mirakl:${integration.environment.replace(/\/$/, '').toLowerCase()}`
+      : `int:${entry[0]}`
+    if (!buckets.has(bucketKey)) {
+      buckets.set(bucketKey, [])
+    }
+    buckets.get(bucketKey)!.push(entry)
+  }
+
+  await Promise.all(Array.from(buckets.values()).map(async (group) => {
+    for (let i = 0; i < group.length; i++) {
+      await processIntegrationEntry(group[i])
+      if (i < group.length - 1) {
+        await new Promise(r => setTimeout(r, 1500))
+      }
+    }
   }))
 
   if (job) {

@@ -797,115 +797,155 @@ export class AmazonAdapter implements MarketplaceAdapter {
   async updateListings(
     companyId: string, 
     updates: { sku: string; marketplaceProductId?: string; stock?: number; price?: number; reducedPrice?: number; msrp?: number; fallbackPrice?: number; saleStartDate?: Date | null; saleEndDate?: Date | null; }[]
-  ): Promise<void> {
+  ): Promise<any> {
     if (!updates || updates.length === 0) return
 
     try {
       const accessToken = await this.getAccessToken()
+      const failures: { sku: string; error: string }[] = []
+      let lastPatchTime = 0
 
       for (const u of updates) {
-        const patches: any[] = []
+        try {
+          const patches: any[] = []
 
-        if (u.stock !== undefined) {
-          patches.push({
-            op: 'replace',
-            path: '/attributes/fulfillment_availability',
-            value: [
-              {
-                fulfillment_channel_code: 'DEFAULT',
-                quantity: u.stock
-              }
-            ]
-          })
-        }
-
-        if (u.msrp !== undefined) {
-          patches.push({
-            op: 'replace',
-            path: '/attributes/list_price',
-            value: [{
-              marketplace_id: this.marketplaceId,
-              value_with_tax: u.msrp,
-              currency: 'EUR'
-            }]
-          })
-        }
-
-        if (u.price !== undefined || u.reducedPrice !== undefined) {
-          const standardPrice = u.price !== undefined ? u.price : (u.fallbackPrice || 0)
-          
-          const purchasableOffer: any = {
-            marketplace_id: this.marketplaceId,
-            audience: 'ALL',
-            currency: 'EUR',
-            our_price: [{ schedule: [{ value_with_tax: standardPrice }] }]
-          }
-
-          if (u.reducedPrice !== undefined && u.reducedPrice > 0) {
-            const formatDate = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, 'Z')
-            let start = u.saleStartDate ? new Date(u.saleStartDate) : new Date()
-            if (start < new Date()) start = new Date()
-            let end = (u.saleEndDate && new Date(u.saleEndDate).getTime() > Date.now()) ? new Date(u.saleEndDate) : new Date(Date.now() + 30*24*60*60*1000)
-            
-            purchasableOffer.discounted_price = [{
-              schedule: [
+          if (u.stock !== undefined) {
+            patches.push({
+              op: 'replace',
+              path: '/attributes/fulfillment_availability',
+              value: [
                 {
-                  value_with_tax: u.reducedPrice,
-                  start_at: formatDate(start),
-                  end_at: formatDate(end)
+                  fulfillment_channel_code: 'DEFAULT',
+                  quantity: u.stock
                 }
               ]
-            }]
+            })
           }
 
-          patches.push({
-            op: 'replace',
-            path: '/attributes/purchasable_offer',
-            value: [purchasableOffer]
-          })
-        }
-
-        if (patches.length > 0) {
-          const payload = {
-            productType: 'PRODUCT',
-            patches
+          if (u.msrp !== undefined) {
+            patches.push({
+              op: 'replace',
+              path: '/attributes/list_price',
+              value: [{
+                marketplace_id: this.marketplaceId,
+                value_with_tax: u.msrp,
+                currency: 'EUR'
+              }]
+            })
           }
 
-          const res = await fetch(`${this.baseUrl}/listings/2021-08-01/items/${this.config.sellerId}/${u.sku}?marketplaceIds=${this.marketplaceId}&issueLocale=de_DE`, {
-            method: 'PATCH',
-            headers: {
-              'x-amz-access-token': accessToken,
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            },
-            body: JSON.stringify(payload)
-          })
-
-          const responseText = await res.text()
-
-          if (!res.ok) {
-            console.error(`[AmazonAdapter] Failed to PATCH SKU ${u.sku}: ${res.status} ${responseText}`)
-            throw new Error(`Amazon API Fehler für SKU ${u.sku}: ${res.status} - ${responseText}`)
-          }
-
-          try {
-            const data = JSON.parse(responseText)
-            const errors = (data.issues || []).filter((i: any) => i.severity === 'ERROR')
-            if (errors.length > 0) {
-              console.error(`[AmazonAdapter] Amazon accepted request but returned errors for SKU ${u.sku}:`, JSON.stringify(errors))
-              throw new Error(`Amazon API Fehler (Issues) für SKU ${u.sku}: ${errors.map((e: any) => e.message).join(', ')}`)
-            } else {
-              console.log(`[AmazonAdapter] Successfully patched SKU ${u.sku}. Status: ${data.status}`)
+          if (u.price !== undefined || u.reducedPrice !== undefined) {
+            const standardPrice = u.price !== undefined ? u.price : (u.fallbackPrice || 0)
+            
+            const purchasableOffer: any = {
+              marketplace_id: this.marketplaceId,
+              audience: 'ALL',
+              currency: 'EUR',
+              our_price: [{ schedule: [{ value_with_tax: standardPrice }] }]
             }
-          } catch (e: any) {
-             if (e.message.includes('Amazon API Fehler (Issues)')) {
-                 throw e;
-             }
-             // Ignore JSON parse error if body is empty or not JSON
+
+            if (u.reducedPrice !== undefined && u.reducedPrice > 0) {
+              const formatDate = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, 'Z')
+              let start = u.saleStartDate ? new Date(u.saleStartDate) : new Date()
+              if (start < new Date()) start = new Date()
+              let end = (u.saleEndDate && new Date(u.saleEndDate).getTime() > Date.now()) ? new Date(u.saleEndDate) : new Date(Date.now() + 30*24*60*60*1000)
+              
+              purchasableOffer.discounted_price = [{
+                schedule: [
+                  {
+                    value_with_tax: u.reducedPrice,
+                    start_at: formatDate(start),
+                    end_at: formatDate(end)
+                  }
+                ]
+              }]
+            }
+
+            patches.push({
+              op: 'replace',
+              path: '/attributes/purchasable_offer',
+              value: [purchasableOffer]
+            })
           }
+
+          if (patches.length > 0) {
+            const payload = {
+              productType: 'PRODUCT',
+              patches
+            }
+
+            const maxRetries = 5
+            let attempt = 0
+            let res: Response | null = null
+            let responseText = ''
+
+            while (true) {
+              // Pace requests to stay within Amazon SP-API 5 req/sec quota (~250ms minimum interval)
+              const now = Date.now()
+              const elapsed = now - lastPatchTime
+              if (elapsed < 250) {
+                await new Promise(r => setTimeout(r, 250 - elapsed))
+              }
+              lastPatchTime = Date.now()
+
+              res = await fetch(`${this.baseUrl}/listings/2021-08-01/items/${this.config.sellerId}/${encodeURIComponent(u.sku)}?marketplaceIds=${this.marketplaceId}&issueLocale=de_DE`, {
+                method: 'PATCH',
+                headers: {
+                  'x-amz-access-token': accessToken,
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json'
+                },
+                body: JSON.stringify(payload)
+              })
+
+              responseText = await res.text()
+
+              if ((res.status === 429 || res.status >= 500) && attempt < maxRetries) {
+                attempt++
+                const retryAfter = res.headers.get('Retry-After') || res.headers.get('retry-after')
+                let delayMs = retryAfter ? Math.ceil(parseFloat(retryAfter) * 1000) : 0
+                if (!delayMs || isNaN(delayMs) || delayMs < 1000) {
+                  delayMs = 1500 * Math.pow(2, attempt - 1)
+                }
+                console.warn(`[AmazonAdapter] HTTP ${res.status} on PATCH SKU ${u.sku}. Retrying (${attempt}/${maxRetries}) in ${delayMs}ms...`)
+                await new Promise(r => setTimeout(r, delayMs))
+                continue
+              }
+
+              break
+            }
+
+            if (!res || !res.ok) {
+              console.error(`[AmazonAdapter] Failed to PATCH SKU ${u.sku}: ${res?.status} ${responseText}`)
+              throw new Error(`Amazon API Fehler für SKU ${u.sku}: ${res?.status} - ${responseText}`)
+            }
+
+            try {
+              const data = JSON.parse(responseText)
+              const errors = (data.issues || []).filter((i: any) => i.severity === 'ERROR')
+              if (errors.length > 0) {
+                console.error(`[AmazonAdapter] Amazon accepted request but returned errors for SKU ${u.sku}:`, JSON.stringify(errors))
+                throw new Error(`Amazon API Fehler (Issues) für SKU ${u.sku}: ${errors.map((e: any) => e.message).join(', ')}`)
+              } else {
+                console.log(`[AmazonAdapter] Successfully patched SKU ${u.sku}. Status: ${data.status}`)
+              }
+            } catch (e: any) {
+               if (e.message.includes('Amazon API Fehler (Issues)')) {
+                   throw e;
+               }
+               // Ignore JSON parse error if body is empty or not JSON
+            }
+          }
+        } catch (skuErr: any) {
+          failures.push({ sku: u.sku, error: skuErr?.message || 'Unknown Amazon error' })
         }
       }
 
+      if (failures.length > 0 && failures.length === updates.length) {
+        throw new Error(failures[0].error)
+      }
+
+      return { failures }
     } catch (error) {
       console.error(`[AmazonAdapter] Error updating listings:`, error)
       throw error
