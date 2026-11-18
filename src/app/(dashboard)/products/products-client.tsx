@@ -1489,33 +1489,53 @@ export function ProductsClient({ initialProducts, integrations = [] }: { initial
     }
 
     if (searchQuery.trim()) {
-      const terms = searchQuery.toLowerCase().trim().split(/\s+/).filter(Boolean)
-      result = result.filter(p => {
-        return terms.every(term => {
-          if (searchField === 'sku') {
-            return (p.sku && p.sku.toLowerCase().includes(term)) || (p.mappingSkus && p.mappingSkus.toLowerCase().includes(term))
+      const rawTokens = searchQuery.trim().match(/(?:-\s*)?(?:"[^"]*"|'[^']*'|\S+)/g) || []
+      const parsedTokens = rawTokens
+        .map(raw => {
+          const isExclude = raw.startsWith('-')
+          let val = isExclude ? raw.slice(1).trim() : raw.trim()
+          if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+            val = val.slice(1, -1)
           }
-          if (searchField === 'title') {
-            return (p.title && p.title.toLowerCase().includes(term))
-          }
-          if (searchField === 'color') {
-            return (p.color && p.color.toLowerCase().includes(term))
-          }
-          if (searchField === 'size') {
-            return (p.size && p.size.toLowerCase().includes(term))
-          }
-          if (searchField === 'ean') {
-            return (p.ean && p.ean.toLowerCase().includes(term)) || (p.mappingEans && p.mappingEans.toLowerCase().includes(term))
-          }
-          return (p.sku && p.sku.toLowerCase().includes(term)) || 
-            (p.title && p.title.toLowerCase().includes(term)) || 
-            (p.color && p.color.toLowerCase().includes(term)) || 
-            (p.size && p.size.toLowerCase().includes(term)) || 
-            (p.ean && p.ean.toLowerCase().includes(term)) ||
-            (p.mappingSkus && p.mappingSkus.toLowerCase().includes(term)) ||
-            (p.mappingEans && p.mappingEans.toLowerCase().includes(term))
+          return { isExclude, term: val.toLowerCase().trim() }
         })
-      })
+        .filter(t => t.term.length > 0)
+
+      const matchesProduct = (p: any, term: string) => {
+        if (searchField === 'sku') {
+          return Boolean((p.sku && p.sku.toLowerCase().includes(term)) || (p.mappingSkus && p.mappingSkus.toLowerCase().includes(term)))
+        }
+        if (searchField === 'title') {
+          return Boolean(p.title && p.title.toLowerCase().includes(term))
+        }
+        if (searchField === 'color') {
+          return Boolean(p.color && p.color.toLowerCase().includes(term))
+        }
+        if (searchField === 'size') {
+          return Boolean(p.size && p.size.toLowerCase().includes(term))
+        }
+        if (searchField === 'ean') {
+          return Boolean((p.ean && p.ean.toLowerCase().includes(term)) || (p.mappingEans && p.mappingEans.toLowerCase().includes(term)))
+        }
+        return Boolean(
+          (p.sku && p.sku.toLowerCase().includes(term)) || 
+          (p.title && p.title.toLowerCase().includes(term)) || 
+          (p.color && p.color.toLowerCase().includes(term)) || 
+          (p.size && p.size.toLowerCase().includes(term)) || 
+          (p.ean && p.ean.toLowerCase().includes(term)) ||
+          (p.mappingSkus && p.mappingSkus.toLowerCase().includes(term)) ||
+          (p.mappingEans && p.mappingEans.toLowerCase().includes(term))
+        )
+      }
+
+      if (parsedTokens.length > 0) {
+        result = result.filter(p => {
+          return parsedTokens.every(({ isExclude, term }) => {
+            const hasMatch = matchesProduct(p, term)
+            return isExclude ? !hasMatch : hasMatch
+          })
+        })
+      }
     }
 
     result.sort((a, b) => {
@@ -1731,7 +1751,8 @@ export function ProductsClient({ initialProducts, integrations = [] }: { initial
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input 
                 type="text"
-                placeholder={searchField === 'all' ? "SKU, Titel oder EAN suchen..." : `${searchField.toUpperCase()} suchen...`} 
+                placeholder={searchField === 'all' ? "SKU, Titel oder EAN suchen (z.B. Stiefel -B-Ware)..." : `${searchField.toUpperCase()} suchen (mit -Begriff ausschließen)...`} 
+                title="Tipp: Begriffe mit vorangestelltem Minus ausschließen, z.B. Stiefel -B-Ware"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-9 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all text-slate-900 placeholder:text-slate-500 font-medium"
