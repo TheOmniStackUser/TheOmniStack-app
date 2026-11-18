@@ -357,7 +357,9 @@ export function InventoryClient({ initialProducts }: { initialProducts: Inventor
 
   // Template Download / Upload Modal
   const [showTemplateModal, setShowTemplateModal] = useState(false)
-  const [templateFilter, setTemplateFilter] = useState<'all' | 'missing_ek' | 'in_stock'>('all')
+  const [templateFilter, setTemplateFilter] = useState<
+    'all' | 'in_stock_missing_ek' | 'missing_ek' | 'in_stock'
+  >('all')
   const [isDownloadingTemplate, setIsDownloadingTemplate] = useState<'xlsx' | 'csv' | null>(null)
   const [isParsingUpload, setIsParsingUpload] = useState(false)
   const [isApplyingUpload, setIsApplyingUpload] = useState(false)
@@ -496,12 +498,16 @@ export function InventoryClient({ initialProducts }: { initialProducts: Inventor
     const totalSkus = filteredProducts.length
     const missingEkCount = totalSkus - skusWithEk
     const ekCoveragePercent = totalSkus > 0 ? Math.round((skusWithEk / totalSkus) * 100) : 100
+    const inStockSkusWithEk = inStockSkus - inStockSkusMissingEk
+    const inStockEkCoveragePercent =
+      inStockSkus > 0 ? Math.round((inStockSkusWithEk / inStockSkus) * 100) : 100
     const potentialProfit = totalVkNet - totalEkValue
 
     return {
       totalSkus,
       totalUnits,
       inStockSkus,
+      inStockSkusWithEk,
       totalEkValue,
       totalVkGross,
       totalVkNet,
@@ -509,6 +515,7 @@ export function InventoryClient({ initialProducts }: { initialProducts: Inventor
       missingEkCount,
       inStockSkusMissingEk,
       ekCoveragePercent,
+      inStockEkCoveragePercent,
       potentialProfit,
     }
   }, [filteredProducts])
@@ -983,40 +990,67 @@ export function InventoryClient({ initialProducts }: { initialProducts: Inventor
         </div>
 
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Einkaufspreis-Abdeckung
-            </span>
+          <div className="flex items-start justify-between gap-2 mb-1.5">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block">
+                Einkaufspreis-Abdeckung
+              </span>
+              <span className="text-[11px] font-semibold text-slate-500">
+                Lagernd: <strong className="text-slate-800">{kpis.inStockEkCoveragePercent}%</strong> ({kpis.inStockSkusWithEk}/{kpis.inStockSkus}) • Gesamt: {kpis.ekCoveragePercent}%
+              </span>
+            </div>
             <span
-              className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                kpis.missingEkCount === 0
+              className={`text-xs font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap shrink-0 ${
+                kpis.inStockSkusMissingEk === 0
                   ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                   : 'bg-amber-50 text-amber-800 border border-amber-200'
               }`}
+              title={`${kpis.inStockSkusWithEk} von ${kpis.inStockSkus} lagernden SKUs mit Einkaufspreis gepflegt (${kpis.ekCoveragePercent}% aller SKUs inkl. Bestand 0)`}
             >
-              {kpis.ekCoveragePercent}% gepflegt
+              {kpis.inStockEkCoveragePercent}% mit Bestand
             </span>
           </div>
           <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden my-1.5">
             <div
               className={`h-full transition-all duration-500 ${
-                kpis.missingEkCount === 0 ? 'bg-emerald-500' : 'bg-cyan-500'
+                kpis.inStockSkusMissingEk === 0 ? 'bg-emerald-500' : 'bg-cyan-500'
               }`}
-              style={{ width: `${kpis.ekCoveragePercent}%` }}
+              style={{ width: `${kpis.inStockEkCoveragePercent}%` }}
             />
           </div>
-          <div className="flex items-center justify-between text-xs mt-1">
-            {kpis.missingEkCount > 0 ? (
+          <div className="flex items-center justify-between gap-2 text-xs mt-1">
+            {kpis.inStockSkusMissingEk > 0 ? (
               <>
                 <span className="text-amber-700 font-medium">
-                  {kpis.missingEkCount} SKUs ohne EK ({kpis.inStockSkusMissingEk} lagernd)
+                  <strong>{kpis.inStockSkusMissingEk} lagernd ohne EK</strong> ({kpis.missingEkCount} gesamt)
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (ekFilter === 'missing_ek' && stockFilter === 'in_stock') {
+                      setEkFilter('all')
+                      setStockFilter('all')
+                    } else {
+                      setEkFilter('missing_ek')
+                      setStockFilter('in_stock')
+                    }
+                  }}
+                  className="font-bold text-cyan-600 hover:text-cyan-700 underline cursor-pointer shrink-0"
+                >
+                  {ekFilter === 'missing_ek' && stockFilter === 'in_stock' ? 'Alle zeigen' : 'Filtern'}
+                </button>
+              </>
+            ) : kpis.missingEkCount > 0 ? (
+              <>
+                <span className="text-emerald-600 font-semibold flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> 100% mit Bestand gepflegt ({kpis.missingEkCount} ohne Bestand offen)
                 </span>
                 <button
                   type="button"
                   onClick={() =>
                     setEkFilter(prev => (prev === 'missing_ek' ? 'all' : 'missing_ek'))
                   }
-                  className="font-bold text-cyan-600 hover:text-cyan-700 underline cursor-pointer"
+                  className="font-bold text-cyan-600 hover:text-cyan-700 underline cursor-pointer shrink-0"
                 >
                   {ekFilter === 'missing_ek' ? 'Alle zeigen' : 'Filtern'}
                 </button>
@@ -1667,8 +1701,17 @@ export function InventoryClient({ initialProducts }: { initialProducts: Inventor
                       <option value="all">
                         Alle zusammengefassten SKUs ({products.length})
                       </option>
+                      <option value="in_stock_missing_ek">
+                        Nur lagernde SKUs ohne Einkaufspreis (
+                        {
+                          products.filter(
+                            p => p.currentStock > 0 && (!p.purchasePrice || p.purchasePrice <= 0)
+                          ).length
+                        }
+                        )
+                      </option>
                       <option value="missing_ek">
-                        Nur SKUs ohne Einkaufspreis (
+                        Alle SKUs ohne Einkaufspreis (
                         {products.filter(p => !p.purchasePrice || p.purchasePrice <= 0).length})
                       </option>
                       <option value="in_stock">

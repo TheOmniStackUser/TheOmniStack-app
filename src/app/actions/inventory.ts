@@ -127,7 +127,7 @@ async function fetchConsolidatedProductsWithMappings(companyId: string) {
 // ─── 1. Download Purchase Price Template (Excel & CSV) ────────────────────────
 export async function downloadPurchasePriceTemplateAction(options: {
   format: 'csv' | 'xlsx'
-  filter?: 'all' | 'missing_ek' | 'in_stock'
+  filter?: 'all' | 'missing_ek' | 'in_stock' | 'in_stock_missing_ek'
   productIds?: string[]
 }) {
   const auth = await requireAuth()
@@ -136,6 +136,12 @@ export async function downloadPurchasePriceTemplateAction(options: {
   if (options.productIds && options.productIds.length > 0) {
     const idSet = new Set(options.productIds)
     items = items.filter(p => idSet.has(p.id))
+  } else if (options.filter === 'in_stock_missing_ek') {
+    items = items.filter(
+      p =>
+        Number(p.currentStock || 0) > 0 &&
+        (p.purchasePrice === null || p.purchasePrice === undefined || Number(p.purchasePrice) <= 0)
+    )
   } else if (options.filter === 'missing_ek') {
     items = items.filter(p => p.purchasePrice === null || p.purchasePrice === undefined || Number(p.purchasePrice) <= 0)
   } else if (options.filter === 'in_stock') {
