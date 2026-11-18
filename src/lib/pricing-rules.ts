@@ -1,4 +1,4 @@
-import type { MarketplaceSyncSettings } from '@/app/actions/products'
+import type { MarketplaceSyncSettings, MarketplacePriceRule } from '@/app/actions/products'
 
 export interface ChannelPriceRule {
   integrationId: string
@@ -16,6 +16,8 @@ export interface ChannelPriceRule {
   currency: string
   exchangeRate: number
   minPriceThreshold?: number | null
+  maxPriceThreshold?: number | null
+  additionalPriceRules?: MarketplacePriceRule[]
 }
 
 export interface ChannelPriceCalculation extends ChannelPriceRule {
@@ -112,6 +114,24 @@ export function getChannelPriceRule(integration: {
   const exchangeRate = isConversionEnabled && sync.exchangeRate && sync.exchangeRate > 0 ? Number(sync.exchangeRate) : 1.0
   const roundingRule: 'decimals' | 'round' = sync.roundingMode || (currency === 'SEK' ? 'round' : 'decimals')
 
+  const additionalPriceRules: MarketplacePriceRule[] = Array.isArray(sync.additionalPriceRules)
+    ? sync.additionalPriceRules.map((r) => ({
+        id: r.id,
+        priceModifierType: (r.priceModifierType as any) || 'none',
+        priceModifierValue:
+          r.priceModifierValue !== undefined && r.priceModifierValue !== null ? Number(r.priceModifierValue) : 0,
+        priceBase: (r.priceBase as any) || 'standard',
+        minPriceThreshold:
+          r.minPriceThreshold !== undefined && r.minPriceThreshold !== null && (r.minPriceThreshold as any) !== ''
+            ? Number(r.minPriceThreshold)
+            : undefined,
+        maxPriceThreshold:
+          r.maxPriceThreshold !== undefined && r.maxPriceThreshold !== null && (r.maxPriceThreshold as any) !== ''
+            ? Number(r.maxPriceThreshold)
+            : undefined,
+      }))
+    : []
+
   return {
     integrationId: integration.id,
     channel: integration.type,
@@ -127,7 +147,145 @@ export function getChannelPriceRule(integration: {
     roundingRule,
     currency,
     exchangeRate,
-    minPriceThreshold: sync.minPriceThreshold !== undefined && sync.minPriceThreshold !== null ? Number(sync.minPriceThreshold) : null,
+    minPriceThreshold:
+      sync.minPriceThreshold !== undefined && sync.minPriceThreshold !== null && (sync.minPriceThreshold as any) !== ''
+        ? Number(sync.minPriceThreshold)
+        : null,
+    maxPriceThreshold:
+      sync.maxPriceThreshold !== undefined && sync.maxPriceThreshold !== null && (sync.maxPriceThreshold as any) !== ''
+        ? Number(sync.maxPriceThreshold)
+        : null,
+    additionalPriceRules,
+  }
+}
+
+export function doesPriceMatchRuleThresholds(
+  price: number,
+  minPriceThreshold?: number | null,
+  maxPriceThreshold?: number | null
+): boolean {
+  if (minPriceThreshold !== undefined && minPriceThreshold !== null && minPriceThreshold > 0) {
+    if (price < minPriceThreshold) return false
+  }
+  if (maxPriceThreshold !== undefined && maxPriceThreshold !== null && maxPriceThreshold > 0) {
+    if (price >= maxPriceThreshold) return false
+  }
+  return true
+}
+
+export function applySingleRuleModifier(
+  originalPrice: number,
+  modifierType: 'none' | 'percentage' | 'fixed',
+  modifierValue: number
+): number {
+  if (modifierType === 'none' || modifierValue === 0) return originalPrice
+  let calculated = originalPrice
+  if (modifierType === 'percentage') {
+    calculated = originalPrice * (1 + modifierValue / 100)
+  } else if (modifierType === 'fixed') {
+    calculated = originalPrice + modifierValue
+  }
+  return Math.max(0, Math.round(calculated * 100) / 100)
+}
+
+export function evaluatePriceRulesForProduct(params: {
+  rawPrice?: number
+  rawReducedPrice?: number
+  rawMsrp?: number
+  primaryRule: MarketplacePriceRule
+  additionalRules?: MarketplacePriceRule[]
+  mappingOverride?: {
+    priceModifierType?: 'none' | 'percentage' | 'fixed' | string | null
+    priceModifierValue?: number | string | null
+  } | null
+}): {
+  modifiedPrice: number | undefined
+  modifiedReducedPrice: number | undefined
+  rawBasePrice: number
+  basePriceUsed: 'standard' | 'reduced' | 'msrp' | 'all'
+  hasMappingModifier: boolean
+} {
+  const { rawPrice, rawReducedPrice, rawMsrp, primaryRule, additionalRules = [], mappingOverride } = params
+
+  const hasMappingModifier = Boolean(
+    mappingOverride?.priceModifierType && mappingOverride.priceModifierType !== 'none'
+  )
+
+  const rulesToEvaluate: MarketplacePriceRule[] = hasMappingModifier
+    ? [
+        {
+          priceModifierType: mappingOverride!.priceModifierType as 'percentage' | 'fixed',
+          priceModifierValue: Number(mappingOverride!.priceModifierValue || 0),
+          priceBase: primaryRule.priceBase || 'standard',
+          minPriceThreshold: primaryRule.minPriceThreshold,
+          maxPriceThreshold: primaryRule.maxPriceThreshold,
+        },
+      ]
+    : [primaryRule, ...additionalRules]
+
+  const activeRules = rulesToEvaluate.filter(
+    (r) => r.priceModifierType && r.priceModifierType !== 'none' && Number(r.priceModifierValue) !== 0
+  )
+
+  let modifiedPrice: number | undefined = rawPrice
+  let modifiedReducedPrice: number | undefined = rawReducedPrice
+  let rawBasePrice: number = rawPrice ?? 0
+  let basePriceUsed: 'standard' | 'reduced' | 'msrp' | 'all' = (primaryRule.priceBase as any) || 'standard'
+
+  // 1. Evaluate regular selling price (standard / msrp / all)
+  const standardTargetRules = activeRules.filter((r) => {
+    const base = r.priceBase || 'standard'
+    return base === 'standard' || base === 'msrp' || base === 'all'
+  })
+
+  for (const r of standardTargetRules) {
+    const base = r.priceBase || 'standard'
+    const candidateVal =
+      base === 'msrp'
+        ? rawMsrp !== undefined && rawMsrp > 0
+          ? rawMsrp
+          : rawPrice
+        : rawPrice
+
+    if (candidateVal !== undefined && doesPriceMatchRuleThresholds(candidateVal, r.minPriceThreshold, r.maxPriceThreshold)) {
+      modifiedPrice = applySingleRuleModifier(candidateVal, r.priceModifierType, Number(r.priceModifierValue))
+      rawBasePrice = candidateVal
+      basePriceUsed = base
+      break
+    }
+  }
+
+  // 2. Evaluate reduced promotional price (reduced / all)
+  if (rawReducedPrice !== undefined) {
+    if (rawReducedPrice > 0) {
+      const reducedTargetRules = activeRules.filter((r) => {
+        const base = r.priceBase || 'standard'
+        return base === 'reduced' || base === 'all'
+      })
+
+      for (const r of reducedTargetRules) {
+        if (doesPriceMatchRuleThresholds(rawReducedPrice, r.minPriceThreshold, r.maxPriceThreshold)) {
+          modifiedReducedPrice = applySingleRuleModifier(
+            rawReducedPrice,
+            r.priceModifierType,
+            Number(r.priceModifierValue)
+          )
+          rawBasePrice = rawReducedPrice
+          basePriceUsed = (r.priceBase as any) || 'reduced'
+          break
+        }
+      }
+    } else if (rawReducedPrice === 0) {
+      modifiedReducedPrice = 0
+    }
+  }
+
+  return {
+    modifiedPrice,
+    modifiedReducedPrice,
+    rawBasePrice,
+    basePriceUsed,
+    hasMappingModifier,
   }
 }
 
@@ -163,71 +321,25 @@ export function calculateChannelPrice(params: {
       : null
   const rawMsrp = product.msrp !== null && product.msrp !== undefined && Number(product.msrp) > 0 ? Number(product.msrp) : null
 
-  // Check mapping override: product-specific mapping modifier takes precedence if not 'none'
-  const hasMappingModifier = Boolean(mapping?.priceModifierType && mapping.priceModifierType !== 'none')
-  const modifierType: 'none' | 'percentage' | 'fixed' = hasMappingModifier
-    ? (mapping!.priceModifierType as any)
-    : rule.ruleType
-  const modifierValue: number = hasMappingModifier
-    ? Number(mapping!.priceModifierValue || 0)
-    : rule.value
+  const evaluated = evaluatePriceRulesForProduct({
+    rawPrice,
+    rawReducedPrice: rawReducedPrice ?? undefined,
+    rawMsrp: rawMsrp ?? undefined,
+    primaryRule: {
+      priceModifierType: rule.ruleType,
+      priceModifierValue: rule.value,
+      priceBase: rule.basePrice,
+      minPriceThreshold: rule.minPriceThreshold ?? undefined,
+      maxPriceThreshold: rule.maxPriceThreshold ?? undefined,
+    },
+    additionalRules: rule.additionalPriceRules || [],
+    mappingOverride: mapping,
+  })
 
-  const minThreshold = rule.minPriceThreshold !== undefined && rule.minPriceThreshold !== null ? rule.minPriceThreshold : undefined
-
-  const applyModifier = (val: number): number => {
-    if (modifierType === 'none' || modifierValue === 0) return val
-
-    const isReduction = modifierValue < 0
-    if (isReduction && minThreshold !== undefined && minThreshold > 0 && val < minThreshold) {
-      return val
-    }
-
-    let calculated = val
-    if (modifierType === 'percentage') {
-      calculated = val * (1 + modifierValue / 100)
-    } else if (modifierType === 'fixed') {
-      calculated = val + modifierValue
-    }
-
-    if (isReduction && minThreshold !== undefined && minThreshold > 0 && calculated < minThreshold) {
-      calculated = minThreshold
-    }
-
-    return Math.max(0, Math.round(calculated * 100) / 100)
-  }
-
-  let modifiedPrice: number = rawPrice
-  let modifiedReducedPrice: number | null = rawReducedPrice
-  let rawBasePrice: number = rawPrice
-
-  if (rule.basePrice === 'msrp') {
-    if (rawMsrp && rawMsrp > 0) {
-      rawBasePrice = rawMsrp
-      modifiedPrice = applyModifier(rawMsrp)
-    } else {
-      rawBasePrice = rawPrice
-      modifiedPrice = applyModifier(rawPrice)
-    }
-    // Reduced price remains unshifted or unchanged
-    modifiedReducedPrice = rawReducedPrice
-  } else if (rule.basePrice === 'reduced') {
-    modifiedPrice = rawPrice
-    if (rawReducedPrice && rawReducedPrice > 0) {
-      rawBasePrice = rawReducedPrice
-      modifiedReducedPrice = applyModifier(rawReducedPrice)
-    }
-  } else if (rule.basePrice === 'all') {
-    rawBasePrice = rawPrice
-    modifiedPrice = applyModifier(rawPrice)
-    if (rawReducedPrice && rawReducedPrice > 0) {
-      modifiedReducedPrice = applyModifier(rawReducedPrice)
-    }
-  } else {
-    // Default: 'standard'
-    rawBasePrice = rawPrice
-    modifiedPrice = applyModifier(rawPrice)
-    modifiedReducedPrice = rawReducedPrice
-  }
+  const modifiedPrice = evaluated.modifiedPrice ?? rawPrice
+  const modifiedReducedPrice = evaluated.modifiedReducedPrice !== undefined ? evaluated.modifiedReducedPrice : null
+  const rawBasePrice = evaluated.rawBasePrice
+  const hasMappingModifier = evaluated.hasMappingModifier
 
   // Apply currency conversion
   const convertCurrency = (val: number): number => {
@@ -281,7 +393,7 @@ export function calculateChannelPrice(params: {
     reducedPrice: finalReducedPrice,
     msrp: finalMsrp,
     finalPrice,
-    basePriceUsed: rule.basePrice,
+    basePriceUsed: evaluated.basePriceUsed,
     rawBasePrice,
     isDiscounted: Boolean(finalReducedPrice !== null && finalReducedPrice > 0 && finalReducedPrice < finalRegularPrice),
     mappingModifierActive: hasMappingModifier,

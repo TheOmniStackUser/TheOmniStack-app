@@ -4373,6 +4373,8 @@ export async function executeTool(
               currency: rule.currency,
               exchangeRate: rule.exchangeRate,
               minPriceThreshold: rule.minPriceThreshold,
+              maxPriceThreshold: rule.maxPriceThreshold,
+              additionalPriceRules: rule.additionalPriceRules || [],
             },
           }
         })

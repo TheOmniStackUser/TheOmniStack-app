@@ -7,6 +7,7 @@ import { Worker, Queue, type Job } from 'bullmq'
 import IORedis from 'ioredis'
 import { getAdapterForIntegration } from '@/workers/marketplace-sync'
 import { getShopifyStoreName } from '@/lib/marketplaces'
+import { evaluatePriceRulesForProduct } from '@/lib/pricing-rules'
 
 export const QUEUE_PRODUCT_SYNC = process.env.NODE_ENV === 'production' ? 'product-sync' : 'product-sync-dev'
 
@@ -395,97 +396,50 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
     const isPriceSyncAllowed = canSyncPrice && mapping.syncPrice === true && hasPriceInUpdate
 
     if (isPriceSyncAllowed) {
-      // Determine modifier configuration:
-      // Product-specific mapping modifier takes precedence if explicitly set (i.e. not 'none').
-      // Otherwise, fall back to global integration sync settings.
-      const hasMappingModifier = mapping.priceModifierType && mapping.priceModifierType !== 'none'
-      const modifierType: 'none' | 'percentage' | 'fixed' = hasMappingModifier
-        ? mapping.priceModifierType
-        : (productSyncSettings?.priceModifierType || 'none')
-      const modifierValue: number = hasMappingModifier
-        ? parseFloat(mapping.priceModifierValue?.toString() || '0')
-        : (parseFloat(productSyncSettings?.priceModifierValue?.toString() || '0') || 0)
-
-      const priceBase: 'standard' | 'msrp' | 'reduced' | 'all' = productSyncSettings?.priceBase || 'standard'
-      const minPriceThreshold: number | undefined = productSyncSettings?.minPriceThreshold !== undefined && productSyncSettings.minPriceThreshold !== null && productSyncSettings.minPriceThreshold !== ''
-        ? parseFloat(productSyncSettings.minPriceThreshold.toString())
-        : undefined
-
-      const applyModifier = (originalPrice: number): number => {
-        if (modifierType === 'none' || modifierValue === 0) return originalPrice
-
-        const isReduction = modifierValue < 0
-        // Exclude products with a price below minPriceThreshold from reductions
-        if (isReduction && minPriceThreshold !== undefined && minPriceThreshold > 0 && originalPrice < minPriceThreshold) {
-          return originalPrice
-        }
-
-        let calculated = originalPrice
-        if (modifierType === 'percentage') {
-          calculated = originalPrice * (1 + modifierValue / 100)
-        } else if (modifierType === 'fixed') {
-          calculated = originalPrice + modifierValue
-        }
-
-        // Ensure reduction does not drop price below the threshold
-        if (isReduction && minPriceThreshold !== undefined && minPriceThreshold > 0 && calculated < minPriceThreshold) {
-          calculated = minPriceThreshold
-        }
-
-        return Math.max(0, Math.round(calculated * 100) / 100)
-      }
-
       const rawPrice = updateDef.price !== undefined ? updateDef.price : (centralProduct.price ? parseFloat(centralProduct.price) : undefined)
       const rawReducedPrice = updateDef.reducedPrice !== undefined ? updateDef.reducedPrice : (centralProduct.reducedPrice ? parseFloat(centralProduct.reducedPrice) : undefined)
       const rawMsrp = updateDef.msrp !== undefined ? updateDef.msrp : (centralProduct.msrp ? parseFloat(centralProduct.msrp) : undefined)
 
-      let modifiedPrice: number | undefined
-      let modifiedReducedPrice: number | undefined
-      let modifiedMsrp: number | undefined = rawMsrp
+      const minPriceThreshold: number | undefined = productSyncSettings?.minPriceThreshold !== undefined && productSyncSettings.minPriceThreshold !== null && productSyncSettings.minPriceThreshold !== ''
+        ? parseFloat(productSyncSettings.minPriceThreshold.toString())
+        : undefined
+      const maxPriceThreshold: number | undefined = productSyncSettings?.maxPriceThreshold !== undefined && productSyncSettings.maxPriceThreshold !== null && productSyncSettings.maxPriceThreshold !== ''
+        ? parseFloat(productSyncSettings.maxPriceThreshold.toString())
+        : undefined
 
-      if (priceBase === 'msrp') {
-        // Base is MSRP (UVP)
-        if (rawMsrp !== undefined && rawMsrp > 0) {
-          modifiedPrice = applyModifier(rawMsrp)
-          modifiedMsrp = rawMsrp // Preserve original MSRP for compare_at_price / strikethrough price
-        } else if (rawPrice !== undefined) {
-          // Fallback to standard price if no MSRP is set
-          modifiedPrice = applyModifier(rawPrice)
-        }
-        if (rawReducedPrice !== undefined && rawReducedPrice > 0) {
-          modifiedReducedPrice = rawReducedPrice
-        } else if (rawReducedPrice === 0) {
-          modifiedReducedPrice = 0
-        }
-      } else if (priceBase === 'reduced') {
-        // Base is reduced price
-        modifiedPrice = rawPrice
-        if (rawReducedPrice !== undefined && rawReducedPrice > 0) {
-          modifiedReducedPrice = applyModifier(rawReducedPrice)
-        } else if (rawReducedPrice === 0) {
-          modifiedReducedPrice = 0
-        }
-      } else if (priceBase === 'all') {
-        // Apply modifier to both standard price and reduced price
-        if (rawPrice !== undefined) {
-          modifiedPrice = applyModifier(rawPrice)
-        }
-        if (rawReducedPrice !== undefined && rawReducedPrice > 0) {
-          modifiedReducedPrice = applyModifier(rawReducedPrice)
-        } else if (rawReducedPrice === 0) {
-          modifiedReducedPrice = 0
-        }
-      } else {
-        // Default: 'standard' - Apply modifier to standard price
-        if (rawPrice !== undefined) {
-          modifiedPrice = applyModifier(rawPrice)
-        }
-        if (rawReducedPrice !== undefined && rawReducedPrice > 0) {
-          modifiedReducedPrice = rawReducedPrice
-        } else if (rawReducedPrice === 0) {
-          modifiedReducedPrice = 0
-        }
-      }
+      const additionalRules = Array.isArray(productSyncSettings?.additionalPriceRules)
+        ? productSyncSettings.additionalPriceRules.map((r: any) => ({
+            id: r.id,
+            priceModifierType: r.priceModifierType || 'none',
+            priceModifierValue: parseFloat(r.priceModifierValue?.toString() || '0') || 0,
+            priceBase: r.priceBase || 'standard',
+            minPriceThreshold: r.minPriceThreshold !== undefined && r.minPriceThreshold !== null && r.minPriceThreshold !== ''
+              ? parseFloat(r.minPriceThreshold.toString())
+              : undefined,
+            maxPriceThreshold: r.maxPriceThreshold !== undefined && r.maxPriceThreshold !== null && r.maxPriceThreshold !== ''
+              ? parseFloat(r.maxPriceThreshold.toString())
+              : undefined,
+          }))
+        : []
+
+      const evaluated = evaluatePriceRulesForProduct({
+        rawPrice,
+        rawReducedPrice,
+        rawMsrp,
+        primaryRule: {
+          priceModifierType: productSyncSettings?.priceModifierType || 'none',
+          priceModifierValue: parseFloat(productSyncSettings?.priceModifierValue?.toString() || '0') || 0,
+          priceBase: productSyncSettings?.priceBase || 'standard',
+          minPriceThreshold,
+          maxPriceThreshold,
+        },
+        additionalRules,
+        mappingOverride: mapping,
+      })
+
+      const modifiedPrice: number | undefined = evaluated.modifiedPrice
+      const modifiedReducedPrice: number | undefined = evaluated.modifiedReducedPrice
+      const modifiedMsrp: number | undefined = rawMsrp
 
       // Currency conversion & exchange rate
       const isConversionEnabled = productSyncSettings?.enableCurrencyConversion !== undefined

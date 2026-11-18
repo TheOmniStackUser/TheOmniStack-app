@@ -9,6 +9,15 @@ import { revalidatePath, unstable_noStore } from 'next/cache'
 import { after } from 'next/server'
 import { extractSizeAndColor } from '@/lib/product-variant-parser'
 
+export type MarketplacePriceRule = {
+  id?: string
+  priceModifierType: 'none' | 'percentage' | 'fixed'
+  priceModifierValue: number
+  priceBase?: 'standard' | 'msrp' | 'reduced' | 'all'
+  minPriceThreshold?: number
+  maxPriceThreshold?: number
+}
+
 export type MarketplaceSyncSettings = {
   enabled: boolean
   syncStock: boolean
@@ -18,6 +27,8 @@ export type MarketplaceSyncSettings = {
   priceModifierValue: number
   priceBase?: 'standard' | 'msrp' | 'reduced' | 'all'
   minPriceThreshold?: number
+  maxPriceThreshold?: number
+  additionalPriceRules?: MarketplacePriceRule[]
   enableCurrencyConversion?: boolean // whether foreign currency conversion is enabled
   targetCurrency?: string // 'EUR', 'SEK', 'PLN', 'CZK', etc.
   exchangeRate?: number // e.g. 11.0 for SEK

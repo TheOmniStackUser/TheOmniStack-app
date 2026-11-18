@@ -2,12 +2,41 @@
 
 import { useState } from 'react'
 import { updateMarketplaceSyncSettings } from '@/app/actions/products'
-import type { MarketplaceSyncSettings } from '@/app/actions/products'
-import { Save, Check, ServerCrash, CheckCircle2, AlertCircle, X, ChevronUp, ChevronDown } from 'lucide-react'
+import type { MarketplaceSyncSettings, MarketplacePriceRule } from '@/app/actions/products'
+import { Save, Check, ServerCrash, CheckCircle2, AlertCircle, X, ChevronUp, ChevronDown, Plus, Trash2 } from 'lucide-react'
 import { formatMarketplaceName } from '@/lib/marketplaces'
 
-type IntegrationSettingsState = Omit<MarketplaceSyncSettings, 'priceModifierValue'> & {
+type PriceRuleState = Omit<MarketplacePriceRule, 'priceModifierValue'> & {
   priceModifierValue: number | string
+}
+
+type IntegrationSettingsState = Omit<MarketplaceSyncSettings, 'priceModifierValue' | 'additionalPriceRules'> & {
+  priceModifierValue: number | string
+  additionalPriceRules?: PriceRuleState[]
+}
+
+function getPriceRangeHelperText(min?: number, max?: number): string {
+  const hasMin = min !== undefined && min !== null && min > 0
+  const hasMax = max !== undefined && max !== null && max > 0
+  if (hasMin && hasMax) {
+    return `Gilt für Produkte ab ${min} € bis unter ${max} €.`
+  }
+  if (hasMin) {
+    return `Gilt ab ${min} € (Preise unter ${min} € sind von dieser Regel ausgenommen).`
+  }
+  if (hasMax) {
+    return `Gilt für Produkte mit einem Preis unter ${max} €.`
+  }
+  return 'Preise unter „Ab“ werden ausgenommen; mit „Unter“ gilt die Regel nur unterhalb des Betrags.'
+}
+
+function getPriceRangeBadgeText(min?: number, max?: number): string | null {
+  const hasMin = min !== undefined && min !== null && min > 0
+  const hasMax = max !== undefined && max !== null && max > 0
+  if (hasMin && hasMax) return `Ab ${min} € bis < ${max} €`
+  if (hasMin) return `Ab ${min} €`
+  if (hasMax) return `Unter ${max} €`
+  return null
 }
 
 function IntegrationCard({ 
@@ -45,6 +74,8 @@ function IntegrationCard({
     priceModifierValue: 0,
     priceBase: 'standard',
     minPriceThreshold: undefined,
+    maxPriceThreshold: undefined,
+    additionalPriceRules: [],
     enableCurrencyConversion: isCurrencyActive,
     targetCurrency: detectedCurrency,
     exchangeRate: detectedRate,
@@ -55,17 +86,29 @@ function IntegrationCard({
   const [settings, setSettings] = useState<IntegrationSettingsState>(initialSettings)
   const [isSaving, setIsSaving] = useState(false)
 
+  const parseModifierNumber = (val: number | string | undefined): number => {
+    const raw = typeof val === 'string' ? val.trim().replace(',', '.') : val
+    const parsed = typeof raw === 'string' ? parseFloat(raw) : Number(raw)
+    return isNaN(parsed) ? 0 : Math.round(parsed * 100) / 100
+  }
+
   const handleSave = async () => {
     const displayName = formatMarketplaceName(integration, allIntegrations)
     setIsSaving(true)
     try {
-      const rawVal = typeof settings.priceModifierValue === 'string'
-        ? settings.priceModifierValue.trim().replace(',', '.')
-        : settings.priceModifierValue
-      const parsedVal = typeof rawVal === 'string' ? parseFloat(rawVal) : Number(rawVal)
+      const sanitizedAdditionalRules: MarketplacePriceRule[] = (settings.additionalPriceRules || []).map((rule, idx) => ({
+        id: rule.id || `rule_${idx + 2}`,
+        priceModifierType: rule.priceModifierType || 'none',
+        priceModifierValue: parseModifierNumber(rule.priceModifierValue),
+        priceBase: rule.priceBase || 'standard',
+        minPriceThreshold: rule.minPriceThreshold !== undefined && rule.minPriceThreshold !== null ? Number(rule.minPriceThreshold) : undefined,
+        maxPriceThreshold: rule.maxPriceThreshold !== undefined && rule.maxPriceThreshold !== null ? Number(rule.maxPriceThreshold) : undefined,
+      }))
+
       const sanitizedSettings: MarketplaceSyncSettings = {
         ...settings,
-        priceModifierValue: isNaN(parsedVal) ? 0 : Math.round(parsedVal * 100) / 100,
+        priceModifierValue: parseModifierNumber(settings.priceModifierValue),
+        additionalPriceRules: sanitizedAdditionalRules,
       }
       await updateMarketplaceSyncSettings(integration.id, sanitizedSettings)
       showNotification(`${displayName} Einstellungen gespeichert.`, undefined, 'success')
@@ -164,144 +207,459 @@ function IntegrationCard({
             <span className="text-xs text-slate-500">Regeln für Preisübertragung an {displayName}</span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Typ */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Typ</label>
-              <select 
-                className="w-full bg-white border border-slate-200 rounded-lg px-4 py-2.5 text-sm font-medium text-slate-900 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all shadow-sm"
-                value={settings.priceModifierType}
-                onChange={(e) => setSettings({ ...settings, priceModifierType: e.target.value as any })}
-              >
-                <option value="none" className="text-slate-900 bg-white">Keine Änderung (1:1)</option>
-                <option value="percentage" className="text-slate-900 bg-white">Prozentual (%)</option>
-                <option value="fixed" className="text-slate-900 bg-white">Fixbetrag (€)</option>
-              </select>
-            </div>
+          <div className="space-y-4">
+            {/* Regel 1 (Primärregel) */}
+            <div className={`${(settings.additionalPriceRules?.length ?? 0) > 0 ? 'p-4 rounded-xl bg-slate-50/60 border border-slate-200/80' : ''}`}>
+              {(settings.additionalPriceRules?.length ?? 0) > 0 && (
+                <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-200/70">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-700 bg-white px-2.5 py-0.5 rounded-md border border-slate-200 shadow-2xs">
+                      Regel 1
+                    </span>
+                    {getPriceRangeBadgeText(settings.minPriceThreshold, settings.maxPriceThreshold) && (
+                      <span className="text-xs font-semibold text-cyan-800 bg-cyan-50 px-2.5 py-0.5 rounded-md border border-cyan-200/70">
+                        {getPriceRangeBadgeText(settings.minPriceThreshold, settings.maxPriceThreshold)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
 
-            {/* Wert */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Wert</label>
-              <div className="relative">
-                <input 
-                  type="text"
-                  inputMode="decimal"
-                  disabled={settings.priceModifierType === 'none'}
-                  className="w-full bg-white border border-slate-200 rounded-lg pl-4 pr-16 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-500 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all disabled:opacity-50 disabled:bg-slate-50 shadow-sm"
-                  placeholder="z.B. 10 für +10% oder -15 für 15% Rabatt"
-                  value={settings.priceModifierValue ?? ''}
-                  onChange={(e) => {
-                    const val = e.target.value
-                    if (val === '' || val === '-' || /^-?\d*[.,]?\d*$/.test(val)) {
-                      setSettings({ ...settings, priceModifierValue: val })
-                    }
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-                      e.preventDefault()
-                      const raw = String(settings.priceModifierValue ?? '').replace(',', '.')
-                      const currentVal = parseFloat(raw) || 0
-                      const step = 1
-                      const nextVal = e.key === 'ArrowUp' ? currentVal + step : currentVal - step
-                      const rounded = Math.round(nextVal * 100) / 100
-                      setSettings({ ...settings, priceModifierValue: rounded })
-                    }
-                  }}
-                  onBlur={() => {
-                    const raw = String(settings.priceModifierValue ?? '').trim().replace(',', '.')
-                    const parsed = parseFloat(raw)
-                    setSettings({
-                      ...settings,
-                      priceModifierValue: isNaN(parsed) ? 0 : parsed,
-                    })
-                  }}
-                />
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
-                  {settings.priceModifierType !== 'none' && (
-                    <div className="flex flex-col border border-slate-200 rounded overflow-hidden bg-white shadow-xs">
-                      <button
-                        type="button"
-                        tabIndex={-1}
-                        className="px-1 py-0.5 hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors leading-none cursor-pointer"
-                        title="Erhöhen"
-                        onClick={() => {
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Typ */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Typ</label>
+                  <select 
+                    className="w-full bg-white border border-slate-200 rounded-lg px-4 py-2.5 text-sm font-medium text-slate-900 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all shadow-sm"
+                    value={settings.priceModifierType}
+                    onChange={(e) => setSettings({ ...settings, priceModifierType: e.target.value as any })}
+                  >
+                    <option value="none" className="text-slate-900 bg-white">Keine Änderung (1:1)</option>
+                    <option value="percentage" className="text-slate-900 bg-white">Prozentual (%)</option>
+                    <option value="fixed" className="text-slate-900 bg-white">Fixbetrag (€)</option>
+                  </select>
+                </div>
+
+                {/* Wert */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Wert</label>
+                  <div className="relative">
+                    <input 
+                      type="text"
+                      inputMode="decimal"
+                      disabled={settings.priceModifierType === 'none'}
+                      className="w-full bg-white border border-slate-200 rounded-lg pl-4 pr-16 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-500 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all disabled:opacity-50 disabled:bg-slate-50 shadow-sm"
+                      placeholder="z.B. 10 für +10% oder -15 für 15% Rabatt"
+                      value={settings.priceModifierValue ?? ''}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        if (val === '' || val === '-' || /^-?\d*[.,]?\d*$/.test(val)) {
+                          setSettings({ ...settings, priceModifierValue: val })
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                          e.preventDefault()
                           const raw = String(settings.priceModifierValue ?? '').replace(',', '.')
                           const currentVal = parseFloat(raw) || 0
-                          const nextVal = Math.round((currentVal + 1) * 100) / 100
-                          setSettings({ ...settings, priceModifierValue: nextVal })
-                        }}
-                      >
-                        <ChevronUp className="w-2.5 h-2.5" />
-                      </button>
-                      <button
-                        type="button"
-                        tabIndex={-1}
-                        className="px-1 py-0.5 hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors leading-none border-t border-slate-200 cursor-pointer"
-                        title="Verringern"
-                        onClick={() => {
-                          const raw = String(settings.priceModifierValue ?? '').replace(',', '.')
-                          const currentVal = parseFloat(raw) || 0
-                          const nextVal = Math.round((currentVal - 1) * 100) / 100
-                          setSettings({ ...settings, priceModifierValue: nextVal })
-                        }}
-                      >
-                        <ChevronDown className="w-2.5 h-2.5" />
-                      </button>
+                          const step = 1
+                          const nextVal = e.key === 'ArrowUp' ? currentVal + step : currentVal - step
+                          const rounded = Math.round(nextVal * 100) / 100
+                          setSettings({ ...settings, priceModifierValue: rounded })
+                        }
+                      }}
+                      onBlur={() => {
+                        const raw = String(settings.priceModifierValue ?? '').trim().replace(',', '.')
+                        const parsed = parseFloat(raw)
+                        setSettings({
+                          ...settings,
+                          priceModifierValue: isNaN(parsed) ? 0 : parsed,
+                        })
+                      }}
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+                      {settings.priceModifierType !== 'none' && (
+                        <div className="flex flex-col border border-slate-200 rounded overflow-hidden bg-white shadow-xs">
+                          <button
+                            type="button"
+                            tabIndex={-1}
+                            className="px-1 py-0.5 hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors leading-none cursor-pointer"
+                            title="Erhöhen"
+                            onClick={() => {
+                              const raw = String(settings.priceModifierValue ?? '').replace(',', '.')
+                              const currentVal = parseFloat(raw) || 0
+                              const nextVal = Math.round((currentVal + 1) * 100) / 100
+                              setSettings({ ...settings, priceModifierValue: nextVal })
+                            }}
+                          >
+                            <ChevronUp className="w-2.5 h-2.5" />
+                          </button>
+                          <button
+                            type="button"
+                            tabIndex={-1}
+                            className="px-1 py-0.5 hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors leading-none border-t border-slate-200 cursor-pointer"
+                            title="Verringern"
+                            onClick={() => {
+                              const raw = String(settings.priceModifierValue ?? '').replace(',', '.')
+                              const currentVal = parseFloat(raw) || 0
+                              const nextVal = Math.round((currentVal - 1) * 100) / 100
+                              setSettings({ ...settings, priceModifierValue: nextVal })
+                            }}
+                          >
+                            <ChevronDown className="w-2.5 h-2.5" />
+                          </button>
+                        </div>
+                      )}
+                      <span className="text-slate-500 font-bold text-sm pointer-events-none min-w-[14px] text-center">
+                        {settings.priceModifierType === 'percentage' ? '%' : settings.priceModifierType === 'fixed' ? '€' : ''}
+                      </span>
                     </div>
-                  )}
-                  <span className="text-slate-500 font-bold text-sm pointer-events-none min-w-[14px] text-center">
-                    {settings.priceModifierType === 'percentage' ? '%' : settings.priceModifierType === 'fixed' ? '€' : ''}
-                  </span>
+                  </div>
+                </div>
+
+                {/* Berechnungsgrundlage / Basispreis */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Berechnungsgrundlage (Basispreis)</label>
+                  <select 
+                    disabled={settings.priceModifierType === 'none'}
+                    className="w-full bg-white border border-slate-200 rounded-lg px-4 py-2.5 text-sm font-medium text-slate-900 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all disabled:opacity-50 disabled:bg-slate-50 shadow-sm"
+                    value={settings.priceBase || 'standard'}
+                    onChange={(e) => setSettings({ ...settings, priceBase: e.target.value as any })}
+                  >
+                    <option value="standard" className="text-slate-900 bg-white">Standard-Preis (Verkaufspreis)</option>
+                    <option value="msrp" className="text-slate-900 bg-white">UVP (Unverbindliche Preisempfehlung)</option>
+                    <option value="reduced" className="text-slate-900 bg-white">Reduzierter Preis (Aktionspreis)</option>
+                    <option value="all" className="text-slate-900 bg-white">Standard- & Reduzierter Preis</option>
+                  </select>
+                  <p className="text-xs text-slate-500 mt-1.5">Auf welchen Produktpreis der Aufschlag/Abschlag angewendet wird.</p>
+                </div>
+
+                {/* Preisgrenzen (Ab / Unter) */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Rabatt-Ausschlussgrenze / Preisspanne (€)</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="relative flex items-center">
+                      <span className="absolute left-3 text-xs font-semibold text-slate-500 pointer-events-none select-none">
+                        Ab
+                      </span>
+                      <input 
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        disabled={settings.priceModifierType === 'none'}
+                        className="w-full bg-white border border-slate-200 rounded-lg pl-9 pr-7 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-500 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all disabled:opacity-50 disabled:bg-slate-50 shadow-sm"
+                        placeholder="z.B. 80"
+                        value={settings.minPriceThreshold !== undefined && settings.minPriceThreshold !== null ? settings.minPriceThreshold : ''}
+                        onChange={(e) => {
+                          const raw = e.target.value
+                          setSettings({ 
+                            ...settings, 
+                            minPriceThreshold: raw === '' ? undefined : (parseFloat(raw) || 0) 
+                          })
+                        }}
+                      />
+                      <div className="absolute right-2.5 text-slate-500 font-bold text-xs pointer-events-none">
+                        €
+                      </div>
+                    </div>
+
+                    <div className="relative flex items-center">
+                      <span className="absolute left-3 text-xs font-semibold text-slate-500 pointer-events-none select-none">
+                        Unter
+                      </span>
+                      <input 
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        disabled={settings.priceModifierType === 'none'}
+                        className="w-full bg-white border border-slate-200 rounded-lg pl-13 pr-7 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-500 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all disabled:opacity-50 disabled:bg-slate-50 shadow-sm"
+                        placeholder="optional"
+                        value={settings.maxPriceThreshold !== undefined && settings.maxPriceThreshold !== null ? settings.maxPriceThreshold : ''}
+                        onChange={(e) => {
+                          const raw = e.target.value
+                          setSettings({ 
+                            ...settings, 
+                            maxPriceThreshold: raw === '' ? undefined : (parseFloat(raw) || 0) 
+                          })
+                        }}
+                      />
+                      <div className="absolute right-2.5 text-slate-500 font-bold text-xs pointer-events-none">
+                        €
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1.5">
+                    {getPriceRangeHelperText(settings.minPriceThreshold, settings.maxPriceThreshold)}
+                  </p>
                 </div>
               </div>
             </div>
 
-            {/* Berechnungsgrundlage / Basispreis */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Berechnungsgrundlage (Basispreis)</label>
-              <select 
-                disabled={settings.priceModifierType === 'none'}
-                className="w-full bg-white border border-slate-200 rounded-lg px-4 py-2.5 text-sm font-medium text-slate-900 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all disabled:opacity-50 disabled:bg-slate-50 shadow-sm"
-                value={settings.priceBase || 'standard'}
-                onChange={(e) => setSettings({ ...settings, priceBase: e.target.value as any })}
-              >
-                <option value="standard" className="text-slate-900 bg-white">Standard-Preis (Verkaufspreis)</option>
-                <option value="msrp" className="text-slate-900 bg-white">UVP (Unverbindliche Preisempfehlung)</option>
-                <option value="reduced" className="text-slate-900 bg-white">Reduzierter Preis (Aktionspreis)</option>
-                <option value="all" className="text-slate-900 bg-white">Standard- & Reduzierter Preis</option>
-              </select>
-              <p className="text-xs text-slate-500 mt-1.5">Auf welchen Produktpreis der Aufschlag/Abschlag angewendet wird.</p>
-            </div>
+            {/* Weitere Preisregeln (Regel 2, Regel 3, ...) */}
+            {(settings.additionalPriceRules || []).map((rule, index) => {
+              const updateRule = (patch: Partial<PriceRuleState>) => {
+                const next = [...(settings.additionalPriceRules || [])]
+                next[index] = { ...next[index], ...patch }
+                setSettings({ ...settings, additionalPriceRules: next })
+              }
 
-            {/* Rabatt-Ausschlussgrenze */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Rabatt-Ausschlussgrenze (€)</label>
-              <div className="relative">
-                <input 
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  disabled={settings.priceModifierType === 'none'}
-                  className="w-full bg-white border border-slate-200 rounded-lg pl-4 pr-10 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-500 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all disabled:opacity-50 disabled:bg-slate-50 shadow-sm"
-                  placeholder="z.B. 15.00 (optional)"
-                  value={settings.minPriceThreshold !== undefined && settings.minPriceThreshold !== null ? settings.minPriceThreshold : ''}
-                  onChange={(e) => {
-                    const raw = e.target.value
-                    setSettings({ 
-                      ...settings, 
-                      minPriceThreshold: raw === '' ? undefined : (parseFloat(raw) || 0) 
-                    })
-                  }}
-                />
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-sm pointer-events-none">
-                  €
+              const removeRule = () => {
+                const next = (settings.additionalPriceRules || []).filter((_, i) => i !== index)
+                setSettings({ ...settings, additionalPriceRules: next })
+              }
+
+              const badgeText = getPriceRangeBadgeText(rule.minPriceThreshold, rule.maxPriceThreshold)
+
+              return (
+                <div key={rule.id || index} className="p-4 rounded-xl bg-slate-50/60 border border-slate-200/80 space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-200/70">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-700 bg-white px-2.5 py-0.5 rounded-md border border-slate-200 shadow-2xs">
+                        Regel {index + 2}
+                      </span>
+                      {badgeText && (
+                        <span className="text-xs font-semibold text-cyan-800 bg-cyan-50 px-2.5 py-0.5 rounded-md border border-cyan-200/70">
+                          {badgeText}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={removeRule}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 hover:text-red-700 hover:bg-red-50 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                      title="Regel entfernen"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Entfernen
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Typ */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Typ</label>
+                      <select
+                        className="w-full bg-white border border-slate-200 rounded-lg px-4 py-2.5 text-sm font-medium text-slate-900 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all shadow-sm"
+                        value={rule.priceModifierType}
+                        onChange={(e) => updateRule({ priceModifierType: e.target.value as any })}
+                      >
+                        <option value="none" className="text-slate-900 bg-white">Keine Änderung (1:1)</option>
+                        <option value="percentage" className="text-slate-900 bg-white">Prozentual (%)</option>
+                        <option value="fixed" className="text-slate-900 bg-white">Fixbetrag (€)</option>
+                      </select>
+                    </div>
+
+                    {/* Wert */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Wert</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          disabled={rule.priceModifierType === 'none'}
+                          className="w-full bg-white border border-slate-200 rounded-lg pl-4 pr-16 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-500 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all disabled:opacity-50 disabled:bg-slate-50 shadow-sm"
+                          placeholder="z.B. -5 für 5€ bzw. 5% Rabatt"
+                          value={rule.priceModifierValue ?? ''}
+                          onChange={(e) => {
+                            const val = e.target.value
+                            if (val === '' || val === '-' || /^-?\d*[.,]?\d*$/.test(val)) {
+                              updateRule({ priceModifierValue: val })
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                              e.preventDefault()
+                              const raw = String(rule.priceModifierValue ?? '').replace(',', '.')
+                              const currentVal = parseFloat(raw) || 0
+                              const step = 1
+                              const nextVal = e.key === 'ArrowUp' ? currentVal + step : currentVal - step
+                              const rounded = Math.round(nextVal * 100) / 100
+                              updateRule({ priceModifierValue: rounded })
+                            }
+                          }}
+                          onBlur={() => {
+                            const raw = String(rule.priceModifierValue ?? '').trim().replace(',', '.')
+                            const parsed = parseFloat(raw)
+                            updateRule({
+                              priceModifierValue: isNaN(parsed) ? 0 : parsed,
+                            })
+                          }}
+                        />
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+                          {rule.priceModifierType !== 'none' && (
+                            <div className="flex flex-col border border-slate-200 rounded overflow-hidden bg-white shadow-xs">
+                              <button
+                                type="button"
+                                tabIndex={-1}
+                                className="px-1 py-0.5 hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors leading-none cursor-pointer"
+                                title="Erhöhen"
+                                onClick={() => {
+                                  const raw = String(rule.priceModifierValue ?? '').replace(',', '.')
+                                  const currentVal = parseFloat(raw) || 0
+                                  const nextVal = Math.round((currentVal + 1) * 100) / 100
+                                  updateRule({ priceModifierValue: nextVal })
+                                }}
+                              >
+                                <ChevronUp className="w-2.5 h-2.5" />
+                              </button>
+                              <button
+                                type="button"
+                                tabIndex={-1}
+                                className="px-1 py-0.5 hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors leading-none border-t border-slate-200 cursor-pointer"
+                                title="Verringern"
+                                onClick={() => {
+                                  const raw = String(rule.priceModifierValue ?? '').replace(',', '.')
+                                  const currentVal = parseFloat(raw) || 0
+                                  const nextVal = Math.round((currentVal - 1) * 100) / 100
+                                  updateRule({ priceModifierValue: nextVal })
+                                }}
+                              >
+                                <ChevronDown className="w-2.5 h-2.5" />
+                              </button>
+                            </div>
+                          )}
+                          <span className="text-slate-500 font-bold text-sm pointer-events-none min-w-[14px] text-center">
+                            {rule.priceModifierType === 'percentage' ? '%' : rule.priceModifierType === 'fixed' ? '€' : ''}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Berechnungsgrundlage / Basispreis */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Berechnungsgrundlage (Basispreis)</label>
+                      <select
+                        disabled={rule.priceModifierType === 'none'}
+                        className="w-full bg-white border border-slate-200 rounded-lg px-4 py-2.5 text-sm font-medium text-slate-900 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all disabled:opacity-50 disabled:bg-slate-50 shadow-sm"
+                        value={rule.priceBase || 'standard'}
+                        onChange={(e) => updateRule({ priceBase: e.target.value as any })}
+                      >
+                        <option value="standard" className="text-slate-900 bg-white">Standard-Preis (Verkaufspreis)</option>
+                        <option value="msrp" className="text-slate-900 bg-white">UVP (Unverbindliche Preisempfehlung)</option>
+                        <option value="reduced" className="text-slate-900 bg-white">Reduzierter Preis (Aktionspreis)</option>
+                        <option value="all" className="text-slate-900 bg-white">Standard- & Reduzierter Preis</option>
+                      </select>
+                      <p className="text-xs text-slate-500 mt-1.5">Auf welchen Produktpreis der Aufschlag/Abschlag angewendet wird.</p>
+                    </div>
+
+                    {/* Preisgrenzen (Ab / Unter) */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Preisspanne / Grenze (€)</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="relative flex items-center">
+                          <span className="absolute left-3 text-xs font-semibold text-slate-500 pointer-events-none select-none">
+                            Ab
+                          </span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            disabled={rule.priceModifierType === 'none'}
+                            className="w-full bg-white border border-slate-200 rounded-lg pl-9 pr-7 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-500 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all disabled:opacity-50 disabled:bg-slate-50 shadow-sm"
+                            placeholder="optional"
+                            value={rule.minPriceThreshold !== undefined && rule.minPriceThreshold !== null ? rule.minPriceThreshold : ''}
+                            onChange={(e) => {
+                              const raw = e.target.value
+                              updateRule({
+                                minPriceThreshold: raw === '' ? undefined : (parseFloat(raw) || 0),
+                              })
+                            }}
+                          />
+                          <div className="absolute right-2.5 text-slate-500 font-bold text-xs pointer-events-none">
+                            €
+                          </div>
+                        </div>
+
+                        <div className="relative flex items-center">
+                          <span className="absolute left-3 text-xs font-semibold text-slate-500 pointer-events-none select-none">
+                            Unter
+                          </span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            disabled={rule.priceModifierType === 'none'}
+                            className="w-full bg-white border border-slate-200 rounded-lg pl-13 pr-7 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-500 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all disabled:opacity-50 disabled:bg-slate-50 shadow-sm"
+                            placeholder="z.B. 80"
+                            value={rule.maxPriceThreshold !== undefined && rule.maxPriceThreshold !== null ? rule.maxPriceThreshold : ''}
+                            onChange={(e) => {
+                              const raw = e.target.value
+                              updateRule({
+                                maxPriceThreshold: raw === '' ? undefined : (parseFloat(raw) || 0),
+                              })
+                            }}
+                          />
+                          <div className="absolute right-2.5 text-slate-500 font-bold text-xs pointer-events-none">
+                            €
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1.5">
+                        {getPriceRangeHelperText(rule.minPriceThreshold, rule.maxPriceThreshold)}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <p className="text-xs text-slate-500 mt-1.5">Preise unter diesem Betrag werden von Discounts/Abschlägen ausgenommen.</p>
-            </div>
+              )
+            })}
           </div>
 
-          <p className="text-xs text-slate-500 mt-3">Nutzen Sie negative Werte (z.B. -5) für einen Discount/Abschlag.</p>
+          {/* Buttons zum Hinzufügen weiterer Regeln */}
+          <div className="mt-4 flex flex-wrap items-center gap-2.5">
+            {settings.minPriceThreshold !== undefined &&
+              settings.minPriceThreshold > 0 &&
+              !(settings.additionalPriceRules || []).some(
+                (r) => Number(r.maxPriceThreshold) === Number(settings.minPriceThreshold)
+              ) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextRules: PriceRuleState[] = [
+                      ...(settings.additionalPriceRules || []),
+                      {
+                        id: `rule_${Date.now()}`,
+                        priceModifierType: settings.priceModifierType !== 'none' ? settings.priceModifierType : 'fixed',
+                        priceModifierValue: 0,
+                        priceBase: settings.priceBase || 'standard',
+                        minPriceThreshold: undefined,
+                        maxPriceThreshold: settings.minPriceThreshold,
+                      },
+                    ]
+                    setSettings({ ...settings, additionalPriceRules: nextRules })
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-cyan-800 bg-cyan-50 hover:bg-cyan-100/80 border border-cyan-200 rounded-xl transition-colors cursor-pointer shadow-2xs"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Regel für Produkte unter {settings.minPriceThreshold} € anlegen
+                </button>
+              )}
+
+            <button
+              type="button"
+              onClick={() => {
+                const nextRules: PriceRuleState[] = [
+                  ...(settings.additionalPriceRules || []),
+                  {
+                    id: `rule_${Date.now()}`,
+                    priceModifierType: settings.priceModifierType !== 'none' ? settings.priceModifierType : 'fixed',
+                    priceModifierValue: 0,
+                    priceBase: settings.priceBase || 'standard',
+                    minPriceThreshold: undefined,
+                    maxPriceThreshold: undefined,
+                  },
+                ]
+                setSettings({ ...settings, additionalPriceRules: nextRules })
+              }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors cursor-pointer shadow-2xs"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Weitere Regel hinzufügen
+            </button>
+          </div>
+
+          <p className="text-xs text-slate-500 mt-3">
+            Nutzen Sie negative Werte (z.B. -5) für einen Discount/Abschlag. Regeln werden von oben nach unten geprüft – die erste passende Regel greift.
+          </p>
         </div>
 
         {/* Währung & Umrechnungsfaktor */}
