@@ -1,6 +1,8 @@
 'use client'
 
 import React, { useState, useTransition, useMemo } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   TrendingUp,
   TrendingDown,
@@ -64,12 +66,19 @@ function MetricTrendBadge({ change }: { change: number }) {
   )
 }
 
-export function PerformanceClient({ initialData }: { initialData: PerformanceAnalyticsResponse }) {
+export function PerformanceClient({
+  initialData,
+  initialTab = 'overview',
+}: {
+  initialData: PerformanceAnalyticsResponse
+  initialTab?: 'overview' | 'marketplaces' | 'products'
+}) {
+  const router = useRouter()
   const [data, setData] = useState<PerformanceAnalyticsResponse>(initialData)
   const [isPending, startTransition] = useTransition()
 
   // Filter States
-  const [activeTab, setActiveTab] = useState<'overview' | 'marketplaces' | 'products'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'marketplaces' | 'products'>(initialTab)
   const [timeRange, setTimeRange] = useState<TimeRangePreset>(initialData.timeRange.preset)
   const [selectedMarketplace, setSelectedMarketplace] = useState<string>(initialData.selectedMarketplace)
   const [customFrom, setCustomFrom] = useState<string>(initialData.timeRange.from.split('T')[0])
@@ -229,6 +238,16 @@ export function PerformanceClient({ initialData }: { initialData: PerformanceAna
     { id: '365d', label: '365 Tage' },
     { id: 'custom', label: 'Benutzerdefiniert' },
   ]
+
+  const getMarketplaceDetailHref = (mpId: string) => {
+    const params = new URLSearchParams()
+    params.set('timeRange', timeRange)
+    if (timeRange === 'custom') {
+      params.set('from', customFrom)
+      params.set('to', customTo)
+    }
+    return `/performance/marketplaces/${encodeURIComponent(mpId)}?${params.toString()}`
+  }
 
   const ov = data.overview
 
@@ -443,6 +462,7 @@ export function PerformanceClient({ initialData }: { initialData: PerformanceAna
           <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
             <RevenueOrdersTimelineChart
               data={data.timeline}
+              previousPeriodSummary={data.previousPeriodSummary}
               previousYearSummary={data.previousYearSummary}
               previousYear2Summary={data.previousYear2Summary}
             />
@@ -574,21 +594,33 @@ export function PerformanceClient({ initialData }: { initialData: PerformanceAna
               <MarketplaceDonutChart data={data.marketplaces} />
             </div>
             <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
-              <MarketplaceBarChart data={data.marketplaces} />
+              <MarketplaceBarChart
+                data={data.marketplaces}
+                onSelectMarketplace={(mp) => router.push(getMarketplaceDetailHref(mp))}
+              />
             </div>
           </div>
 
           {/* Marketplace Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {data.marketplaces.map((mp) => (
-              <div
+              <Link
                 key={mp.marketplace}
-                className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:border-cyan-300 hover:shadow-md transition-all flex flex-col justify-between"
+                href={getMarketplaceDetailHref(mp.marketplace)}
+                className="group bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:border-cyan-400 hover:shadow-md transition-all flex flex-col justify-between cursor-pointer"
               >
                 <div>
                   <div className="flex items-start justify-between">
                     <div>
-                      <h4 className="text-base font-bold text-slate-900">{mp.name}</h4>
+                      <div className="flex items-center gap-1.5">
+                        <h4 className="text-base font-bold text-slate-900 group-hover:text-cyan-600 transition-colors">
+                          {mp.name}
+                        </h4>
+                        <ChevronRight
+                          size={16}
+                          className="text-slate-300 group-hover:text-cyan-600 group-hover:translate-x-0.5 transition-all"
+                        />
+                      </div>
                       <p className="text-xs text-slate-400 font-mono mt-0.5">{mp.marketplace}</p>
                     </div>
                     <span className="text-xs font-bold text-cyan-600 bg-cyan-50 px-2 py-0.5 rounded-lg border border-cyan-100">
@@ -612,21 +644,28 @@ export function PerformanceClient({ initialData }: { initialData: PerformanceAna
 
                 <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
                   <span>Ø Warenkorb: <strong className="text-slate-800">{formatCurrency(mp.averageOrderValue)}</strong></span>
-                  {mp.returnRate > 0 && (
-                    <span className="text-rose-600 font-medium">Retouren: {mp.returnRate}%</span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {mp.returnRate > 0 && (
+                      <span className="text-rose-600 font-medium">Retouren: {mp.returnRate}%</span>
+                    )}
+                    <span className="text-[11px] font-semibold text-cyan-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                      Chart & Vergleich →
+                    </span>
+                  </div>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
 
           {/* Detailed Marketplace Comparison Table */}
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-            <div className="p-5 border-b border-slate-100">
-              <h4 className="text-base font-bold text-slate-900">Marktplatz Performance-Matrix</h4>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Detaillierte Gegenüberstellung aller Verkaufskanäle
-              </p>
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h4 className="text-base font-bold text-slate-900">Marktplatz Performance-Matrix</h4>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Klicke auf einen Marktplatz für die Detailansicht & Periodenvergleich
+                </p>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
@@ -640,12 +679,17 @@ export function PerformanceClient({ initialData }: { initialData: PerformanceAna
                     <th className="py-3 px-4 text-right">Ø Warenkorb</th>
                     <th className="py-3 px-4 text-right">Stornoquote</th>
                     <th className="py-3 px-4 text-right">Retourenquote</th>
+                    <th className="py-3 px-4 text-center">Analyse</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {data.marketplaces.map((mp) => (
-                    <tr key={mp.marketplace} className="hover:bg-slate-50/60 transition-colors">
-                      <td className="py-3.5 px-4 font-semibold text-slate-900">
+                    <tr
+                      key={mp.marketplace}
+                      onClick={() => router.push(getMarketplaceDetailHref(mp.marketplace))}
+                      className="hover:bg-slate-50/60 transition-colors cursor-pointer group"
+                    >
+                      <td className="py-3.5 px-4 font-semibold text-slate-900 group-hover:text-cyan-600 transition-colors">
                         {mp.name}
                         <span className="text-xs text-slate-400 font-mono ml-2">({mp.marketplace})</span>
                       </td>
@@ -673,6 +717,15 @@ export function PerformanceClient({ initialData }: { initialData: PerformanceAna
                         ) : (
                           <span className="text-slate-400">0%</span>
                         )}
+                      </td>
+                      <td className="py-3.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                        <Link
+                          href={getMarketplaceDetailHref(mp.marketplace)}
+                          className="inline-flex items-center justify-center p-1.5 text-slate-400 hover:text-cyan-600 hover:bg-cyan-50 rounded-lg transition-colors"
+                          title="Marktplatz-Chart & Zeitvergleich öffnen"
+                        >
+                          <ChevronRight size={18} />
+                        </Link>
                       </td>
                     </tr>
                   ))}

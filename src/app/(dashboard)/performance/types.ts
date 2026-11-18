@@ -14,6 +14,8 @@ export interface PerformanceFilterOptions {
   timeRange: TimeRangePreset
   customFrom?: string // ISO date or YYYY-MM-DD
   customTo?: string   // ISO date or YYYY-MM-DD
+  compareFrom?: string // Optional custom comparison period start (YYYY-MM-DD)
+  compareTo?: string   // Optional custom comparison period end (YYYY-MM-DD)
   marketplace?: string // 'all' or specific marketplace id
 }
 
@@ -45,6 +47,9 @@ export interface TimelineDataPoint {
   revenue: number    // in EUR
   orders: number
   units: number
+  prevPeriodDate?: string
+  prevPeriodRevenue?: number // in EUR in previous period
+  prevPeriodOrders?: number  // orders in previous period
   prevYearDate?: string
   prevYearRevenue?: number // in EUR 1 year ago
   prevYearOrders?: number  // orders 1 year ago
@@ -105,12 +110,28 @@ export interface ProductDrilldownData {
   }[]
 }
 
+export interface PreviousPeriodSummary {
+  from: string
+  to: string
+  label: string
+  totalRevenue: number
+  totalOrders: number
+  averageOrderValue: number
+  totalUnitsSold: number
+  growthPercentRevenue: number
+  growthPercentOrders: number
+  growthPercentAOV: number
+  growthPercentUnits: number
+}
+
 export interface PreviousYearSummary {
   year: number
   totalRevenue: number
   totalOrders: number
+  averageOrderValue: number
   growthPercentRevenue: number
   growthPercentOrders: number
+  growthPercentAOV: number
 }
 
 export interface PerformanceAnalyticsResponse {
@@ -122,11 +143,13 @@ export interface PerformanceAnalyticsResponse {
     previousTo: string
   }
   selectedMarketplace: string
+  selectedMarketplaceName?: string
   availableMarketplaces: { id: string; name: string }[]
   overview: PerformanceOverviewMetrics
   timeline: TimelineDataPoint[]
   marketplaces: MarketplacePerformanceData[]
   products: ProductPerformanceData[]
+  previousPeriodSummary?: PreviousPeriodSummary
   previousYearSummary?: PreviousYearSummary
   previousYear2Summary?: PreviousYearSummary
 }

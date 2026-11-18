@@ -59,7 +59,13 @@ function getMarketplaceName(id: string): string {
   return id.charAt(0).toUpperCase() + id.slice(1)
 }
 
-function calculateDateRange(preset: TimeRangePreset, customFrom?: string, customTo?: string) {
+function calculateDateRange(
+  preset: TimeRangePreset,
+  customFrom?: string,
+  customTo?: string,
+  compareFrom?: string,
+  compareTo?: string
+) {
   const now = new Date()
   const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
   let fromDate: Date
@@ -97,8 +103,27 @@ function calculateDateRange(preset: TimeRangePreset, customFrom?: string, custom
   }
 
   const durationMs = toDate.getTime() - fromDate.getTime()
-  const previousToDate = new Date(fromDate.getTime() - 1)
-  const previousFromDate = new Date(previousToDate.getTime() - durationMs)
+  let previousToDate = new Date(fromDate.getTime() - 1)
+  let previousFromDate = new Date(previousToDate.getTime() - durationMs)
+
+  if (compareFrom) {
+    const cf = new Date(compareFrom)
+    if (!isNaN(cf.getTime())) {
+      cf.setHours(0, 0, 0, 0)
+      previousFromDate = cf
+      if (compareTo) {
+        const ct = new Date(compareTo)
+        if (!isNaN(ct.getTime())) {
+          ct.setHours(23, 59, 59, 999)
+          previousToDate = ct
+        } else {
+          previousToDate = new Date(previousFromDate.getTime() + durationMs)
+        }
+      } else {
+        previousToDate = new Date(previousFromDate.getTime() + durationMs)
+      }
+    }
+  }
 
   return { fromDate, toDate, previousFromDate, previousToDate }
 }
@@ -117,7 +142,9 @@ export async function getPerformanceAnalytics(filters: PerformanceFilterOptions)
   const { fromDate, toDate, previousFromDate, previousToDate } = calculateDateRange(
     filters.timeRange, 
     filters.customFrom, 
-    filters.customTo
+    filters.customTo,
+    filters.compareFrom,
+    filters.compareTo
   )
 
   const selectedMarketplace = filters.marketplace && filters.marketplace !== 'all' ? filters.marketplace : 'all'
@@ -173,11 +200,21 @@ export async function getPerformanceAnalytics(filters: PerformanceFilterOptions)
       subtotalAmount: orders.subtotalAmount,
       currency: orders.currency,
       status: orders.status,
+      date: sql<string>`coalesce(${orders.marketplacePurchaseDate}, ${orders.createdAt})`,
     })
     .from(orders)
     .where(and(...previousOrdersWhere))
 
   // 3. Fetch returns for current period
+  const returnsWhere = [
+    eq(returnsLog.companyId, companyId),
+    gte(returnsLog.scannedAt, fromDate),
+    lte(returnsLog.scannedAt, toDate),
+  ]
+  if (selectedMarketplace !== 'all') {
+    returnsWhere.push(eq(returnsLog.marketplace, selectedMarketplace))
+  }
+
   const returnsPromise = db
     .select({
       id: returnsLog.id,
@@ -186,13 +223,7 @@ export async function getPerformanceAnalytics(filters: PerformanceFilterOptions)
       status: returnsLog.status,
     })
     .from(returnsLog)
-    .where(
-      and(
-        eq(returnsLog.companyId, companyId),
-        gte(returnsLog.scannedAt, fromDate),
-        lte(returnsLog.scannedAt, toDate)
-      )
-    )
+    .where(and(...returnsWhere))
 
   // 4. Fetch returned items by SKU for product return counts
   const returnedItemsPromise = db
@@ -202,13 +233,7 @@ export async function getPerformanceAnalytics(filters: PerformanceFilterOptions)
     })
     .from(returnedItems)
     .innerJoin(returnsLog, eq(returnedItems.returnLogId, returnsLog.id))
-    .where(
-      and(
-        eq(returnsLog.companyId, companyId),
-        gte(returnsLog.scannedAt, fromDate),
-        lte(returnsLog.scannedAt, toDate)
-      )
-    )
+    .where(and(...returnsWhere))
 
   // 5. Fetch central products catalog for stock and titles
   const productsPromise = db
@@ -439,6 +464,17 @@ export async function getPerformanceAnalytics(filters: PerformanceFilterOptions)
     }
   }
 
+  // Aggregate previous period daily values
+  const prevPeriodDailyMap: Record<string, { revenue: number; orders: number }> = {}
+  for (const o of previousOrders) {
+    if (o.status !== 'cancelled') {
+      const dayKey = new Date(o.date).toISOString().split('T')[0]
+      if (!prevPeriodDailyMap[dayKey]) prevPeriodDailyMap[dayKey] = { revenue: 0, orders: 0 }
+      prevPeriodDailyMap[dayKey].revenue += (parseFloat(o.totalAmount || '0') || 0) * getEurRate(o.currency)
+      prevPeriodDailyMap[dayKey].orders += 1
+    }
+  }
+
   // Aggregate previous year (N-1) daily values
   const prevYearDailyMap: Record<string, { revenue: number; orders: number }> = {}
   for (const o of prevYearOrders) {
@@ -457,15 +493,25 @@ export async function getPerformanceAnalytics(filters: PerformanceFilterOptions)
     prevYear2DailyMap[dayKey].orders += 1
   }
 
-  const timeline: TimelineDataPoint[] = Object.keys(dailyMap)
-    .sort()
-    .map(key => {
+  const sortedDays = Object.keys(dailyMap).sort()
+  const prevPeriodStartMs = new Date(
+    previousFromDate.getFullYear(),
+    previousFromDate.getMonth(),
+    previousFromDate.getDate()
+  ).getTime()
+
+  const timeline: TimelineDataPoint[] = sortedDays.map((key, idx) => {
       const parts = key.split('-')
       const y = parseInt(parts[0], 10)
       const m = parseInt(parts[1], 10)
       const dNum = parseInt(parts[2], 10)
       const d = new Date(y, m - 1, dNum)
       const label = d.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })
+
+      // Corresponding day in previous/comparison period (aligned by day offset idx)
+      const ppDateObj = new Date(prevPeriodStartMs + idx * 86400000)
+      const prevPeriodKey = ppDateObj.toISOString().split('T')[0]
+      const pp = prevPeriodDailyMap[prevPeriodKey]
 
       // Exact date minus 1 year and 2 years (handling Feb 29 for leap years)
       let prevDay = dNum
@@ -482,6 +528,9 @@ export async function getPerformanceAnalytics(filters: PerformanceFilterOptions)
         revenue: Number(dailyMap[key].revenue.toFixed(2)),
         orders: dailyMap[key].orders,
         units: Math.round(dailyMap[key].units),
+        prevPeriodDate: prevPeriodKey,
+        prevPeriodRevenue: pp ? Number(pp.revenue.toFixed(2)) : 0,
+        prevPeriodOrders: pp ? pp.orders : 0,
         prevYearDate: prevYearKey,
         prevYearRevenue: py ? Number(py.revenue.toFixed(2)) : 0,
         prevYearOrders: py ? py.orders : 0,
@@ -701,20 +750,43 @@ export async function getPerformanceAnalytics(filters: PerformanceFilterOptions)
     py2TotalRev += (parseFloat(o.totalAmount || '0') || 0) * getEurRate(o.currency)
   }
 
+  const pyAOV = prevYearOrders.length > 0 ? pyTotalRev / prevYearOrders.length : 0
+  const py2AOV = prevYear2Orders.length > 0 ? py2TotalRev / prevYear2Orders.length : 0
+
+  const prevPeriodLabel = `${previousFromDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })} – ${previousToDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}`
+
+  const previousPeriodSummary = {
+    from: previousFromDate.toISOString(),
+    to: previousToDate.toISOString(),
+    label: prevPeriodLabel,
+    totalRevenue: Number(prevTotalRev.toFixed(2)),
+    totalOrders: prevOrdersCount,
+    averageOrderValue: Number(prevAOV.toFixed(2)),
+    totalUnitsSold: Math.round(previousUnitsSold),
+    growthPercentRevenue: calculatePercentChange(currentTotalRev, prevTotalRev),
+    growthPercentOrders: calculatePercentChange(currentOrdersCount, prevOrdersCount),
+    growthPercentAOV: calculatePercentChange(currentAOV, prevAOV),
+    growthPercentUnits: calculatePercentChange(currentUnitsSold, previousUnitsSold),
+  }
+
   const previousYearSummary = {
     year: fromDate.getFullYear() - 1,
     totalRevenue: Number(pyTotalRev.toFixed(2)),
     totalOrders: prevYearOrders.length,
+    averageOrderValue: Number(pyAOV.toFixed(2)),
     growthPercentRevenue: calculatePercentChange(currentTotalRev, pyTotalRev),
-    growthPercentOrders: calculatePercentChange(currentOrdersCount, prevYearOrders.length)
+    growthPercentOrders: calculatePercentChange(currentOrdersCount, prevYearOrders.length),
+    growthPercentAOV: calculatePercentChange(currentAOV, pyAOV),
   }
 
   const previousYear2Summary = {
     year: fromDate.getFullYear() - 2,
     totalRevenue: Number(py2TotalRev.toFixed(2)),
     totalOrders: prevYear2Orders.length,
+    averageOrderValue: Number(py2AOV.toFixed(2)),
     growthPercentRevenue: calculatePercentChange(currentTotalRev, py2TotalRev),
-    growthPercentOrders: calculatePercentChange(currentOrdersCount, prevYear2Orders.length)
+    growthPercentOrders: calculatePercentChange(currentOrdersCount, prevYear2Orders.length),
+    growthPercentAOV: calculatePercentChange(currentAOV, py2AOV),
   }
 
   return {
@@ -726,6 +798,7 @@ export async function getPerformanceAnalytics(filters: PerformanceFilterOptions)
       previousTo: previousToDate.toISOString()
     },
     selectedMarketplace,
+    selectedMarketplaceName: selectedMarketplace === 'all' ? 'Alle Marktplätze' : getMarketplaceName(selectedMarketplace),
     availableMarketplaces,
     overview: {
       totalRevenue: {
@@ -765,6 +838,7 @@ export async function getPerformanceAnalytics(filters: PerformanceFilterOptions)
     timeline,
     marketplaces,
     products: productsData,
+    previousPeriodSummary,
     previousYearSummary,
     previousYear2Summary
   }
@@ -828,7 +902,22 @@ export async function getProductPerformanceDrilldown(
 
   const skuList = Array.from(candidateSkus).filter(Boolean)
 
+  const selectedMp = filters.marketplace && filters.marketplace !== 'all' ? filters.marketplace : 'all'
+
   // 2. Fetch order items matching this SKU or any of its mappings in range
+  const drilldownItemsWhere = [
+    eq(orders.companyId, companyId),
+    inArray(orderItems.sku, skuList),
+    eq(orders.isArchived, false),
+    ne(orders.status, 'draft'),
+    ne(orders.status, 'cancelled'),
+    sql`coalesce(${orders.marketplacePurchaseDate}, ${orders.createdAt}) >= ${fromDate.toISOString()}`,
+    sql`coalesce(${orders.marketplacePurchaseDate}, ${orders.createdAt}) <= ${toDate.toISOString()}`
+  ]
+  if (selectedMp !== 'all') {
+    drilldownItemsWhere.push(eq(orders.marketplace, selectedMp))
+  }
+
   const items = await db
     .select({
       orderId: orderItems.orderId,
@@ -841,33 +930,26 @@ export async function getProductPerformanceDrilldown(
     })
     .from(orderItems)
     .innerJoin(orders, eq(orderItems.orderId, orders.id))
-    .where(
-      and(
-        eq(orders.companyId, companyId),
-        inArray(orderItems.sku, skuList),
-        eq(orders.isArchived, false),
-        ne(orders.status, 'draft'),
-        ne(orders.status, 'cancelled'),
-        sql`coalesce(${orders.marketplacePurchaseDate}, ${orders.createdAt}) >= ${fromDate.toISOString()}`,
-        sql`coalesce(${orders.marketplacePurchaseDate}, ${orders.createdAt}) <= ${toDate.toISOString()}`
-      )
-    )
+    .where(and(...drilldownItemsWhere))
 
   // 3. Fetch returns for this product or any of its mappings
+  const drilldownReturnsWhere = [
+    eq(returnsLog.companyId, companyId),
+    inArray(returnedItems.skuOrProductName, skuList),
+    gte(returnsLog.scannedAt, fromDate),
+    lte(returnsLog.scannedAt, toDate)
+  ]
+  if (selectedMp !== 'all') {
+    drilldownReturnsWhere.push(eq(returnsLog.marketplace, selectedMp))
+  }
+
   const returnStats = await db
     .select({
       totalReturned: sql<number>`coalesce(sum(${returnedItems.quantity}), 0)::int`
     })
     .from(returnedItems)
     .innerJoin(returnsLog, eq(returnedItems.returnLogId, returnsLog.id))
-    .where(
-      and(
-        eq(returnsLog.companyId, companyId),
-        inArray(returnedItems.skuOrProductName, skuList),
-        gte(returnsLog.scannedAt, fromDate),
-        lte(returnsLog.scannedAt, toDate)
-      )
-    )
+    .where(and(...drilldownReturnsWhere))
 
   let totalUnits = 0
   let totalRev = 0
