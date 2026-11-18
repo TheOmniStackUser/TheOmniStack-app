@@ -1,4 +1,5 @@
 import { requireAuth } from '@/lib/session'
+import { redirect } from 'next/navigation'
 import { db } from '@/db/client'
 import { marketplaceQuestions } from '@/db/schema/questions'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
@@ -12,6 +13,8 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 export default async function QuestionsPage() {
+  redirect('/dashboard')
+
   const auth = await requireAuth()
 
   // Ensure tables exist before querying (self-healing for production)

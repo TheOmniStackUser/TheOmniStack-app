@@ -11,7 +11,6 @@ import {
   Users, 
   RotateCcw, 
   Box,
-  MessageSquareText,
   BarChart3
 } from 'lucide-react'
 
@@ -43,8 +42,6 @@ export function SidebarNav({
   if (features.products) {
     links.push({ href: '/products', label: 'Produkte', icon: Box })
   }
-
-  links.push({ href: '/questions', label: 'Kundenanfragen', icon: MessageSquareText })
 
   if (isCraftVariant) {
     links = links.filter(link => !['/orders', '/returns', '/products', '/questions', '/performance'].includes(link.href))
