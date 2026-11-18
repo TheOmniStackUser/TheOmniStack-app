@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { ArrowLeft, Layers, Database } from 'lucide-react'
 import { ImportClient } from './import-client'
 import { UnmappedClient } from './unmapped-client'
+import { ProductsSubNav } from '../products-subnav'
 
 export const metadata = {
   title: 'Import & Mapping - Produkte',
@@ -39,22 +40,24 @@ export default async function ProductImportPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
-      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-        <div>
-          <Link href="/products" className="inline-flex items-center text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors mb-2">
-            <ArrowLeft className="w-4 h-4 mr-1" />
-            Zurück zur Übersicht
-          </Link>
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
-            <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl">
-              <Layers className="w-6 h-6" />
-            </div>
-            Import & Mapping
-          </h1>
-          <p className="text-slate-500 mt-2 font-medium">Verknüpfen Sie neue Marktplatz-Artikel mit Ihrem zentralen Bestand.</p>
+      <header className="flex flex-col gap-5 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
+              <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl">
+                <Layers className="w-6 h-6" />
+              </div>
+              Import & Mapping
+            </h1>
+            <p className="text-slate-500 mt-1.5 font-medium text-sm">Verknüpfen Sie neue Marktplatz-Artikel mit Ihrem zentralen Bestand.</p>
+          </div>
+
+          <ImportClient marketplaces={marketplaces} />
         </div>
 
-        <ImportClient marketplaces={marketplaces} />
+        <div className="pt-4 border-t border-slate-100">
+          <ProductsSubNav />
+        </div>
       </header>
 
       <UnmappedClient unmappedProducts={unmappedProducts} marketplaces={marketplaces} />

@@ -5,6 +5,7 @@ import { eq, and } from 'drizzle-orm'
 import Link from 'next/link'
 import { ArrowLeft, Settings2, Info } from 'lucide-react'
 import { SyncSettingsClient } from './settings-client'
+import { ProductsSubNav } from '../products-subnav'
 
 export const metadata = {
   title: 'Warenwirtschaft Einstellungen - TheOmniStack',
@@ -29,19 +30,15 @@ export default async function ProductsSettingsPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
-      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+      <header className="flex flex-col gap-5 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
         <div>
-          <Link href="/products" className="inline-flex items-center text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors mb-2">
-            <ArrowLeft className="w-4 h-4 mr-1" />
-            Zurück zur Warenwirtschaft
-          </Link>
           <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
             <div className="p-2.5 bg-slate-50 text-slate-600 rounded-xl">
               <Settings2 className="w-6 h-6" />
             </div>
             Globale Einstellungen
           </h1>
-          <p className="text-slate-500 mt-2 font-medium">Konfiguriere die Synchronisation pro Marktplatz.</p>
+          <p className="text-slate-500 mt-1.5 font-medium text-sm">Konfiguriere die Synchronisation pro Marktplatz.</p>
           <details className="mt-4 group bg-cyan-50/50 border border-cyan-100 rounded-xl max-w-3xl overflow-hidden cursor-pointer">
             <summary className="flex gap-3 p-3 text-sm text-cyan-900/90 items-center font-medium select-none outline-none">
               <div className="shrink-0 text-cyan-600">
@@ -63,6 +60,10 @@ export default async function ProductsSettingsPage() {
               </ul>
             </div>
           </details>
+        </div>
+
+        <div className="pt-4 border-t border-slate-100">
+          <ProductsSubNav />
         </div>
       </header>
 

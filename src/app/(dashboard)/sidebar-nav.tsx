@@ -12,8 +12,7 @@ import {
   RotateCcw, 
   Box,
   MessageSquareText,
-  BarChart3,
-  ClipboardList
+  BarChart3
 } from 'lucide-react'
 
 export function SidebarNav({ 
@@ -58,57 +57,29 @@ export function SidebarNav({
         <span className="hidden group-[.collapsed]/sidebar:block text-[10px]">Op</span>
       </div>
       {links.map((link) => {
-        const isInventorySubpage = pathname?.startsWith('/products/inventory')
-        const isActive =
-          link.href === '/products'
-            ? (pathname === '/products' || (pathname?.startsWith('/products/') && !isInventorySubpage))
-            : pathname === link.href || pathname?.startsWith(`${link.href}/`)
+        const isActive = pathname === link.href || pathname?.startsWith(`${link.href}/`)
         const Icon = link.icon
         
         return (
-          <div key={link.href}>
-            <div title={link.label}>
-              <Link
-                href={link.href}
-                prefetch={true}
-                className={`flex items-center px-4 py-2.5 group-[.collapsed]/sidebar:px-0 group-[.collapsed]/sidebar:justify-center text-sm font-medium rounded-xl transition-all duration-200 ${
-                  isActive 
-                    ? 'bg-cyan-500/10 text-cyan-400 shadow-[inset_0_0_10px_rgba(34,211,238,0.1)]' 
-                    : 'text-slate-400 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <div className="relative flex items-center justify-center mr-3 group-[.collapsed]/sidebar:mr-0 transition-all">
-                  <Icon size={18} className={`${isActive ? 'text-cyan-400' : 'text-slate-400 group-hover:text-white'} transition-colors`} />
-                  {/* Active indicator dot for collapsed mode */}
-                  {isActive && (
-                    <div className="absolute -right-1 -bottom-1 w-2 h-2 rounded-full bg-cyan-400 hidden group-[.collapsed]/sidebar:block" />
-                  )}
-                </div>
-                <span className="group-[.collapsed]/sidebar:hidden whitespace-nowrap">{link.label}</span>
-              </Link>
-            </div>
-
-            {link.href === '/products' && (
-              <div className="mt-1 ml-6 pl-3 border-l border-slate-800 space-y-1 group-[.collapsed]/sidebar:ml-0 group-[.collapsed]/sidebar:pl-0 group-[.collapsed]/sidebar:border-l-0" title="Laufende Inventur">
-                <Link
-                  href="/products/inventory"
-                  prefetch={true}
-                  className={`flex items-center px-3 py-2 group-[.collapsed]/sidebar:px-0 group-[.collapsed]/sidebar:justify-center text-xs font-medium rounded-lg transition-all duration-200 ${
-                    isInventorySubpage
-                      ? 'bg-cyan-500/10 text-cyan-400 shadow-[inset_0_0_10px_rgba(34,211,238,0.1)]'
-                      : 'text-slate-400 hover:text-white hover:bg-white/5'
-                  }`}
-                >
-                  <div className="relative flex items-center justify-center mr-2.5 group-[.collapsed]/sidebar:mr-0 transition-all">
-                    <ClipboardList size={15} className={`${isInventorySubpage ? 'text-cyan-400' : 'text-slate-400 group-hover:text-white'} transition-colors`} />
-                    {isInventorySubpage && (
-                      <div className="absolute -right-1 -bottom-1 w-1.5 h-1.5 rounded-full bg-cyan-400 hidden group-[.collapsed]/sidebar:block" />
-                    )}
-                  </div>
-                  <span className="group-[.collapsed]/sidebar:hidden whitespace-nowrap">Laufende Inventur</span>
-                </Link>
+          <div key={link.href} title={link.label}>
+            <Link
+              href={link.href}
+              prefetch={true}
+              className={`flex items-center px-4 py-2.5 group-[.collapsed]/sidebar:px-0 group-[.collapsed]/sidebar:justify-center text-sm font-medium rounded-xl transition-all duration-200 ${
+                isActive 
+                  ? 'bg-cyan-500/10 text-cyan-400 shadow-[inset_0_0_10px_rgba(34,211,238,0.1)]' 
+                  : 'text-slate-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <div className="relative flex items-center justify-center mr-3 group-[.collapsed]/sidebar:mr-0 transition-all">
+                <Icon size={18} className={`${isActive ? 'text-cyan-400' : 'text-slate-400 group-hover:text-white'} transition-colors`} />
+                {/* Active indicator dot for collapsed mode */}
+                {isActive && (
+                  <div className="absolute -right-1 -bottom-1 w-2 h-2 rounded-full bg-cyan-400 hidden group-[.collapsed]/sidebar:block" />
+                )}
               </div>
-            )}
+              <span className="group-[.collapsed]/sidebar:hidden whitespace-nowrap">{link.label}</span>
+            </Link>
           </div>
         )
       })}

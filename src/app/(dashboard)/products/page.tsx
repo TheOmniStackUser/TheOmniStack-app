@@ -7,6 +7,7 @@ import { Plus, Package, Settings, ServerCrash, AlertTriangle, Info, History, Cli
 import { CsvActions } from './csv-actions'
 import { ProductsClient } from './products-client'
 import { ManualSyncButton } from './manual-sync-button'
+import { ProductsSubNav } from './products-subnav'
 
 export const metadata = {
   title: 'Produkte - TheOmniStack',
@@ -94,108 +95,87 @@ export default async function ProductsPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
-      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden">
+      <header className="flex flex-col gap-5 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-cyan-400/10 to-transparent rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl pointer-events-none" />
         
-        <div>
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
-            <div className="p-2.5 bg-cyan-50 text-cyan-600 rounded-xl">
-              <Package className="w-6 h-6" />
-            </div>
-            Warenwirtschaft
-            <span className="text-sm font-bold bg-slate-100 text-slate-600 px-3 py-1 rounded-full border border-slate-200 align-middle shadow-sm">
-              {productList.length} Produkte
-            </span>
-          </h1>
-          <p className="text-slate-500 mt-2 font-medium">Verwalte deine {productList.length} Produkte und Marktplatz-Listings zentral.</p>
-          <div className="mt-4 flex flex-col gap-2.5 max-w-3xl">
-            <details className="group bg-blue-50/50 border border-blue-100 rounded-xl overflow-hidden cursor-pointer">
-              <summary className="flex gap-3 p-3 text-sm text-blue-800/90 items-center font-medium select-none outline-none">
-                <div className="shrink-0 text-blue-500">
-                  <Info className="w-5 h-5" />
-                </div>
-                <span><strong>TheOmniStack ist dein Master-System.</strong> (Klicken für Details)</span>
-              </summary>
-              <div className="px-3 pb-3 pt-1 text-sm text-blue-800/90 leading-relaxed border-t border-blue-100/50 ml-11">
-                Bitte passe manuelle Bestände und Preise immer hier an. 
-                Diese werden dann automatisch an alle angebundenen Marktplätze (Otto, About You, etc.) gepusht. 
-                <br/><br/>
-                <em>Hinweis zu Verkäufen:</em> Eingehende Bestellungen aus den Marktplätzen reduzieren den Bestand hier in TheOmniStack natürlich vollautomatisch. Nur <strong>manuelle Änderungen</strong>, die direkt in Fremdportalen vorgenommen werden, überträgt das System nicht zurück.
-                <br/><br/>
-                <em>Hinweis zu Aktionspreisen:</em> Wird ein Aktionspreis gesetzt, ohne ein explizites Datum auszuwählen, übermittelt das System automatisch einen Aktionszeitraum von „ab sofort bis in 10 Jahren“. So wird sichergestellt, dass Marktplätze wie Otto oder Amazon den reduzierten Preis garantiert akzeptieren.
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+          <div className="min-w-0">
+            <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight flex flex-wrap items-center gap-3">
+              <div className="p-2.5 bg-cyan-50 text-cyan-600 rounded-xl shrink-0">
+                <Package className="w-6 h-6" />
               </div>
-            </details>
+              <span>Warenwirtschaft</span>
+              <span className="text-sm font-bold bg-slate-100 text-slate-600 px-3 py-1 rounded-full border border-slate-200 align-middle shadow-sm whitespace-nowrap">
+                {productList.length} Produkte
+              </span>
+            </h1>
+            <p className="text-slate-500 mt-1.5 font-medium text-sm">Verwalte deine {productList.length} Produkte und Marktplatz-Listings zentral.</p>
+          </div>
 
-            <details className="group bg-cyan-50/50 border border-cyan-100 rounded-xl overflow-hidden cursor-pointer">
-              <summary className="flex gap-3 p-3 text-sm text-cyan-900/90 items-center font-medium select-none outline-none">
-                <div className="shrink-0 text-cyan-600">
-                  <Settings className="w-5 h-5" />
-                </div>
-                <span><strong>Wie funktionieren die Sync-Einstellungen?</strong> (Allgemein vs. Produkt)</span>
-              </summary>
-              <div className="px-3 pb-3.5 pt-2 text-sm text-cyan-950/90 leading-relaxed border-t border-cyan-100/60 ml-11 space-y-3">
-                <p>
-                  Die Synchronisation von Beständen und Preisen wird auf <strong>zwei Ebenen</strong> gesteuert, die Hand in Hand arbeiten:
-                </p>
-                <div className="space-y-2">
-                  <div>
-                    <strong className="text-cyan-900">1. Allgemeine Einstellungen (pro Marktplatz):</strong> Unter dem Button <em>„Einstellungen“</em> oben rechts legst du für jeden Marktplatz fest, ob der Sync generell aktiv ist, ob Bestände und/oder Preise übertragen werden dürfen und welche globalen Preisregeln (Auf-/Abschläge, Basispreis, Währungsumrechnung) oder Vorbestellungs-Freigaben gelten.
-                  </div>
-                  <div>
-                    <strong className="text-cyan-900">2. Einstellungen am Produkt (pro Artikel / Mapping):</strong> Direkt am Produkt (über das <code>...</code>-Menü in der Tabelle, die Mehrfachauswahl oder in der Produkt-Detailansicht unter <em>Marktplatz Mappings</em>) steuerst du den Bestands- und Preis-Sync für das einzelne Produkt und kannst optional einen individuellen Preisaufschlag oder Rabatt hinterlegen.
-                  </div>
-                </div>
-                <div className="bg-white/70 border border-cyan-200/60 rounded-lg p-3 space-y-1.5 text-xs text-cyan-950">
-                  <div className="font-bold text-cyan-900 uppercase tracking-wide text-[11px]">So greifen beide Ebenen ineinander:</div>
-                  <ul className="list-disc pl-4 space-y-1">
-                    <li>
-                      <strong>Beide Schalter müssen AN sein (UND-Prinzip):</strong> Ein Bestand oder Preis wird nur dann an einen Marktplatz gesendet, wenn der Abgleich sowohl in den <em>Allgemeinen Einstellungen</em> des Marktplatzes als auch <em>am Produkt selbst</em> aktiviert ist. Schaltest du den Preis-Sync global für einen Marktplatz aus, werden für diesen Kanal keinerlei Preise übertragen – selbst wenn der Haken am Produkt gesetzt ist. Umgekehrt kannst du einzelne Produkte gezielt vom Sync ausschließen.
-                    </li>
-                    <li>
-                      <strong>Preisregeln (Produkt überschreibt Allgemein):</strong> Hast du direkt am Produkt-Mapping einen eigenen Preisaufschlag oder Rabatt eingestellt, hat dieser <strong>Vorrang</strong> vor der allgemeinen Marktplatz-Regel. Steht das Produkt-Mapping auf <em>„Keine Änderung (1:1)“</em>, greift automatisch die allgemeine Preisregel aus den Marktplatz-Einstellungen.
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </details>
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            <ManualSyncButton />
+            <CsvActions />
+            <button className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold hover:from-cyan-400 hover:to-blue-400 shadow-md hover:shadow-lg transition-all duration-300 whitespace-nowrap">
+              <Plus className="w-4 h-4" />
+              Neues Produkt
+            </button>
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-3">
-          <Link
-            href="/products/inventory"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-50 text-emerald-700 font-semibold hover:bg-emerald-100 transition-colors border border-emerald-200 shadow-sm"
-          >
-            <ClipboardList className="w-4 h-4" />
-            Laufende Inventur
-          </Link>
-          <Link
-            href="/products/logs"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-50 text-slate-700 font-semibold hover:bg-slate-100 transition-colors border border-slate-200 shadow-sm"
-          >
-            <History className="w-4 h-4" />
-            Logs
-          </Link>
-          <Link
-            href="/products/settings"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-50 text-slate-700 font-semibold hover:bg-slate-100 transition-colors border border-slate-200 shadow-sm"
-          >
-            <Settings className="w-4 h-4" />
-            Einstellungen
-          </Link>
-          <Link
-            href="/products/import"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-50 text-slate-700 font-semibold hover:bg-slate-100 transition-colors border border-slate-200 shadow-sm"
-          >
-            <ServerCrash className="w-4 h-4" />
-            Marketplace Import
-          </Link>
-          <ManualSyncButton />
-          <CsvActions />
-          <button className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold hover:from-cyan-400 hover:to-blue-400 shadow-md hover:shadow-lg transition-all duration-300">
-            <Plus className="w-4 h-4" />
-            Neues Produkt
-          </button>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <details className="group bg-blue-50/50 border border-blue-100 rounded-xl overflow-hidden cursor-pointer h-fit">
+            <summary className="flex gap-3 p-3 text-sm text-blue-800/90 items-center font-medium select-none outline-none">
+              <div className="shrink-0 text-blue-500">
+                <Info className="w-5 h-5" />
+              </div>
+              <span><strong>TheOmniStack ist dein Master-System.</strong> (Klicken für Details)</span>
+            </summary>
+            <div className="px-3 pb-3 pt-1 text-sm text-blue-800/90 leading-relaxed border-t border-blue-100/50 ml-11">
+              Bitte passe manuelle Bestände und Preise immer hier an. 
+              Diese werden dann automatisch an alle angebundenen Marktplätze (Otto, About You, etc.) gepusht. 
+              <br/><br/>
+              <em>Hinweis zu Verkäufen:</em> Eingehende Bestellungen aus den Marktplätzen reduzieren den Bestand hier in TheOmniStack natürlich vollautomatisch. Nur <strong>manuelle Änderungen</strong>, die direkt in Fremdportalen vorgenommen werden, überträgt das System nicht zurück.
+              <br/><br/>
+              <em>Hinweis zu Aktionspreisen:</em> Wird ein Aktionspreis gesetzt, ohne ein explizites Datum auszuwählen, übermittelt das System automatisch einen Aktionszeitraum von „ab sofort bis in 10 Jahren“. So wird sichergestellt, dass Marktplätze wie Otto oder Amazon den reduzierten Preis garantiert akzeptieren.
+            </div>
+          </details>
+
+          <details className="group bg-cyan-50/50 border border-cyan-100 rounded-xl overflow-hidden cursor-pointer h-fit">
+            <summary className="flex gap-3 p-3 text-sm text-cyan-900/90 items-center font-medium select-none outline-none">
+              <div className="shrink-0 text-cyan-600">
+                <Settings className="w-5 h-5" />
+              </div>
+              <span><strong>Wie funktionieren die Sync-Einstellungen?</strong> (Allgemein vs. Produkt)</span>
+            </summary>
+            <div className="px-3 pb-3.5 pt-2 text-sm text-cyan-950/90 leading-relaxed border-t border-cyan-100/60 ml-11 space-y-3">
+              <p>
+                Die Synchronisation von Beständen und Preisen wird auf <strong>zwei Ebenen</strong> gesteuert, die Hand in Hand arbeiten:
+              </p>
+              <div className="space-y-2">
+                <div>
+                  <strong className="text-cyan-900">1. Allgemeine Einstellungen (pro Marktplatz):</strong> Unter dem Reiter <em>„Einstellungen“</em> legst du für jeden Marktplatz fest, ob der Sync generell aktiv ist, ob Bestände und/oder Preise übertragen werden dürfen und welche globalen Preisregeln (Auf-/Abschläge, Basispreis, Währungsumrechnung) oder Vorbestellungs-Freigaben gelten.
+                </div>
+                <div>
+                  <strong className="text-cyan-900">2. Einstellungen am Produkt (pro Artikel / Mapping):</strong> Direkt am Produkt (über das <code>...</code>-Menü in der Tabelle, die Mehrfachauswahl oder in der Produkt-Detailansicht unter <em>Marktplatz Mappings</em>) steuerst du den Bestands- und Preis-Sync für das einzelne Produkt und kannst optional einen individuellen Preisaufschlag oder Rabatt hinterlegen.
+                </div>
+              </div>
+              <div className="bg-white/70 border border-cyan-200/60 rounded-lg p-3 space-y-1.5 text-xs text-cyan-950">
+                <div className="font-bold text-cyan-900 uppercase tracking-wide text-[11px]">So greifen beide Ebenen ineinander:</div>
+                <ul className="list-disc pl-4 space-y-1">
+                  <li>
+                    <strong>Beide Schalter müssen AN sein (UND-Prinzip):</strong> Ein Bestand oder Preis wird nur dann an einen Marktplatz gesendet, wenn der Abgleich sowohl in den <em>Allgemeinen Einstellungen</em> des Marktplatzes als auch <em>am Produkt selbst</em> aktiviert ist. Schaltest du den Preis-Sync global für einen Marktplatz aus, werden für diesen Kanal keinerlei Preise übertragen – selbst wenn der Haken am Produkt gesetzt ist. Umgekehrt kannst du einzelne Produkte gezielt vom Sync ausschließen.
+                  </li>
+                  <li>
+                    <strong>Preisregeln (Produkt überschreibt Allgemein):</strong> Hast du direkt am Produkt-Mapping einen eigenen Preisaufschlag oder Rabatt eingestellt, hat dieser <strong>Vorrang</strong> vor der allgemeinen Marktplatz-Regel. Steht das Produkt-Mapping auf <em>„Keine Änderung (1:1)“</em>, greift automatisch die allgemeine Preisregel aus den Marktplatz-Einstellungen.
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </details>
+        </div>
+
+        <div className="pt-4 border-t border-slate-100">
+          <ProductsSubNav />
         </div>
       </header>
 

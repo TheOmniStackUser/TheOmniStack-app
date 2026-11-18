@@ -37,6 +37,7 @@ import {
   PurchasePricePreviewItem,
 } from '@/app/actions/inventory'
 import { updateProductPurchasePriceInline, updateProductStockInline } from '@/app/actions/products'
+import { ProductsSubNav } from '../products-subnav'
 
 export type InventoryProductItem = {
   id: string
@@ -804,88 +805,89 @@ export function InventoryClient({ initialProducts }: { initialProducts: Inventor
   return (
     <div className="space-y-6">
       {/* Header */}
-      <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden">
+      <header className="flex flex-col gap-5 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-72 h-72 bg-gradient-to-br from-cyan-400/10 via-emerald-400/5 to-transparent rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl pointer-events-none" />
 
-        <div>
-          <Link
-            href="/products"
-            className="inline-flex items-center text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors mb-2"
-          >
-            <ArrowLeft className="w-4 h-4 mr-1.5" />
-            Zurück zur Produktübersicht
-          </Link>
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight flex flex-wrap items-center gap-3">
-            <div className="p-2.5 bg-cyan-50 text-cyan-600 rounded-xl border border-cyan-100">
-              <ClipboardList className="w-6 h-6" />
-            </div>
-            Laufende Inventur
-            <span className="text-sm font-bold bg-slate-100 text-slate-700 px-3 py-1 rounded-full border border-slate-200">
-              {products.length} zusammengefasste SKUs
-            </span>
-          </h1>
-          <p className="text-slate-500 mt-2 font-medium max-w-2xl">
-            Echtzeit-Bestandsbewertung über alle zusammengefassten SKUs, manuelle oder vorlagenbasierte Pflege der Einkaufspreise sowie Export als Excel (.xlsx) und CSV.
-          </p>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight flex flex-wrap items-center gap-3">
+              <div className="p-2.5 bg-cyan-50 text-cyan-600 rounded-xl border border-cyan-100 shrink-0">
+                <ClipboardList className="w-6 h-6" />
+              </div>
+              <span>Laufende Inventur</span>
+              <span className="text-sm font-bold bg-slate-100 text-slate-700 px-3 py-1 rounded-full border border-slate-200 whitespace-nowrap">
+                {products.length} zusammengefasste SKUs
+              </span>
+            </h1>
+            <p className="text-slate-500 mt-1.5 font-medium text-sm">
+              Echtzeit-Bestandsbewertung über alle zusammengefassten SKUs, Pflege der Einkaufspreise (manuell oder per Vorlage) sowie Export als Excel und CSV.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => handleExportInventory('xlsx')}
+              disabled={isExporting !== null}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-all shadow-sm disabled:opacity-50 cursor-pointer whitespace-nowrap"
+            >
+              {isExporting === 'xlsx' ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <FileSpreadsheet className="w-4 h-4" />
+              )}
+              Excel Export (.xlsx)
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleExportInventory('csv')}
+              disabled={isExporting !== null}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition-all shadow-sm disabled:opacity-50 cursor-pointer whitespace-nowrap"
+            >
+              {isExporting === 'csv' ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <FileText className="w-4 h-4" />
+              )}
+              CSV Export (.csv)
+            </button>
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 shrink-0">
-          <button
-            type="button"
-            onClick={() => setShowTemplateModal(true)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-50 text-indigo-700 font-semibold hover:bg-indigo-100 transition-colors border border-indigo-200 shadow-xs cursor-pointer"
-          >
-            <Upload className="w-4 h-4" />
-            Einkaufspreis-Vorlage (Download / Upload)
-          </button>
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pt-4 border-t border-slate-100">
+          <ProductsSubNav />
 
-          <button
-            type="button"
-            onClick={() => {
-              if (isQuickEditMode) {
-                setQuickEdits({})
-                setIsQuickEditMode(false)
-              } else {
-                setIsQuickEditMode(true)
-              }
-            }}
-            className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold transition-all border shadow-xs cursor-pointer ${
-              isQuickEditMode
-                ? 'bg-amber-500 text-white border-amber-600 hover:bg-amber-600'
-                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-            }`}
-          >
-            <Edit3 className="w-4 h-4" />
-            {isQuickEditMode ? 'Schnellerfassung beenden' : 'Schnellerfassung (Manuell)'}
-          </button>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => setShowTemplateModal(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-bold hover:bg-indigo-100 transition-colors border border-indigo-200 shadow-xs cursor-pointer whitespace-nowrap"
+            >
+              <Upload className="w-4 h-4" />
+              Einkaufspreis-Vorlage (Download / Upload)
+            </button>
 
-          <button
-            type="button"
-            onClick={() => handleExportInventory('xlsx')}
-            disabled={isExporting !== null}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 transition-all shadow-sm disabled:opacity-50 cursor-pointer"
-          >
-            {isExporting === 'xlsx' ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <FileSpreadsheet className="w-4 h-4" />
-            )}
-            Excel Export (.xlsx)
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleExportInventory('csv')}
-            disabled={isExporting !== null}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-all shadow-sm disabled:opacity-50 cursor-pointer"
-          >
-            {isExporting === 'csv' ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <FileText className="w-4 h-4" />
-            )}
-            CSV Export (.csv)
-          </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (isQuickEditMode) {
+                  setQuickEdits({})
+                  setIsQuickEditMode(false)
+                } else {
+                  setIsQuickEditMode(true)
+                }
+              }}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border shadow-xs cursor-pointer whitespace-nowrap ${
+                isQuickEditMode
+                  ? 'bg-amber-500 text-white border-amber-600 hover:bg-amber-600'
+                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+              }`}
+            >
+              <Edit3 className="w-4 h-4" />
+              {isQuickEditMode ? 'Schnellerfassung beenden' : 'Schnellerfassung (Manuell)'}
+            </button>
+          </div>
         </div>
       </header>
 
