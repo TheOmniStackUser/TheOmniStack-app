@@ -754,13 +754,21 @@ export class ShopifyAdapter implements MarketplaceAdapter {
       const hasStockUpdates = updates.some(u => u.stock !== undefined)
       let locationId = ''
       let totalLocationsCount = 0
+      const activeLocationIds = new Set<string>()
       if (hasStockUpdates) {
         const locRes = await this.shopifyFetchWithRetry(`${shopUrl}/admin/api/2024-01/locations.json`, { headers })
         if (locRes.ok) {
           const locData = await locRes.json()
-          const locations = locData.locations || []
+          const allLocations = locData.locations || []
+          const activeLocations = allLocations.filter((l: any) => l.active !== false)
+          const locations = activeLocations.length > 0 ? activeLocations : allLocations
           totalLocationsCount = locations.length
-          locationId = locations[0]?.id?.toString() || ''
+          for (const l of locations) {
+            if (l.id) activeLocationIds.add(l.id.toString())
+          }
+          const primaryLocId = (integration.metadata as any)?.shop?.primary_location_id?.toString()
+          const primaryLoc = primaryLocId ? locations.find((l: any) => l.id?.toString() === primaryLocId) : null
+          locationId = (primaryLoc?.id || locations[0]?.id || '').toString()
         }
       }
 
@@ -901,7 +909,10 @@ export class ShopifyAdapter implements MarketplaceAdapter {
 
                 if (levelsRes.ok) {
                   const levelsData = await levelsRes.json()
-                  const levels = levelsData.inventory_levels || []
+                  const allLevels = levelsData.inventory_levels || []
+                  const levels = activeLocationIds.size > 0
+                    ? allLevels.filter((l: any) => activeLocationIds.has(l.location_id?.toString()))
+                    : allLevels
 
                   if (levels.length > 0) {
                     // Set the target stock on the first location, and 0 on all others to ensure total sum is exact

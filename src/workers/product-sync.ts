@@ -88,12 +88,13 @@ export function createProductSyncWorker() {
  */
 async function updateSyncStatus(integrationId: string, status: { isRunning: boolean, status: string, message: string, progress: number, total: number }) {
   try {
-    const [integration] = await db.select().from(marketplaceIntegrations).where(eq(marketplaceIntegrations.id, integrationId)).limit(1)
-    if (integration) {
-      const metadata = (integration.metadata as any) || {}
-      metadata.syncStatus = { ...status, lastUpdated: Date.now() }
-      await db.update(marketplaceIntegrations).set({ metadata }).where(eq(marketplaceIntegrations.id, integrationId))
-    }
+    const syncStatusPayload = JSON.stringify({ ...status, lastUpdated: Date.now() })
+    await db
+      .update(marketplaceIntegrations)
+      .set({
+        metadata: sql`jsonb_set(COALESCE(${marketplaceIntegrations.metadata}, '{}'::jsonb), '{syncStatus}', ${syncStatusPayload}::jsonb, true)`
+      })
+      .where(eq(marketplaceIntegrations.id, integrationId))
   } catch (err) {
     console.error(`[ProductSync] Failed to update sync status for ${integrationId}`, err)
   }
@@ -596,17 +597,19 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
         return { ...item, status: 'success' }
       })
 
-      // Save success or partial status in metadata
-      const updatedMeta = {
-        ...meta,
-        lastPushSync: {
-          timestamp: Date.now(),
-          status: isPartial ? 'partial' : 'success',
-          updatesCount: mpUpdates.length,
-          ...(isPartial ? { partialFailures: failures } : {})
-        }
-      }
-      await db.update(marketplaceIntegrations).set({ metadata: updatedMeta }).where(eq(marketplaceIntegrations.id, integrationId))
+      // Save success or partial status in metadata without overwriting concurrent productSync changes
+      const lastPushSyncSuccess = JSON.stringify({
+        timestamp: Date.now(),
+        status: isPartial ? 'partial' : 'success',
+        updatesCount: mpUpdates.length,
+        ...(isPartial ? { partialFailures: failures } : {})
+      })
+      await db
+        .update(marketplaceIntegrations)
+        .set({
+          metadata: sql`jsonb_set(COALESCE(${marketplaceIntegrations.metadata}, '{}'::jsonb), '{lastPushSync}', ${lastPushSyncSuccess}::jsonb, true)`
+        })
+        .where(eq(marketplaceIntegrations.id, integrationId))
 
       // Update log to success or partial
       if (logId) {
@@ -629,9 +632,18 @@ export async function pushUpdatesToMarketplaces(companyId: string, updates: { sk
       console.error(`[ProductSync] Failed to push updates to ${marketplace}:`, error)
       failedMarketplaces.push({ name: displayName, error: error.message || 'Unbekannter Fehler' })
       
-      // Save error status
-      const updatedMeta = { ...meta, lastPushSync: { timestamp: Date.now(), status: 'error', error: error.message || 'Unbekannter Fehler' } }
-      await db.update(marketplaceIntegrations).set({ metadata: updatedMeta }).where(eq(marketplaceIntegrations.id, integrationId))
+      // Save error status without overwriting concurrent productSync changes
+      const lastPushSyncError = JSON.stringify({
+        timestamp: Date.now(),
+        status: 'error',
+        error: error.message || 'Unbekannter Fehler'
+      })
+      await db
+        .update(marketplaceIntegrations)
+        .set({
+          metadata: sql`jsonb_set(COALESCE(${marketplaceIntegrations.metadata}, '{}'::jsonb), '{lastPushSync}', ${lastPushSyncError}::jsonb, true)`
+        })
+        .where(eq(marketplaceIntegrations.id, integrationId))
 
       // Update log to error
       if (logId) {

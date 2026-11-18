@@ -1237,6 +1237,7 @@ export function ProductsClient({ initialProducts, integrations = [] }: { initial
   const [bulkOrigin, setBulkOrigin] = useState('DE')
   const [isBulkUpdatingCustoms, setIsBulkUpdatingCustoms] = useState(false)
   const [syncingProductId, setSyncingProductId] = useState<string | null>(null)
+  const [bulkSyncProgress, setBulkSyncProgress] = useState<{ current: number; total: number } | null>(null)
 
   
   const [showBulkEditModal, setShowBulkEditModal] = useState(false)
@@ -2112,13 +2113,16 @@ export function ProductsClient({ initialProducts, integrations = [] }: { initial
             </button>
 
             <button
+              disabled={bulkSyncProgress !== null}
               onClick={async () => {
-                
+                if (bulkSyncProgress !== null) return;
                 const { triggerMarketplaceSyncForProducts } = await import('@/app/actions/products');
-                showToast('Sync wird gestartet, bitte warten...', 'info');
+                const productIds = Array.from(selectedProductIds);
+                const total = productIds.length;
+                setBulkSyncProgress({ current: 0, total });
+                showToast(`Sync für ${total} Produkte gestartet...`, 'info');
                 try {
-                  const productIds = Array.from(selectedProductIds);
-                  const chunkSize = 20;
+                  const chunkSize = 50;
                   const failed = [];
                   for (let i = 0; i < productIds.length; i += chunkSize) {
                     const chunk = productIds.slice(i, i + chunkSize);
@@ -2126,22 +2130,26 @@ export function ProductsClient({ initialProducts, integrations = [] }: { initial
                     if (result.failedMarketplaces && result.failedMarketplaces.length > 0) {
                       failed.push(...result.failedMarketplaces);
                     }
+                    setBulkSyncProgress({ current: Math.min(i + chunk.length, total), total });
                   }
                   
                   if (failed.length > 0) {
                     showToast(`Sync mit Fehlern beendet. Bitte Logs prüfen.`, 'error')
                   } else {
-                    showToast(`Sync für ${selectedProductIds.size} Produkte erfolgreich!`, 'success');
+                    showToast(`Sync für ${total} Produkte erfolgreich!`, 'success');
                   }
                 } catch (error) {
-
                   showToast('Fehler beim Sync', 'error');
+                } finally {
+                  setBulkSyncProgress(null);
                 }
               }}
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors text-sm font-semibold border border-emerald-200"
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-sm font-semibold border border-emerald-200"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.59-9.21l5.67-1.35"/></svg>
-              Jetzt synchronisieren
+              <svg className={bulkSyncProgress ? 'animate-spin' : ''} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.59-9.21l5.67-1.35"/></svg>
+              {bulkSyncProgress
+                ? `Synchronisiere... (${bulkSyncProgress.current}/${bulkSyncProgress.total})`
+                : 'Jetzt synchronisieren'}
             </button>
             <button
               onClick={() => setShowBulkDeleteConfirm(true)}
