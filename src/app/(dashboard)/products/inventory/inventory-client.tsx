@@ -990,60 +990,75 @@ export function InventoryClient({ initialProducts }: { initialProducts: Inventor
         </div>
 
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between">
-          <div className="flex items-start justify-between gap-2 mb-1.5">
-            <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block">
-                Einkaufspreis-Abdeckung
+          <div className="flex items-start justify-between gap-2 mb-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Einkaufspreis-Abdeckung
+            </span>
+            <div className="flex flex-wrap items-center justify-end gap-1.5 shrink-0">
+              <span
+                className={`text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${
+                  kpis.missingEkCount === 0
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                    : 'bg-amber-50 text-amber-800 border border-amber-200'
+                }`}
+                title={`${kpis.skusWithEk} von ${kpis.totalSkus} SKUs insgesamt gepflegt`}
+              >
+                {kpis.ekCoveragePercent}% Gesamt
               </span>
-              <span className="text-[11px] font-semibold text-slate-500">
-                Lagernd: <strong className="text-slate-800">{kpis.inStockEkCoveragePercent}%</strong> ({kpis.inStockSkusWithEk}/{kpis.inStockSkus}) • Gesamt: {kpis.ekCoveragePercent}%
+              <span
+                className={`text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${
+                  kpis.inStockSkusMissingEk === 0
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                    : 'bg-cyan-50 text-cyan-800 border border-cyan-200'
+                }`}
+                title={`${kpis.inStockSkusWithEk} von ${kpis.inStockSkus} lagernden SKUs (Bestand > 0) gepflegt`}
+              >
+                {kpis.inStockEkCoveragePercent}% mit Bestand
               </span>
             </div>
-            <span
-              className={`text-xs font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap shrink-0 ${
-                kpis.inStockSkusMissingEk === 0
-                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                  : 'bg-amber-50 text-amber-800 border border-amber-200'
-              }`}
-              title={`${kpis.inStockSkusWithEk} von ${kpis.inStockSkus} lagernden SKUs mit Einkaufspreis gepflegt (${kpis.ekCoveragePercent}% aller SKUs inkl. Bestand 0)`}
-            >
-              {kpis.inStockEkCoveragePercent}% mit Bestand
-            </span>
           </div>
-          <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden my-1.5">
-            <div
-              className={`h-full transition-all duration-500 ${
-                kpis.inStockSkusMissingEk === 0 ? 'bg-emerald-500' : 'bg-cyan-500'
-              }`}
-              style={{ width: `${kpis.inStockEkCoveragePercent}%` }}
-            />
+
+          <div className="space-y-2 my-1">
+            <div>
+              <div className="flex items-center justify-between text-[11px] mb-0.5">
+                <span className="text-slate-500 font-medium">
+                  Alle SKUs ({kpis.skusWithEk}/{kpis.totalSkus})
+                </span>
+                <span className="font-bold text-slate-800">{kpis.ekCoveragePercent}% gepflegt</span>
+              </div>
+              <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                <div
+                  className={`h-full transition-all duration-500 ${
+                    kpis.missingEkCount === 0 ? 'bg-emerald-500' : 'bg-cyan-500'
+                  }`}
+                  style={{ width: `${kpis.ekCoveragePercent}%` }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between text-[11px] mb-0.5">
+                <span className="text-slate-500 font-medium">
+                  Mit Bestand ({kpis.inStockSkusWithEk}/{kpis.inStockSkus})
+                </span>
+                <span className="font-bold text-emerald-700">
+                  {kpis.inStockEkCoveragePercent}% gepflegt
+                </span>
+              </div>
+              <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                <div
+                  className="h-full transition-all duration-500 bg-emerald-500"
+                  style={{ width: `${kpis.inStockEkCoveragePercent}%` }}
+                />
+              </div>
+            </div>
           </div>
-          <div className="flex items-center justify-between gap-2 text-xs mt-1">
-            {kpis.inStockSkusMissingEk > 0 ? (
+
+          <div className="flex items-center justify-between gap-2 text-xs mt-2 pt-1.5 border-t border-slate-100">
+            {kpis.missingEkCount > 0 ? (
               <>
                 <span className="text-amber-700 font-medium">
-                  <strong>{kpis.inStockSkusMissingEk} lagernd ohne EK</strong> ({kpis.missingEkCount} gesamt)
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (ekFilter === 'missing_ek' && stockFilter === 'in_stock') {
-                      setEkFilter('all')
-                      setStockFilter('all')
-                    } else {
-                      setEkFilter('missing_ek')
-                      setStockFilter('in_stock')
-                    }
-                  }}
-                  className="font-bold text-cyan-600 hover:text-cyan-700 underline cursor-pointer shrink-0"
-                >
-                  {ekFilter === 'missing_ek' && stockFilter === 'in_stock' ? 'Alle zeigen' : 'Filtern'}
-                </button>
-              </>
-            ) : kpis.missingEkCount > 0 ? (
-              <>
-                <span className="text-emerald-600 font-semibold flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> 100% mit Bestand gepflegt ({kpis.missingEkCount} ohne Bestand offen)
+                  {kpis.missingEkCount} SKUs ohne EK ({kpis.inStockSkusMissingEk} lagernd)
                 </span>
                 <button
                   type="button"
