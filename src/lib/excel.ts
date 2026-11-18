@@ -384,6 +384,43 @@ export function generateExcelBuffer(options: GenerateExcelOptions): Buffer {
   ])
 }
 
+export function decodeExcelString(input: string): string {
+  if (!input) return ''
+  let str = input
+  // Decode up to 2 passes in case of double-escaped entities like &amp;#252;
+  for (let pass = 0; pass < 2; pass++) {
+    const prev = str
+    str = str
+      .replace(/&#(\d+);/g, (_, dec) => {
+        const code = parseInt(dec, 10)
+        return !isNaN(code) && code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : _
+      })
+      .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => {
+        const code = parseInt(hex, 16)
+        return !isNaN(code) && code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : _
+      })
+      .replace(/_x([0-9a-fA-F]{4})_/g, (_, hex) => {
+        const code = parseInt(hex, 16)
+        return !isNaN(code) ? String.fromCharCode(code) : _
+      })
+      .replace(/&auml;/g, 'ä')
+      .replace(/&ouml;/g, 'ö')
+      .replace(/&uuml;/g, 'ü')
+      .replace(/&Auml;/g, 'Ä')
+      .replace(/&Ouml;/g, 'Ö')
+      .replace(/&Uuml;/g, 'Ü')
+      .replace(/&szlig;/g, 'ß')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&quot;/g, '"')
+      .replace(/&apos;/g, "'")
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&')
+    if (str === prev) break
+  }
+  return str.normalize('NFC')
+}
+
 /**
  * Parses the first worksheet of an .xlsx file buffer into an array of row objects
  * keyed by the header row (row 1).
@@ -395,6 +432,7 @@ export function parseExcelBuffer(xlsxBuffer: Buffer): Record<string, string>[] {
     attributeNamePrefix: '@_',
     parseTagValue: false,
     trimValues: false,
+    htmlEntities: true,
   })
 
   // 1. Parse shared strings if present
@@ -406,16 +444,16 @@ export function parseExcelBuffer(xlsxBuffer: Buffer): Record<string, string>[] {
     const items = Array.isArray(siList) ? siList : siList ? [siList] : []
     for (const si of items) {
       if (typeof si?.t === 'string') {
-        sharedStrings.push(si.t)
+        sharedStrings.push(decodeExcelString(si.t))
       } else if (si?.t && typeof si.t['#text'] !== 'undefined') {
-        sharedStrings.push(String(si.t['#text']))
+        sharedStrings.push(decodeExcelString(String(si.t['#text'])))
       } else if (si?.r) {
         // Rich text runs
         const runs = Array.isArray(si.r) ? si.r : [si.r]
         const text = runs
           .map((r: any) => (typeof r?.t === 'string' ? r.t : r?.t?.['#text'] || ''))
           .join('')
-        sharedStrings.push(text)
+        sharedStrings.push(decodeExcelString(text))
       } else {
         sharedStrings.push('')
       }
@@ -446,17 +484,24 @@ export function parseExcelBuffer(xlsxBuffer: Buffer): Record<string, string>[] {
     const type = cell['@_t']
     if (type === 'inlineStr') {
       const isNode = cell.is
-      if (typeof isNode?.t === 'string') return isNode.t
-      if (isNode?.t && typeof isNode.t['#text'] !== 'undefined') return String(isNode.t['#text'])
+      if (typeof isNode?.t === 'string') return decodeExcelString(isNode.t)
+      if (isNode?.t && typeof isNode.t['#text'] !== 'undefined') return decodeExcelString(String(isNode.t['#text']))
+      if (isNode?.r) {
+        const runs = Array.isArray(isNode.r) ? isNode.r : [isNode.r]
+        const text = runs
+          .map((r: any) => (typeof r?.t === 'string' ? r.t : r?.t?.['#text'] || ''))
+          .join('')
+        return decodeExcelString(text)
+      }
       return ''
     }
     const rawV = cell.v
     const valStr = typeof rawV === 'object' && rawV !== null ? String(rawV['#text'] ?? '') : String(rawV ?? '')
     if (type === 's') {
       const idx = parseInt(valStr, 10)
-      return !isNaN(idx) && sharedStrings[idx] !== undefined ? sharedStrings[idx] : valStr
+      return !isNaN(idx) && sharedStrings[idx] !== undefined ? sharedStrings[idx] : decodeExcelString(valStr)
     }
-    return valStr
+    return decodeExcelString(valStr)
   }
 
   // Parse all rows into sparse arrays of strings by column index

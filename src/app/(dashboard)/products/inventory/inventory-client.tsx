@@ -765,7 +765,14 @@ export function InventoryClient({ initialProducts }: { initialProducts: Inventor
     if (!uploadPreview) return
     setIsApplyingUpload(true)
     try {
-      const itemsToApply = uploadPreview.items.map(i => ({
+      const changedItems = uploadPreview.items.filter(
+        i =>
+          i.priceChanged ||
+          (uploadAlsoUpdateStock && i.stockChanged) ||
+          (uploadAlsoUpdateStorage && i.storageLocationChanged)
+      )
+
+      const itemsToApply = (changedItems.length > 0 ? changedItems : uploadPreview.items).map(i => ({
         productId: i.productId,
         purchasePrice: i.newPurchasePrice,
         currentStock: i.newStock,
@@ -778,6 +785,27 @@ export function InventoryClient({ initialProducts }: { initialProducts: Inventor
         updateStock: uploadAlsoUpdateStock,
         updateStorageLocation: uploadAlsoUpdateStorage,
       })
+
+      // Optimistically update local state immediately
+      const appliedMap = new Map(itemsToApply.map(i => [i.productId, i]))
+      setProducts(prev =>
+        prev.map(p => {
+          const upd = appliedMap.get(p.id)
+          if (!upd) return p
+          return {
+            ...p,
+            purchasePrice: upd.purchasePrice !== undefined ? upd.purchasePrice : p.purchasePrice,
+            currentStock:
+              uploadAlsoUpdateStock && upd.currentStock !== undefined && upd.currentStock !== null
+                ? upd.currentStock
+                : p.currentStock,
+            storageLocation:
+              uploadAlsoUpdateStorage && upd.storageLocation !== undefined
+                ? upd.storageLocation
+                : p.storageLocation,
+          }
+        })
+      )
 
       showToast(
         `${res.updatedCount} Produkte erfolgreich aus der Vorlage aktualisiert!`,

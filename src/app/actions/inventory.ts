@@ -7,7 +7,7 @@ import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { eq, and, inArray } from 'drizzle-orm'
 import Papa from 'papaparse'
 import { revalidatePath } from 'next/cache'
-import { generateExcelBuffer, parseExcelBuffer, ExcelColumnDef } from '@/lib/excel'
+import { generateExcelBuffer, parseExcelBuffer, decodeExcelString, ExcelColumnDef } from '@/lib/excel'
 
 function formatMarketplaceLabel(mp: string): string {
   const map: Record<string, string> = {
@@ -249,8 +249,11 @@ export async function previewPurchasePriceUploadAction(payload: {
   if (isXlsx) {
     rawRows = parseExcelBuffer(rawBuffer)
   } else {
-    // Strip UTF-8 BOM if present
-    const csvText = rawBuffer.toString('utf8').replace(/^\uFEFF/, '')
+    // Strip UTF-8 BOM if present, fallback to latin1 if UTF-8 produces replacement chars
+    let csvText = rawBuffer.toString('utf8').replace(/^\uFEFF/, '')
+    if (csvText.includes('\uFFFD')) {
+      csvText = rawBuffer.toString('latin1').replace(/^\uFEFF/, '')
+    }
     const parsed = Papa.parse<Record<string, string>>(csvText, {
       header: true,
       skipEmptyLines: true,
@@ -265,27 +268,51 @@ export async function previewPurchasePriceUploadAction(payload: {
     throw new Error('Die hochgeladene Datei enthält keine Datenzeilen.')
   }
 
+  const normalizeSkuKey = (sku: string) => decodeExcelString(sku).trim().toLowerCase()
+  const foldUmlauts = (sku: string) =>
+    normalizeSkuKey(sku)
+      .replace(/ä/g, 'ae')
+      .replace(/ö/g, 'oe')
+      .replace(/ü/g, 'ue')
+      .replace(/ß/g, 'ss')
+
   // Fetch company products & mappings to match both main SKUs and consolidated marketplace SKUs
   const allProducts = await fetchConsolidatedProductsWithMappings(auth.activeCompanyId)
 
   const mainSkuMap = new Map<string, (typeof allProducts)[0]>()
   const mappedSkuMap = new Map<string, (typeof allProducts)[0]>()
+  const foldedSkuMap = new Map<string, (typeof allProducts)[0] | null>()
 
-  for (const prod of allProducts) {
-    mainSkuMap.set(prod.sku.trim().toLowerCase(), prod)
-    for (const mSku of prod.mappedSkusList) {
-      const norm = mSku.trim().toLowerCase()
-      if (!mappedSkuMap.has(norm)) {
-        mappedSkuMap.set(norm, prod)
-      }
+  const registerFolded = (folded: string, prod: (typeof allProducts)[0]) => {
+    const existing = foldedSkuMap.get(folded)
+    if (existing === undefined) {
+      foldedSkuMap.set(folded, prod)
+    } else if (existing !== null && existing.id !== prod.id) {
+      // Mark ambiguous if two distinct products share the same umlaut-folded SKU
+      foldedSkuMap.set(folded, null)
     }
   }
 
-  // Helper to get column value case-insensitively
+  for (const prod of allProducts) {
+    const normMain = normalizeSkuKey(prod.sku)
+    mainSkuMap.set(normMain, prod)
+    registerFolded(foldUmlauts(prod.sku), prod)
+
+    for (const mSku of prod.mappedSkusList) {
+      const norm = normalizeSkuKey(mSku)
+      if (!mappedSkuMap.has(norm)) {
+        mappedSkuMap.set(norm, prod)
+      }
+      registerFolded(foldUmlauts(mSku), prod)
+    }
+  }
+
+  // Helper to get column value case-insensitively (decoding XML entities in headers too)
   const getCol = (row: Record<string, string>, candidates: string[]): string | undefined => {
     const keys = Object.keys(row)
     for (const cand of candidates) {
-      const foundKey = keys.find(k => k.trim().toLowerCase() === cand.toLowerCase())
+      const normCand = normalizeSkuKey(cand)
+      const foundKey = keys.find(k => normalizeSkuKey(k) === normCand)
       if (foundKey !== undefined) return row[foundKey]
     }
     return undefined
@@ -296,7 +323,7 @@ export async function previewPurchasePriceUploadAction(payload: {
   let skippedEmptyPriceRows = 0
 
   for (const row of rawRows) {
-    const rawSku = getCol(row, [
+    const rawSkuCell = getCol(row, [
       'SKU',
       'Haupt-SKU',
       'Zusammengefasste SKU',
@@ -304,19 +331,53 @@ export async function previewPurchasePriceUploadAction(payload: {
       'Art.-Nr.',
       'ArtNr',
       'Product SKU',
-    ])?.trim()
+    ])
+    const rawSku = rawSkuCell ? decodeExcelString(rawSkuCell).trim() : undefined
 
-    if (!rawSku || rawSku.toLowerCase() === 'gesamt' || rawSku.toLowerCase() === 'summe') {
+    if (
+      !rawSku ||
+      rawSku.toLowerCase() === 'gesamt' ||
+      rawSku.toLowerCase() === 'summe' ||
+      rawSku.toLowerCase() === 'gesamt / summe'
+    ) {
       continue
     }
 
-    const normSku = rawSku.toLowerCase()
+    const normSku = normalizeSkuKey(rawSku)
     let matchedProd = mainSkuMap.get(normSku)
     let matchedVia: 'main_sku' | 'mapped_sku' = 'main_sku'
 
     if (!matchedProd) {
       matchedProd = mappedSkuMap.get(normSku)
       matchedVia = 'mapped_sku'
+    }
+
+    if (!matchedProd) {
+      // Check if 'Zusammengefasste SKUs' column has a matching SKU
+      const rawMappedCol = getCol(row, ['Zusammengefasste SKUs'])
+      if (rawMappedCol) {
+        const parts = decodeExcelString(rawMappedCol)
+          .split(',')
+          .map(s => s.trim())
+          .filter(Boolean)
+        for (const part of parts) {
+          const normPart = normalizeSkuKey(part)
+          matchedProd = mainSkuMap.get(normPart) || mappedSkuMap.get(normPart)
+          if (matchedProd) {
+            matchedVia = 'mapped_sku'
+            break
+          }
+        }
+      }
+    }
+
+    if (!matchedProd) {
+      // Unambiguous umlaut-folding fallback (e.g. Grün <-> Gruen)
+      const foldedMatch = foldedSkuMap.get(foldUmlauts(rawSku))
+      if (foldedMatch) {
+        matchedProd = foldedMatch
+        matchedVia = normalizeSkuKey(foldedMatch.sku) === normSku ? 'main_sku' : 'mapped_sku'
+      }
     }
 
     if (!matchedProd) {
@@ -329,6 +390,7 @@ export async function previewPurchasePriceUploadAction(payload: {
     const rawEk = getCol(row, [
       'Einkaufspreis',
       'Einkaufspreis (Einzel)',
+      'Einkaufspreis (Einzel €)',
       'Einkaufspreis (€)',
       'EK',
       'EK-Preis',
@@ -343,7 +405,7 @@ export async function previewPurchasePriceUploadAction(payload: {
 
     const parsedEk = parseFlexibleNumber(rawEk)
     const parsedStock = parseFlexibleNumber(rawStock)
-    const cleanStorage = rawStorage !== undefined ? rawStorage.trim() : undefined
+    const cleanStorage = rawStorage !== undefined ? decodeExcelString(rawStorage).trim() : undefined
 
     const oldEk =
       matchedProd.purchasePrice !== null && matchedProd.purchasePrice !== undefined
@@ -353,13 +415,8 @@ export async function previewPurchasePriceUploadAction(payload: {
     const oldStorage = matchedProd.storageLocation || null
 
     // If the EK cell in the template was left completely blank, check if stock or storage changed
-    const ekProvided = rawEk !== undefined && String(rawEk).trim() !== ''
+    const ekProvided = rawEk !== undefined && String(rawEk).trim() !== '' && String(rawEk).trim() !== '-'
     const newEk = ekProvided && parsedEk !== null ? Math.max(0, Math.round(parsedEk * 100) / 100) : oldEk
-
-    if (!ekProvided && parsedStock === null && cleanStorage === undefined) {
-      skippedEmptyPriceRows++
-      continue
-    }
 
     const priceChanged =
       ekProvided &&
@@ -371,6 +428,10 @@ export async function previewPurchasePriceUploadAction(payload: {
 
     const newStorageVal = cleanStorage !== undefined ? (cleanStorage || null) : oldStorage
     const storageLocationChanged = cleanStorage !== undefined && (newStorageVal || '') !== (oldStorage || '')
+
+    if (!ekProvided && !stockChanged && !storageLocationChanged) {
+      skippedEmptyPriceRows++
+    }
 
     previewItemsMap.set(matchedProd.id, {
       productId: matchedProd.id,
@@ -392,7 +453,14 @@ export async function previewPurchasePriceUploadAction(payload: {
     })
   }
 
-  const items = Array.from(previewItemsMap.values())
+  // Sort items so that rows with changed prices (or changed stock/storage) appear first in the preview
+  const items = Array.from(previewItemsMap.values()).sort((a, b) => {
+    const aRank = a.priceChanged ? 0 : a.stockChanged || a.storageLocationChanged ? 1 : a.newPurchasePrice !== null ? 2 : 3
+    const bRank = b.priceChanged ? 0 : b.stockChanged || b.storageLocationChanged ? 1 : b.newPurchasePrice !== null ? 2 : 3
+    if (aRank !== bRank) return aRank - bRank
+    return a.sku.localeCompare(b.sku, 'de')
+  })
+
   const changedPriceCount = items.filter(i => i.priceChanged).length
   const changedStockCount = items.filter(i => i.stockChanged).length
   const withValidPriceCount = items.filter(i => i.newPurchasePrice !== null).length
