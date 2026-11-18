@@ -8,6 +8,7 @@ import { sql, count, gte, and, lte, desc, eq } from 'drizzle-orm'
 import Link from 'next/link'
 
 import { PeriodSelector } from './components/period-selector'
+import { MerchantNameCell } from './components/merchant-name-cell'
 import { Suspense } from 'react'
 
 export default async function AdminDashboardPage(props: {
@@ -64,7 +65,7 @@ export default async function AdminDashboardPage(props: {
     .where(gte(orders.createdAt, startOfMonth))
 
   // Orders per company in selected period
-  const topMerchants = await db
+  const topMerchantsRaw = await db
     .select({
       companyId: orders.companyId,
       companyName: companies.name,
@@ -81,13 +82,79 @@ export default async function AdminDashboardPage(props: {
     .orderBy(sql`count(${orders.id}) desc`)
     .limit(5)
 
-  // Last 3 new registrations
+  const topMerchantIds = topMerchantsRaw.map((m) => m.companyId).filter(Boolean) as string[]
+  const topMerchantCompanies = topMerchantIds.length > 0
+    ? await db
+        .select({
+          id: companies.id,
+          name: companies.name,
+          legalName: companies.legalName,
+          email: companies.email,
+          phone: companies.phone,
+          website: companies.website,
+          street: companies.street,
+          zip: companies.zip,
+          city: companies.city,
+          country: companies.country,
+          warehouseStreet: companies.warehouseStreet,
+          warehouseZip: companies.warehouseZip,
+          warehouseCity: companies.warehouseCity,
+          warehouseCountry: companies.warehouseCountry,
+          vatId: companies.vatId,
+          taxId: companies.taxId,
+          bankName: companies.bankName,
+          iban: companies.iban,
+          bic: companies.bic,
+          paymentRecipient: companies.paymentRecipient,
+          registeredApp: companies.registeredApp,
+          trialExpiresAt: companies.trialExpiresAt,
+          canceledAt: companies.canceledAt,
+          createdAt: companies.createdAt,
+        })
+        .from(companies)
+        .where(sql`${companies.id} IN ${topMerchantIds}`)
+    : []
+
+  const topCompanyMap = new Map(
+    topMerchantCompanies.map((c) => [
+      c.id,
+      {
+        ...c,
+        createdAt: c.createdAt ? c.createdAt.toISOString() : null,
+        trialExpiresAt: c.trialExpiresAt ? c.trialExpiresAt.toISOString() : null,
+        canceledAt: c.canceledAt ? c.canceledAt.toISOString() : null,
+      },
+    ])
+  )
+
+  const topMerchants = topMerchantsRaw.map((m) => ({
+    ...m,
+    company: m.companyId ? topCompanyMap.get(m.companyId) || null : null,
+  }))
+
+  // Last 3 new registrations with complete firm/address data
   const latestCompanies = await db
     .select({
       id: companies.id,
       name: companies.name,
       legalName: companies.legalName,
       email: companies.email,
+      phone: companies.phone,
+      website: companies.website,
+      street: companies.street,
+      zip: companies.zip,
+      city: companies.city,
+      country: companies.country,
+      warehouseStreet: companies.warehouseStreet,
+      warehouseZip: companies.warehouseZip,
+      warehouseCity: companies.warehouseCity,
+      warehouseCountry: companies.warehouseCountry,
+      vatId: companies.vatId,
+      taxId: companies.taxId,
+      bankName: companies.bankName,
+      iban: companies.iban,
+      bic: companies.bic,
+      paymentRecipient: companies.paymentRecipient,
       registeredApp: companies.registeredApp,
       trialExpiresAt: companies.trialExpiresAt,
       canceledAt: companies.canceledAt,
@@ -120,6 +187,9 @@ export default async function AdminDashboardPage(props: {
 
   const recentRegistrations = latestCompanies.map((c) => ({
     ...c,
+    createdAt: c.createdAt ? c.createdAt.toISOString() : null,
+    trialExpiresAt: c.trialExpiresAt ? c.trialExpiresAt.toISOString() : null,
+    canceledAt: c.canceledAt ? c.canceledAt.toISOString() : null,
     user: memberMap.get(c.id) || null,
   }))
 
@@ -128,6 +198,20 @@ export default async function AdminDashboardPage(props: {
     .select({
       id: companies.id,
       name: companies.name,
+      legalName: companies.legalName,
+      email: companies.email,
+      phone: companies.phone,
+      website: companies.website,
+      street: companies.street,
+      zip: companies.zip,
+      city: companies.city,
+      country: companies.country,
+      warehouseStreet: companies.warehouseStreet,
+      warehouseZip: companies.warehouseZip,
+      warehouseCity: companies.warehouseCity,
+      warehouseCountry: companies.warehouseCountry,
+      vatId: companies.vatId,
+      taxId: companies.taxId,
       canceledAt: companies.canceledAt,
       cancelEffectiveDate: companies.cancelEffectiveDate,
       cancelReason: companies.cancelReason,
@@ -209,7 +293,11 @@ export default async function AdminDashboardPage(props: {
                 <span className="text-white/30 text-xs w-5">{i + 1}.</span>
                 <div className="flex-1">
                   <div className="flex justify-between items-center mb-1">
-                    <span className="text-sm text-white font-medium">{m.companyName || 'Unbekannt'}</span>
+                    {m.company ? (
+                      <MerchantNameCell company={m.company} subtitle={null} />
+                    ) : (
+                      <span className="text-sm text-white font-medium">{m.companyName || 'Unbekannt'}</span>
+                    )}
                     <span className="text-sm font-bold text-violet-400">{m.orderCount} Bestellungen</span>
                   </div>
                   <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
@@ -265,12 +353,14 @@ export default async function AdminDashboardPage(props: {
                   return (
                     <tr key={c.id} className="text-sm hover:bg-white/[0.02] transition-colors">
                       <td className="py-3.5 pr-4">
-                        <div>
-                          <p className="text-white font-medium">{c.name}</p>
-                          {c.legalName && c.legalName !== c.name && (
-                            <p className="text-xs text-white/40 truncate max-w-[220px]">{c.legalName}</p>
-                          )}
-                        </div>
+                        <MerchantNameCell
+                          company={c}
+                          subtitle={
+                            c.legalName && c.legalName !== c.name ? (
+                              <p className="text-xs text-white/40 truncate max-w-[220px]">{c.legalName}</p>
+                            ) : undefined
+                          }
+                        />
                       </td>
                       <td className="py-3.5 px-4 text-white/70">
                         {c.user ? (
@@ -367,7 +457,14 @@ export default async function AdminDashboardPage(props: {
                   const reason = c.cancelReason as { category: string; subReason?: string; details?: string } | null
                   return (
                     <tr key={c.id} className="text-sm">
-                      <td className="py-3 pr-4 text-white font-medium">{c.name}</td>
+                      <td className="py-3 pr-4">
+                        <MerchantNameCell
+                          company={{
+                            ...c,
+                            canceledAt: c.canceledAt ? c.canceledAt.toISOString() : null,
+                          }}
+                        />
+                      </td>
                       <td className="py-3 px-4 text-white/70">
                         {c.canceledAt ? new Date(c.canceledAt).toLocaleDateString('de-DE') : '-'}
                       </td>

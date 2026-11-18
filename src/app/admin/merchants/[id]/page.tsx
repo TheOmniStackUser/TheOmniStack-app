@@ -7,6 +7,7 @@ import { sql, count, gte, and, eq, lte } from 'drizzle-orm'
 import { notFound } from 'next/navigation'
 import { TrialManager } from './trial-manager'
 import { FeatureManager } from './feature-manager'
+import { CompanyAddressSection } from './company-address-section'
 
 export default async function AdminMerchantDetailPage({
   params,
@@ -88,6 +89,36 @@ export default async function AdminMerchantDetailPage({
           </div>
         </div>
       </div>
+
+      {/* Company & Billing Address Section */}
+      <CompanyAddressSection
+        initialCompany={{
+          id: company.id,
+          name: company.name,
+          legalName: company.legalName,
+          street: company.street,
+          zip: company.zip,
+          city: company.city,
+          country: company.country,
+          warehouseStreet: company.warehouseStreet,
+          warehouseZip: company.warehouseZip,
+          warehouseCity: company.warehouseCity,
+          warehouseCountry: company.warehouseCountry,
+          vatId: company.vatId,
+          taxId: company.taxId,
+          email: company.email,
+          phone: company.phone,
+          website: company.website,
+          bankName: company.bankName,
+          iban: company.iban,
+          bic: company.bic,
+          paymentRecipient: company.paymentRecipient,
+          registeredApp: company.registeredApp,
+          createdAt: company.createdAt ? company.createdAt.toISOString() : null,
+          trialExpiresAt: company.trialExpiresAt ? company.trialExpiresAt.toISOString() : null,
+          canceledAt: company.canceledAt ? company.canceledAt.toISOString() : null,
+        }}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         {/* Bar Chart */}

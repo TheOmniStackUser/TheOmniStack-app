@@ -57,6 +57,11 @@ export async function updateCompanyBillingAddressAction(companyId: string, data:
   zip?: string
   city?: string
   country?: string
+  warehouseStreet?: string
+  warehouseZip?: string
+  warehouseCity?: string
+  warehouseCountry?: string
+  website?: string
   vatId?: string
   taxId?: string
   email?: string
@@ -80,6 +85,11 @@ export async function updateCompanyBillingAddressAction(companyId: string, data:
       zip: data.zip !== undefined ? data.zip.trim() || null : undefined,
       city: data.city !== undefined ? data.city.trim() || null : undefined,
       country: data.country ? data.country.trim() : existing.country,
+      warehouseStreet: data.warehouseStreet !== undefined ? data.warehouseStreet.trim() || null : undefined,
+      warehouseZip: data.warehouseZip !== undefined ? data.warehouseZip.trim() || null : undefined,
+      warehouseCity: data.warehouseCity !== undefined ? data.warehouseCity.trim() || null : undefined,
+      warehouseCountry: data.warehouseCountry ? data.warehouseCountry.trim() : undefined,
+      website: data.website !== undefined ? data.website.trim() || null : undefined,
       vatId: data.vatId !== undefined ? data.vatId.trim() || null : undefined,
       taxId: data.taxId !== undefined ? data.taxId.trim() || null : undefined,
       email: data.email !== undefined ? data.email.trim() || null : undefined,
@@ -88,6 +98,7 @@ export async function updateCompanyBillingAddressAction(companyId: string, data:
     })
     .where(eq(companies.id, companyId))
 
+  revalidatePath('/admin')
   revalidatePath('/admin/billing')
   revalidatePath(`/admin/merchants/${companyId}`)
   revalidatePath('/admin/merchants')
