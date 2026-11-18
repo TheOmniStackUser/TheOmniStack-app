@@ -263,6 +263,86 @@ function PriceEditor({ product, onToast }: { product: Product; onToast?: (messag
 }
 
 
+function PurchasePriceEditor({ product, onToast }: { product: Product; onToast?: (message: string, type: 'success' | 'error' | 'info') => void }) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [value, setValue] = useState(product.purchasePrice ? Number(product.purchasePrice).toFixed(2) : '')
+  const [isSaving, setIsSaving] = useState(false)
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!isEditing) {
+      setValue(product.purchasePrice ? Number(product.purchasePrice).toFixed(2) : '')
+    }
+  }, [product.purchasePrice, isEditing])
+
+  const handleSave = async () => {
+    const trimmed = value.trim().replace(',', '.')
+    const numericValue = trimmed === '' ? null : Number(trimmed)
+    if (trimmed !== '' && (numericValue === null || isNaN(numericValue) || numericValue < 0)) {
+      setIsEditing(false)
+      setValue(product.purchasePrice ? Number(product.purchasePrice).toFixed(2) : '')
+      return
+    }
+
+    const oldVal = product.purchasePrice ? Number(product.purchasePrice) : null
+    if (numericValue === oldVal) {
+      setIsEditing(false)
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      const { updateProductPurchasePriceInline } = await import('@/app/actions/products')
+      await updateProductPurchasePriceInline(product.id, numericValue)
+      setIsEditing(false)
+      onToast?.('Einkaufspreis erfolgreich aktualisiert', 'success')
+      router.refresh()
+    } catch (e) {
+      console.error(e)
+      onToast?.('Fehler beim Speichern des Einkaufspreises', 'error')
+      setValue(product.purchasePrice ? Number(product.purchasePrice).toFixed(2) : '')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleSave()
+    if (e.key === 'Escape') {
+      setValue(product.purchasePrice ? Number(product.purchasePrice).toFixed(2) : '')
+      setIsEditing(false)
+    }
+  }
+
+  if (!isEditing) {
+    return (
+      <div 
+        className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-1.5 -ml-1.5 rounded-md transition-colors group w-fit"
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsEditing(true); }}
+        title="Einkaufspreis bearbeiten"
+      >
+        <span className={`font-semibold border-b border-dashed whitespace-nowrap ${product.purchasePrice ? 'text-slate-700 border-slate-300' : 'text-slate-400 border-slate-200'}`}>
+          {product.purchasePrice ? `${Number(product.purchasePrice).toFixed(2)} €` : '-'}
+        </span>
+        {isSaving ? (
+          <Loader2 className="w-3 h-3 animate-spin text-slate-400" />
+        ) : (
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+      <input autoFocus type="number" step="0.01" min="0" value={value} onChange={e => setValue(e.target.value)} onKeyDown={handleKeyDown} disabled={isSaving} placeholder="0.00" className="w-24 px-2 py-1 text-sm border border-cyan-400 focus:ring-2 focus:ring-cyan-500/50 outline-none rounded font-semibold text-slate-900 placeholder:text-slate-500 bg-white" />
+      <button onClick={handleSave} disabled={isSaving} className="p-1.5 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></button>
+      <button onClick={() => { setValue(product.purchasePrice ? Number(product.purchasePrice).toFixed(2) : ''); setIsEditing(false); }} disabled={isSaving} className="p-1.5 rounded bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors"><X className="w-3.5 h-3.5" /></button>
+    </div>
+  )
+}
+
+
 function MsrpEditor({ product, onToast }: { product: Product; onToast?: (message: string, type: 'success' | 'error' | 'info') => void }) {
   const [isEditing, setIsEditing] = useState(false)
   const [value, setValue] = useState(product.msrp ? Number(product.msrp).toFixed(2) : '0.00')
@@ -1163,6 +1243,7 @@ export function ProductsClient({ initialProducts, integrations = [] }: { initial
   const [bulkStock, setBulkStock] = useState('')
   const [bulkMsrp, setBulkMsrp] = useState('')
   const [bulkPrice, setBulkPrice] = useState('')
+  const [bulkPurchasePrice, setBulkPurchasePrice] = useState('')
   const [bulkTaxRate, setBulkTaxRate] = useState('')
   const [bulkReducedPrice, setBulkReducedPrice] = useState('')
   const [bulkSaleStartDate, setBulkSaleStartDate] = useState('')
@@ -1178,6 +1259,7 @@ export function ProductsClient({ initialProducts, integrations = [] }: { initial
       const newSaleEndDate = bulkSaleEndDate ? new Date(bulkSaleEndDate) : undefined
       const newStock = bulkStock.trim() !== '' ? Math.max(0, parseInt(bulkStock)) : undefined
       let newPrice: number | undefined
+      let newPurchasePrice: number | undefined
       let newReducedPrice: number | undefined
       let parsedMsrp = undefined;
       if (bulkMsrp.trim() !== '') {
@@ -1188,12 +1270,16 @@ export function ProductsClient({ initialProducts, integrations = [] }: { initial
         const parsed = parseFloat(bulkPrice.replace(',', '.'))
         if (!isNaN(parsed)) newPrice = Math.max(0, parsed)
       }
+      if (bulkPurchasePrice.trim() !== '') {
+        const parsed = parseFloat(bulkPurchasePrice.replace(',', '.'))
+        if (!isNaN(parsed)) newPurchasePrice = Math.max(0, parsed)
+      }
       if (bulkReducedPrice.trim() !== '') {
         const parsed = parseFloat(bulkReducedPrice.replace(',', '.'))
         if (!isNaN(parsed)) newReducedPrice = Math.max(0, parsed)
       }
 
-      if (newStock === undefined && parsedMsrp === undefined && newPrice === undefined && newReducedPrice === undefined && newSaleStartDate === undefined && newSaleEndDate === undefined && bulkTaxRate.trim() === '') {
+      if (newStock === undefined && parsedMsrp === undefined && newPrice === undefined && newPurchasePrice === undefined && newReducedPrice === undefined && newSaleStartDate === undefined && newSaleEndDate === undefined && bulkTaxRate.trim() === '') {
         showToast('Keine Änderungen eingegeben', 'info')
         setIsBulkEditing(false)
         return
@@ -1207,12 +1293,14 @@ export function ProductsClient({ initialProducts, integrations = [] }: { initial
         parsedMsrp, 
         newSaleStartDate, 
         newSaleEndDate,
-        bulkTaxRate.trim() !== '' ? bulkTaxRate : undefined
+        bulkTaxRate.trim() !== '' ? bulkTaxRate : undefined,
+        newPurchasePrice
       )
       setShowBulkEditModal(false)
       setBulkStock('')
       setBulkMsrp('')
       setBulkPrice('')
+      setBulkPurchasePrice('')
       setBulkTaxRate('')
       setBulkReducedPrice('')
       showToast('Daten erfolgreich für ausgewählte Produkte aktualisiert', 'success')
@@ -1434,7 +1522,7 @@ export function ProductsClient({ initialProducts, integrations = [] }: { initial
       let aVal = a[sortColumn]
       let bVal = b[sortColumn]
 
-      if (sortColumn === 'price' || sortColumn === 'currentStock') {
+      if (sortColumn === 'price' || sortColumn === 'currentStock' || sortColumn === 'purchasePrice' || sortColumn === 'msrp' || sortColumn === 'reducedPrice') {
         aVal = Number(aVal) || 0
         bVal = Number(bVal) || 0
       } else if (sortColumn === 'isPreorder') {
@@ -1467,6 +1555,7 @@ export function ProductsClient({ initialProducts, integrations = [] }: { initial
     size: 90,
     isPreorder: 140,
     currentStock: 110,
+    purchasePrice: 120,
     msrp: 100,
     price: 130,
     reducedPrice: 140,
@@ -1507,6 +1596,7 @@ export function ProductsClient({ initialProducts, integrations = [] }: { initial
       size: 70,
       isPreorder: 100,
       currentStock: 80,
+      purchasePrice: 85,
       msrp: 75,
       price: 85,
       reducedPrice: 100,
@@ -2058,6 +2148,7 @@ export function ProductsClient({ initialProducts, integrations = [] }: { initial
               <col style={{ width: `${columnWidths.size || 90}px` }} />
               <col style={{ width: `${columnWidths.isPreorder || 140}px` }} />
               <col style={{ width: `${columnWidths.currentStock || 110}px` }} />
+              <col style={{ width: `${columnWidths.purchasePrice || 120}px` }} />
               <col style={{ width: `${columnWidths.msrp || 100}px` }} />
               <col style={{ width: `${columnWidths.price || 130}px` }} />
               <col style={{ width: `${columnWidths.reducedPrice || 140}px` }} />
@@ -2127,6 +2218,7 @@ export function ProductsClient({ initialProducts, integrations = [] }: { initial
                 </Th>
                 <Th column="isPreorder">Vorbestellung</Th>
                 <Th column="currentStock">Bestand</Th>
+                <Th column="purchasePrice">Einkaufspreis</Th>
                 <Th column="msrp">UVP</Th>
                 <Th column="price">Standard Preis</Th>
                 <Th column="reducedPrice">Reduzierter Preis</Th>
@@ -2152,7 +2244,7 @@ export function ProductsClient({ initialProducts, integrations = [] }: { initial
             <tbody className="divide-y divide-slate-100">
               {filteredAndSortedProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={14} className="px-6 py-12 text-center text-slate-500">
+                  <td colSpan={15} className="px-6 py-12 text-center text-slate-500">
                   <div className="flex flex-col items-center justify-center">
                     <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
                       <Package className="w-8 h-8 text-slate-300" />
@@ -2231,6 +2323,9 @@ export function ProductsClient({ initialProducts, integrations = [] }: { initial
                       </td>
                       <td className="px-6 py-4">
                         <StockEditor product={product} onToast={showToast} />
+                      </td>
+                      <td className="px-6 py-4">
+                        <PurchasePriceEditor product={product} onToast={showToast} />
                       </td>
                       <td className="px-6 py-4">
                         <MsrpEditor product={product} onToast={showToast} />
@@ -2327,7 +2422,7 @@ export function ProductsClient({ initialProducts, integrations = [] }: { initial
                     </tr>
                     {isExpanded && (
                       <tr className="bg-slate-50/30 border-b border-slate-100">
-                        <td colSpan={14} className="p-0">
+                        <td colSpan={15} className="p-0">
                           <div className="px-14 py-6 animate-in slide-in-from-top-2 fade-in duration-200">
                             {/* Prominently display full title when expanded */}
                             <div className="mb-5 pb-4 border-b border-slate-200/80 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
@@ -2387,7 +2482,7 @@ export function ProductsClient({ initialProducts, integrations = [] }: { initial
                                   </div>
                                   <div className="flex justify-between items-center">
                                     <span className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5"><Tag className="w-3.5 h-3.5 text-rose-400"/> Einkaufspreis</span>
-                                    <span className="text-sm text-slate-900">{product.purchasePrice ? `${Number(product.purchasePrice).toFixed(2)} €` : '-'}</span>
+                                    <PurchasePriceEditor product={product} onToast={showToast} />
                                   </div>
                                 </div>
                                 
@@ -2470,6 +2565,17 @@ export function ProductsClient({ initialProducts, integrations = [] }: { initial
                     value={bulkPrice} 
                     onChange={e => setBulkPrice(e.target.value)} 
                     placeholder="z.B. 19.90" 
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 placeholder:text-slate-500" 
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700">Neuer Einkaufspreis (EK in €)</label>
+                  <input 
+                    type="text" 
+                    value={bulkPurchasePrice} 
+                    onChange={e => setBulkPurchasePrice(e.target.value)} 
+                    placeholder="z.B. 8.50" 
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-slate-900 placeholder:text-slate-500" 
                   />
                 </div>

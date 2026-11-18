@@ -832,8 +832,36 @@ export async function updateProductPriceInline(productId: string, newPrice: numb
 
   const { revalidatePath } = await import('next/cache')
   revalidatePath('/products')
+  revalidatePath('/products/inventory')
 
   return { success: true }
+}
+
+export async function updateProductPurchasePriceInline(productId: string, newPurchasePrice: number | null) {
+  const auth = await requireAuth()
+
+  const [product] = await db
+    .select({ id: products.id })
+    .from(products)
+    .where(and(eq(products.id, productId), eq(products.companyId, auth.activeCompanyId)))
+
+  if (!product) throw new Error('Produkt nicht gefunden.')
+
+  const formattedPrice =
+    newPurchasePrice === null || newPurchasePrice === undefined || isNaN(newPurchasePrice)
+      ? null
+      : Math.max(0, newPurchasePrice).toFixed(2)
+
+  await db
+    .update(products)
+    .set({ purchasePrice: formattedPrice, updatedAt: new Date() })
+    .where(eq(products.id, productId))
+
+  revalidatePath('/products')
+  revalidatePath('/products/inventory')
+  revalidatePath(`/products/${productId}`)
+
+  return { success: true, purchasePrice: formattedPrice }
 }
 
 export async function updateProductVariantInfoInline(
@@ -1323,12 +1351,13 @@ export async function bulkUpdateStockAndPrice(
   newMsrp?: number, 
   newSaleStartDate?: Date | null, 
   newSaleEndDate?: Date | null,
-  newTaxRate?: string | number
+  newTaxRate?: string | number,
+  newPurchasePrice?: number | null
 ) {
   const auth = await requireAuth()
   if (productIds.length === 0) return { success: true }
 
-  const updates: Partial<{ currentStock: string; price: string; reducedPrice: string | null; msrp: string | null; saleStartDate: Date | null; saleEndDate: Date | null; taxRate: string; updatedAt: Date }> = { updatedAt: new Date() }
+  const updates: Partial<{ currentStock: string; price: string; reducedPrice: string | null; msrp: string | null; purchasePrice: string | null; saleStartDate: Date | null; saleEndDate: Date | null; taxRate: string; updatedAt: Date }> = { updatedAt: new Date() }
   let safeStock: number | undefined
   let safePrice: number | undefined
   let safeReducedPrice: number | undefined
@@ -1339,6 +1368,14 @@ export async function bulkUpdateStockAndPrice(
     if (!isNaN(parsed)) {
       const rate = parsed > 1 ? parsed / 100 : parsed
       updates.taxRate = rate.toFixed(4)
+    }
+  }
+
+  if (newPurchasePrice !== undefined) {
+    if (newPurchasePrice === null || isNaN(newPurchasePrice)) {
+      updates.purchasePrice = null
+    } else {
+      updates.purchasePrice = Math.max(0, newPurchasePrice).toFixed(2)
     }
   }
 
@@ -1395,29 +1432,40 @@ if (newSaleStartDate !== undefined) {
     .set(updates)
     .where(and(inArray(products.id, productIds), eq(products.companyId, auth.activeCompanyId)))
 
-  // Trigger Sync
-  const { pushUpdatesToMarketplaces } = await import('@/workers/product-sync')
-  import('next/server').then(({ after }) => {
-    after(async () => {
-      try {
-        const syncPayload = selectedProducts.map(p => ({
-          sku: p.sku,
-          stock: safeStock,
-          price: safePrice,
-          reducedPrice: safeReducedPrice,
-          msrp: safeMsrp,
-          saleStartDate: newSaleStartDate,
-          saleEndDate: newSaleEndDate
-        }))
-        await pushUpdatesToMarketplaces(auth.activeCompanyId, syncPayload)
-      } catch (error) {
-        console.error('[bulkUpdateStockAndPrice] Background sync failed:', error)
-      }
-    })
-  }).catch(console.error)
+  // Trigger Sync only if marketplace-relevant fields changed
+  const hasMarketplaceChanges =
+    safeStock !== undefined ||
+    safePrice !== undefined ||
+    safeReducedPrice !== undefined ||
+    safeMsrp !== undefined ||
+    newSaleStartDate !== undefined ||
+    newSaleEndDate !== undefined
+
+  if (hasMarketplaceChanges) {
+    const { pushUpdatesToMarketplaces } = await import('@/workers/product-sync')
+    import('next/server').then(({ after }) => {
+      after(async () => {
+        try {
+          const syncPayload = selectedProducts.map(p => ({
+            sku: p.sku,
+            stock: safeStock,
+            price: safePrice,
+            reducedPrice: safeReducedPrice,
+            msrp: safeMsrp,
+            saleStartDate: newSaleStartDate,
+            saleEndDate: newSaleEndDate
+          }))
+          await pushUpdatesToMarketplaces(auth.activeCompanyId, syncPayload)
+        } catch (error) {
+          console.error('[bulkUpdateStockAndPrice] Background sync failed:', error)
+        }
+      })
+    }).catch(console.error)
+  }
 
   const { revalidatePath } = await import('next/cache')
   revalidatePath('/products')
+  revalidatePath('/products/inventory')
 
   return { success: true }
 }
