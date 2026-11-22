@@ -28,12 +28,15 @@ import {
   Check,
   Sparkles,
   ExternalLink,
+  SlidersHorizontal,
+  EyeOff,
 } from 'lucide-react'
 import {
   downloadPurchasePriceTemplateAction,
   previewPurchasePriceUploadAction,
   applyInventoryUpdatesAction,
   exportInventoryAction,
+  updateInventoryMaxStockThresholdAction,
   PurchasePricePreviewItem,
 } from '@/app/actions/inventory'
 import { updateProductPurchasePriceInline, updateProductStockInline } from '@/app/actions/products'
@@ -326,17 +329,47 @@ function InlineStockCell({
   )
 }
 
-export function InventoryClient({ initialProducts }: { initialProducts: InventoryProductItem[] }) {
+export function InventoryClient({
+  initialProducts,
+  initialMaxStockThreshold,
+}: {
+  initialProducts: InventoryProductItem[]
+  initialMaxStockThreshold: number | null
+}) {
   const router = useRouter()
   const [products, setProducts] = useState<InventoryProductItem[]>(initialProducts)
+  const [maxStockThreshold, setMaxStockThreshold] = useState<number | null>(
+    initialMaxStockThreshold
+  )
 
   useEffect(() => {
     setProducts(initialProducts)
   }, [initialProducts])
 
+  useEffect(() => {
+    setMaxStockThreshold(initialMaxStockThreshold)
+  }, [initialMaxStockThreshold])
+
+  // Placeholder stock threshold modal state
+  const [showThresholdModal, setShowThresholdModal] = useState(false)
+  const [thresholdInput, setThresholdInput] = useState(
+    initialMaxStockThreshold !== null ? String(initialMaxStockThreshold) : ''
+  )
+  const [isSavingThreshold, setIsSavingThreshold] = useState(false)
+
+  const openThresholdModal = () => {
+    setThresholdInput(maxStockThreshold !== null ? String(maxStockThreshold) : '')
+    setShowThresholdModal(true)
+  }
+
+  const isIgnoredPlaceholderStock = (stock: number, threshold = maxStockThreshold) =>
+    threshold !== null && threshold > 0 && stock > threshold
+
   // Search & Filter states
   const [searchQuery, setSearchQuery] = useState('')
-  const [stockFilter, setStockFilter] = useState<'all' | 'in_stock' | 'out_of_stock'>('all')
+  const [stockFilter, setStockFilter] = useState<
+    'all' | 'in_stock' | 'out_of_stock' | 'ignored_placeholder'
+  >('all')
   const [ekFilter, setEkFilter] = useState<'all' | 'with_ek' | 'missing_ek'>('all')
   const [marketplaceFilter, setMarketplaceFilter] = useState<string>('all')
   const [sortColumn, setSortColumn] = useState<string>('sku')
@@ -396,14 +429,117 @@ export function InventoryClient({ initialProducts }: { initialProducts: Inventor
     return Array.from(s).sort()
   }, [products])
 
+  const totalIgnoredCatalogCount = useMemo(() => {
+    if (maxStockThreshold === null || maxStockThreshold <= 0) return 0
+    return products.filter(p => p.currentStock > maxStockThreshold).length
+  }, [products, maxStockThreshold])
+
+  // Live preview for threshold modal
+  const thresholdPreview = useMemo(() => {
+    const trimmed = thresholdInput.trim()
+    if (!trimmed) {
+      return {
+        isValid: true,
+        parsed: null as number | null,
+        affectedSkus: 0,
+        affectedUnits: 0,
+        affectedEkValue: 0,
+        affectedVkGross: 0,
+        topExamples: [] as InventoryProductItem[],
+      }
+    }
+    const parsed = /^\d+$/.test(trimmed) ? Number(trimmed) : NaN
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 100_000_000) {
+      return {
+        isValid: false,
+        parsed: null as number | null,
+        affectedSkus: 0,
+        affectedUnits: 0,
+        affectedEkValue: 0,
+        affectedVkGross: 0,
+        topExamples: [] as InventoryProductItem[],
+      }
+    }
+
+    const affected = products.filter(p => p.currentStock > parsed)
+    let affectedUnits = 0
+    let affectedEkValue = 0
+    let affectedVkGross = 0
+    for (const p of affected) {
+      const s = Math.max(0, p.currentStock)
+      affectedUnits += s
+      if (p.purchasePrice !== null && p.purchasePrice > 0) {
+        affectedEkValue += s * p.purchasePrice
+      }
+      affectedVkGross += s * p.price
+    }
+    const topExamples = [...affected]
+      .sort((a, b) => b.currentStock - a.currentStock)
+      .slice(0, 4)
+
+    return {
+      isValid: true,
+      parsed,
+      affectedSkus: affected.length,
+      affectedUnits,
+      affectedEkValue,
+      affectedVkGross,
+      topExamples,
+    }
+  }, [thresholdInput, products])
+
+  const handleSaveThreshold = async (overrideValue?: number | null) => {
+    let targetValue: number | null
+    if (overrideValue !== undefined) {
+      targetValue = overrideValue
+    } else {
+      const trimmed = thresholdInput.trim()
+      if (!trimmed) {
+        targetValue = null
+      } else {
+        const parsed = /^\d+$/.test(trimmed) ? Number(trimmed) : NaN
+        if (!Number.isInteger(parsed) || parsed < 1 || parsed > 100_000_000) {
+          showToast('Bitte eine ganze Zahl größer als 0 eingeben (oder leer lassen zum Deaktivieren).', 'error')
+          return
+        }
+        targetValue = parsed
+      }
+    }
+
+    setIsSavingThreshold(true)
+    try {
+      const res = await updateInventoryMaxStockThresholdAction(targetValue)
+      setMaxStockThreshold(res.maxStockThreshold)
+      if (res.maxStockThreshold === null && stockFilter === 'ignored_placeholder') {
+        setStockFilter('all')
+      }
+      setShowThresholdModal(false)
+      showToast(
+        res.maxStockThreshold !== null
+          ? `Platzhalter-Grenze gespeichert: Bestände > ${res.maxStockThreshold.toLocaleString('de-DE')} Stück werden ignoriert.`
+          : 'Platzhalter-Grenze deaktiviert — alle Bestände werden gezählt.',
+        'success'
+      )
+      router.refresh()
+    } catch (err: any) {
+      showToast(err.message || 'Fehler beim Speichern der Bestandsgrenze', 'error')
+    } finally {
+      setIsSavingThreshold(false)
+    }
+  }
+
   // Filtered & sorted products
   const filteredProducts = useMemo(() => {
     let list = [...products]
 
     if (stockFilter === 'in_stock') {
-      list = list.filter(p => p.currentStock > 0)
+      list = list.filter(
+        p => p.currentStock > 0 && !isIgnoredPlaceholderStock(p.currentStock, maxStockThreshold)
+      )
     } else if (stockFilter === 'out_of_stock') {
       list = list.filter(p => p.currentStock <= 0)
+    } else if (stockFilter === 'ignored_placeholder') {
+      list = list.filter(p => isIgnoredPlaceholderStock(p.currentStock, maxStockThreshold))
     }
 
     if (ekFilter === 'with_ek') {
@@ -438,11 +574,15 @@ export function InventoryClient({ initialProducts }: { initialProducts: Inventor
       let bVal: any
 
       if (sortColumn === 'ekTotal') {
-        aVal = a.purchasePrice !== null ? a.currentStock * a.purchasePrice : -1
-        bVal = b.purchasePrice !== null ? b.currentStock * b.purchasePrice : -1
+        const aStock = isIgnoredPlaceholderStock(a.currentStock, maxStockThreshold) ? 0 : a.currentStock
+        const bStock = isIgnoredPlaceholderStock(b.currentStock, maxStockThreshold) ? 0 : b.currentStock
+        aVal = a.purchasePrice !== null ? aStock * a.purchasePrice : -1
+        bVal = b.purchasePrice !== null ? bStock * b.purchasePrice : -1
       } else if (sortColumn === 'vkTotal') {
-        aVal = a.currentStock * a.price
-        bVal = b.currentStock * b.price
+        const aStock = isIgnoredPlaceholderStock(a.currentStock, maxStockThreshold) ? 0 : a.currentStock
+        const bStock = isIgnoredPlaceholderStock(b.currentStock, maxStockThreshold) ? 0 : b.currentStock
+        aVal = aStock * a.price
+        bVal = bStock * b.price
       } else if (sortColumn === 'purchasePrice') {
         aVal = a.purchasePrice !== null ? a.purchasePrice : -1
         bVal = b.purchasePrice !== null ? b.purchasePrice : -1
@@ -465,12 +605,23 @@ export function InventoryClient({ initialProducts }: { initialProducts: Inventor
     })
 
     return list
-  }, [products, stockFilter, ekFilter, marketplaceFilter, searchQuery, sortColumn, sortDirection])
+  }, [
+    products,
+    stockFilter,
+    ekFilter,
+    marketplaceFilter,
+    searchQuery,
+    sortColumn,
+    sortDirection,
+    maxStockThreshold,
+  ])
 
   // Global & Filtered KPIs
   const kpis = useMemo(() => {
     let totalUnits = 0
     let inStockSkus = 0
+    let ignoredStockSkus = 0
+    let ignoredStockUnits = 0
     let totalEkValue = 0
     let totalVkGross = 0
     let totalVkNet = 0
@@ -478,9 +629,16 @@ export function InventoryClient({ initialProducts }: { initialProducts: Inventor
     let inStockSkusMissingEk = 0
 
     for (const p of filteredProducts) {
-      const stock = Math.max(0, p.currentStock)
+      const rawStock = Math.max(0, p.currentStock)
+      const ignored = isIgnoredPlaceholderStock(rawStock, maxStockThreshold)
+      const stock = ignored ? 0 : rawStock
       const hasEk = p.purchasePrice !== null && p.purchasePrice > 0
       const netPrice = p.taxRate > 0 ? p.price / (1 + p.taxRate) : p.price
+
+      if (ignored) {
+        ignoredStockSkus++
+        ignoredStockUnits += rawStock
+      }
 
       totalUnits += stock
       if (stock > 0) inStockSkus++
@@ -508,6 +666,8 @@ export function InventoryClient({ initialProducts }: { initialProducts: Inventor
       totalUnits,
       inStockSkus,
       inStockSkusWithEk,
+      ignoredStockSkus,
+      ignoredStockUnits,
       totalEkValue,
       totalVkGross,
       totalVkNet,
@@ -518,7 +678,7 @@ export function InventoryClient({ initialProducts }: { initialProducts: Inventor
       inStockEkCoveragePercent,
       potentialProfit,
     }
-  }, [filteredProducts])
+  }, [filteredProducts, maxStockThreshold])
 
   const toggleSort = (col: string) => {
     if (sortColumn === col) {
@@ -896,6 +1056,22 @@ export function InventoryClient({ initialProducts }: { initialProducts: Inventor
           <div className="flex flex-wrap items-center gap-2.5">
             <button
               type="button"
+              onClick={openThresholdModal}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border shadow-xs cursor-pointer whitespace-nowrap ${
+                maxStockThreshold !== null
+                  ? 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100'
+                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+              }`}
+              title="Schwellenwert festlegen, ab dem hohe Platzhalter-Bestände in der Inventurbewertung ignoriert werden"
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              {maxStockThreshold !== null
+                ? `Platzhalter-Grenze: > ${maxStockThreshold.toLocaleString('de-DE')} Stk.`
+                : 'Platzhalter-Bestände ignorieren'}
+            </button>
+
+            <button
+              type="button"
               onClick={() => setShowTemplateModal(true)}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-bold hover:bg-indigo-100 transition-colors border border-indigo-200 shadow-xs cursor-pointer whitespace-nowrap"
             >
@@ -944,6 +1120,11 @@ export function InventoryClient({ initialProducts }: { initialProducts: Inventor
             <p className="text-xs text-slate-500 mt-1">
               Bewertet zu hinterlegten Einkaufspreisen ({kpis.skusWithEk} von {kpis.totalSkus} SKUs)
             </p>
+            {kpis.ignoredStockSkus > 0 && maxStockThreshold !== null && (
+              <p className="text-[11px] font-semibold text-amber-700 mt-1.5">
+                Ohne {kpis.ignoredStockSkus} Platzhalter-SKU{kpis.ignoredStockSkus === 1 ? '' : 's'} (&gt; {maxStockThreshold.toLocaleString('de-DE')} Stk.)
+              </p>
+            )}
           </div>
         </div>
 
@@ -952,8 +1133,22 @@ export function InventoryClient({ initialProducts }: { initialProducts: Inventor
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
               Gesamtbestand (Lagernd)
             </span>
-            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
-              <Package className="w-4 h-4" />
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={openThresholdModal}
+                className={`p-2 rounded-lg transition-colors cursor-pointer ${
+                  maxStockThreshold !== null
+                    ? 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200'
+                    : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                }`}
+                title="Platzhalter-Bestandsgrenze konfigurieren"
+              >
+                <SlidersHorizontal className="w-4 h-4" />
+              </button>
+              <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
+                <Package className="w-4 h-4" />
+              </div>
             </div>
           </div>
           <div>
@@ -963,13 +1158,50 @@ export function InventoryClient({ initialProducts }: { initialProducts: Inventor
             <p className="text-xs text-slate-500 mt-1">
               Verteilt auf {kpis.inStockSkus} lagernde SKUs ({kpis.totalSkus} SKUs gesamt)
             </p>
+            <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+              {maxStockThreshold !== null ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setStockFilter(prev =>
+                        prev === 'ignored_placeholder' ? 'all' : 'ignored_placeholder'
+                      )
+                    }
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-full transition-colors cursor-pointer text-left"
+                    title={`${kpis.ignoredStockUnits.toLocaleString('de-DE')} Stück auf ${kpis.ignoredStockSkus} SKUs ignoriert — klicken zum Filtern`}
+                  >
+                    <EyeOff className="w-3 h-3 shrink-0" />
+                    <span>
+                      &gt; {maxStockThreshold.toLocaleString('de-DE')} ignoriert ({kpis.ignoredStockSkus} SKUs)
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openThresholdModal}
+                    className="text-[11px] font-bold text-cyan-600 hover:text-cyan-700 underline cursor-pointer shrink-0"
+                  >
+                    Ändern
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={openThresholdModal}
+                  className="text-[11px] font-semibold text-slate-500 hover:text-cyan-700 transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  <SlidersHorizontal className="w-3 h-3" />
+                  <span>Platzhalter-Bestände (z.B. &gt; 500) ignorieren</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Verkaufswert & Rohertrag
+              Verkaufswert &amp; Rohertrag
             </span>
             <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
               <TrendingUp className="w-4 h-4" />
@@ -986,6 +1218,11 @@ export function InventoryClient({ initialProducts }: { initialProducts: Inventor
                 {formatCurrency(kpis.potentialProfit)}
               </span>
             </p>
+            {kpis.ignoredStockSkus > 0 && maxStockThreshold !== null && (
+              <p className="text-[11px] font-semibold text-amber-700 mt-1.5">
+                Bereinigt um {kpis.ignoredStockUnits.toLocaleString('de-DE')} Platzhalter-Stück
+              </p>
+            )}
           </div>
         </div>
 
@@ -1157,8 +1394,17 @@ export function InventoryClient({ initialProducts }: { initialProducts: Inventor
               className="px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-900 focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 outline-none cursor-pointer"
             >
               <option value="all">Bestand: Alle ({products.length})</option>
-              <option value="in_stock">Nur mit Bestand &gt; 0</option>
+              <option value="in_stock">
+                {maxStockThreshold !== null
+                  ? `Nur mit Bestand (1–${maxStockThreshold.toLocaleString('de-DE')})`
+                  : 'Nur mit Bestand > 0'}
+              </option>
               <option value="out_of_stock">Ohne Bestand (0)</option>
+              {maxStockThreshold !== null && (
+                <option value="ignored_placeholder">
+                  Ignorierte Platzhalter (&gt; {maxStockThreshold.toLocaleString('de-DE')} Stk.) ({totalIgnoredCatalogCount})
+                </option>
+              )}
             </select>
 
             <select
@@ -1380,6 +1626,7 @@ export function InventoryClient({ initialProducts }: { initialProducts: Inventor
                       ? effectiveEk
                       : null
 
+                  const isRowPlaceholderIgnored = isIgnoredPlaceholderStock(effectiveStock)
                   const ekTotal = validEk !== null ? effectiveStock * validEk : null
                   const vkNetUnit =
                     product.taxRate > 0 ? product.price / (1 + product.taxRate) : product.price
@@ -1394,7 +1641,11 @@ export function InventoryClient({ initialProducts }: { initialProducts: Inventor
                     <tr
                       key={product.id}
                       className={`hover:bg-slate-50/70 transition-colors ${
-                        isSelected ? 'bg-cyan-50/30' : ''
+                        isSelected
+                          ? 'bg-cyan-50/30'
+                          : isRowPlaceholderIgnored
+                          ? 'bg-amber-50/25'
+                          : ''
                       }`}
                     >
                       <td className="px-4 py-3 text-center">
@@ -1504,27 +1755,38 @@ export function InventoryClient({ initialProducts }: { initialProducts: Inventor
 
                       {/* Stock */}
                       <td className="px-4 py-3 text-right align-middle">
-                        {isQuickEditMode ? (
-                          <input
-                            type="number"
-                            min="0"
-                            value={
-                              rowEdits.currentStock !== undefined
-                                ? rowEdits.currentStock
-                                : String(product.currentStock)
-                            }
-                            onChange={e =>
-                              handleQuickEditChange(product.id, 'currentStock', e.target.value)
-                            }
-                            className="w-20 px-2.5 py-1 text-sm font-bold text-right border border-slate-300 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 rounded-lg text-slate-900 placeholder:text-slate-500 bg-white outline-none"
-                          />
-                        ) : (
-                          <InlineStockCell
-                            product={product}
-                            onSaved={handleInlineStockSaved}
-                            onToast={showToast}
-                          />
-                        )}
+                        <div className="flex flex-col items-end gap-1">
+                          {isQuickEditMode ? (
+                            <input
+                              type="number"
+                              min="0"
+                              value={
+                                rowEdits.currentStock !== undefined
+                                  ? rowEdits.currentStock
+                                  : String(product.currentStock)
+                              }
+                              onChange={e =>
+                                handleQuickEditChange(product.id, 'currentStock', e.target.value)
+                              }
+                              className="w-20 px-2.5 py-1 text-sm font-bold text-right border border-slate-300 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 rounded-lg text-slate-900 placeholder:text-slate-500 bg-white outline-none"
+                            />
+                          ) : (
+                            <InlineStockCell
+                              product={product}
+                              onSaved={handleInlineStockSaved}
+                              onToast={showToast}
+                            />
+                          )}
+                          {isRowPlaceholderIgnored && maxStockThreshold !== null && (
+                            <span
+                              className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-100/90 border border-amber-200 px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                              title={`Bestand überschreitet die konfigurierte Grenze von ${maxStockThreshold.toLocaleString('de-DE')} Stück und wird in den Summen ignoriert.`}
+                            >
+                              <EyeOff className="w-2.5 h-2.5" />
+                              Platzhalter
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Purchase Price (EK) */}
@@ -1566,7 +1828,18 @@ export function InventoryClient({ initialProducts }: { initialProducts: Inventor
 
                       {/* Total Inventory Value (EK * Stock) */}
                       <td className="px-4 py-3 text-right align-middle bg-cyan-50/20 font-bold text-slate-900">
-                        {ekTotal !== null ? (
+                        {isRowPlaceholderIgnored ? (
+                          <div className="flex flex-col items-end">
+                            {ekTotal !== null && (
+                              <span className="text-xs font-medium text-slate-400 line-through">
+                                {formatCurrency(ekTotal)}
+                              </span>
+                            )}
+                            <span className="text-[11px] font-bold text-amber-700">
+                              Ignoriert
+                            </span>
+                          </div>
+                        ) : ekTotal !== null ? (
                           <span>{formatCurrency(ekTotal)}</span>
                         ) : (
                           <span className="text-xs font-medium text-amber-600 italic">
@@ -1587,7 +1860,18 @@ export function InventoryClient({ initialProducts }: { initialProducts: Inventor
 
                       {/* Total VK Gross Value */}
                       <td className="px-4 py-3 text-right align-middle font-semibold text-slate-700">
-                        {formatCurrency(vkGrossTotal)}
+                        {isRowPlaceholderIgnored ? (
+                          <div className="flex flex-col items-end">
+                            <span className="text-xs font-medium text-slate-400 line-through">
+                              {formatCurrency(vkGrossTotal)}
+                            </span>
+                            <span className="text-[11px] font-bold text-amber-700">
+                              Ignoriert
+                            </span>
+                          </div>
+                        ) : (
+                          formatCurrency(vkGrossTotal)
+                        )}
                       </td>
 
                       {/* Margin */}
@@ -1622,7 +1906,14 @@ export function InventoryClient({ initialProducts }: { initialProducts: Inventor
               <tfoot>
                 <tr className="bg-slate-900 text-white font-bold text-sm">
                   <td colSpan={4} className="px-4 py-4">
-                    GESAMT / SUMME ({filteredProducts.length} zusammengefasste SKUs)
+                    <span>
+                      GESAMT / SUMME ({filteredProducts.length} zusammengefasste SKUs)
+                    </span>
+                    {kpis.ignoredStockSkus > 0 && maxStockThreshold !== null && (
+                      <span className="block text-[11px] font-medium text-amber-300 mt-0.5">
+                        Ohne {kpis.ignoredStockSkus} Platzhalter-SKU{kpis.ignoredStockSkus === 1 ? '' : 's'} mit Bestand &gt; {maxStockThreshold.toLocaleString('de-DE')} Stk. ({kpis.ignoredStockUnits.toLocaleString('de-DE')} Stk. ignoriert)
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-4 text-right">
                     {kpis.totalUnits.toLocaleString('de-DE')} Stk.
@@ -1720,7 +2011,10 @@ export function InventoryClient({ initialProducts }: { initialProducts: Inventor
                         Nur lagernde SKUs ohne Einkaufspreis (
                         {
                           products.filter(
-                            p => p.currentStock > 0 && (!p.purchasePrice || p.purchasePrice <= 0)
+                            p =>
+                              p.currentStock > 0 &&
+                              !isIgnoredPlaceholderStock(p.currentStock) &&
+                              (!p.purchasePrice || p.purchasePrice <= 0)
                           ).length
                         }
                         )
@@ -1731,7 +2025,12 @@ export function InventoryClient({ initialProducts }: { initialProducts: Inventor
                       </option>
                       <option value="in_stock">
                         Nur lagernde SKUs mit Bestand &gt; 0 (
-                        {products.filter(p => p.currentStock > 0).length})
+                        {
+                          products.filter(
+                            p => p.currentStock > 0 && !isIgnoredPlaceholderStock(p.currentStock)
+                          ).length
+                        }
+                        )
                       </option>
                     </select>
                   </div>
@@ -2039,6 +2338,222 @@ export function InventoryClient({ initialProducts }: { initialProducts: Inventor
                   className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold text-white bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 transition-colors cursor-pointer"
                 >
                   {isSavingBulkEk && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Speichern
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 3: Platzhalter-Bestände ignorieren (Per-Merchant Threshold) */}
+      {showThresholdModal && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => {
+            if (!isSavingThreshold) setShowThresholdModal(false)
+          }}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="p-6 border-b border-slate-100 flex items-start justify-between gap-3 bg-slate-50/70">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-amber-100 text-amber-700 rounded-xl shrink-0">
+                  <SlidersHorizontal className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-extrabold text-slate-900">
+                    Platzhalter-Bestände ignorieren
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Persönliche Einstellung für deinen Händler-Account.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowThresholdModal(false)}
+                disabled={isSavingThreshold}
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-5">
+              <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 border border-slate-200 rounded-xl p-3.5">
+                Artikel mit künstlich hohen Platzhalter-Beständen (z.B. 999 oder 9.999 Stück) können den Inventurwert, Gesamtbestand und Verkaufswert stark verfälschen. Lege optional eine Obergrenze fest: Alle SKUs mit einem Bestand{' '}
+                <strong className="text-slate-900">größer als (&gt;)</strong> diesem Wert werden in den KPI-Karten, Summen und Inventur-Exporten ignoriert, bleiben aber in der Tabelle sichtbar.
+              </p>
+
+              <div className="space-y-2">
+                <label
+                  htmlFor="inventory-max-stock-threshold"
+                  className="block text-sm font-bold text-slate-800"
+                >
+                  Bestände größer als (&gt;) ignorieren
+                </label>
+                <div className="relative">
+                  <input
+                    id="inventory-max-stock-threshold"
+                    autoFocus
+                    type="number"
+                    min="1"
+                    step="1"
+                    inputMode="numeric"
+                    value={thresholdInput}
+                    onChange={e => setThresholdInput(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && thresholdPreview.isValid && !isSavingThreshold) {
+                        handleSaveThreshold()
+                      }
+                      if (e.key === 'Escape' && !isSavingThreshold) {
+                        setShowThresholdModal(false)
+                      }
+                    }}
+                    placeholder="z.B. 500 (leer lassen = kein Limit)"
+                    className="w-full px-4 py-2.5 pr-16 bg-white border border-slate-300 rounded-xl text-sm font-semibold text-slate-900 placeholder:text-slate-500 focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 outline-none transition-all"
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-500 pointer-events-none">
+                    Stück
+                  </span>
+                </div>
+
+                {/* Quick presets */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  <span className="text-[11px] font-semibold text-slate-500 mr-1">
+                    Schnellauswahl:
+                  </span>
+                  {[100, 250, 500, 1000, 5000].map(preset => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setThresholdInput(String(preset))}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
+                        thresholdInput.trim() === String(preset)
+                          ? 'bg-amber-100 text-amber-900 border-amber-300'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      &gt; {preset.toLocaleString('de-DE')}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setThresholdInput('')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
+                      thresholdInput.trim() === ''
+                        ? 'bg-slate-900 text-white border-slate-900'
+                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    Kein Limit
+                  </button>
+                </div>
+              </div>
+
+              {/* Live Impact Preview */}
+              {!thresholdPreview.isValid ? (
+                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-xs font-medium text-rose-800 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                  <span>Bitte eine ganze Zahl größer als 0 eingeben oder das Feld leer lassen.</span>
+                </div>
+              ) : thresholdPreview.parsed === null ? (
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 flex items-center gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-slate-400" />
+                  <span>
+                    <strong className="text-slate-800">Kein Limit aktiv:</strong> Alle Bestände fließen vollständig in die Inventur- und Verkaufswerte ein.
+                  </span>
+                </div>
+              ) : (
+                <div className="p-4 rounded-xl bg-amber-50/80 border border-amber-200 space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                      <EyeOff className="w-4 h-4 text-amber-700" />
+                      Vorschau für Limit &gt; {thresholdPreview.parsed.toLocaleString('de-DE')} Stück
+                    </span>
+                    <span className="text-xs font-extrabold text-amber-900 bg-amber-100 px-2.5 py-0.5 rounded-full border border-amber-300">
+                      {thresholdPreview.affectedSkus} SKU{thresholdPreview.affectedSkus === 1 ? '' : 's'} betroffen
+                    </span>
+                  </div>
+
+                  {thresholdPreview.affectedSkus > 0 ? (
+                    <>
+                      <p className="text-xs text-amber-900">
+                        Es werden{' '}
+                        <strong>
+                          {thresholdPreview.affectedUnits.toLocaleString('de-DE')} Stück
+                        </strong>{' '}
+                        aus der Bewertung ausgeschlossen (VK Brutto:{' '}
+                        <strong>{formatCurrency(thresholdPreview.affectedVkGross)}</strong>
+                        {thresholdPreview.affectedEkValue > 0
+                          ? ` • EK: ${formatCurrency(thresholdPreview.affectedEkValue)}`
+                          : ''}
+                        ).
+                      </p>
+                      <div className="space-y-1 pt-1 border-t border-amber-200/80">
+                        <span className="text-[11px] font-semibold text-amber-800">
+                          Beispiele mit höchstem Bestand:
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {thresholdPreview.topExamples.map(ex => (
+                            <span
+                              key={ex.id}
+                              className="inline-flex items-center gap-1.5 text-[11px] font-mono font-semibold bg-white text-slate-800 border border-amber-200 px-2 py-0.5 rounded-md"
+                            >
+                              <span>{ex.sku}</span>
+                              <span className="text-amber-700 font-bold">
+                                {ex.currentStock.toLocaleString('de-DE')} Stk.
+                              </span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-xs text-amber-900">
+                      Aktuell hat keine SKU einen Bestand über{' '}
+                      <strong>{thresholdPreview.parsed.toLocaleString('de-DE')} Stück</strong>. Die Regel greift automatisch, sobald entsprechende Platzhalter-Bestände vorhanden sind.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-3">
+              <div>
+                {maxStockThreshold !== null && (
+                  <button
+                    type="button"
+                    onClick={() => handleSaveThreshold(null)}
+                    disabled={isSavingThreshold}
+                    className="px-3.5 py-2 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors disabled:opacity-50 cursor-pointer"
+                  >
+                    Deaktivieren
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setShowThresholdModal(false)}
+                  disabled={isSavingThreshold}
+                  className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-200/70 transition-colors cursor-pointer"
+                >
+                  Abbrechen
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSaveThreshold()}
+                  disabled={isSavingThreshold || !thresholdPreview.isValid}
+                  className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold text-white bg-slate-900 hover:bg-slate-800 disabled:opacity-50 transition-colors shadow-xs cursor-pointer"
+                >
+                  {isSavingThreshold && <Loader2 className="w-4 h-4 animate-spin" />}
                   Speichern
                 </button>
               </div>

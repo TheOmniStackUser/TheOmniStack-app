@@ -3,6 +3,7 @@
 import { requireAuth } from '@/lib/session'
 import { db } from '@/db/client'
 import { products, productMappings } from '@/db/schema/products'
+import { companies } from '@/db/schema/companies'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { eq, and, inArray } from 'drizzle-orm'
 import Papa from 'papaparse'
@@ -65,6 +66,63 @@ function parseFlexibleNumber(raw: string | number | null | undefined): number | 
 function formatGermanNumber(num: number | null | undefined, decimals = 2): string {
   if (num === null || num === undefined || isNaN(num)) return ''
   return num.toFixed(decimals).replace('.', ',')
+}
+
+function isPlaceholderStock(stock: number, maxStockThreshold: number | null | undefined): boolean {
+  return (
+    maxStockThreshold !== null &&
+    maxStockThreshold !== undefined &&
+    maxStockThreshold > 0 &&
+    stock > maxStockThreshold
+  )
+}
+
+async function getCompanyInventoryMaxStockThreshold(companyId: string): Promise<number | null> {
+  const [company] = await db
+    .select({ inventoryMaxStockThreshold: companies.inventoryMaxStockThreshold })
+    .from(companies)
+    .where(eq(companies.id, companyId))
+    .limit(1)
+
+  const val = company?.inventoryMaxStockThreshold
+  return typeof val === 'number' && Number.isInteger(val) && val > 0 ? val : null
+}
+
+// ─── 0. Update Per-Merchant Inventory Max Stock Threshold ─────────────────────
+export async function updateInventoryMaxStockThresholdAction(maxStockThreshold: number | null) {
+  const auth = await requireAuth()
+
+  let normalized: number | null = null
+  if (maxStockThreshold !== null && maxStockThreshold !== undefined) {
+    if (typeof maxStockThreshold !== 'number' || !Number.isFinite(maxStockThreshold)) {
+      throw new Error('Bitte einen gültigen numerischen Schwellenwert eingeben.')
+    }
+    const rounded = Math.floor(maxStockThreshold)
+    if (rounded < 1) {
+      throw new Error(
+        'Der Schwellenwert muss mindestens 1 Stück betragen (oder leer lassen zum Deaktivieren).'
+      )
+    }
+    if (rounded > 100_000_000) {
+      throw new Error('Der Schwellenwert ist zu groß.')
+    }
+    normalized = rounded
+  }
+
+  await db
+    .update(companies)
+    .set({
+      inventoryMaxStockThreshold: normalized,
+      updatedAt: new Date(),
+    })
+    .where(eq(companies.id, auth.activeCompanyId))
+
+  revalidatePath('/products/inventory')
+
+  return {
+    success: true,
+    maxStockThreshold: normalized,
+  }
 }
 
 async function fetchConsolidatedProductsWithMappings(companyId: string) {
@@ -131,7 +189,16 @@ export async function downloadPurchasePriceTemplateAction(options: {
   productIds?: string[]
 }) {
   const auth = await requireAuth()
-  let items = await fetchConsolidatedProductsWithMappings(auth.activeCompanyId)
+  const [allItems, maxStockThreshold] = await Promise.all([
+    fetchConsolidatedProductsWithMappings(auth.activeCompanyId),
+    getCompanyInventoryMaxStockThreshold(auth.activeCompanyId),
+  ])
+  let items = allItems
+
+  const isEffectiveInStock = (rawStock: unknown) => {
+    const stock = Number(rawStock || 0)
+    return stock > 0 && !isPlaceholderStock(stock, maxStockThreshold)
+  }
 
   if (options.productIds && options.productIds.length > 0) {
     const idSet = new Set(options.productIds)
@@ -139,13 +206,13 @@ export async function downloadPurchasePriceTemplateAction(options: {
   } else if (options.filter === 'in_stock_missing_ek') {
     items = items.filter(
       p =>
-        Number(p.currentStock || 0) > 0 &&
+        isEffectiveInStock(p.currentStock) &&
         (p.purchasePrice === null || p.purchasePrice === undefined || Number(p.purchasePrice) <= 0)
     )
   } else if (options.filter === 'missing_ek') {
     items = items.filter(p => p.purchasePrice === null || p.purchasePrice === undefined || Number(p.purchasePrice) <= 0)
   } else if (options.filter === 'in_stock') {
-    items = items.filter(p => Number(p.currentStock || 0) > 0)
+    items = items.filter(p => isEffectiveInStock(p.currentStock))
   }
 
   const dateStr = new Date().toISOString().split('T')[0]
@@ -596,20 +663,29 @@ export async function applyInventoryUpdatesAction(payload: {
 export async function exportInventoryAction(options: {
   format: 'csv' | 'xlsx'
   productIds?: string[]
-  stockFilter?: 'all' | 'in_stock' | 'out_of_stock'
+  stockFilter?: 'all' | 'in_stock' | 'out_of_stock' | 'ignored_placeholder'
   ekFilter?: 'all' | 'with_ek' | 'missing_ek'
 }) {
   const auth = await requireAuth()
-  let items = await fetchConsolidatedProductsWithMappings(auth.activeCompanyId)
+  const [allItems, maxStockThreshold] = await Promise.all([
+    fetchConsolidatedProductsWithMappings(auth.activeCompanyId),
+    getCompanyInventoryMaxStockThreshold(auth.activeCompanyId),
+  ])
+  let items = allItems
 
   if (options.productIds && options.productIds.length > 0) {
     const idSet = new Set(options.productIds)
     items = items.filter(p => idSet.has(p.id))
   } else {
     if (options.stockFilter === 'in_stock') {
-      items = items.filter(p => Number(p.currentStock || 0) > 0)
+      items = items.filter(p => {
+        const s = Number(p.currentStock || 0)
+        return s > 0 && !isPlaceholderStock(s, maxStockThreshold)
+      })
     } else if (options.stockFilter === 'out_of_stock') {
       items = items.filter(p => Number(p.currentStock || 0) <= 0)
+    } else if (options.stockFilter === 'ignored_placeholder') {
+      items = items.filter(p => isPlaceholderStock(Number(p.currentStock || 0), maxStockThreshold))
     }
 
     if (options.ekFilter === 'with_ek') {
@@ -633,23 +709,28 @@ export async function exportInventoryAction(options: {
   let totalEkValue = 0
   let totalVkGrossValue = 0
   let totalVkNetValue = 0
+  let ignoredCount = 0
 
   const enrichedRows = items.map(p => {
     const stock = Math.max(0, Number(p.currentStock || 0))
+    const ignored = isPlaceholderStock(stock, maxStockThreshold)
+    const valuationStock = ignored ? 0 : stock
+    if (ignored) ignoredCount++
+
     const ekUnit =
       p.purchasePrice !== null && p.purchasePrice !== undefined ? Number(p.purchasePrice) : null
     const vkGrossUnit = Number(p.price || 0)
     const taxRateNum = p.taxRate ? parseFloat(p.taxRate) : 0.19
     const vkNetUnit = taxRateNum > 0 ? vkGrossUnit / (1 + taxRateNum) : vkGrossUnit
 
-    const ekTotal = ekUnit !== null ? stock * ekUnit : null
-    const vkGrossTotal = stock * vkGrossUnit
-    const vkNetTotal = stock * vkNetUnit
+    const ekTotal = ekUnit !== null ? valuationStock * ekUnit : null
+    const vkGrossTotal = valuationStock * vkGrossUnit
+    const vkNetTotal = valuationStock * vkNetUnit
 
     const marginUnit = ekUnit !== null ? vkNetUnit - ekUnit : null
     const marginPercent = ekUnit !== null && vkNetUnit > 0 ? (vkNetUnit - ekUnit) / vkNetUnit : null
 
-    totalStock += stock
+    totalStock += valuationStock
     if (ekTotal !== null) totalEkValue += ekTotal
     totalVkGrossValue += vkGrossTotal
     totalVkNetValue += vkNetTotal
@@ -666,6 +747,9 @@ export async function exportInventoryAction(options: {
       brand: p.brand || '',
       storageLocation: p.storageLocation || '',
       stock,
+      valuationStatus: ignored
+        ? `Ignoriert (Platzhalter > ${maxStockThreshold})`
+        : 'Bewertet',
       ekUnit,
       ekTotal,
       vkGrossUnit: Math.round(vkGrossUnit * 100) / 100,
@@ -680,6 +764,12 @@ export async function exportInventoryAction(options: {
     }
   })
 
+  const evaluatedCount = enrichedRows.length - ignoredCount
+  const summarySkuLabel =
+    ignoredCount > 0 && maxStockThreshold !== null
+      ? `${evaluatedCount} bewertete SKUs (${ignoredCount} Platzhalter > ${maxStockThreshold} ignoriert)`
+      : `${enrichedRows.length} SKUs`
+
   if (options.format === 'xlsx') {
     const columns: ExcelColumnDef[] = [
       { header: 'SKU', key: 'sku', width: 20, type: 'string' },
@@ -693,6 +783,9 @@ export async function exportInventoryAction(options: {
       { header: 'Kategorie', key: 'category', width: 18, type: 'string' },
       { header: 'Lagerort', key: 'storageLocation', width: 15, type: 'string' },
       { header: 'Bestand', key: 'stock', width: 12, type: 'integer' },
+      ...(maxStockThreshold !== null
+        ? [{ header: 'Bestandsbewertung', key: 'valuationStatus', width: 28, type: 'string' as const }]
+        : []),
       { header: 'Einkaufspreis (Einzel)', key: 'ekUnit', width: 20, type: 'currency' },
       { header: 'Inventurwert EK (Gesamt)', key: 'ekTotal', width: 24, type: 'currency' },
       { header: 'VK Brutto (Einzel)', key: 'vkGrossUnit', width: 18, type: 'currency' },
@@ -706,9 +799,9 @@ export async function exportInventoryAction(options: {
       { header: 'Inventur-Stichtag', key: 'stichtag', width: 19, type: 'string' },
     ]
 
-    const summaryRow = {
+    const summaryRow: Record<string, string | number> = {
       sku: 'GESAMT / SUMME',
-      mappedSkus: `${enrichedRows.length} SKUs`,
+      mappedSkus: summarySkuLabel,
       marketplaces: '',
       title: '',
       color: '',
@@ -718,6 +811,7 @@ export async function exportInventoryAction(options: {
       category: '',
       storageLocation: '',
       stock: totalStock,
+      ...(maxStockThreshold !== null ? { valuationStatus: `Grenze: <= ${maxStockThreshold} Stk.` } : {}),
       ekUnit: '',
       ekTotal: Math.round(totalEkValue * 100) / 100,
       vkGrossUnit: '',
@@ -747,35 +841,41 @@ export async function exportInventoryAction(options: {
   }
 
   // CSV Export with German formatting and summary row
-  const csvData = enrichedRows.map(r => ({
-    SKU: r.sku,
-    'Zusammengefasste SKUs': r.mappedSkus,
-    'Marktplätze': r.marketplaces,
-    Titel: r.title,
-    Farbe: r.color,
-    'Größe': r.size,
-    EAN: r.ean,
-    Marke: r.brand,
-    Kategorie: r.category,
-    Lagerort: r.storageLocation,
-    Bestand: String(r.stock),
-    'Einkaufspreis (Einzel €)': r.ekUnit !== null ? formatGermanNumber(r.ekUnit) : '',
-    'Inventurwert EK (Gesamt €)': r.ekTotal !== null ? formatGermanNumber(r.ekTotal) : '',
-    'VK Brutto (Einzel €)': formatGermanNumber(r.vkGrossUnit),
-    'MwSt.': r.taxRatePercent,
-    'VK Netto (Einzel €)': formatGermanNumber(r.vkNetUnit),
-    'VK-Wert Brutto (Gesamt €)': formatGermanNumber(r.vkGrossTotal),
-    'VK-Wert Netto (Gesamt €)': formatGermanNumber(r.vkNetTotal),
-    'Rohertrag / Stück (Netto €)': r.marginUnit !== null ? formatGermanNumber(r.marginUnit) : '',
-    'Marge (%)': r.marginPercent !== null ? formatGermanNumber(r.marginPercent * 100, 1) + '%' : '',
-    'Letzte Änderung': r.updatedAt,
-    'Inventur-Stichtag': r.stichtag,
-  }))
+  const csvData: Record<string, string>[] = enrichedRows.map(r => {
+    const row: Record<string, string> = {
+      SKU: r.sku,
+      'Zusammengefasste SKUs': r.mappedSkus,
+      'Marktplätze': r.marketplaces,
+      Titel: r.title,
+      Farbe: r.color,
+      'Größe': r.size,
+      EAN: r.ean,
+      Marke: r.brand,
+      Kategorie: r.category,
+      Lagerort: r.storageLocation,
+      Bestand: String(r.stock),
+    }
+    if (maxStockThreshold !== null) {
+      row['Bestandsbewertung'] = r.valuationStatus
+    }
+    row['Einkaufspreis (Einzel €)'] = r.ekUnit !== null ? formatGermanNumber(r.ekUnit) : ''
+    row['Inventurwert EK (Gesamt €)'] = r.ekTotal !== null ? formatGermanNumber(r.ekTotal) : ''
+    row['VK Brutto (Einzel €)'] = formatGermanNumber(r.vkGrossUnit)
+    row['MwSt.'] = r.taxRatePercent
+    row['VK Netto (Einzel €)'] = formatGermanNumber(r.vkNetUnit)
+    row['VK-Wert Brutto (Gesamt €)'] = formatGermanNumber(r.vkGrossTotal)
+    row['VK-Wert Netto (Gesamt €)'] = formatGermanNumber(r.vkNetTotal)
+    row['Rohertrag / Stück (Netto €)'] = r.marginUnit !== null ? formatGermanNumber(r.marginUnit) : ''
+    row['Marge (%)'] = r.marginPercent !== null ? formatGermanNumber(r.marginPercent * 100, 1) + '%' : ''
+    row['Letzte Änderung'] = r.updatedAt
+    row['Inventur-Stichtag'] = r.stichtag
+    return row
+  })
 
   // Add summary row at the end of CSV
-  csvData.push({
+  const csvSummaryRow: Record<string, string> = {
     SKU: 'GESAMT / SUMME',
-    'Zusammengefasste SKUs': `${enrichedRows.length} SKUs`,
+    'Zusammengefasste SKUs': summarySkuLabel,
     'Marktplätze': '',
     Titel: '',
     Farbe: '',
@@ -785,18 +885,22 @@ export async function exportInventoryAction(options: {
     Kategorie: '',
     Lagerort: '',
     Bestand: String(totalStock),
-    'Einkaufspreis (Einzel €)': '',
-    'Inventurwert EK (Gesamt €)': formatGermanNumber(totalEkValue),
-    'VK Brutto (Einzel €)': '',
-    'MwSt.': '',
-    'VK Netto (Einzel €)': '',
-    'VK-Wert Brutto (Gesamt €)': formatGermanNumber(totalVkGrossValue),
-    'VK-Wert Netto (Gesamt €)': formatGermanNumber(totalVkNetValue),
-    'Rohertrag / Stück (Netto €)': '',
-    'Marge (%)': '',
-    'Letzte Änderung': '',
-    'Inventur-Stichtag': stichtagFormatted,
-  })
+  }
+  if (maxStockThreshold !== null) {
+    csvSummaryRow['Bestandsbewertung'] = `Grenze: <= ${maxStockThreshold} Stk.`
+  }
+  csvSummaryRow['Einkaufspreis (Einzel €)'] = ''
+  csvSummaryRow['Inventurwert EK (Gesamt €)'] = formatGermanNumber(totalEkValue)
+  csvSummaryRow['VK Brutto (Einzel €)'] = ''
+  csvSummaryRow['MwSt.'] = ''
+  csvSummaryRow['VK Netto (Einzel €)'] = ''
+  csvSummaryRow['VK-Wert Brutto (Gesamt €)'] = formatGermanNumber(totalVkGrossValue)
+  csvSummaryRow['VK-Wert Netto (Gesamt €)'] = formatGermanNumber(totalVkNetValue)
+  csvSummaryRow['Rohertrag / Stück (Netto €)'] = ''
+  csvSummaryRow['Marge (%)'] = ''
+  csvSummaryRow['Letzte Änderung'] = ''
+  csvSummaryRow['Inventur-Stichtag'] = stichtagFormatted
+  csvData.push(csvSummaryRow)
 
   const csvString = '\uFEFF' + Papa.unparse(csvData, { quotes: true, delimiter: ';' })
 

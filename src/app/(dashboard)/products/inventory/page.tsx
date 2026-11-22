@@ -1,6 +1,7 @@
 import { requireAuth } from '@/lib/session'
 import { db } from '@/db/client'
 import { products, productMappings } from '@/db/schema/products'
+import { companies } from '@/db/schema/companies'
 import { marketplaceIntegrations } from '@/db/schema/integrations'
 import { eq, and } from 'drizzle-orm'
 import { AlertTriangle } from 'lucide-react'
@@ -16,7 +17,7 @@ export default async function InventoryPage() {
   const auth = await requireAuth()
 
   try {
-    const [productList, allMappings] = await Promise.all([
+    const [productList, allMappings, companyRows] = await Promise.all([
       db
         .select()
         .from(products)
@@ -39,7 +40,20 @@ export default async function InventoryPage() {
             eq(marketplaceIntegrations.isActive, true)
           )
         ),
+      db
+        .select({
+          inventoryMaxStockThreshold: companies.inventoryMaxStockThreshold,
+        })
+        .from(companies)
+        .where(eq(companies.id, auth.activeCompanyId))
+        .limit(1),
     ])
+
+    const rawThreshold = companyRows[0]?.inventoryMaxStockThreshold
+    const initialMaxStockThreshold =
+      typeof rawThreshold === 'number' && Number.isInteger(rawThreshold) && rawThreshold > 0
+        ? rawThreshold
+        : null
 
     const mappingsByProduct = new Map<string, typeof allMappings>()
     for (const m of allMappings) {
@@ -89,7 +103,10 @@ export default async function InventoryPage() {
 
     return (
       <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
-        <InventoryClient initialProducts={enrichedProducts} />
+        <InventoryClient
+          initialProducts={enrichedProducts}
+          initialMaxStockThreshold={initialMaxStockThreshold}
+        />
       </div>
     )
   } catch (error: any) {

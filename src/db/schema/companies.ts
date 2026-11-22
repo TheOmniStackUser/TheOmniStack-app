@@ -6,6 +6,7 @@ import {
   pgEnum,
   boolean,
   jsonb,
+  integer,
 } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { users } from './auth'
@@ -62,6 +63,11 @@ export const companies = pgTable('companies', {
 
   // Shipping settings
   defaultParcelClass: text('default_parcel_class').default('XS'),
+
+  // Inventory valuation settings
+  // Optional per-merchant threshold: stock quantities strictly greater than this value
+  // are treated as placeholder stock and excluded from inventory valuation KPIs & exports.
+  inventoryMaxStockThreshold: integer('inventory_max_stock_threshold'),
 
   // Invoice settings
   invoicePrefix: text('invoice_prefix').notNull().default('INV'),
