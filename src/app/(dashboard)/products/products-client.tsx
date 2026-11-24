@@ -1024,7 +1024,7 @@ function MultiSelectFacetFilter({
             }} 
           />
           <div 
-            className={`absolute ${variant === 'header' ? 'left-0 mt-2' : 'left-0 sm:left-auto sm:right-0 mt-2'} w-72 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 p-3 text-left animate-in fade-in zoom-in-95 duration-150`}
+            className={`absolute ${variant === 'header' ? 'left-0 mt-2' : 'left-0 sm:left-auto sm:right-0 mt-2'} w-72 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 p-3 text-left normal-case tracking-normal font-normal animate-in fade-in zoom-in-95 duration-150`}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -1172,10 +1172,95 @@ export function ProductsClient({ initialProducts, integrations = [] }: { initial
   const [selectedSizes, setSelectedSizes] = useState<Set<string>>(new Set())
   const [activeFacetFilter, setActiveFacetFilter] = useState<string | null>(null)
 
+  const baseFilteredProducts = useMemo(() => {
+    let result = initialProducts
+
+    if (syncFilter !== 'all') {
+      result = result.filter(p => {
+        if (syncFilter === 'stock_on') return p.hasSyncStockOn
+        if (syncFilter === 'stock_off') return p.hasSyncStockOff
+        if (syncFilter === 'price_on') return p.hasSyncPriceOn
+        if (syncFilter === 'price_off') return p.hasSyncPriceOff
+        return true
+      })
+    }
+
+    if (marketplaceFilter !== 'all') {
+      result = result.filter(p => p.marketplaces && p.marketplaces.includes(marketplaceFilter))
+    }
+
+    if (preorderFilter !== 'all') {
+      result = result.filter(p => {
+        if (preorderFilter === 'preorder_only') return !!p.isPreorder
+        if (preorderFilter === 'regular_only') return !p.isPreorder
+        return true
+      })
+    }
+
+    if (searchQuery.trim()) {
+      const rawTokens = searchQuery.trim().match(/(?:-\s*)?(?:"[^"]*"|'[^']*'|\S+)/g) || []
+      const parsedTokens = rawTokens
+        .map(raw => {
+          const isExclude = raw.startsWith('-')
+          let val = isExclude ? raw.slice(1).trim() : raw.trim()
+          if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+            val = val.slice(1, -1)
+          }
+          return { isExclude, term: val.toLowerCase().trim() }
+        })
+        .filter(t => t.term.length > 0)
+
+      const matchesProduct = (p: any, term: string) => {
+        if (searchField === 'sku') {
+          return Boolean((p.sku && p.sku.toLowerCase().includes(term)) || (p.mappingSkus && p.mappingSkus.toLowerCase().includes(term)))
+        }
+        if (searchField === 'title') {
+          return Boolean(p.title && p.title.toLowerCase().includes(term))
+        }
+        if (searchField === 'color') {
+          return Boolean(p.color && p.color.toLowerCase().includes(term))
+        }
+        if (searchField === 'size') {
+          return Boolean(p.size && p.size.toLowerCase().includes(term))
+        }
+        if (searchField === 'ean') {
+          return Boolean((p.ean && p.ean.toLowerCase().includes(term)) || (p.mappingEans && p.mappingEans.toLowerCase().includes(term)))
+        }
+        return Boolean(
+          (p.sku && p.sku.toLowerCase().includes(term)) ||
+          (p.title && p.title.toLowerCase().includes(term)) ||
+          (p.color && p.color.toLowerCase().includes(term)) ||
+          (p.size && p.size.toLowerCase().includes(term)) ||
+          (p.ean && p.ean.toLowerCase().includes(term)) ||
+          (p.mappingSkus && p.mappingSkus.toLowerCase().includes(term)) ||
+          (p.mappingEans && p.mappingEans.toLowerCase().includes(term))
+        )
+      }
+
+      if (parsedTokens.length > 0) {
+        result = result.filter(p => {
+          return parsedTokens.every(({ isExclude, term }) => {
+            const hasMatch = matchesProduct(p, term)
+            return isExclude ? !hasMatch : hasMatch
+          })
+        })
+      }
+    }
+
+    return result
+  }, [initialProducts, syncFilter, marketplaceFilter, preorderFilter, searchQuery, searchField])
+
   const availableColors = useMemo(() => {
+    const sourceProducts = selectedSizes.size > 0
+      ? baseFilteredProducts.filter(p => {
+          const s = p.size?.trim()
+          return s ? selectedSizes.has(s) : selectedSizes.has('__EMPTY__')
+        })
+      : baseFilteredProducts
+
     const counts = new Map<string, number>()
     let emptyCount = 0
-    initialProducts.forEach(p => {
+    sourceProducts.forEach(p => {
       const c = p.color?.trim()
       if (c) {
         counts.set(c, (counts.get(c) || 0) + 1)
@@ -1183,20 +1268,34 @@ export function ProductsClient({ initialProducts, integrations = [] }: { initial
         emptyCount++
       }
     })
+
+    selectedColors.forEach(c => {
+      if (c !== '__EMPTY__' && !counts.has(c)) {
+        counts.set(c, 0)
+      }
+    })
+
     const list = Array.from(counts.entries())
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'de'))
     
-    if (emptyCount > 0) {
+    if (emptyCount > 0 || selectedColors.has('__EMPTY__')) {
       list.push({ name: '__EMPTY__', count: emptyCount })
     }
     return list
-  }, [initialProducts])
+  }, [baseFilteredProducts, selectedSizes, selectedColors])
 
   const availableSizes = useMemo(() => {
+    const sourceProducts = selectedColors.size > 0
+      ? baseFilteredProducts.filter(p => {
+          const c = p.color?.trim()
+          return c ? selectedColors.has(c) : selectedColors.has('__EMPTY__')
+        })
+      : baseFilteredProducts
+
     const counts = new Map<string, number>()
     let emptyCount = 0
-    initialProducts.forEach(p => {
+    sourceProducts.forEach(p => {
       const s = p.size?.trim()
       if (s) {
         counts.set(s, (counts.get(s) || 0) + 1)
@@ -1204,15 +1303,22 @@ export function ProductsClient({ initialProducts, integrations = [] }: { initial
         emptyCount++
       }
     })
+
+    selectedSizes.forEach(s => {
+      if (s !== '__EMPTY__' && !counts.has(s)) {
+        counts.set(s, 0)
+      }
+    })
+
     const list = Array.from(counts.entries())
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => compareSizes(a.name, b.name))
     
-    if (emptyCount > 0) {
+    if (emptyCount > 0 || selectedSizes.has('__EMPTY__')) {
       list.push({ name: '__EMPTY__', count: emptyCount })
     }
     return list
-  }, [initialProducts])
+  }, [baseFilteredProducts, selectedColors, selectedSizes])
 
   const availableMarketplaces = useMemo(() => {
     const s = new Set<string>()
@@ -1445,29 +1551,7 @@ export function ProductsClient({ initialProducts, integrations = [] }: { initial
   }
 
   const filteredAndSortedProducts = useMemo(() => {
-    let result = [...initialProducts]
-
-    if (syncFilter !== 'all') {
-      result = result.filter(p => {
-        if (syncFilter === 'stock_on') return p.hasSyncStockOn
-        if (syncFilter === 'stock_off') return p.hasSyncStockOff
-        if (syncFilter === 'price_on') return p.hasSyncPriceOn
-        if (syncFilter === 'price_off') return p.hasSyncPriceOff
-        return true
-      })
-    }
-
-    if (marketplaceFilter !== 'all') {
-      result = result.filter(p => p.marketplaces && p.marketplaces.includes(marketplaceFilter))
-    }
-
-    if (preorderFilter !== 'all') {
-      result = result.filter(p => {
-        if (preorderFilter === 'preorder_only') return !!p.isPreorder
-        if (preorderFilter === 'regular_only') return !p.isPreorder
-        return true
-      })
-    }
+    let result = [...baseFilteredProducts]
 
     if (selectedColors.size > 0) {
       result = result.filter(p => {
@@ -1487,56 +1571,6 @@ export function ProductsClient({ initialProducts, integrations = [] }: { initial
         }
         return selectedSizes.has(s)
       })
-    }
-
-    if (searchQuery.trim()) {
-      const rawTokens = searchQuery.trim().match(/(?:-\s*)?(?:"[^"]*"|'[^']*'|\S+)/g) || []
-      const parsedTokens = rawTokens
-        .map(raw => {
-          const isExclude = raw.startsWith('-')
-          let val = isExclude ? raw.slice(1).trim() : raw.trim()
-          if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-            val = val.slice(1, -1)
-          }
-          return { isExclude, term: val.toLowerCase().trim() }
-        })
-        .filter(t => t.term.length > 0)
-
-      const matchesProduct = (p: any, term: string) => {
-        if (searchField === 'sku') {
-          return Boolean((p.sku && p.sku.toLowerCase().includes(term)) || (p.mappingSkus && p.mappingSkus.toLowerCase().includes(term)))
-        }
-        if (searchField === 'title') {
-          return Boolean(p.title && p.title.toLowerCase().includes(term))
-        }
-        if (searchField === 'color') {
-          return Boolean(p.color && p.color.toLowerCase().includes(term))
-        }
-        if (searchField === 'size') {
-          return Boolean(p.size && p.size.toLowerCase().includes(term))
-        }
-        if (searchField === 'ean') {
-          return Boolean((p.ean && p.ean.toLowerCase().includes(term)) || (p.mappingEans && p.mappingEans.toLowerCase().includes(term)))
-        }
-        return Boolean(
-          (p.sku && p.sku.toLowerCase().includes(term)) || 
-          (p.title && p.title.toLowerCase().includes(term)) || 
-          (p.color && p.color.toLowerCase().includes(term)) || 
-          (p.size && p.size.toLowerCase().includes(term)) || 
-          (p.ean && p.ean.toLowerCase().includes(term)) ||
-          (p.mappingSkus && p.mappingSkus.toLowerCase().includes(term)) ||
-          (p.mappingEans && p.mappingEans.toLowerCase().includes(term))
-        )
-      }
-
-      if (parsedTokens.length > 0) {
-        result = result.filter(p => {
-          return parsedTokens.every(({ isExclude, term }) => {
-            const hasMatch = matchesProduct(p, term)
-            return isExclude ? !hasMatch : hasMatch
-          })
-        })
-      }
     }
 
     result.sort((a, b) => {
@@ -1567,7 +1601,7 @@ export function ProductsClient({ initialProducts, integrations = [] }: { initial
     })
 
     return result
-  }, [initialProducts, searchQuery, sortColumn, sortDirection, searchField, syncFilter, marketplaceFilter, preorderFilter, selectedColors, selectedSizes])
+  }, [baseFilteredProducts, sortColumn, sortDirection, selectedColors, selectedSizes])
 
   const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
     sku: 140,

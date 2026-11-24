@@ -59,21 +59,33 @@ export class EbayAdapter implements MarketplaceAdapter {
       const totalAmount = parseFloat(order.pricingSummary?.total?.value || '0')
       const taxAmount = parseFloat(order.pricingSummary?.tax?.value || '0')
       
-      const items = (order.lineItems || []).map((item: any) => {
+      const items: NormalizedOrder['items'] = (order.lineItems || []).map((item: any) => {
         let taxRate: number | undefined = undefined
         const lineTax = parseFloat(item.taxes?.[0]?.amount?.value || '0')
-        const lineCost = parseFloat(item.lineItemCost?.value || '0')
+        const lineCost = parseFloat(item.discountedLineItemCost?.value || item.lineItemCost?.value || '0')
+        const qty = Math.max(1, parseInt(item.quantity || '1', 10))
         if (lineTax > 0 && lineCost > lineTax) {
           taxRate = lineTax / (lineCost - lineTax)
         }
         return {
           sku: item.sku || item.legacyItemId || 'unknown',
           title: item.title || 'eBay Item',
-          quantity: item.quantity || 1,
-          unitPrice: lineCost,
+          quantity: qty,
+          unitPrice: lineCost / qty,
           taxRate,
         }
       })
+
+      const deliveryCost = parseFloat(order.pricingSummary?.deliveryCost?.value || '0')
+      if (deliveryCost > 0) {
+        items.push({
+          sku: 'SHIPPING',
+          title: 'Versandkosten',
+          quantity: 1,
+          unitPrice: deliveryCost,
+          taxRate: undefined,
+        })
+      }
 
       const shipping = order.fulfillmentStartInstructions?.[0]?.shippingStep?.shipTo || {}
 
@@ -247,13 +259,19 @@ export class EbayAdapter implements MarketplaceAdapter {
       reasonForRefund: 'BUYER_RETURN',
       comment: 'Refund processed via OmniStack',
       orderLevelRefundAmount: isFullRefund ? orderData.pricingSummary?.total : undefined,
-      refundItems: isFullRefund ? undefined : refundLineItems.map(item => ({
-         lineItemId: item.lineItemId,
-         refundAmount: {
-            value: (parseFloat(lineItems.find((l:any) => l.lineItemId === item.lineItemId).lineItemCost.value) * item.quantity).toFixed(2),
+      refundItems: isFullRefund ? undefined : refundLineItems.map(item => {
+        const line = lineItems.find((l: any) => l.lineItemId === item.lineItemId)
+        const lineCost = parseFloat(line?.discountedLineItemCost?.value || line?.lineItemCost?.value || '0')
+        const lineQty = Math.max(1, parseInt(line?.quantity || '1', 10))
+        const unitPrice = lineCost / lineQty
+        return {
+          lineItemId: item.lineItemId,
+          refundAmount: {
+            value: (unitPrice * item.quantity).toFixed(2),
             currency: orderData.pricingSummary?.total?.currency || 'EUR'
-         }
-      }))
+          }
+        }
+      })
     }
 
     const refundEndpoint = `${baseUrl}/sell/fulfillment/v1/order/${marketplaceOrderId}/issue_refund`

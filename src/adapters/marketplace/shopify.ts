@@ -121,11 +121,37 @@ export class ShopifyAdapter implements MarketplaceAdapter {
       
       const totalWeightKg = order.total_weight ? order.total_weight / 1000 : undefined
 
-      const items = (order.line_items || []).map((li: any) => {
-        const unitPrice = parseFloat(li.price || '0')
-        // Shopify line items don't provide tax rate easily, but we can try to guess it from unit tax or default to 19%
+      const taxesIncluded = order.taxes_included !== false
+      const discountsByRate = new Map<string, { rate?: number; amount: number }>()
+      let totalLineDiscount = 0
+
+      const items: NormalizedOrder['items'] = (order.line_items || []).map((li: any) => {
+        const quantity = Number(li.quantity || 1)
         const liTaxLines = li.tax_lines || []
-        const taxRate = liTaxLines.length > 0 ? liTaxLines[0].rate : 0.19
+        const rawTaxRate = liTaxLines.length > 0 ? Number(liTaxLines[0].rate) : undefined
+        const taxRate = rawTaxRate !== undefined && !isNaN(rawTaxRate) ? rawTaxRate : undefined
+
+        let unitPrice = parseFloat(li.price || '0')
+        if (!taxesIncluded && liTaxLines.length > 0 && quantity > 0) {
+          const lineTax = liTaxLines.reduce((sum: number, tl: any) => sum + parseFloat(tl.price || '0'), 0)
+          unitPrice += lineTax / quantity
+        }
+
+        // Capture line-item discounts (discount_allocations covers discount codes like FUN10; fall back to total_discount)
+        const allocDiscount = (li.discount_allocations || []).reduce(
+          (sum: number, da: any) => sum + parseFloat(da.amount || '0'),
+          0
+        )
+        const lineDiscount = allocDiscount > 0 ? allocDiscount : parseFloat(li.total_discount || '0')
+        if (lineDiscount > 0) {
+          totalLineDiscount += lineDiscount
+          const rateKey = taxRate !== undefined ? taxRate.toFixed(4) : 'default'
+          const prev = discountsByRate.get(rateKey)
+          discountsByRate.set(rateKey, {
+            rate: taxRate,
+            amount: (prev?.amount || 0) + lineDiscount,
+          })
+        }
 
         const resolvedSku = (li.sku && String(li.sku).trim().length > 0)
           ? String(li.sku).trim()
@@ -134,11 +160,76 @@ export class ShopifyAdapter implements MarketplaceAdapter {
         return {
           sku: resolvedSku,
           title: li.title || 'Shopify Item',
-          quantity: li.quantity,
+          quantity,
           unitPrice,
           taxRate,
         }
       })
+
+      // Build human-readable discount label from Shopify discount codes / applications
+      const discountCodes = (order.discount_codes || [])
+        .map((dc: any) => dc?.code)
+        .filter((c: any): c is string => typeof c === 'string' && c.trim().length > 0)
+      const discountAppTitles = (order.discount_applications || [])
+        .map((da: any) => da?.code || da?.title)
+        .filter((t: any): t is string => typeof t === 'string' && t.trim().length > 0)
+      const discountLabelSource = discountCodes.length > 0
+        ? Array.from(new Set(discountCodes)).join(', ')
+        : (discountAppTitles.length > 0 ? Array.from(new Set(discountAppTitles)).join(', ') : '')
+      const discountTitle = discountLabelSource ? `Rabatt (${discountLabelSource})` : 'Rabatt'
+
+      // Add discount line item(s)
+      for (const entry of discountsByRate.values()) {
+        if (entry.amount > 0.004) {
+          items.push({
+            sku: 'DISCOUNT',
+            title: discountTitle,
+            quantity: 1,
+            unitPrice: -Math.round(entry.amount * 100) / 100,
+            taxRate: entry.rate,
+          })
+        }
+      }
+
+      // Add shipping line item(s) using discounted_price (already reflects free-shipping discounts)
+      let shippingDiscountTotal = 0
+      for (const sl of order.shipping_lines || []) {
+        if (sl?.is_removed) continue
+        const rawShipPrice = parseFloat(sl.price || '0')
+        let shipPrice = parseFloat(sl.discounted_price ?? sl.price ?? '0')
+        if (rawShipPrice > shipPrice) {
+          shippingDiscountTotal += rawShipPrice - shipPrice
+        }
+        const slTaxLines = sl.tax_lines || []
+        const rawSlRate = slTaxLines.length > 0 ? Number(slTaxLines[0].rate) : undefined
+        const slTaxRate = rawSlRate !== undefined && !isNaN(rawSlRate) ? rawSlRate : undefined
+        if (!taxesIncluded && slTaxLines.length > 0) {
+          const shipTax = slTaxLines.reduce((sum: number, tl: any) => sum + parseFloat(tl.price || '0'), 0)
+          shipPrice += shipTax
+        }
+        if (shipPrice > 0.004) {
+          items.push({
+            sku: 'SHIPPING',
+            title: sl.title ? `Versandkosten (${sl.title})` : 'Versandkosten',
+            quantity: 1,
+            unitPrice: Math.round(shipPrice * 100) / 100,
+            taxRate: slTaxRate,
+          })
+        }
+      }
+
+      // Fallback: if Shopify reported order-level total_discounts not already captured on line items or shipping
+      const orderTotalDiscounts = parseFloat(order.total_discounts || '0')
+      const remainingOrderDiscount = orderTotalDiscounts - totalLineDiscount - shippingDiscountTotal
+      if (remainingOrderDiscount > 0.005) {
+        items.push({
+          sku: 'DISCOUNT',
+          title: discountTitle,
+          quantity: 1,
+          unitPrice: -Math.round(remainingOrderDiscount * 100) / 100,
+          taxRate: undefined,
+        })
+      }
 
       return {
         marketplaceOrderId: order.id.toString(),
@@ -371,7 +462,11 @@ export class ShopifyAdapter implements MarketplaceAdapter {
 
       // 5. Map SKU or Line Item ID or Variant ID to Shopify line_item IDs
       const refundLineItems: { line_item_id: number; quantity: number; restock_type: string }[] = []
-      for (const item of refundItems) {
+      const productRefundItems = refundItems.filter((item) => {
+        const upperSku = (item.sku || '').trim().toUpperCase()
+        return upperSku !== 'SHIPPING' && upperSku !== 'DISCOUNT'
+      })
+      for (const item of productRefundItems) {
         const itemSkuTrimmed = (item.sku || '').trim().toLowerCase()
         const itemTitleTrimmed = (item.title || '').trim().toLowerCase()
 
@@ -416,7 +511,7 @@ export class ShopifyAdapter implements MarketplaceAdapter {
         }
 
         // Fallback: If single item order and single refund item, match directly
-        if (!matchingLineItem && shopifyOrder.line_items.length === 1 && refundItems.length === 1) {
+        if (!matchingLineItem && shopifyOrder.line_items.length === 1 && productRefundItems.length === 1) {
           console.log(`[Shopify] Single line item order fallback: matching line item ${shopifyOrder.line_items[0].id}`)
           matchingLineItem = shopifyOrder.line_items[0]
         }

@@ -95,7 +95,7 @@ export const invoiceItems = pgTable('invoice_items', {
   sku: text('sku'),
   description: text('description').notNull(),
   quantity: numeric('quantity', { precision: 10, scale: 2 }).notNull(),
-  unitPrice: numeric('unit_price', { precision: 12, scale: 2 }).notNull(),
+  unitPrice: numeric('unit_price', { precision: 12, scale: 4 }).notNull(),
   taxRate: numeric('tax_rate', { precision: 5, scale: 4 }).notNull().default('0.19'),
   lineTotal: numeric('line_total', { precision: 12, scale: 2 }).notNull(),
 }, (t) => ({

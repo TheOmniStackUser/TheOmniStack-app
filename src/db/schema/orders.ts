@@ -123,7 +123,7 @@ export const orderItems = pgTable('order_items', {
   asin: text('asin'),
   title: text('title').notNull(),
   quantity: numeric('quantity', { precision: 10, scale: 2 }).notNull().default('1'),
-  unitPrice: numeric('unit_price', { precision: 12, scale: 2 }).notNull(),
+  unitPrice: numeric('unit_price', { precision: 12, scale: 4 }).notNull(),
   taxRate: numeric('tax_rate', { precision: 5, scale: 4 }).notNull().default('0.19'),
 }, (t) => ({
   orderItemsOrderIdIdx: index('order_items_order_id_idx').on(t.orderId),

@@ -389,9 +389,20 @@ export async function createInvoiceForOrder(orderId: string, companyId: string, 
       }
     }
 
-    const calculatedSubtotal = order.items.reduce((sum: number, i: typeof orderItems.$inferSelect) => sum + (parseFloat(i.unitPrice) * parseFloat(i.quantity)), 0)
-    const calculatedTax = order.items.reduce((sum: number, i: typeof orderItems.$inferSelect) => sum + (parseFloat(i.unitPrice) * parseFloat(i.quantity) * parseFloat(i.taxRate)), 0)
-    const calculatedTotal = calculatedSubtotal + calculatedTax
+    let calculatedSubtotal = order.items.reduce((sum: number, i: typeof orderItems.$inferSelect) => sum + (parseFloat(i.unitPrice) * parseFloat(i.quantity)), 0)
+    let calculatedTax = order.items.reduce((sum: number, i: typeof orderItems.$inferSelect) => sum + (parseFloat(i.unitPrice) * parseFloat(i.quantity) * parseFloat(i.taxRate)), 0)
+    let calculatedTotal = calculatedSubtotal + calculatedTax
+
+    // Reconcile with order amounts to prevent 1-cent rounding drift from marketplace gross prices
+    if (order.totalAmount && Math.abs(calculatedTotal - parseFloat(order.totalAmount)) <= 0.03) {
+      calculatedTotal = parseFloat(order.totalAmount)
+      if (order.subtotalAmount && order.taxAmount) {
+        calculatedSubtotal = parseFloat(order.subtotalAmount)
+        calculatedTax = parseFloat(order.taxAmount)
+      } else {
+        calculatedTax = calculatedTotal - calculatedSubtotal
+      }
+    }
 
     const [newInvoice] = await tx
       .insert(invoices)

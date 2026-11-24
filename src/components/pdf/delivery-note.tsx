@@ -222,7 +222,12 @@ function DeliveryNotePage({ order, company }: DeliveryNoteProps) {
   const currentDate = format(new Date(), 'dd.MM.yyyy')
   const orderDate = order.marketplacePurchaseDate ? format(new Date(order.marketplacePurchaseDate), 'dd.MM.yyyy') : currentDate
   const companyShortLine = `${company.name} - ${company.street} - ${company.zip} ${company.city}`
-  const items = Array.isArray(order.items) ? order.items : []
+  const items = Array.isArray(order.items)
+    ? order.items.filter((i: any) => {
+        const upperSku = (i.sku || '').trim().toUpperCase()
+        return upperSku !== 'SHIPPING' && upperSku !== 'DISCOUNT'
+      })
+    : []
   const footerText = lang === 'en' ? company.deliveryNoteFooterEn : company.deliveryNoteFooter
 
   return (

@@ -2053,8 +2053,13 @@ export async function persistOrders(
 
       const isThirdCountry = countryVat?.vatType === 'third_country'
 
-      // Calculate each item's tax rate and net amounts
-      const calculatedItems = order.items.map((item) => {
+      // Helper to resolve tax rate for a regular product item
+      const isAuxiliaryItem = (sku?: string) => {
+        const upper = (sku || '').trim().toUpperCase()
+        return upper === 'SHIPPING' || upper === 'DISCOUNT'
+      }
+
+      const resolveProductTaxRate = (item: typeof order.items[number]): number => {
         const skuCandidates = item.sku ? normalizeMarketplaceSku(item.sku) : []
         let productTaxRate: number | undefined = undefined
         for (const candidate of skuCandidates) {
@@ -2070,30 +2075,60 @@ export async function persistOrders(
         const hasPlatformRate = typeof item.taxRate === 'number' && !isNaN(item.taxRate) && item.taxRate >= 0
         const platformRate = hasPlatformRate ? item.taxRate : undefined
 
-        let appliedRate: number
         if (isThirdCountry) {
-          appliedRate = 0.00
+          return 0.00
         } else if (effectiveTaxRateSource === 'product') {
-          if (productTaxRate !== undefined) {
-            appliedRate = productTaxRate
-          } else if (platformRate !== undefined) {
-            appliedRate = platformRate
-          } else {
-            appliedRate = defaultVatRate
-          }
+          if (productTaxRate !== undefined) return productTaxRate
+          if (platformRate !== undefined) return platformRate
+          return defaultVatRate
         } else {
           // platform-first:
           // If the product has an explicitly configured tax rate in TheOmniStack (e.g. 7% or 0%),
           // and platform didn't provide a tax rate or is the standard 19%, honor the merchant's explicit product tax rate!
           if (platformRate !== undefined && (productTaxRate === undefined || productTaxRate === platformRate)) {
-            appliedRate = platformRate
+            return platformRate
           } else if (productTaxRate !== undefined) {
-            appliedRate = productTaxRate
+            return productTaxRate
           } else if (platformRate !== undefined) {
-            appliedRate = platformRate
+            return platformRate
           } else {
-            appliedRate = defaultVatRate
+            return defaultVatRate
           }
+        }
+      }
+
+      // Determine dominant product tax rate (by gross value) for auxiliary SHIPPING / DISCOUNT lines
+      // when the marketplace did not provide an explicit tax rate (German VAT "Nebenleistung" rule).
+      const grossByProductRate = new Map<number, number>()
+      for (const item of order.items) {
+        if (isAuxiliaryItem(item.sku)) continue
+        const rate = resolveProductTaxRate(item)
+        const gross = Math.max(0, item.unitPrice * item.quantity)
+        grossByProductRate.set(rate, (grossByProductRate.get(rate) || 0) + gross)
+      }
+      let dominantProductTaxRate = defaultVatRate
+      let maxGross = -1
+      for (const [rate, gross] of grossByProductRate.entries()) {
+        if (gross > maxGross) {
+          maxGross = gross
+          dominantProductTaxRate = rate
+        }
+      }
+
+      // Calculate each item's tax rate and net amounts
+      const calculatedItems = order.items.map((item) => {
+        let appliedRate: number
+        if (isAuxiliaryItem(item.sku)) {
+          const hasPlatformRate = typeof item.taxRate === 'number' && !isNaN(item.taxRate) && item.taxRate >= 0
+          if (isThirdCountry) {
+            appliedRate = 0.00
+          } else if (hasPlatformRate) {
+            appliedRate = item.taxRate!
+          } else {
+            appliedRate = dominantProductTaxRate
+          }
+        } else {
+          appliedRate = resolveProductTaxRate(item)
         }
 
         const grossUnitPrice = item.unitPrice
@@ -2186,7 +2221,7 @@ export async function persistOrders(
         
         // Deduct stock for each item (matching direct SKU or via productMappings)
         for (const item of order.items) {
-          if (!item.sku || item.sku === 'N/A' || item.sku === 'UNKNOWN') continue;
+          if (!item.sku || item.sku === 'N/A' || item.sku === 'UNKNOWN' || isAuxiliaryItem(item.sku)) continue;
           const candidates = normalizeMarketplaceSku(item.sku)
           if ((item as any).asin && !candidates.includes((item as any).asin)) {
             candidates.push((item as any).asin)
@@ -2220,7 +2255,10 @@ export async function persistOrders(
       
       // 2. Trigger pushUpdatesToMarketplaces for the updated stock
       const rawUpdates = order.items
-        .filter(i => i.sku && i.sku !== 'N/A' && i.sku !== 'UNKNOWN')
+        .filter(i => {
+          const upper = (i.sku || '').trim().toUpperCase()
+          return i.sku && upper !== 'N/A' && upper !== 'UNKNOWN' && upper !== 'SHIPPING' && upper !== 'DISCOUNT'
+        })
         .map(i => i.sku as string)
 
       if (rawUpdates.length > 0) {
