@@ -845,7 +845,7 @@ export function getOpenApiSpec(baseUrl: string = 'https://theomnistack.de') {
         },
         patch: {
           summary: 'Update Product',
-          description: 'Update fields on a product including title, price, reducedPrice, purchasePrice, brand, etc.',
+          description: 'Update fields on a product including title, price, reducedPrice, msrp (UVP), purchasePrice, brand, etc.',
           operationId: 'updateProduct',
           parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', description: 'Product ID (UUID) or SKU' } }],
           requestBody: {
@@ -858,6 +858,7 @@ export function getOpenApiSpec(baseUrl: string = 'https://theomnistack.de') {
                     title: { type: 'string' },
                     price: { type: 'number', description: 'Regular price gross EUR' },
                     reducedPrice: { type: 'number', nullable: true, description: 'Reduced promotional price gross EUR (null to remove)' },
+                    msrp: { type: 'number', nullable: true, description: 'Manufacturer Suggested Retail Price (UVP) gross EUR (must be > 0; null to remove)' },
                     purchasePrice: { type: 'number' },
                     description: { type: 'string' },
                     brand: { type: 'string' },
@@ -877,7 +878,7 @@ export function getOpenApiSpec(baseUrl: string = 'https://theomnistack.de') {
       '/api/connector/grok/products/bulk-prices': {
         post: {
           summary: 'Bulk Update Product Prices',
-          description: 'Update regular prices and/or reduced promotional prices in bulk (up to 500 items). Supports dry-run simulation.',
+          description: 'Update regular prices, reduced promotional prices, and/or UVP (msrp) in bulk (up to 500 items). Supports dry-run simulation.',
           operationId: 'bulkUpdatePrices',
           requestBody: {
             required: true,
@@ -896,6 +897,7 @@ export function getOpenApiSpec(baseUrl: string = 'https://theomnistack.de') {
                           productId: { type: 'string' },
                           price: { type: 'number' },
                           reducedPrice: { type: 'number', nullable: true },
+                          msrp: { type: 'number', nullable: true, description: 'Manufacturer Suggested Retail Price (UVP) gross EUR (must be > 0; null to remove)' },
                         },
                       },
                     },

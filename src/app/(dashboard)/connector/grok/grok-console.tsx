@@ -58,10 +58,10 @@ const SAMPLE_PAYLOADS: Record<string, any> = {
   generate_missing_invoices: { maxCount: 10 },
   list_products: { limit: 10, lowStockOnly: false },
   get_product_details: { identifier: 'REPLACE_WITH_SKU_OR_ID' },
-  update_product: { productId: 'REPLACE_WITH_SKU_OR_ID', price: 49.99, reducedPrice: 39.99 },
+  update_product: { productId: 'REPLACE_WITH_SKU_OR_ID', price: 49.99, reducedPrice: 39.99, msrp: 59.99 },
   bulk_update_prices: {
     items: [
-      { sku: 'SKU-001', price: 49.99, reducedPrice: 39.99 },
+      { sku: 'SKU-001', price: 49.99, reducedPrice: 39.99, msrp: 59.99 },
       { sku: 'SKU-002', reducedPrice: 29.90 },
     ],
     dryRun: false,

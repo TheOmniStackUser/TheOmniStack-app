@@ -48,6 +48,25 @@ function productMatchFilter(ident: string) {
   return or(eq(products.sku, ident), eq(products.ean, ident))!
 }
 
+type MsrpParseResult =
+  | { valid: true; value: string | null }
+  | { valid: false; error: string }
+
+/** Validates optional UVP/MSRP input: positive finite number (formatted to 2 decimals) or null/empty to clear. */
+function parseMsrpInput(value: unknown): MsrpParseResult {
+  if (value === null || value === '') {
+    return { valid: true, value: null }
+  }
+  if (typeof value === 'boolean' || (typeof value === 'string' && value.trim() === '')) {
+    return { valid: false, error: 'msrp must be a positive number, or null to remove.' }
+  }
+  const num = Number(value)
+  if (!Number.isFinite(num) || num <= 0) {
+    return { valid: false, error: 'msrp must be a positive number, or null to remove.' }
+  }
+  return { valid: true, value: num.toFixed(2) }
+}
+
 function isSameCustomer(name1?: string | null, name2?: string | null): boolean {
   if (!name1 || !name2) return true
   const tokenize = (s: string) =>
@@ -414,7 +433,7 @@ export const TOOLS_MANIFEST: ToolDefinition[] = [
   {
     name: 'list_products',
     category: 'products',
-    description: 'List and search products in the central catalog with SKU, EAN, title, pricing, stock levels, and low stock alerts.',
+    description: 'List and search products in the central catalog with SKU, EAN, title, pricing (price, reducedPrice, msrp), stock levels, and low stock alerts.',
     parameters: {
       type: 'object',
       properties: {
@@ -430,7 +449,7 @@ export const TOOLS_MANIFEST: ToolDefinition[] = [
   {
     name: 'get_product_details',
     category: 'products',
-    description: 'Get complete product specifications, current warehouse stock, purchasing and selling prices, tax rate, and marketplace mappings.',
+    description: 'Get complete product specifications, current warehouse stock, purchasing and selling prices (including reducedPrice and msrp/UVP), tax rate, and marketplace mappings.',
     parameters: {
       type: 'object',
       properties: {
@@ -462,15 +481,16 @@ export const TOOLS_MANIFEST: ToolDefinition[] = [
   {
     name: 'update_product',
     category: 'products',
-    description: 'Update product properties such as title, selling price, reduced promotional price, purchase price, weight, description, or storage location.',
+    description: 'Update product properties such as title, selling price, reduced promotional price, UVP (msrp), purchase price, weight, description, or storage location.',
     parameters: {
       type: 'object',
       properties: {
         productId: { type: 'string', description: 'Product ID (UUID) or SKU' },
         sku: { type: 'string', description: 'Product SKU (alternative to productId)' },
         title: { type: 'string' },
-        price: { type: 'number', description: 'Regular selling price / UVP in EUR gross' },
+        price: { type: 'number', description: 'Regular selling price in EUR gross' },
         reducedPrice: { type: 'number', nullable: true, description: 'Reduced promotional price in EUR gross (must be > 0 and <= regular price; pass null to remove)' },
+        msrp: { type: 'number', nullable: true, description: 'Manufacturer Suggested Retail Price (UVP) in EUR gross (must be > 0; pass null to remove)' },
         purchasePrice: { type: 'number' },
         description: { type: 'string' },
         brand: { type: 'string' },
@@ -483,7 +503,7 @@ export const TOOLS_MANIFEST: ToolDefinition[] = [
   {
     name: 'bulk_update_prices',
     category: 'products',
-    description: 'Update regular prices and/or reduced promotional prices in bulk (up to 500 products). Supports dry-run validation.',
+    description: 'Update regular prices, reduced promotional prices, and/or UVP (msrp) in bulk (up to 500 products). Supports dry-run validation.',
     parameters: {
       type: 'object',
       properties: {
@@ -497,6 +517,7 @@ export const TOOLS_MANIFEST: ToolDefinition[] = [
               productId: { type: 'string', description: 'Product ID (UUID)' },
               price: { type: 'number', description: 'Regular selling price in EUR gross' },
               reducedPrice: { type: 'number', nullable: true, description: 'Reduced promotional price in EUR gross (null to remove reduced price)' },
+              msrp: { type: 'number', nullable: true, description: 'Manufacturer Suggested Retail Price (UVP) in EUR gross (must be > 0; null to remove msrp)' },
             },
           },
         },
@@ -1942,6 +1963,14 @@ export async function executeTool(
           }
         }
 
+        if (params.msrp !== undefined) {
+          const parsedMsrp = parseMsrpInput(params.msrp)
+          if (!parsedMsrp.valid) {
+            return { success: false, error: parsedMsrp.error }
+          }
+          updates.msrp = parsedMsrp.value
+        }
+
         if (params.title !== undefined) updates.title = params.title
         if (params.purchasePrice !== undefined) updates.purchasePrice = Number(params.purchasePrice).toFixed(2)
         if (params.description !== undefined) updates.description = params.description
@@ -1961,7 +1990,8 @@ export async function executeTool(
         // GoBD §146 AO compliant audit trail for price mutations
         const priceChanged = updates.price !== undefined && updates.price !== product.price
         const reducedPriceChanged = updates.reducedPrice !== undefined && updates.reducedPrice !== product.reducedPrice
-        if (priceChanged || reducedPriceChanged) {
+        const msrpChanged = updates.msrp !== undefined && updates.msrp !== product.msrp
+        if (priceChanged || reducedPriceChanged || msrpChanged) {
           await auditLog({
             companyId,
             userId: ctx.userId || undefined,
@@ -1972,11 +2002,13 @@ export async function executeTool(
               sku: product.sku,
               price: product.price,
               reducedPrice: product.reducedPrice,
+              msrp: product.msrp,
             },
             nextState: {
               sku: updated.sku,
               price: updated.price,
               reducedPrice: updated.reducedPrice,
+              msrp: updated.msrp,
               updatedBy: 'grok_connector',
             },
             userAgent: 'grok-connector-api',
@@ -2032,8 +2064,8 @@ export async function executeTool(
           sku?: string
           productId?: string
           status: 'updated' | 'not_found' | 'validation_error'
-          oldValues?: { price: string | null; reducedPrice: string | null }
-          newValues?: { price: string | null; reducedPrice: string | null }
+          oldValues?: { price: string | null; reducedPrice: string | null; msrp: string | null }
+          newValues?: { price: string | null; reducedPrice: string | null; msrp: string | null }
           error?: string
         }> = []
 
@@ -2107,13 +2139,32 @@ export async function executeTool(
             }
           }
 
+          let targetMsrpStr: string | null = product.msrp
+
+          if (item.msrp !== undefined) {
+            const parsedMsrp = parseMsrpInput(item.msrp)
+            if (!parsedMsrp.valid) {
+              results.push({
+                identifier: ident,
+                sku: product.sku,
+                productId: product.id,
+                status: 'validation_error',
+                error: parsedMsrp.error,
+              })
+              continue
+            }
+            targetMsrpStr = parsedMsrp.value
+          }
+
           const oldValues = {
             price: product.price,
             reducedPrice: product.reducedPrice,
+            msrp: product.msrp,
           }
           const newValues = {
             price: targetPriceStr,
             reducedPrice: targetReducedPriceStr,
+            msrp: targetMsrpStr,
           }
 
           if (!dryRun) {
@@ -2122,6 +2173,7 @@ export async function executeTool(
               .set({
                 price: targetPriceStr,
                 reducedPrice: targetReducedPriceStr,
+                msrp: targetMsrpStr,
                 updatedAt: new Date(),
               })
               .where(eq(products.id, product.id))
@@ -2136,11 +2188,13 @@ export async function executeTool(
                 sku: product.sku,
                 price: product.price,
                 reducedPrice: product.reducedPrice,
+                msrp: product.msrp,
               },
               nextState: {
                 sku: product.sku,
                 price: targetPriceStr,
                 reducedPrice: targetReducedPriceStr,
+                msrp: targetMsrpStr,
                 updatedBy: 'grok_connector_bulk',
               },
               userAgent: 'grok-connector-api',
@@ -2456,6 +2510,7 @@ export async function executeTool(
               sku: prod.sku,
               basePrice: prod.price,
               reducedPrice: prod.reducedPrice,
+              msrp: prod.msrp,
               channels: channelOutputs,
             }
           })
