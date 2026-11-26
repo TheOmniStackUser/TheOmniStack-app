@@ -7,15 +7,14 @@ import { Settings, Globe, Package, RefreshCw, CheckCircle2, AlertCircle, Plus, T
 // ─── DHL Product Catalog Definition ──────────────────────────────────────────
 export const DHL_CATALOG = [
   { code: 'V01PAK', procedure: '01', defaultTeilnahme: '01', label: 'DHL Paket', defaultName: 'DHL Paket', export: false, returnType: 'V07PAK', services: ['Paketankündigung'] },
-  { code: 'V06PAK', procedure: '53', defaultTeilnahme: '01', label: 'DHL Paket International', defaultName: 'DHL Paket International', export: true, returnType: 'V07PAK', services: ['Paketankündigung'] },
-  { code: 'V53WPAK', procedure: '53', defaultTeilnahme: '01', label: 'DHL Europaket', defaultName: 'DHL Europaket', export: false, returnType: 'V53WPAK', services: ['Paketankündigung'] },
+  { code: 'V53WPAK', procedure: '53', defaultTeilnahme: '01', label: 'DHL Paket International', defaultName: 'DHL Paket International', export: true, returnType: 'V07PAK', services: ['Paketankündigung'] },
+  { code: 'V54EPAK', procedure: '54', defaultTeilnahme: '01', label: 'DHL Europäisches Paket', defaultName: 'DHL Europäisches Paket', export: false, returnType: '', services: ['Paketankündigung'] },
   { code: 'V62KP', procedure: '62', defaultTeilnahme: '01', label: 'DHL Kleinpaket', defaultName: 'DHL Kleinpaket', export: false, returnType: '', services: ['Paketankündigung'] },
   { code: 'V66WPI', procedure: '66', defaultTeilnahme: '01', label: 'Warenpost International', defaultName: 'Warenpost International', export: true, returnType: '', services: ['Paketankündigung'] },
   { code: 'V07PAK', procedure: '07', defaultTeilnahme: '01', label: 'DHL Retoure Online', defaultName: 'DHL Retoure Online', export: false, returnType: '', services: [] },
   { code: 'V55PAK', procedure: '55', defaultTeilnahme: '01', label: 'DHL Paket Connect', defaultName: 'DHL Paket Connect', export: false, returnType: '', services: ['Paketankündigung'] },
   { code: 'V62WP', procedure: '62', defaultTeilnahme: '01', label: 'Warenpost National', defaultName: 'Warenpost National', export: false, returnType: '', services: ['Paketankündigung'] },
   { code: 'V01PRIO', procedure: '01', defaultTeilnahme: '01', label: 'DHL Paket Prio', defaultName: 'DHL Paket Prio', export: false, returnType: '', services: ['Paketankündigung'] },
-  { code: 'V54EPAK', procedure: '54', defaultTeilnahme: '01', label: 'DHL Europäisches Paket', defaultName: 'DHL Europäisches Paket', export: false, returnType: '', services: ['Paketankündigung'] },
 ]
 
 export const DHL_SERVICES = [
@@ -33,8 +32,7 @@ export const DHL_RETURN_TYPES = [
   { value: '', label: 'Keine Retoure' },
   { value: 'V07PAK', label: 'DHL Retoure Online (V07PAK)' },
   { value: 'V07PRIO', label: 'DHL Retoure Online Prio (V07PRIO)' },
-  { value: 'V53WPAK', label: 'DHL Retoure Europaket (V53WPAK)' },
-  { value: 'V06PAK', label: 'DHL Retoure International (V06PAK)' },
+  { value: 'V53WPAK', label: 'DHL Retoure International (V53WPAK)' },
 ]
 
 export type DhlShippingZone = {
@@ -81,7 +79,7 @@ const DEFAULT_ZONES: DhlShippingZone[] = [
   { id: 'domestic', name: 'Versand innerhalb Deutschlands', billingNumber: '', returnBillingNumber: '', productCode: 'V01PAK', description: 'z.B. 33844215670101' },
   { id: 'connect', name: 'Versand in DHL-Connect-Länder', billingNumber: '', returnBillingNumber: '', productCode: 'V55PAK', description: 'Belgien, Deutschland, Luxemburg, NL, Österreich, Polen, Slowakei, Tschechien' },
   { id: 'eu', name: 'Versand innerhalb Europas', billingNumber: '', returnBillingNumber: '', productCode: 'V53WPAK', description: 'Ohne Zypern & Malta, zzgl. Schweiz' },
-  { id: 'international', name: 'Versand außerhalb Europas', billingNumber: '', returnBillingNumber: '', productCode: 'V06PAK', description: 'Weltweit' },
+  { id: 'international', name: 'Versand außerhalb Europas', billingNumber: '', returnBillingNumber: '', productCode: 'V53WPAK', description: 'Weltweit' },
   { id: 'warenpost', name: 'Warenpost / Kleinpaket', billingNumber: '', returnBillingNumber: '', productCode: 'V62KP', description: 'Für leichte Sendungen bis 1 kg' },
   { id: 'warenpost_international', name: 'Warenpost International', billingNumber: '', returnBillingNumber: '', productCode: 'V66WPI', description: 'Internationale leichte Sendungen' },
   { id: 'cash_on_delivery', name: 'Nachnahme', billingNumber: '', returnBillingNumber: '', productCode: 'V01PAK', description: 'Zahlung bei Lieferung' },
@@ -102,7 +100,7 @@ function generateDefaultProducts(accountNumber: string): DhlProduct[] {
     },
     {
       id: '12372',
-      productCode: 'V06PAK',
+      productCode: 'V53WPAK',
       name: 'DHL Paket International',
       billingNumber: `${cleanEkp}5301`,
       returnBillingNumber: `${cleanEkp}0701`,
@@ -149,8 +147,8 @@ function syncZonesFromProducts(products: DhlProduct[], accountNumber: string, ex
 
   const domesticProd = products.find(p => p.productCode === 'V01PAK')
   const connectProd = products.find(p => p.productCode === 'V55PAK') || domesticProd
-  const euProd = products.find(p => p.productCode === 'V53WPAK') || products.find(p => p.productCode === 'V06PAK')
-  const intProd = products.find(p => p.productCode === 'V06PAK') || euProd
+  const euProd = products.find(p => p.productCode === 'V53WPAK' || p.productCode === 'V06PAK')
+  const intProd = products.find(p => p.productCode === 'V53WPAK' || p.productCode === 'V06PAK') || euProd
   const wpProd = products.find(p => p.productCode === 'V62KP' || p.productCode === 'V62WP')
   const wpiProd = products.find(p => p.productCode === 'V66WPI')
 

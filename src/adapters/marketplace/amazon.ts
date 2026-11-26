@@ -113,7 +113,19 @@ export class AmazonAdapter implements MarketplaceAdapter {
         createdBeforeStr = new Date(options.toDate).toISOString();
       }
       
-      const euMarketplaceIdsArray = ['A1PA6795UKMFR9','A1805IZSGTT6HS','A13V1IB3VIYZZH','APJ6JZADPVGVX','A1RKKUPIHCS9HS','A1F83G8C2ARO7P','A1C3SOZRARQ6R3','AMEN7PMS3EDWL','A2NODRKZP88ZB9'];
+      const euMarketplaceIdsArray = [
+        'A1PA6795UKMFR9', // DE
+        'A1805IZSGTT6HS', // NL
+        'A13V1IB3VIYZZH', // FR
+        'APJ6JRA9NG5V4',  // IT (Amazon.it)
+        'A1RKKUPIHCS9HS', // ES
+        'A1F83G8C2ARO7P', // UK
+        'A1C3SOZRARQ6R3', // PL
+        'AMEN7PMS3EDWL',  // BE
+        'A2NODRKZP88ZB9', // SE
+        'A28R8C7NBKEWEA', // IE
+        'A33AVAJ2PDY3EV'  // TR
+      ];
       
       let activeMarketplaces = euMarketplaceIdsArray;
       try {

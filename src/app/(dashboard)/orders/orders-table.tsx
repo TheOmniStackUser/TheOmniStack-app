@@ -112,9 +112,8 @@ const getDefaultDhlProductCode = (country: string | null | undefined, config: Dh
 
   if (isConnect) {
     if (hasZone('V55PAK')) return 'V55PAK' // DHL Paket Connect
-    if (hasZone('V53WPAK')) return 'V53WPAK' // DHL Europaket
+    if (hasZone('V53WPAK') || hasZone('V06PAK')) return 'V53WPAK' // DHL Paket International
     if (hasZone('V66WPI')) return 'V66WPI' // Warenpost International
-    if (hasZone('V06PAK')) return 'V06PAK' // DHL Paket International
   } else {
     const europeanCountries = [
       'FR', 'FRA', 'IT', 'ITA', 'ES', 'ESP', 'DK', 'DNK', 'SE', 'SWE', 'FI', 'FIN', 'EE', 'EST', 'LV', 'LVA', 'LT', 'LTU',
@@ -123,16 +122,14 @@ const getDefaultDhlProductCode = (country: string | null | undefined, config: Dh
     ]
     const isEurope = europeanCountries.includes(c)
     if (isEurope) {
-      if (hasZone('V53WPAK')) return 'V53WPAK' // DHL Europaket
       if (hasZone('V66WPI')) return 'V66WPI' // Warenpost International
-      if (hasZone('V06PAK')) return 'V06PAK' // DHL Paket International
+      if (hasZone('V53WPAK') || hasZone('V06PAK')) return 'V53WPAK' // DHL Paket International
     }
   }
 
   // Fallback / default international
-  if (hasZone('V53WPAK')) return 'V53WPAK'
   if (hasZone('V66WPI')) return 'V66WPI'
-  if (hasZone('V06PAK')) return 'V06PAK'
+  if (hasZone('V53WPAK') || hasZone('V06PAK')) return 'V53WPAK'
   if (hasZone('V55PAK')) return 'V55PAK'
   
   return getFirstConfigured(false)
@@ -143,8 +140,8 @@ const ALL_DHL_PRODUCTS = [
   { value: 'V62WP', label: 'Warenpost' },
   { value: 'V66WPI', label: 'Warenpost International' },
   { value: 'V62KP', label: 'DHL Kleinpaket' },
-  { value: 'V06PAK', label: 'DHL Paket International' },
-  { value: 'V53WPAK', label: 'DHL Europaket' },
+  { value: 'V53WPAK', label: 'DHL Paket International' },
+  { value: 'V54EPAK', label: 'DHL Europaket' },
   { value: 'V55PAK', label: 'DHL Paket Connect' },
 ]
 
@@ -508,20 +505,21 @@ export function OrdersTable({
     if (dhlConfig?.products && dhlConfig.products.length > 0) {
       for (const p of dhlConfig.products) {
         if (!p.productCode || (!p.billingNumber?.trim() && !dhlConfig.accountNumber)) continue
-        const isReturn = p.productCode === 'V07PAK' || (p.billingNumber?.replace(/\s/g, '').slice(10, 12) === '07' && !p.productCode.includes('PAK'))
-        const isDom = DOMESTIC_DHL_PRODUCT_CODES.includes(p.productCode)
+        const code = p.productCode === 'V06PAK' ? 'V53WPAK' : p.productCode
+        const isReturn = code === 'V07PAK' || (p.billingNumber?.replace(/\s/g, '').slice(10, 12) === '07' && !code.includes('PAK'))
+        const isDom = DOMESTIC_DHL_PRODUCT_CODES.includes(code)
         const customName = p.name?.trim()
-        const defaultLabel = ALL_DHL_PRODUCTS.find(ap => ap.value === p.productCode)?.label || p.productCode
+        const defaultLabel = ALL_DHL_PRODUCTS.find(ap => ap.value === code)?.label || code
         const label = customName && customName !== defaultLabel ? `${customName} (${defaultLabel})` : (customName || defaultLabel)
 
         userProducts.push({
-          value: p.productCode,
+          value: code,
           label,
           isDomestic: isDom,
           isReturn,
           billingNumber: p.billingNumber,
         })
-        seenValues.add(p.productCode)
+        seenValues.add(code)
       }
     }
 
@@ -4421,7 +4419,12 @@ const filteredOrders = orders;
               {orders.filter(o => o.id in hermesSelections).map((order) => {
                 const orderNum = getOrderNumber(order as any)
                 const currentSize = hermesSelections[order.id] || 'S'
-                const skus = order.items?.map(item => item.sku).filter(Boolean) || []
+                const itemSummary = order.items && order.items.length > 0
+                  ? order.items.filter(item => item.sku).map(item => {
+                      const q = Math.max(1, Math.round(Number(item.quantity) || 1))
+                      return { sku: item.sku, quantity: q, display: q > 1 ? `${q}x ${item.sku}` : item.sku }
+                    })
+                  : []
                 
                 return (
                   <div key={order.id} className="p-4 border border-slate-100 rounded-2xl bg-slate-50/50 hover:bg-slate-50 transition-colors">
@@ -4593,12 +4596,19 @@ const filteredOrders = orders;
                       )}
                     </div>
                     
-                    {skus.length > 0 && (
+                    {itemSummary.length > 0 && (
                       <div className="mb-4 flex flex-wrap gap-1.5 items-center">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">SKU:</span>
-                        {skus.map((sku, idx) => (
-                          <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded-lg bg-slate-100 text-[10px] font-mono font-bold text-slate-600 border border-slate-200">
-                            {sku}
+                        {itemSummary.map((item, idx) => (
+                          <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded-lg bg-slate-100 text-[10px] font-mono font-bold text-slate-700 border border-slate-200">
+                            {item.quantity > 1 ? (
+                              <>
+                                <span className="text-yellow-600 font-black mr-1">{item.quantity}x</span>
+                                <span>{item.sku}</span>
+                              </>
+                            ) : (
+                              <span>{item.sku}</span>
+                            )}
                           </span>
                         ))}
                       </div>
@@ -4995,7 +5005,12 @@ const filteredOrders = orders;
               {orders.filter(o => o.id in dhlSelections).map((order) => {
                 const orderNum = getOrderNumber(order as any)
                 const selection = dhlSelections[order.id] || { productCode: getDefaultDhlProductCode(order.shippingCountry, dhlConfig), weight: 1 }
-                const skus = order.items?.map(item => item.sku).filter(Boolean) || []
+                const itemSummary = order.items && order.items.length > 0
+                  ? order.items.filter(item => item.sku).map(item => {
+                      const q = Math.max(1, Math.round(Number(item.quantity) || 1))
+                      return { sku: item.sku, quantity: q, display: q > 1 ? `${q}x ${item.sku}` : item.sku }
+                    })
+                  : []
                 
                 return (
                   <div key={order.id} className="p-5 border border-slate-100 rounded-2xl bg-slate-50/50 hover:bg-slate-50 transition-colors">
@@ -5161,12 +5176,19 @@ const filteredOrders = orders;
                       )}
                     </div>
                     
-                    {skus.length > 0 && (
+                    {itemSummary.length > 0 && (
                       <div className="mb-4 flex flex-wrap gap-1.5 items-center">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">SKU:</span>
-                        {skus.map((sku, idx) => (
-                          <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded-lg bg-slate-100 text-[10px] font-mono font-bold text-slate-600 border border-slate-200">
-                            {sku}
+                        {itemSummary.map((item, idx) => (
+                          <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded-lg bg-slate-100 text-[10px] font-mono font-bold text-slate-700 border border-slate-200">
+                            {item.quantity > 1 ? (
+                              <>
+                                <span className="text-yellow-600 font-black mr-1">{item.quantity}x</span>
+                                <span>{item.sku}</span>
+                              </>
+                            ) : (
+                              <span>{item.sku}</span>
+                            )}
                           </span>
                         ))}
                       </div>
@@ -5332,7 +5354,12 @@ const filteredOrders = orders;
               {orders.filter(o => o.id in dpdSelections).map((order) => {
                 const orderNum = getOrderDisplayNumber(order) || order.marketplaceOrderId || order.id
                 const selection = dpdSelections[order.id] || { weight: dpdConfig?.defaultWeight ?? 1.0 }
-                const skus = order.items?.map(item => item.sku).filter(Boolean) || []
+                const itemSummary = order.items && order.items.length > 0
+                  ? order.items.filter(item => item.sku).map(item => {
+                      const q = Math.max(1, Math.round(Number(item.quantity) || 1))
+                      return { sku: item.sku, quantity: q, display: q > 1 ? `${q}x ${item.sku}` : item.sku }
+                    })
+                  : []
                 
                 return (
                   <div key={order.id} className="p-5 border border-slate-100 rounded-2xl bg-slate-50/50 hover:bg-slate-50 transition-colors">
@@ -5473,9 +5500,9 @@ const filteredOrders = orders;
                             <div className="text-xs text-slate-500">{order.shippingAddressAddition}</div>
                           )}
                           <div className="text-xs text-slate-600">{order.shippingZip} {order.shippingCity}, {order.shippingCountry}</div>
-                          {skus.length > 0 && (
+                          {itemSummary.length > 0 && (
                             <div className="mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-500">
-                              Artikel: <span className="font-semibold text-slate-700">{skus.join(', ')}</span>
+                              Artikel: <span className="font-semibold text-slate-700">{itemSummary.map(i => i.display).join(', ')}</span>
                             </div>
                           )}
                         </div>

@@ -543,6 +543,10 @@ export async function generateDhlLabelsAction(
         const isDomestic = destinationCountry === 'DEU'
 
         let productCode = orderConfig?.productCode || (isDomestic ? (domesticZone.productCode || 'V01PAK') : 'V53WPAK')
+        // Normalize legacy V06PAK to V53WPAK (DHL Parcel DE Shipping API v2 product code for DHL Paket International)
+        if (productCode === 'V06PAK') {
+          productCode = 'V53WPAK'
+        }
 
         // Safety Guard: If shipping internationally, NEVER use domestic-only products (V01PAK, V62WP, V62KP)
         if (!isDomestic && ['V01PAK', 'V62WP', 'V62KP'].includes(productCode)) {
@@ -550,13 +554,13 @@ export async function generateDhlLabelsAction(
           const preferredInt = config.products?.find(p => ['V66WPI', 'V53WPAK', 'V55PAK', 'V06PAK'].includes(p.productCode) && p.billingNumber)
             ?? config.zones?.find(z => ['V66WPI', 'V53WPAK', 'V55PAK', 'V06PAK'].includes(z.productCode) && z.billingNumber)
           if (preferredInt) {
-            productCode = preferredInt.productCode
+            productCode = preferredInt.productCode === 'V06PAK' ? 'V53WPAK' : preferredInt.productCode
           } else {
             throw new Error(`Bestellung ${order.marketplaceOrderId ?? order.id}: Das Produkt ${productCode} (national) kann nicht für das Zielland ${order.shippingCountry} verwendet werden. Bitte hinterlege unter Integrationen → DHL ein Auslandsprodukt (z. B. DHL Europaket oder Warenpost International).`)
           }
         }
 
-        const initialProduct = config.products?.find(p => p.productCode === productCode)
+        const initialProduct = config.products?.find(p => p.productCode === productCode || (productCode === 'V53WPAK' && p.productCode === 'V06PAK'))
 
         // Determine if return label should be generated
         const platformReturnSetting = config.platformReturns?.[order.marketplace]
@@ -571,15 +575,15 @@ export async function generateDhlLabelsAction(
         }
 
         // Resolve billing number for this product code from products or zones
-        const productFromConfig = config.products?.find(p => p.productCode === productCode && p.billingNumber)
-        let zone = config.zones?.find(z => z.productCode === productCode && z.billingNumber)
+        const productFromConfig = config.products?.find(p => (p.productCode === productCode || (productCode === 'V53WPAK' && p.productCode === 'V06PAK')) && p.billingNumber)
+        let zone = config.zones?.find(z => (z.productCode === productCode || (productCode === 'V53WPAK' && (z.productCode === 'V06PAK' || z.id === 'eu' || z.id === 'international'))) && z.billingNumber)
         if (!zone && productFromConfig?.billingNumber) {
           zone = {
             id: productCode,
             name: productFromConfig.name,
             billingNumber: productFromConfig.billingNumber,
             returnBillingNumber: productFromConfig.returnBillingNumber || '',
-            productCode: productFromConfig.productCode,
+            productCode: productFromConfig.productCode === 'V06PAK' ? 'V53WPAK' : productFromConfig.productCode,
             description: ''
           }
         }
@@ -625,11 +629,8 @@ export async function generateDhlLabelsAction(
           '66': 'V66WPI',      // Warenpost International
         }
         if (verfahrensId === '53') {
-          // Procedure 53 is valid for both DHL Paket International (V06PAK) and DHL Europaket (V53WPAK).
-          // We keep the user's selection if it is one of these two, otherwise default to V06PAK.
-          if (productCode !== 'V06PAK' && productCode !== 'V53WPAK') {
-            resolvedProductCode = 'V06PAK'
-          }
+          // Procedure 53 in DHL Parcel DE Shipping API v2 is V53WPAK (DHL Paket International)
+          resolvedProductCode = 'V53WPAK'
         } else if (verfahrensId === '62') {
           if (productCode !== 'V62WP' && productCode !== 'V62KP') {
             resolvedProductCode = 'V62WP'
