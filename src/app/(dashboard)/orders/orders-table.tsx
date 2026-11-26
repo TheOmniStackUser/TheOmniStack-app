@@ -5223,8 +5223,8 @@ const filteredOrders = orders;
                               {categorized.incompatible.length > 0 && (
                                 <p className="text-[11px] text-slate-500 mt-1 leading-tight">
                                   {isDE 
-                                    ? `Hinweis: Deine ${categorized.incompatible.length} hinterlegten Auslandsprodukte sind für DE-Lieferungen deaktiviert.`
-                                    : `Hinweis: Deine ${categorized.incompatible.length} hinterlegten Inlandsprodukte sind für ${countryCode} deaktiviert.`}
+                                    ? `Hinweis: Deine ${categorized.incompatible.length} hinterlegten Auslandsprodukte sind für DE-Lieferungen ausgeblendet.`
+                                    : `Hinweis: Für ${countryCode} werden deine passenden Auslandsprodukte verwendet (Inlandsprodukte sind nur für DE verfügbar).`}
                                 </p>
                               )}
                             </div>

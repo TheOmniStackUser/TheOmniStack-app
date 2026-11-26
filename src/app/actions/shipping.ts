@@ -386,7 +386,7 @@ const toIso3 = (code: string | null | undefined): string => {
     AX: "ALA", AZ: "AZE", IE: "IRL", ID: "IDN", UA: "UKR", QA: "QAT", MZ: "MOZ"
   }
   if (!code) return 'DEU'
-  const upper = code.toUpperCase()
+  const upper = code.trim().toUpperCase()
   return map[upper] ?? (upper.length === 3 ? upper : 'DEU')
 }
 
@@ -805,7 +805,8 @@ export async function generateDhlLabelsAction(
         
         // --- CUSTOMS LOGIC FOR NON-EU COUNTRIES (e.g., CH, NO, GB, US) ---
         const euIso3 = ['AUT', 'BEL', 'BGR', 'HRV', 'CYP', 'CZE', 'DNK', 'EST', 'FIN', 'FRA', 'DEU', 'GRC', 'HUN', 'IRL', 'ITA', 'LVA', 'LTU', 'LUX', 'MLT', 'NLD', 'POL', 'PRT', 'ROU', 'SVK', 'SVN', 'ESP', 'SWE', 'MCO']
-        const isNonEu = !euIso3.includes(toIso3(order.shippingCountry))
+        const destinationIso3 = toIso3(order.shippingCountry)
+        const isNonEu = !euIso3.includes(destinationIso3)
 
         if (isNonEu) {
           const items = await db.select({
@@ -815,21 +816,58 @@ export async function generateDhlLabelsAction(
           .leftJoin(products, and(eq(orderItems.sku, products.sku), eq(products.companyId, auth.activeCompanyId)))
           .where(eq(orderItems.orderId, order.id))
 
-          const customsItems = items.map((row) => {
-            return {
-              description: (row.product?.title ?? row.orderItem.title ?? 'Goods').slice(0, 255),
-              countryOfOrigin: row.product?.countryOfOrigin ?? 'DE',
-              hsCode: row.product?.hsCode ?? '000000',
-              value: { uom: order.currency || 'EUR', value: Number(row.orderItem.unitPrice) || 0 },
-              itemWeight: { uom: 'kg', value: row.product?.weight ? Number(row.product.weight) : 0.5 },
-              packagedQuantity: Number(row.orderItem.quantity) || 1
-            }
-          })
+          const customsCurrency = (order.currency || 'EUR').toUpperCase().slice(0, 3)
+          const totalOrderItemsCount = items.reduce((sum, row) => sum + Math.max(1, Math.round(Number(row.orderItem.quantity) || 1)), 0)
+
+          const customsItems = items.length > 0
+            ? items.map((row) => {
+                const rawPrice = Number(row.orderItem.unitPrice)
+                const unitPrice = !isNaN(rawPrice) && rawPrice > 0 
+                  ? rawPrice 
+                  : (Number(order.totalAmount) > 0 ? Number(order.totalAmount) / Math.max(1, totalOrderItemsCount) : 1)
+
+                const singleItemWeight = row.product?.weight && Number(row.product.weight) > 0
+                  ? Number(row.product.weight)
+                  : Math.max(0.01, Math.round((resolvedWeight / Math.max(1, totalOrderItemsCount)) * 1000) / 1000)
+
+                const rawOrigin = row.product?.countryOfOrigin || company.warehouseCountry || company.country || 'DE'
+                const originIso3 = toIso3(rawOrigin) || 'DEU'
+
+                const rawHs = (row.product?.hsCode || '').replace(/\D/g, '')
+                const validHs = rawHs.length >= 6 && rawHs.length <= 11 ? rawHs : undefined
+
+                return {
+                  itemDescription: (row.product?.title ?? row.orderItem.title ?? 'Goods').trim().slice(0, 50) || 'Goods',
+                  countryOfOrigin: originIso3,
+                  ...(validHs ? { hsCode: validHs } : {}),
+                  itemValue: {
+                    currency: customsCurrency,
+                    value: Math.max(0.01, Number(unitPrice.toFixed(2)))
+                  },
+                  itemWeight: {
+                    uom: 'kg',
+                    value: Math.max(0.001, Number(singleItemWeight.toFixed(3)))
+                  },
+                  packagedQuantity: Math.max(1, Math.round(Number(row.orderItem.quantity) || 1))
+                }
+              })
+            : [{
+                itemDescription: 'Goods',
+                countryOfOrigin: shipperIso3 || 'DEU',
+                itemValue: {
+                  currency: customsCurrency,
+                  value: Math.max(0.01, Number((Number(order.totalAmount) || 1).toFixed(2)))
+                },
+                itemWeight: {
+                  uom: 'kg',
+                  value: Math.max(0.001, Number(resolvedWeight.toFixed(3)))
+                },
+                packagedQuantity: 1
+              }]
 
           shipmentPayload.shipments[0].customs = {
-            exportType: 'OTHER',
-            exportDescription: 'Sale of Goods',
-            postalCharges: { uom: order.currency || 'EUR', value: 0 }, // DHL requires this field
+            exportType: 'COMMERCIAL_GOODS',
+            postalCharges: { currency: customsCurrency, value: 0 },
             items: customsItems
           }
         }
